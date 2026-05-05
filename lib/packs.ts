@@ -99,12 +99,12 @@ export const packs: Pack[] = [
     brandSlug: "biene",
     number: 4,
     title: "Volumen-Wunder",
-    subtitle: "Riesige Portionen unter 500 kcal",
+    subtitle: "XL-Mahlzeiten unter 450 kcal",
     category: "Diät-Fokus",
-    tagline: "Optisch riesig, kalorisch fair",
+    tagline: "Frittata, XL-Wraps, Cookie-Crumble — Bienes WPF-Mahlzeiten",
     description:
-      "Zucchini-Nudel-Pfannen, Hähnchen-Salate, Volumen-Bowls — Sättigung ohne Reue, kcal als Hero-Badge.",
-    recipeCount: 6,
+      "Bienes voluminöse WPF-Mahlzeiten aus den Reels: optisch riesig, kalorisch fair. Frittata, XL-Wraps, der virale 'lebensverändernde' Salat, Beeren-Cookie-Crumble.",
+    recipeCount: 5,
     coverImage: "/brands/biene/packs/pack-4.jpg",
     mood: {
       background: "#c8e2a8",
