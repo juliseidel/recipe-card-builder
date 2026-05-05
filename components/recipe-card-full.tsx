@@ -169,20 +169,27 @@ function EditorialLayout({
         ) : null}
       </header>
 
-      {/* HERO IMAGE — full width, 16:9 */}
-      <div className="relative aspect-[16/9] w-full">
-        <Image
-          src={recipe.hero ?? pack.coverImage}
-          alt={recipe.title}
-          fill
-          sizes="(max-width: 940px) 100vw, 940px"
-          className="object-cover"
-          priority
-        />
+      {/* HERO IMAGE — moderate Größe, 3:2 Foto-Format, mit Padding */}
+      <div
+        className="px-8 pt-8 pb-2 sm:px-12 sm:pt-10"
+        style={{ background: pack.mood.background + "30" }}
+      >
         <div
-          className="absolute inset-0 mix-blend-multiply"
-          style={{ background: pack.mood.background, opacity: 0.08 }}
-        />
+          className="relative mx-auto aspect-[3/2] w-full max-w-[680px] overflow-hidden rounded-2xl"
+          style={{
+            boxShadow:
+              "0 1px 0 rgba(43,31,25,0.05), 0 22px 40px -20px rgba(43,31,25,0.25)",
+          }}
+        >
+          <Image
+            src={recipe.hero ?? pack.coverImage}
+            alt={recipe.title}
+            fill
+            sizes="(max-width: 680px) 100vw, 680px"
+            className="object-cover"
+            priority
+          />
+        </div>
       </div>
 
       {/* PORTIONEN HERO BAR — KEY UX ELEMENT */}
@@ -575,17 +582,20 @@ function MinimalLayout({
           >
             <MinStat
               value={String(recipe.nutrition.kcal)}
-              label={recipe.servings === 1 ? "kcal" : "kcal/Stück"}
+              label="kcal"
+              sublabel={recipe.servings === 1 ? undefined : "pro Stück"}
               pack={pack}
             />
             <MinStat
               value={`${recipe.nutrition.protein}g`}
-              label={recipe.servings === 1 ? "Eiweiß" : "Eiweiß/Stück"}
+              label="Eiweiß"
+              sublabel={recipe.servings === 1 ? undefined : "pro Stück"}
               pack={pack}
             />
             <MinStat
               value={`${totalTime}'`}
               label="Min"
+              sublabel="Total"
               pack={pack}
             />
           </div>
@@ -609,10 +619,12 @@ function MinimalLayout({
 function MinStat({
   value,
   label,
+  sublabel,
   pack,
 }: {
   value: string;
   label: string;
+  sublabel?: string;
   pack: Pack;
 }) {
   return (
@@ -624,11 +636,19 @@ function MinStat({
         {value}
       </span>
       <span
-        className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+        className="text-[10px] font-semibold uppercase tracking-[0.14em]"
         style={{ color: pack.mood.inkSoft }}
       >
         {label}
       </span>
+      {sublabel ? (
+        <span
+          className="text-[8px] font-medium uppercase tracking-[0.06em] opacity-70"
+          style={{ color: pack.mood.inkSoft }}
+        >
+          {sublabel}
+        </span>
+      ) : null}
     </div>
   );
 }
