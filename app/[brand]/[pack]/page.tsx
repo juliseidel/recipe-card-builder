@@ -5,7 +5,6 @@ import { getRecipesForPack } from "@/lib/recipes";
 import { SiteHeader } from "@/components/site-header";
 import { PackCover } from "@/components/pack-cover";
 import { PackActions } from "@/components/pack-actions";
-import { RecipeTableOfContents } from "@/components/recipe-table-of-contents";
 import { RecipeCardPreview } from "@/components/recipe-card-preview";
 import { NutritionOverview } from "@/components/nutrition-overview";
 
@@ -49,9 +48,7 @@ export default async function PackPage({ params }: PackPageProps) {
       <PackActions brand={brand} pack={pack} />
 
       <main className="flex-1">
-        <RecipeTableOfContents brand={brand} pack={pack} recipes={recipes} />
-
-        <section className="mx-auto max-w-[1400px] px-6 pt-14 pb-2 lg:px-10 lg:pt-20">
+        <section className="mx-auto max-w-[1400px] px-6 pt-12 pb-2 lg:px-10 lg:pt-16">
           <div
             className="mb-7 flex items-end justify-between gap-3 border-b pb-5"
             style={{ borderColor: brand.tokens.line }}
@@ -66,7 +63,7 @@ export default async function PackPage({ params }: PackPageProps) {
               className="text-[13px]"
               style={{ color: brand.tokens.inkMuted }}
             >
-              Klick auf eine Karte für die Vollansicht
+              {recipes.length} Karten · klick für die Vollansicht
             </span>
           </div>
 
