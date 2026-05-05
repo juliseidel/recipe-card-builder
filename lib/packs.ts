@@ -57,12 +57,12 @@ export const packs: Pack[] = [
     brandSlug: "biene",
     number: 2,
     title: "Bienes Backwelt",
-    subtitle: "Süßes ohne Verzicht",
+    subtitle: "Süßes ohne Zuckerzusatz",
     category: "Backen & Desserts",
-    tagline: "Magerquark-Käsekuchen, Brownies, Biskuitrolle",
+    tagline: "Schoko-Biskuitrolle, Cheesecake, Erdbeer-Kuppeltorte — Bienes Paradedisziplin",
     description:
-      "Ihre Paradedisziplin. High-Protein-Backen mit Chunky Flavour statt Zucker — Nährwerte sichtbar im Vordergrund.",
-    recipeCount: 8,
+      "Bienes legendäre Backwerke aus den Reels: Mehrschicht-Torten, Brot, Muffins — alle ohne zugesetzten Zucker, mit MORE Sahne Protein und Chunky Flavour.",
+    recipeCount: 10,
     coverImage: "/brands/biene/packs/pack-2.jpg",
     mood: {
       background: "#ddc9e8",

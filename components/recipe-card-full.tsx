@@ -43,17 +43,19 @@ function detectIngredientGroup(
   note?: string
 ): { group: string | null; remainingNote?: string } {
   if (!note) return { group: null };
-  // Pattern 1: "für die X" / "für den X"
-  const fuerMatch = note.match(/^für (?:die|den)\s+(.+?)(?:\s·\s*(.*))?$/i);
+  // Pattern 1: "für die X" / "für den X" / "für das X"
+  const fuerMatch = note.match(
+    /^für (?:die|den|das)\s+(.+?)(?:\s·\s*(.*))?$/i
+  );
   if (fuerMatch) {
     return {
       group: fuerMatch[1].trim(),
       remainingNote: fuerMatch[2]?.trim() || undefined,
     };
   }
-  // Pattern 2: Direct keyword (Teig, Topping, Sauce, Belag, Glasur, Streusel, Füllung, Boden)
+  // Pattern 2: Direct keyword
   const keywordMatch = note.match(
-    /^(Teig|Topping|Sauce|Belag|Glasur|Streusel|Füllung|Boden)(?:\s·\s*(.*))?$/i
+    /^(Teig|Topping|Sauce|Belag|Glasur|Streusel|Füllung|Boden|Creme|Krem)(?:\s·\s*(.*))?$/i
   );
   if (keywordMatch) {
     return {
