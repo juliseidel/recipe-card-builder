@@ -160,7 +160,7 @@ export function RecipeCardFull({
       </div>
 
       {/* Body: ingredients + instructions */}
-      <div className="grid grid-cols-1 gap-10 px-8 pt-10 pb-10 sm:px-12 sm:pt-12 lg:grid-cols-[1fr_1.4fr] lg:gap-14">
+      <div className="grid grid-cols-1 gap-10 px-8 pt-10 pb-8 sm:px-12 sm:pt-12 lg:grid-cols-[1fr_1.4fr] lg:gap-14">
         <div className="flex flex-col gap-4">
           <h2
             className="text-[12px] font-semibold uppercase tracking-[0.22em]"
@@ -227,6 +227,83 @@ export function RecipeCardFull({
           </ol>
         </div>
       </div>
+
+      {/* Micronutrients block */}
+      {recipe.nutrition.micros && recipe.nutrition.micros.length > 0 ? (
+        <div className="px-8 pb-10 sm:px-12">
+          <div
+            className="overflow-hidden rounded-2xl border"
+            style={{
+              borderColor: pack.mood.ink + "20",
+              background: pack.mood.background + "60",
+            }}
+          >
+            <div
+              className="flex items-center justify-between gap-3 border-b px-5 py-3"
+              style={{ borderColor: pack.mood.ink + "1a" }}
+            >
+              <h2
+                className="text-[12px] font-semibold uppercase tracking-[0.22em]"
+                style={{ color: pack.mood.accent }}
+              >
+                Mikronährstoffe
+              </h2>
+              <span
+                className="text-[10px] font-medium uppercase tracking-[0.14em]"
+                style={{ color: pack.mood.inkSoft }}
+              >
+                pro Portion · % vom Tagesbedarf
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-px sm:grid-cols-4">
+              {recipe.nutrition.micros.map((micro) => (
+                <div
+                  key={micro.name}
+                  className="flex flex-col gap-1 px-4 py-4"
+                  style={{ background: brand.tokens.surface }}
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span
+                      className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+                      style={{ color: pack.mood.inkSoft }}
+                    >
+                      {micro.name}
+                    </span>
+                    {micro.pctDaily !== undefined ? (
+                      <span
+                        className="font-mono text-[11px] font-semibold tabular-nums"
+                        style={{ color: pack.mood.accent }}
+                      >
+                        {micro.pctDaily}%
+                      </span>
+                    ) : null}
+                  </div>
+                  <span
+                    className="font-display text-[18px] leading-none tabular-nums"
+                    style={{ color: pack.mood.ink }}
+                  >
+                    {micro.amount}
+                  </span>
+                  {micro.pctDaily !== undefined ? (
+                    <div
+                      className="mt-1 h-1 overflow-hidden rounded-full"
+                      style={{ background: pack.mood.ink + "12" }}
+                    >
+                      <div
+                        className="h-full"
+                        style={{
+                          width: `${Math.min(micro.pctDaily, 100)}%`,
+                          background: pack.mood.accent,
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Bienes Signature footer */}
       <div

@@ -5,6 +5,13 @@ export type PackMood = {
   inkSoft: string;
 };
 
+export type CardLayout =
+  | "editorial"
+  | "patisserie"
+  | "minimal"
+  | "sport"
+  | "dashboard";
+
 export type Pack = {
   slug: string;
   brandSlug: string;
@@ -19,6 +26,7 @@ export type Pack = {
   edgeCase?: string;
   mood: PackMood;
   displayFont: "fraunces" | "dm-serif" | "inter-tight";
+  cardLayout: CardLayout;
 };
 
 export const packs: Pack[] = [
@@ -42,6 +50,7 @@ export const packs: Pack[] = [
       inkSoft: "#5e4720",
     },
     displayFont: "fraunces",
+    cardLayout: "editorial",
   },
   {
     slug: "bienes-backwelt",
@@ -62,6 +71,7 @@ export const packs: Pack[] = [
       inkSoft: "#503d6b",
     },
     displayFont: "fraunces",
+    cardLayout: "patisserie",
   },
   {
     slug: "blitz-snacks",
@@ -83,6 +93,7 @@ export const packs: Pack[] = [
       inkSoft: "#365546",
     },
     displayFont: "inter-tight",
+    cardLayout: "minimal",
   },
   {
     slug: "volumen-wunder",
@@ -103,6 +114,7 @@ export const packs: Pack[] = [
       inkSoft: "#3f5b22",
     },
     displayFont: "inter-tight",
+    cardLayout: "sport",
   },
   {
     slug: "meal-prep-heroes",
@@ -123,6 +135,7 @@ export const packs: Pack[] = [
       inkSoft: "#3a4866",
     },
     displayFont: "fraunces",
+    cardLayout: "dashboard",
   },
 ];
 
