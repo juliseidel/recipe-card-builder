@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: BrandPageProps) {
 
   return {
     title: `${brand.name} · Workspace · Recipe Card Builder`,
-    description: `${brand.bio} — ${brand.packCount} Recipe-Packs, ${brand.recipeCount} Rezepte.`,
+    description: `${brand.bio} — ${brand.packCount} Rezept-Packs, ${brand.recipeCount} Rezepte.`,
   };
 }
 
@@ -33,6 +33,7 @@ export default async function BrandPage({ params }: BrandPageProps) {
   }
 
   const packs = getPacksForBrand(brand.slug);
+  const totalRecipes = packs.reduce((sum, p) => sum + p.recipeCount, 0);
 
   return (
     <div
@@ -43,40 +44,49 @@ export default async function BrandPage({ params }: BrandPageProps) {
       <BrandHero brand={brand} />
 
       <main className="flex-1">
-        <section className="mx-auto max-w-[1400px] px-6 pt-14 pb-24 lg:px-10 lg:pt-20 lg:pb-32">
+        <section className="mx-auto max-w-[1400px] px-6 pt-10 pb-24 lg:px-10 lg:pt-12 lg:pb-32">
           <div
-            className="mb-8 flex items-end justify-between border-b pb-5"
+            className="mb-7 flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-end sm:justify-between"
             style={{ borderColor: brand.tokens.line }}
           >
             <div className="flex flex-col gap-1.5">
               <span
-                className="text-[12px] font-semibold uppercase tracking-[0.14em]"
+                className="text-[11px] font-semibold uppercase tracking-[0.18em]"
                 style={{ color: brand.tokens.inkMuted }}
               >
-                {brand.handle} · Pack-Sammlung
+                Workspace · Pack-Sammlung
               </span>
               <h2
-                className="font-display text-[36px] leading-none tracking-[-0.01em]"
+                className="font-display text-[32px] leading-none tracking-[-0.01em]"
                 style={{ color: brand.tokens.ink }}
               >
-                Bienes Recipe-Packs
+                Deine Packs
               </h2>
               <p
                 className="mt-1 text-[14px]"
                 style={{ color: brand.tokens.inkMuted }}
               >
-                Jedes Pack ist eine eigene Welt — eigene Stimmung, eigenes Layout, eigene Akzente.
-                Klick auf ein Pack, um die Karten zu sehen oder zu bearbeiten.
+                {packs.length} Konzepte · {totalRecipes} Rezepte · alle druckfertig.
+                Klick auf ein Pack, um die Karten zu sehen, zu bearbeiten oder als PDF zu exportieren.
               </p>
             </div>
+
             <div
-              className="hidden flex-col items-end gap-1 font-mono text-[11px] uppercase tracking-[0.14em] sm:flex"
-              style={{ color: brand.tokens.inkMuted }}
+              className="flex items-center gap-5 rounded-xl border px-4 py-2.5 text-[12px]"
+              style={{
+                borderColor: brand.tokens.line,
+                background: brand.tokens.surface,
+                color: brand.tokens.inkMuted,
+              }}
             >
-              <span>{packs.length} Packs aktiv</span>
-              <span>
-                {packs.reduce((sum, p) => sum + p.recipeCount, 0)} Rezepte
+              <span className="flex items-center gap-2">
+                <span
+                  className="size-1.5 rounded-full"
+                  style={{ background: brand.tokens.accent }}
+                />
+                Zuletzt bearbeitet
               </span>
+              <span style={{ color: brand.tokens.ink }}>Heute, 14:32</span>
             </div>
           </div>
 
@@ -96,7 +106,7 @@ export default async function BrandPage({ params }: BrandPageProps) {
           background: brand.tokens.surface,
         }}
       >
-        <div className="mx-auto flex max-w-[1400px] flex-col items-start justify-between gap-3 px-6 py-8 text-[13px] sm:flex-row sm:items-center lg:px-10">
+        <div className="mx-auto flex max-w-[1400px] flex-col items-start justify-between gap-3 px-6 py-7 text-[13px] sm:flex-row sm:items-center lg:px-10">
           <p style={{ color: brand.tokens.inkMuted }}>
             <span style={{ color: brand.tokens.ink, fontWeight: 500 }}>
               {brand.signature}
