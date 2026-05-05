@@ -32,9 +32,67 @@ const baseShellStyle = (pack: Pack, brand: Brand): React.CSSProperties => ({
 });
 
 // ════════════════════════════════════════════════
+// HELPER: Detect ingredient subgroups (e.g. "für die Mayo", "Teig", "Topping")
+// ════════════════════════════════════════════════
+type IngredientGroup = {
+  name: string | null;
+  items: Array<{ amount: string; name: string; note?: string }>;
+};
+
+function detectIngredientGroup(
+  note?: string
+): { group: string | null; remainingNote?: string } {
+  if (!note) return { group: null };
+  // Pattern 1: "für die X" / "für den X"
+  const fuerMatch = note.match(/^für (?:die|den)\s+(.+?)(?:\s·\s*(.*))?$/i);
+  if (fuerMatch) {
+    return {
+      group: fuerMatch[1].trim(),
+      remainingNote: fuerMatch[2]?.trim() || undefined,
+    };
+  }
+  // Pattern 2: Direct keyword (Teig, Topping, Sauce, Belag, Glasur, Streusel, Füllung, Boden)
+  const keywordMatch = note.match(
+    /^(Teig|Topping|Sauce|Belag|Glasur|Streusel|Füllung|Boden)(?:\s·\s*(.*))?$/i
+  );
+  if (keywordMatch) {
+    return {
+      group: keywordMatch[1],
+      remainingNote: keywordMatch[2]?.trim() || undefined,
+    };
+  }
+  return { group: null };
+}
+
+function groupIngredients(
+  ingredients: Recipe["ingredients"]
+): IngredientGroup[] {
+  const mainGroup: IngredientGroup = { name: null, items: [] };
+  const groupMap = new Map<string, IngredientGroup>();
+
+  ingredients.forEach((ing) => {
+    const { group, remainingNote } = detectIngredientGroup(ing.note);
+    const item = { amount: ing.amount, name: ing.name, note: remainingNote };
+    if (group) {
+      if (!groupMap.has(group)) {
+        groupMap.set(group, { name: group, items: [] });
+      }
+      groupMap.get(group)!.items.push(item);
+    } else {
+      mainGroup.items.push(item);
+    }
+  });
+
+  const result: IngredientGroup[] = [];
+  if (mainGroup.items.length > 0) result.push(mainGroup);
+  groupMap.forEach((g) => result.push(g));
+  return result;
+}
+
+// ════════════════════════════════════════════════
 // LAYOUT 1: EDITORIAL — Pack 1 (Feierabend, Honey)
-// Typografisches Cookbook-Spread: Title dominiert, Bild als
-// kleiner quadratischer Akzent in der Zutaten-Spalte
+// Premium Cookbook-Spread mit Hero-Image, klarer Portionen-Hierarchie,
+// Subgruppen-Erkennung für Zutaten, Makro-Bars statt Cells
 // ════════════════════════════════════════════════
 function EditorialLayout({
   brand,
@@ -43,119 +101,293 @@ function EditorialLayout({
   totalRecipes,
 }: RecipeCardFullProps) {
   const totalTime = recipe.prepTime + (recipe.cookTime ?? 0);
+  const grouped = groupIngredients(recipe.ingredients);
+  const portionsLabel = recipe.servings === 1 ? "Portion" : "Portionen";
+
   return (
     <article
-      className="mx-auto w-full max-w-[860px] overflow-hidden rounded-[var(--radius-card)] border bg-white"
+      className="mx-auto w-full max-w-[940px] overflow-hidden rounded-[var(--radius-card)] border bg-white"
       style={baseShellStyle(pack, brand)}
     >
-      {/* Title-driven header: kein Hero-Image, nur Typo */}
-      <div
-        className="border-b px-10 pt-12 pb-10 sm:px-14 sm:pt-14"
+      {/* HEADER */}
+      <header
+        className="border-b px-8 pt-10 pb-8 sm:px-12 sm:pt-12 sm:pb-10"
         style={{
           borderColor: pack.mood.ink + "1a",
           background: pack.mood.background + "30",
         }}
       >
-        <div className="flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.22em]">
+        <div className="flex items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.22em]">
           <span style={{ color: pack.mood.inkSoft }}>
             Pack {String(pack.number).padStart(2, "0")} · {pack.title}
           </span>
-          <span
-            className="font-mono"
-            style={{ color: pack.mood.inkSoft }}
-          >
-            Karte {String(recipe.number).padStart(2, "0")} / {String(totalRecipes).padStart(2, "0")}
+          <span className="font-mono" style={{ color: pack.mood.inkSoft }}>
+            Karte {String(recipe.number).padStart(2, "0")} /{" "}
+            {String(totalRecipes).padStart(2, "0")}
           </span>
         </div>
 
         <h1
-          className="mt-7 max-w-[20ch] font-display text-[48px] uppercase leading-[0.96] tracking-[-0.01em] sm:text-[64px]"
+          className="mt-6 max-w-[20ch] font-display text-[40px] uppercase leading-[0.96] tracking-[-0.01em] sm:text-[56px]"
           style={{ color: pack.mood.ink }}
         >
           {recipe.title}
         </h1>
         <p
-          className="mt-4 max-w-[48ch] font-display text-[20px] italic leading-snug"
+          className="mt-3 max-w-[52ch] font-display text-[18px] italic leading-snug"
           style={{ color: pack.mood.inkSoft }}
         >
           {recipe.subtitle}
         </p>
 
-        {/* Stats row */}
+        {recipe.description ? (
+          <p
+            className="mt-4 max-w-[60ch] text-[14px] leading-relaxed"
+            style={{ color: pack.mood.ink, opacity: 0.85 }}
+          >
+            {recipe.description}
+          </p>
+        ) : null}
+
+        {recipe.tags?.length ? (
+          <div className="mt-5 flex flex-wrap gap-1.5">
+            {recipe.tags.map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em]"
+                style={{
+                  background: pack.mood.background,
+                  color: pack.mood.ink,
+                }}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </header>
+
+      {/* HERO IMAGE — full width, 16:9 */}
+      <div className="relative aspect-[16/9] w-full">
+        <Image
+          src={recipe.hero ?? pack.coverImage}
+          alt={recipe.title}
+          fill
+          sizes="(max-width: 940px) 100vw, 940px"
+          className="object-cover"
+          priority
+        />
         <div
-          className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-2 text-[11px] font-semibold uppercase tracking-[0.18em]"
-          style={{ color: pack.mood.inkSoft }}
+          className="absolute inset-0 mix-blend-multiply"
+          style={{ background: pack.mood.background, opacity: 0.08 }}
+        />
+      </div>
+
+      {/* PORTIONEN HERO BAR — KEY UX ELEMENT */}
+      <div
+        className="grid grid-cols-3 border-t border-b"
+        style={{ borderColor: pack.mood.ink + "1f" }}
+      >
+        {/* Tile 1: Servings */}
+        <div
+          className="flex flex-col items-center gap-1 border-r px-3 py-6 text-center"
+          style={{ borderColor: pack.mood.ink + "1f" }}
         >
-          <span>{totalTime} Min</span>
-          <span style={{ opacity: 0.4 }}>·</span>
-          <span>
-            {recipe.servings} Portion{recipe.servings === 1 ? "" : "en"}
+          <span
+            className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            Rezept ergibt
           </span>
-          <span style={{ opacity: 0.4 }}>·</span>
-          <span>{recipe.difficulty}</span>
-          <span style={{ opacity: 0.4 }}>·</span>
-          <span style={{ color: pack.mood.accent }}>
-            {recipe.nutrition.kcal} kcal
+          <span
+            className="font-display text-[36px] leading-none tabular-nums"
+            style={{ color: pack.mood.ink }}
+          >
+            {recipe.servings}×
+          </span>
+          <span
+            className="text-[11px] font-medium"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            {portionsLabel}
+          </span>
+        </div>
+
+        {/* Tile 2: kcal pro Portion (HIGHLIGHT) */}
+        <div
+          className="flex flex-col items-center gap-1 border-r px-3 py-6 text-center"
+          style={{
+            borderColor: pack.mood.ink + "1f",
+            background: pack.mood.background + "55",
+          }}
+        >
+          <span
+            className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+            style={{ color: pack.mood.accent }}
+          >
+            Pro Portion
+          </span>
+          <span
+            className="font-display text-[36px] leading-none tabular-nums"
+            style={{ color: pack.mood.ink }}
+          >
+            {recipe.nutrition.kcal}
+          </span>
+          <span
+            className="text-[11px] font-medium"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            kcal · {recipe.nutrition.protein}g Eiweiß
+          </span>
+        </div>
+
+        {/* Tile 3: Time */}
+        <div className="flex flex-col items-center gap-1 px-3 py-6 text-center">
+          <span
+            className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            Gesamtzeit
+          </span>
+          <span
+            className="font-display text-[36px] leading-none tabular-nums"
+            style={{ color: pack.mood.ink }}
+          >
+            {totalTime}
+          </span>
+          <span
+            className="text-[11px] font-medium"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            Min · {recipe.difficulty}
           </span>
         </div>
       </div>
 
-      {/* Body 2-column: image as small accent in the ingredients column */}
-      <div className="grid grid-cols-1 gap-12 px-10 pt-10 pb-8 sm:px-14 lg:grid-cols-[1fr_1.4fr] lg:gap-16">
-        <div className="flex flex-col gap-6">
-          {/* Compact image as visual anchor — square polaroid */}
-          <div className="relative">
-            <div
-              className="relative aspect-square w-full max-w-[300px] overflow-hidden rounded-2xl"
-              style={{
-                boxShadow:
-                  "0 1px 0 rgba(43,31,25,0.05), 0 18px 32px -16px rgba(43,31,25,0.25)",
-              }}
+      {/* BODY: Ingredients (group-aware, 2-col bei viel) + Steps */}
+      <div className="grid grid-cols-1 gap-10 px-8 py-10 sm:px-12 lg:grid-cols-[0.95fr_1.1fr] lg:gap-14">
+        {/* INGREDIENTS — group-aware */}
+        <section>
+          <div
+            className="flex items-baseline justify-between gap-3 border-b pb-3"
+            style={{ borderColor: pack.mood.ink + "20" }}
+          >
+            <h2
+              className="text-[12px] font-semibold uppercase tracking-[0.22em]"
+              style={{ color: pack.mood.accent }}
             >
-              <Image
-                src={recipe.hero ?? pack.coverImage}
-                alt={recipe.title}
-                fill
-                sizes="300px"
-                className="object-cover"
-                priority
-              />
-              <div
-                className="absolute inset-0 mix-blend-multiply"
-                style={{ background: pack.mood.background, opacity: 0.15 }}
-              />
-            </div>
-            {recipe.tags.length ? (
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {recipe.tags.slice(0, 3).map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full px-2.5 py-1 text-[10px] font-medium"
-                    style={{
-                      background: pack.mood.background + "70",
-                      color: pack.mood.ink,
-                    }}
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            ) : null}
+              Man nehme
+            </h2>
+            <span
+              className="text-[10px] font-medium uppercase tracking-[0.14em]"
+              style={{ color: pack.mood.inkSoft }}
+            >
+              für {recipe.servings} {portionsLabel}
+            </span>
           </div>
 
-          <SectionList recipe={recipe} pack={pack} kind="ingredients" />
-        </div>
+          <div className="mt-5 flex flex-col gap-6">
+            {grouped.map((group, gIdx) => {
+              const useTwoCol = !group.name && group.items.length > 8;
+              return (
+                <div key={group.name ?? `main-${gIdx}`}>
+                  {group.name ? (
+                    <h3
+                      className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em]"
+                      style={{ color: pack.mood.inkSoft }}
+                    >
+                      Für {group.name.toLowerCase()}
+                    </h3>
+                  ) : null}
+                  <ul
+                    className={
+                      useTwoCol
+                        ? "grid grid-cols-1 gap-x-6 sm:grid-cols-2"
+                        : "flex flex-col"
+                    }
+                  >
+                    {group.items.map((ing, iIdx) => (
+                      <li
+                        key={`${ing.name}-${iIdx}`}
+                        className="grid grid-cols-[4.5rem_1fr] items-baseline gap-3 border-b py-2"
+                        style={{
+                          borderColor: pack.mood.ink + "10",
+                          color: pack.mood.ink,
+                        }}
+                      >
+                        <span
+                          className="font-mono text-[12px] tabular-nums"
+                          style={{ color: pack.mood.inkSoft }}
+                        >
+                          {ing.amount}
+                        </span>
+                        <span className="text-[14px] leading-snug">
+                          {ing.name}
+                          {ing.note ? (
+                            <span
+                              className="block text-[11px] italic"
+                              style={{ color: pack.mood.inkSoft }}
+                            >
+                              {ing.note}
+                            </span>
+                          ) : null}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        </section>
 
-        <SectionList recipe={recipe} pack={pack} kind="steps" />
+        {/* STEPS */}
+        <section>
+          <div
+            className="flex items-baseline justify-between gap-3 border-b pb-3"
+            style={{ borderColor: pack.mood.ink + "20" }}
+          >
+            <h2
+              className="text-[12px] font-semibold uppercase tracking-[0.22em]"
+              style={{ color: pack.mood.accent }}
+            >
+              Zubereitung
+            </h2>
+            <span
+              className="text-[10px] font-medium uppercase tracking-[0.14em]"
+              style={{ color: pack.mood.inkSoft }}
+            >
+              {recipe.steps.length} Schritte
+            </span>
+          </div>
+          <ol className="mt-5 flex flex-col gap-5">
+            {recipe.steps.map((step, idx) => (
+              <li key={idx} className="grid grid-cols-[2.4rem_1fr] gap-3">
+                <span
+                  className="font-display text-[28px] leading-none tabular-nums"
+                  style={{ color: pack.mood.accent }}
+                >
+                  {idx + 1}
+                </span>
+                <span
+                  className="text-[15px] leading-[1.55]"
+                  style={{ color: pack.mood.ink }}
+                >
+                  {step}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
       </div>
 
-      {/* Macros */}
-      <MacrosBlock recipe={recipe} pack={pack} variant="strip" />
+      {/* MACROS — Premium Bar */}
+      <MacrosBlock recipe={recipe} pack={pack} variant="hero" />
 
-      {/* Micronutrients */}
+      {/* MICROS */}
       <MicrosBlock recipe={recipe} pack={pack} brand={brand} variant="grid" />
 
-      <CardFooter brand={brand} pack={pack} />
+      <CardFooter brand={brand} pack={pack} recipe={recipe} />
     </article>
   );
 }
@@ -257,7 +489,7 @@ function PatisserieLayout({
       </div>
 
       <MicrosBlock recipe={recipe} pack={pack} brand={brand} variant="tags" />
-      <CardFooter brand={brand} pack={pack} italic />
+      <CardFooter brand={brand} pack={pack} recipe={recipe} italic />
     </article>
   );
 }
@@ -358,7 +590,7 @@ function MinimalLayout({
 
       <MicrosBlock recipe={recipe} pack={pack} brand={brand} variant="minimal" />
 
-      <CardFooter brand={brand} pack={pack} />
+      <CardFooter brand={brand} pack={pack} recipe={recipe} />
     </article>
   );
 }
@@ -466,7 +698,7 @@ function SportLayout({
       </div>
 
       <MicrosBlock recipe={recipe} pack={pack} brand={brand} variant="grid" />
-      <CardFooter brand={brand} pack={pack} />
+      <CardFooter brand={brand} pack={pack} recipe={recipe} />
     </article>
   );
 }
@@ -604,7 +836,7 @@ function DashboardLayout({
         brand={brand}
         variant="dashboard"
       />
-      <CardFooter brand={brand} pack={pack} />
+      <CardFooter brand={brand} pack={pack} recipe={recipe} />
     </article>
   );
 }
@@ -744,13 +976,83 @@ function MacrosBlock({
 }: {
   recipe: Recipe;
   pack: Pack;
-  variant: "strip" | "pills" | "bold";
+  variant: "strip" | "pills" | "bold" | "hero";
 }) {
   const items = [
     { label: "Eiweiß", value: `${recipe.nutrition.protein}g` },
     { label: "Kohlenhydrate", value: `${recipe.nutrition.carbs}g` },
     { label: "Fett", value: `${recipe.nutrition.fat}g` },
   ];
+
+  if (variant === "hero") {
+    const macroBars = [
+      { label: "Eiweiß", value: recipe.nutrition.protein, max: 60, unit: "g" },
+      { label: "Kohlenhydrate", value: recipe.nutrition.carbs, max: 100, unit: "g" },
+      { label: "Fett", value: recipe.nutrition.fat, max: 40, unit: "g" },
+    ];
+    if (recipe.nutrition.fiber !== undefined) {
+      macroBars.push({ label: "Ballaststoffe", value: recipe.nutrition.fiber, max: 15, unit: "g" });
+    }
+    return (
+      <div
+        className="border-t border-b px-8 py-8 sm:px-12"
+        style={{
+          borderColor: pack.mood.ink + "20",
+          background: pack.mood.background + "20",
+        }}
+      >
+        <div className="mb-5 flex items-baseline justify-between gap-3">
+          <h2
+            className="text-[12px] font-semibold uppercase tracking-[0.22em]"
+            style={{ color: pack.mood.accent }}
+          >
+            Makronährstoffe
+          </h2>
+          <span
+            className="text-[10px] font-medium uppercase tracking-[0.14em]"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            pro Portion ({recipe.nutrition.kcal} kcal)
+          </span>
+        </div>
+        <div className="flex flex-col gap-3.5">
+          {macroBars.map((m) => (
+            <div
+              key={m.label}
+              className="grid grid-cols-[7.5rem_1fr_3.5rem] items-center gap-4"
+            >
+              <span
+                className="text-[12px] font-semibold uppercase tracking-[0.14em]"
+                style={{ color: pack.mood.inkSoft }}
+              >
+                {m.label}
+              </span>
+              <div
+                className="h-2 overflow-hidden rounded-full"
+                style={{ background: pack.mood.ink + "12" }}
+              >
+                <div
+                  className="h-full rounded-full transition-[width]"
+                  style={{
+                    width: `${Math.min((m.value / m.max) * 100, 100)}%`,
+                    background: pack.mood.accent,
+                  }}
+                />
+              </div>
+              <span
+                className="text-right font-display text-[18px] tabular-nums"
+                style={{ color: pack.mood.ink }}
+              >
+                {m.value}
+                {m.unit}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   if (variant === "pills") {
     return (
       <div
@@ -1101,15 +1403,17 @@ function MicrosBlock({
 function CardFooter({
   brand,
   pack,
+  recipe,
   italic = false,
 }: {
   brand: Brand;
   pack: Pack;
+  recipe?: Recipe;
   italic?: boolean;
 }) {
   return (
     <div
-      className="flex items-center justify-between gap-3 border-t px-10 py-5"
+      className="flex flex-wrap items-center justify-between gap-3 border-t px-8 py-4 sm:px-10"
       style={{
         borderColor: brand.tokens.line,
         background: brand.tokens.surface,
@@ -1121,12 +1425,41 @@ function CardFooter({
       >
         {brand.signature}
       </span>
-      <span
-        className="text-[11px] font-medium uppercase tracking-[0.16em]"
-        style={{ color: brand.tokens.inkMuted }}
-      >
-        {brand.handle} · {pack.title}
-      </span>
+
+      <div className="flex flex-wrap items-center gap-3">
+        {recipe?.sourceUrl ? (
+          <a
+            href={recipe.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-opacity hover:opacity-80"
+            style={{
+              borderColor: brand.tokens.line,
+              color: brand.tokens.inkMuted,
+              background: brand.tokens.background,
+            }}
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden
+            >
+              <rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" strokeWidth="1.8" />
+              <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.8" />
+              <circle cx="17.5" cy="6.5" r="1.2" fill="currentColor" />
+            </svg>
+            {recipe.sourceLabel ?? "Original-Reel ansehen"}
+          </a>
+        ) : null}
+        <span
+          className="text-[11px] font-medium uppercase tracking-[0.16em]"
+          style={{ color: brand.tokens.inkMuted }}
+        >
+          {brand.handle} · {pack.title}
+        </span>
+      </div>
     </div>
   );
 }
