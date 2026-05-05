@@ -245,12 +245,21 @@ select.editor-input {
 }
 
 /* Combobox popover for ingredient autocomplete */
+.combobox-container {
+  position: relative;
+  width: 100%;
+}
+
+.combobox-container[data-open="true"] {
+  z-index: 60;
+}
+
 .combobox-popover {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  z-index: 50;
+  z-index: 100;
   border-radius: 14px;
   border: 1px solid;
   box-shadow:
@@ -289,6 +298,8 @@ select.editor-input {
   border-radius: 999px;
   background: var(--color-canvas-alt);
   gap: 2px;
+  width: fit-content;
+  align-self: flex-start;
 }
 
 .pill-group-btn {

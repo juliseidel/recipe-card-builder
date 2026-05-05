@@ -4,6 +4,7 @@ import { getPack } from "@/lib/packs";
 import { getRecipe, getRecipesForPack } from "@/lib/recipes";
 import { RecipeDetailLayout } from "@/components/recipe-detail-layout";
 import { CustomRecipeView } from "@/components/custom-recipe-view";
+import { StaticRecipeDeleteButton } from "@/components/static-recipe-delete-button";
 
 type RecipePageProps = {
   params: Promise<{ brand: string; pack: string; recipe: string }>;
@@ -70,6 +71,14 @@ export default async function RecipePage({ params }: RecipePageProps) {
         totalRecipes={staticRecipes.length}
         previous={previous}
         next={next}
+        deleteAction={
+          <StaticRecipeDeleteButton
+            brandSlug={brand.slug}
+            packSlug={pack.slug}
+            recipeSlug={recipe.slug}
+            pack={pack}
+          />
+        }
       />
     );
   }

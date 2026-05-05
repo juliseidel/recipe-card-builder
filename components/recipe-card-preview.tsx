@@ -36,7 +36,8 @@ export function RecipeCardPreview({
   const totalTime = recipe.prepTime + (recipe.cookTime ?? 0);
   const positionClass = positions[(recipe.number - 1) % positions.length];
   const isCustom = "isCustom" in recipe && recipe.isCustom;
-  const customId = isCustom ? (recipe as CustomRecipe).id : null;
+  // Use customId for custom recipes, slug as fallback identifier for static
+  const deleteId = isCustom ? (recipe as CustomRecipe).id : recipe.slug;
 
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -51,16 +52,15 @@ export function RecipeCardPreview({
   const handleDeleteClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!customId || !onDelete) return;
+    if (!onDelete) return;
     if (!confirming) {
       setConfirming(true);
-      // Auto-cancel after 3s
       if (confirmTimeout.current) clearTimeout(confirmTimeout.current);
       confirmTimeout.current = setTimeout(() => setConfirming(false), 3000);
       return;
     }
     setDeleting(true);
-    await onDelete(customId);
+    await onDelete(deleteId);
   };
 
   return (
@@ -106,7 +106,7 @@ export function RecipeCardPreview({
         </span>
 
         <div className="flex items-center gap-2">
-          {isCustom && onDelete ? (
+          {onDelete ? (
             <button
               type="button"
               onClick={handleDeleteClick}

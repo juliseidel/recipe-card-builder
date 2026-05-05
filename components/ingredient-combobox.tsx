@@ -66,7 +66,11 @@ export function IngredientCombobox({
   };
 
   return (
-    <div ref={containerRef} className="relative w-full">
+    <div
+      ref={containerRef}
+      className="combobox-container"
+      data-open={showDropdown}
+    >
       <input
         ref={inputRef}
         type="text"

@@ -9,6 +9,12 @@ import {
   removeCustomRecipe,
 } from "@/lib/custom-recipes";
 import type { CustomRecipe } from "@/lib/custom-recipes";
+import {
+  getHiddenKeys,
+  hideRecipe,
+  makeHiddenKey,
+} from "@/lib/hidden-recipes";
+import type { HiddenKey } from "@/lib/hidden-recipes";
 import { NewRecipeCard } from "./new-recipe-card";
 import { RecipeCardPreview } from "./recipe-card-preview";
 
@@ -20,20 +26,29 @@ type RecipeGridProps = {
 
 export function RecipeGrid({ brand, pack, staticRecipes }: RecipeGridProps) {
   const [customRecipes, setCustomRecipes] = useState<CustomRecipe[]>([]);
+  const [hiddenKeys, setHiddenKeys] = useState<Set<HiddenKey>>(new Set());
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
     (async () => {
-      const custom = await getCustomRecipesForPack(pack.slug);
+      const [custom, hidden] = await Promise.all([
+        getCustomRecipesForPack(pack.slug),
+        getHiddenKeys(),
+      ]);
       if (!active) return;
       setCustomRecipes(custom);
+      setHiddenKeys(hidden);
       setLoaded(true);
     })();
     return () => {
       active = false;
     };
   }, [pack.slug]);
+
+  const visibleStaticRecipes = staticRecipes.filter(
+    (r) => !hiddenKeys.has(makeHiddenKey(brand.slug, pack.slug, r.slug))
+  );
 
   return (
     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -58,11 +73,9 @@ export function RecipeGrid({ brand, pack, staticRecipes }: RecipeGridProps) {
           pack={pack}
           recipe={recipe}
           onDelete={async (id) => {
-            // Optimistic UI: remove immediately, then sync to DB
             setCustomRecipes((prev) => prev.filter((r) => r.id !== id));
             const ok = await removeCustomRecipe(id);
             if (!ok) {
-              // Rollback by re-fetching
               const fresh = await getCustomRecipesForPack(pack.slug);
               setCustomRecipes(fresh);
             }
@@ -70,12 +83,25 @@ export function RecipeGrid({ brand, pack, staticRecipes }: RecipeGridProps) {
         />
       ))}
 
-      {staticRecipes.map((recipe) => (
+      {visibleStaticRecipes.map((recipe) => (
         <RecipeCardPreview
           key={recipe.slug}
           brand={brand}
           pack={pack}
           recipe={recipe}
+          onDelete={async () => {
+            // Hide static recipe (mark in DB, removable later)
+            const key = makeHiddenKey(brand.slug, pack.slug, recipe.slug);
+            setHiddenKeys((prev) => new Set([...prev, key]));
+            const ok = await hideRecipe(brand.slug, pack.slug, recipe.slug);
+            if (!ok) {
+              setHiddenKeys((prev) => {
+                const next = new Set(prev);
+                next.delete(key);
+                return next;
+              });
+            }
+          }}
         />
       ))}
     </div>
