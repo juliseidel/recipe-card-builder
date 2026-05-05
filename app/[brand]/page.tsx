@@ -81,13 +81,8 @@ export default async function BrandPage({ params }: BrandPageProps) {
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {packs.map((pack, index) => (
-              <PackCard
-                key={pack.slug}
-                pack={pack}
-                brand={brand}
-                index={index}
-              />
+            {packs.map((pack) => (
+              <PackCard key={pack.slug} pack={pack} brand={brand} />
             ))}
             <NewPackCard brand={brand} />
           </div>

@@ -64,7 +64,7 @@ export const brands: Brand[] = [
       body: "var(--font-inter)",
     },
     packCount: 5,
-    recipeCount: 38,
+    recipeCount: 35,
   },
 ];
 

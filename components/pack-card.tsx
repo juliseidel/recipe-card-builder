@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
@@ -5,38 +6,38 @@ import type { Pack } from "@/lib/packs";
 type PackCardProps = {
   pack: Pack;
   brand: Brand;
-  index: number;
 };
 
 const fontClassMap: Record<Pack["displayFont"], string> = {
   fraunces: "font-display",
   "dm-serif": "font-display italic",
-  "inter-tight": "font-sans font-semibold tracking-[-0.02em]",
+  "inter-tight": "font-sans font-bold tracking-[-0.02em]",
 };
 
-export function PackCard({ pack, brand, index }: PackCardProps) {
+export function PackCard({ pack, brand }: PackCardProps) {
   const fontClass = fontClassMap[pack.displayFont];
-  const orderLabel = String(index + 1).padStart(2, "0");
+  const orderLabel = String(pack.number).padStart(2, "0");
 
   return (
     <Link
       href={`/${brand.slug}/${pack.slug}`}
-      className="group relative flex aspect-[4/5] flex-col justify-between overflow-hidden rounded-[var(--radius-card)] p-7 ring-1 transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[var(--shadow-card-hover)]"
+      className="group relative flex flex-col overflow-hidden rounded-[var(--radius-card)] transition-all duration-500 hover:-translate-y-2 hover:shadow-[var(--shadow-card-hover)]"
       style={{
         background: pack.mood.background,
         color: pack.mood.ink,
         boxShadow: "var(--shadow-card)",
-        ["--tw-ring-color" as never]: pack.mood.accent + "40",
       }}
     >
-      <div className="flex items-start justify-between">
+      {/* Top row: Pack number + edge case badge */}
+      <div className="flex items-start justify-between gap-3 px-6 pt-5">
         <span
-          className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] opacity-60"
+          className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em]"
+          style={{ color: pack.mood.inkSoft }}
         >
           Pack {orderLabel}
         </span>
         <span
-          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] backdrop-blur"
+          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em]"
           style={{
             background: "rgba(255,255,255,0.7)",
             color: pack.mood.ink,
@@ -50,32 +51,60 @@ export function PackCard({ pack, brand, index }: PackCardProps) {
         </span>
       </div>
 
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-4 top-1/2 -translate-y-1/2 select-none text-[180px] leading-none opacity-15 transition-transform duration-700 ease-out group-hover:scale-110 group-hover:rotate-6"
-      >
-        {pack.coverEmoji}
+      {/* Hero image */}
+      <div className="relative mx-6 mt-4 aspect-[4/3.4] overflow-hidden rounded-2xl">
+        <Image
+          src={pack.coverImage}
+          alt={`${pack.title} – ${pack.tagline}`}
+          fill
+          sizes="(min-width: 1280px) 420px, (min-width: 768px) 50vw, 100vw"
+          className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.06]"
+        />
       </div>
 
-      <div className="relative flex flex-col gap-3">
+      {/* Text body */}
+      <div className="flex flex-1 flex-col gap-3 px-6 pt-6 pb-6">
         <span
-          className="text-[12px] font-medium uppercase tracking-[0.14em] opacity-70"
+          className="text-[12px] font-semibold uppercase tracking-[0.16em]"
+          style={{ color: pack.mood.inkSoft }}
         >
-          {pack.tagline}
+          {pack.category}
         </span>
         <h3
           className={`${fontClass} text-[34px] leading-[0.96] tracking-[-0.01em]`}
         >
           {pack.title}
+          <span
+            className="block text-[18px] font-normal italic opacity-80"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            {pack.subtitle}
+          </span>
         </h3>
-        <p className="max-w-[28ch] text-[14px] leading-[1.55] opacity-80">
-          {pack.description}
+        <p
+          className="text-[14px] leading-[1.55]"
+          style={{ color: pack.mood.inkSoft }}
+        >
+          {pack.tagline}
         </p>
 
-        <div className="mt-4 flex items-center justify-between">
+        {pack.edgeCase ? (
           <span
-            className="inline-flex items-center gap-1.5 text-[13px] font-medium transition-transform duration-300 group-hover:translate-x-0.5"
+            className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]"
+            style={{
+              background: pack.mood.accent + "20",
+              color: pack.mood.accent,
+            }}
           >
+            ★ {pack.edgeCase}
+          </span>
+        ) : null}
+
+        <div
+          className="mt-3 flex items-center justify-between border-t pt-4"
+          style={{ borderColor: pack.mood.ink + "1a" }}
+        >
+          <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold transition-transform duration-300 group-hover:translate-x-0.5">
             Pack öffnen
             <svg
               width="14"
@@ -87,16 +116,18 @@ export function PackCard({ pack, brand, index }: PackCardProps) {
               <path
                 d="M3 7h8m0 0L7.5 3.5M11 7l-3.5 3.5"
                 stroke="currentColor"
-                strokeWidth="1.6"
+                strokeWidth="1.7"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
             </svg>
           </span>
           <span
-            className="size-9 rounded-full transition-transform duration-500 group-hover:scale-110"
-            style={{ background: pack.mood.accent + "30" }}
-          />
+            className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em]"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            druckfertig
+          </span>
         </div>
       </div>
     </Link>
