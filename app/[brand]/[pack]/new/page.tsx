@@ -7,6 +7,12 @@ import { getBrand } from "@/lib/brands";
 import { getPack } from "@/lib/packs";
 import type { Ingredient, Recipe } from "@/lib/recipes";
 import { addCustomRecipe, slugify } from "@/lib/custom-recipes";
+import {
+  ingredientSuggestions,
+  commonUnits,
+} from "@/lib/ingredient-suggestions";
+import { tagSuggestions } from "@/lib/common-tags";
+import { microQuickPicks } from "@/lib/common-micros";
 import { SiteHeader } from "@/components/site-header";
 import { RecipeCardPreview } from "@/components/recipe-card-preview";
 
@@ -28,7 +34,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   const [difficulty, setDifficulty] =
     useState<Recipe["difficulty"]>("Einfach");
   const [servings, setServings] = useState("2");
-  const [tagsInput, setTagsInput] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([
     { amount: "", name: "" },
     { amount: "", name: "" },
@@ -41,9 +47,20 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   const [fat, setFat] = useState("");
   const [micros, setMicros] = useState<
     { name: string; amount: string; pctDaily: string }[]
-  >([{ name: "", amount: "", pctDaily: "" }]);
+  >([]);
   const [saving, setSaving] = useState(false);
+  const [savedSuccess, setSavedSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const cleanIngredients = ingredients.filter((i) => i.amount || i.name);
+  const cleanSteps = steps.filter((s) => s.trim());
+  const cleanMicros = micros
+    .filter((m) => m.name && m.amount)
+    .map((m) => ({
+      name: m.name,
+      amount: m.amount,
+      pctDaily: m.pctDaily ? parseInt(m.pctDaily) : undefined,
+    }));
 
   const previewRecipe: Recipe | null = useMemo(() => {
     if (!pack) return null;
@@ -58,24 +75,17 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
       cookTime: cookTime ? parseInt(cookTime) : undefined,
       difficulty,
       servings: parseInt(servings) || 1,
-      tags: tagsInput
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
-      ingredients: ingredients.filter((i) => i.amount || i.name),
-      steps: steps.filter((s) => s.trim()),
+      tags,
+      ingredients: cleanIngredients.length
+        ? cleanIngredients
+        : [{ amount: "—", name: "Zutaten" }],
+      steps: cleanSteps.length ? cleanSteps : ["Zubereitung erscheint hier."],
       nutrition: {
         kcal: parseInt(kcal) || 0,
         protein: parseInt(protein) || 0,
         carbs: parseInt(carbs) || 0,
         fat: parseInt(fat) || 0,
-        micros: micros
-          .filter((m) => m.name && m.amount)
-          .map((m) => ({
-            name: m.name,
-            amount: m.amount,
-            pctDaily: m.pctDaily ? parseInt(m.pctDaily) : undefined,
-          })),
+        micros: cleanMicros,
       },
     };
   }, [
@@ -87,15 +97,25 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     cookTime,
     difficulty,
     servings,
-    tagsInput,
-    ingredients,
-    steps,
+    tags,
+    cleanIngredients,
+    cleanSteps,
     kcal,
     protein,
     carbs,
     fat,
-    micros,
+    cleanMicros,
   ]);
+
+  // Required fields tracking — used for save-button counter
+  const requirements: { label: string; ok: boolean }[] = [
+    { label: "Titel", ok: title.trim().length > 0 },
+    { label: "mindestens 1 Zutat", ok: cleanIngredients.length >= 1 },
+    { label: "mindestens 1 Schritt", ok: cleanSteps.length >= 1 },
+    { label: "Kalorien", ok: parseInt(kcal) > 0 },
+  ];
+  const missingCount = requirements.filter((r) => !r.ok).length;
+  const isValid = missingCount === 0;
 
   if (!brand || !pack) {
     return (
@@ -108,21 +128,11 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     );
   }
 
-  const cleanIngredients = ingredients.filter((i) => i.amount || i.name);
-  const cleanSteps = steps.filter((s) => s.trim());
-  const cleanMicros = micros
-    .filter((m) => m.name && m.amount)
-    .map((m) => ({
-      name: m.name,
-      amount: m.amount,
-      pctDaily: m.pctDaily ? parseInt(m.pctDaily) : undefined,
-    }));
-
-  const isValid =
-    title.trim().length > 0 &&
-    cleanIngredients.length >= 1 &&
-    cleanSteps.length >= 1 &&
-    parseInt(kcal) > 0;
+  const cssVars = {
+    "--accent-color": pack.mood.accent,
+    "--accent-color-soft": pack.mood.accent + "18",
+    "--pulse-color": pack.mood.accent + "40",
+  } as React.CSSProperties;
 
   const handleSave = async () => {
     if (!isValid || !pack || !brand || !previewRecipe) return;
@@ -141,10 +151,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
       cookTime: cookTime ? parseInt(cookTime) : undefined,
       difficulty,
       servings: parseInt(servings) || 1,
-      tags: tagsInput
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
+      tags,
       ingredients: cleanIngredients,
       steps: cleanSteps,
       nutrition: {
@@ -157,61 +164,89 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     });
     if (!saved) {
       setSaving(false);
-      setError(
-        "Konnte die Karte nicht speichern. Bitte Verbindung prüfen oder erneut versuchen."
-      );
+      setError("Konnte die Karte nicht speichern. Bitte erneut versuchen.");
       return;
     }
-    router.push(`/${brand.slug}/${pack.slug}/${saved.slug}`);
+    setSavedSuccess(true);
+    setTimeout(() => {
+      router.push(`/${brand.slug}/${pack.slug}/${saved.slug}`);
+    }, 350);
+  };
+
+  const toggleTag = (tag: string) => {
+    setTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const setIngredientAt = (idx: number, patch: Partial<Ingredient>) => {
+    setIngredients((prev) =>
+      prev.map((i, k) => (k === idx ? { ...i, ...patch } : i))
+    );
+  };
+
+  const addMicroQuickPick = (pick: (typeof microQuickPicks)[number]) => {
+    if (micros.some((m) => m.name === pick.name)) return;
+    setMicros([
+      ...micros,
+      {
+        name: pick.name,
+        amount: pick.amount,
+        pctDaily: pick.pctDaily.toString(),
+      },
+    ]);
   };
 
   return (
     <div
       className="flex min-h-screen flex-col"
-      style={{ background: brand.tokens.background }}
+      style={{ background: brand.tokens.background, ...cssVars }}
     >
       <SiteHeader />
 
+      {/* Editor top bar — sticky */}
       <header
-        className="border-b"
+        className="sticky top-[68px] z-20 border-b backdrop-blur-xl"
         style={{
-          background: pack.mood.background,
-          borderColor: pack.mood.ink + "1a",
+          background: brand.tokens.surface + "ee",
+          borderColor: brand.tokens.line,
         }}
       >
-        <div className="mx-auto flex max-w-[1400px] flex-col gap-3 px-6 py-5 sm:flex-row sm:items-center sm:justify-between lg:px-10">
-          <div className="flex flex-col gap-1">
+        <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-6 py-4 lg:px-10">
+          <div className="flex items-center gap-3 min-w-0">
             <Link
               href={`/${brand.slug}/${pack.slug}`}
-              className="inline-flex items-center gap-1.5 text-[12px] font-medium opacity-75 transition-opacity hover:opacity-100"
-              style={{ color: pack.mood.inkSoft }}
+              className="grid size-9 place-items-center rounded-full border transition-colors hover:bg-canvas-alt"
+              style={{ borderColor: brand.tokens.line }}
+              aria-label="Zurück zum Pack"
             >
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path
                   d="M11 7H3m0 0L6.5 3.5M3 7l3.5 3.5"
-                  stroke="currentColor"
+                  stroke={pack.mood.ink}
                   strokeWidth="1.6"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
               </svg>
-              {pack.title}
             </Link>
-            <h1
-              className="font-display text-[28px] leading-none tracking-[-0.01em]"
-              style={{ color: pack.mood.ink }}
-            >
-              Neue Rezeptkarte
-            </h1>
-            <p
-              className="text-[13px]"
-              style={{ color: pack.mood.inkSoft }}
-            >
-              Manuell eingeben — die Karte erscheint live in der Vorschau rechts und wird in deinem Pack gespeichert.
-            </p>
+            <div className="flex min-w-0 flex-col leading-tight">
+              <span
+                className="truncate font-mono text-[11px] font-semibold uppercase tracking-[0.18em]"
+                style={{ color: pack.mood.inkSoft }}
+              >
+                Pack {String(pack.number).padStart(2, "0")} · {pack.title}
+              </span>
+              <span
+                className="font-display text-[20px] leading-none"
+                style={{ color: pack.mood.ink }}
+              >
+                Neue Rezeptkarte
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {error ? (
               <span
                 className="text-[12px] font-medium"
@@ -220,215 +255,259 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                 {error}
               </span>
             ) : null}
+
+            {!isValid ? (
+              <span
+                className="hidden text-[12px] sm:inline"
+                style={{ color: pack.mood.inkSoft }}
+              >
+                Noch {missingCount} Pflichtfeld{missingCount === 1 ? "" : "er"}
+              </span>
+            ) : null}
+
             <Link
               href={`/${brand.slug}/${pack.slug}`}
-              className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-medium transition-colors"
-              style={{
-                background: "transparent",
-                color: pack.mood.ink,
-                border: `1px solid ${pack.mood.ink}30`,
-              }}
+              className="rounded-full px-4 py-2 text-[13px] font-medium transition-colors hover:bg-canvas-alt"
+              style={{ color: pack.mood.ink }}
             >
               Abbrechen
             </Link>
+
             <button
               type="button"
               disabled={!isValid || saving}
               onClick={handleSave}
-              className="inline-flex items-center gap-2 rounded-full px-5 py-2 text-[13px] font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-40"
+              className="editor-button-primary"
               style={{
-                background: pack.mood.ink,
-                color: pack.mood.background,
+                background: isValid ? pack.mood.ink : pack.mood.background,
+                color: isValid ? pack.mood.background : pack.mood.inkSoft,
+                border: isValid ? "none" : `1px solid ${pack.mood.ink}30`,
               }}
             >
-              {saving ? "Speichere…" : "Karte speichern"}
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 14 14"
-                fill="none"
-                aria-hidden
-              >
-                <path
-                  d="M3 7l3 3 5-7"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              {savedSuccess ? (
+                <>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                    aria-hidden
+                  >
+                    <path
+                      d="M3 7l3 3 5-7"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Gespeichert
+                </>
+              ) : saving ? (
+                <>
+                  <span className="inline-block size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Speichere…
+                </>
+              ) : (
+                <>
+                  Karte speichern
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                    aria-hidden
+                  >
+                    <path
+                      d="M3 7h8m0 0L7.5 3.5M11 7l-3.5 3.5"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </>
+              )}
             </button>
           </div>
         </div>
       </header>
 
       <main className="flex-1">
-        <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-10 px-6 py-10 lg:grid-cols-[1.4fr_1fr] lg:gap-14 lg:px-10">
-          {/* FORM */}
-          <div className="flex flex-col gap-10">
-            {/* Section: Basics */}
-            <Section title="Eckdaten" subtitle="Name, Beschreibung, Zeit" pack={pack}>
-              <Field label="Titel *" required>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="z. B. Magerquark-Käsekuchen"
-                  className="w-full rounded-lg border bg-white px-4 py-2.5 text-[14px] outline-none transition-colors focus:border-current"
-                  style={{
-                    borderColor: brand.tokens.line,
-                    color: brand.tokens.ink,
-                  }}
-                />
-              </Field>
+        <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-10 px-6 py-10 lg:grid-cols-[1.5fr_1fr] lg:gap-14 lg:px-10">
+          {/* FORM COLUMN */}
+          <div className="flex flex-col gap-6">
+            {/* Datalist for ingredient autocomplete */}
+            <datalist id="ingredient-suggestions">
+              {ingredientSuggestions.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
 
-              <Field label="Subtitle / Slogan">
-                <input
-                  type="text"
-                  value={subtitle}
-                  onChange={(e) => setSubtitle(e.target.value)}
-                  placeholder="z. B. Cremig, fluffig, 380 kcal"
-                  className="w-full rounded-lg border bg-white px-4 py-2.5 text-[14px] outline-none focus:border-current"
-                  style={{
-                    borderColor: brand.tokens.line,
-                    color: brand.tokens.ink,
-                  }}
-                />
-              </Field>
+            {/* Section 1: Eckdaten */}
+            <section className="editor-section editor-card">
+              <SectionHeader number={1} title="Eckdaten" pack={pack}>
+                Was kommt auf die Karte
+              </SectionHeader>
 
-              <Field label="Kurzbeschreibung">
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="2–3 Sätze für die Karte"
-                  rows={3}
-                  className="w-full rounded-lg border bg-white px-4 py-2.5 text-[14px] outline-none focus:border-current"
-                  style={{
-                    borderColor: brand.tokens.line,
-                    color: brand.tokens.ink,
-                  }}
-                />
-              </Field>
-
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <Field label="Vorbereitung (Min)">
+              <div className="mt-6 flex flex-col gap-5">
+                <Field label="Titel" required>
                   <input
-                    type="number"
-                    inputMode="numeric"
-                    value={prepTime}
-                    onChange={(e) => setPrepTime(e.target.value)}
-                    className="w-full rounded-lg border bg-white px-4 py-2.5 text-[14px] outline-none focus:border-current"
-                    style={{
-                      borderColor: brand.tokens.line,
-                      color: brand.tokens.ink,
-                    }}
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="z. B. Magerquark-Käsekuchen"
+                    className="editor-input"
                   />
                 </Field>
-                <Field label="Garzeit (Min)">
+
+                <Field label="Subtitle">
                   <input
-                    type="number"
-                    inputMode="numeric"
-                    value={cookTime}
-                    onChange={(e) => setCookTime(e.target.value)}
-                    placeholder="optional"
-                    className="w-full rounded-lg border bg-white px-4 py-2.5 text-[14px] outline-none focus:border-current"
-                    style={{
-                      borderColor: brand.tokens.line,
-                      color: brand.tokens.ink,
-                    }}
+                    type="text"
+                    value={subtitle}
+                    onChange={(e) => setSubtitle(e.target.value)}
+                    placeholder="z. B. Cremig, fluffig, 380 kcal"
+                    className="editor-input"
                   />
                 </Field>
-                <Field label="Portionen">
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={servings}
-                    onChange={(e) => setServings(e.target.value)}
-                    className="w-full rounded-lg border bg-white px-4 py-2.5 text-[14px] outline-none focus:border-current"
-                    style={{
-                      borderColor: brand.tokens.line,
-                      color: brand.tokens.ink,
-                    }}
+
+                <Field label="Kurzbeschreibung">
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="2–3 Sätze für die Karte"
+                    rows={3}
+                    className="editor-input resize-none"
                   />
                 </Field>
-                <Field label="Schwierigkeit">
-                  <select
-                    value={difficulty}
-                    onChange={(e) =>
-                      setDifficulty(e.target.value as Recipe["difficulty"])
-                    }
-                    className="w-full rounded-lg border bg-white px-4 py-2.5 text-[14px] outline-none focus:border-current"
-                    style={{
-                      borderColor: brand.tokens.line,
-                      color: brand.tokens.ink,
-                    }}
-                  >
-                    <option value="Einfach">Einfach</option>
-                    <option value="Mittel">Mittel</option>
-                    <option value="Aufwendig">Aufwendig</option>
-                  </select>
-                </Field>
+
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <Field label="Vorbereitung">
+                    <div className="relative">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={prepTime}
+                        onChange={(e) => setPrepTime(e.target.value)}
+                        className="editor-input pr-9"
+                      />
+                      <UnitSuffix label="Min" />
+                    </div>
+                  </Field>
+                  <Field label="Garzeit">
+                    <div className="relative">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={cookTime}
+                        onChange={(e) => setCookTime(e.target.value)}
+                        placeholder="optional"
+                        className="editor-input pr-9"
+                      />
+                      <UnitSuffix label="Min" />
+                    </div>
+                  </Field>
+                  <Field label="Portionen">
+                    <div className="relative">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={servings}
+                        onChange={(e) => setServings(e.target.value)}
+                        className="editor-input pr-9"
+                      />
+                      <UnitSuffix label="×" />
+                    </div>
+                  </Field>
+                  <Field label="Schwierigkeit">
+                    <select
+                      value={difficulty}
+                      onChange={(e) =>
+                        setDifficulty(e.target.value as Recipe["difficulty"])
+                      }
+                      className="editor-input"
+                    >
+                      <option value="Einfach">Einfach</option>
+                      <option value="Mittel">Mittel</option>
+                      <option value="Aufwendig">Aufwendig</option>
+                    </select>
+                  </Field>
+                </div>
               </div>
+            </section>
 
-              <Field
-                label="Tags (durch Komma getrennt)"
-                hint="z. B. High-Protein, Glutenfrei, Schnell"
-              >
-                <input
-                  type="text"
-                  value={tagsInput}
-                  onChange={(e) => setTagsInput(e.target.value)}
-                  placeholder="High-Protein, Schnell"
-                  className="w-full rounded-lg border bg-white px-4 py-2.5 text-[14px] outline-none focus:border-current"
-                  style={{
-                    borderColor: brand.tokens.line,
-                    color: brand.tokens.ink,
-                  }}
-                />
-              </Field>
-            </Section>
+            {/* Section 2: Tags */}
+            <section className="editor-section editor-card">
+              <SectionHeader number={2} title="Tags" pack={pack}>
+                Auswählen oder durch Komma ergänzen
+              </SectionHeader>
 
-            {/* Section: Ingredients */}
-            <Section
-              title="Zutaten *"
-              subtitle="Mindestens eine Zutat"
-              pack={pack}
-            >
-              <div className="flex flex-col gap-2">
+              <div className="mt-5">
+                {tags.length > 0 ? (
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    {tags.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleTag(tag)}
+                        className="editor-chip editor-chip-active"
+                      >
+                        {tag}
+                        <span className="opacity-70">×</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
+                <div className="flex flex-wrap gap-2">
+                  {tagSuggestions
+                    .filter((t) => !tags.includes(t))
+                    .map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleTag(tag)}
+                        className="editor-chip"
+                      >
+                        + {tag}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            </section>
+
+            {/* Section 3: Zutaten */}
+            <section className="editor-section editor-card">
+              <SectionHeader number={3} title="Zutaten" pack={pack} required>
+                Tipp: anfangen zu tippen, Vorschläge erscheinen automatisch
+              </SectionHeader>
+
+              <div className="mt-5 flex flex-col gap-2">
                 {ingredients.map((ingredient, idx) => (
                   <div
                     key={idx}
-                    className="grid grid-cols-[6rem_1fr_auto] gap-2"
+                    className="editor-row grid grid-cols-[1fr_auto] items-center gap-2 sm:grid-cols-[7rem_1fr_auto]"
                   >
                     <input
                       type="text"
                       value={ingredient.amount}
-                      onChange={(e) => {
-                        const next = [...ingredients];
-                        next[idx] = { ...next[idx], amount: e.target.value };
-                        setIngredients(next);
-                      }}
+                      onChange={(e) =>
+                        setIngredientAt(idx, { amount: e.target.value })
+                      }
                       placeholder="200 g"
-                      className="rounded-lg border bg-white px-3 py-2 text-[13px] tabular-nums outline-none focus:border-current"
-                      style={{
-                        borderColor: brand.tokens.line,
-                        color: brand.tokens.ink,
-                      }}
+                      className="editor-input col-span-1 sm:col-auto"
+                      aria-label={`Menge Zutat ${idx + 1}`}
                     />
                     <input
                       type="text"
+                      list="ingredient-suggestions"
                       value={ingredient.name}
-                      onChange={(e) => {
-                        const next = [...ingredients];
-                        next[idx] = { ...next[idx], name: e.target.value };
-                        setIngredients(next);
-                      }}
-                      placeholder="Zutat"
-                      className="rounded-lg border bg-white px-3 py-2 text-[13px] outline-none focus:border-current"
-                      style={{
-                        borderColor: brand.tokens.line,
-                        color: brand.tokens.ink,
-                      }}
+                      onChange={(e) =>
+                        setIngredientAt(idx, { name: e.target.value })
+                      }
+                      placeholder="Zutat — z. B. Magerquark"
+                      className="editor-input col-span-1 sm:col-auto"
+                      aria-label={`Name Zutat ${idx + 1}`}
                     />
                     <button
                       type="button"
@@ -437,7 +516,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                         setIngredients(ingredients.filter((_, i) => i !== idx));
                       }}
                       disabled={ingredients.length === 1}
-                      className="grid size-10 place-items-center rounded-lg border text-[16px] transition-colors disabled:opacity-30"
+                      className="grid size-10 place-items-center rounded-xl border text-[16px] transition-colors hover:bg-canvas-alt disabled:opacity-30"
                       style={{
                         borderColor: brand.tokens.line,
                         color: brand.tokens.inkMuted,
@@ -448,36 +527,65 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                     </button>
                   </div>
                 ))}
-                <button
-                  type="button"
-                  onClick={() =>
-                    setIngredients([...ingredients, { amount: "", name: "" }])
-                  }
-                  className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold uppercase tracking-[0.12em] transition-colors"
-                  style={{
-                    background: pack.mood.background,
-                    color: pack.mood.ink,
-                  }}
-                >
-                  + Zutat hinzufügen
-                </button>
-              </div>
-            </Section>
 
-            {/* Section: Steps */}
-            <Section
-              title="Zubereitung *"
-              subtitle="Schritt für Schritt"
-              pack={pack}
-            >
-              <div className="flex flex-col gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setIngredients([...ingredients, { amount: "", name: "" }])
+                    }
+                    className="editor-button-primary"
+                    style={{
+                      background: pack.mood.background,
+                      color: pack.mood.ink,
+                    }}
+                  >
+                    + Zutat hinzufügen
+                  </button>
+                  <span
+                    className="text-[11px] font-medium uppercase tracking-[0.14em]"
+                    style={{ color: pack.mood.inkSoft }}
+                  >
+                    Schnell-Einheit:
+                  </span>
+                  {commonUnits.map((unit) => (
+                    <button
+                      key={unit}
+                      type="button"
+                      onClick={() => {
+                        // Append unit to last empty amount field
+                        const lastEmptyIdx = ingredients
+                          .map((i, idx) => ({ i, idx }))
+                          .reverse()
+                          .find(({ i }) => i.amount === "")?.idx;
+                        if (lastEmptyIdx === undefined) return;
+                        setIngredientAt(lastEmptyIdx, {
+                          amount: `1 ${unit}`,
+                        });
+                      }}
+                      className="editor-chip"
+                    >
+                      {unit}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {/* Section 4: Zubereitung */}
+            <section className="editor-section editor-card">
+              <SectionHeader number={4} title="Zubereitung" pack={pack} required>
+                Schritt für Schritt
+              </SectionHeader>
+
+              <div className="mt-5 flex flex-col gap-3">
                 {steps.map((step, idx) => (
                   <div
                     key={idx}
-                    className="grid grid-cols-[2.5rem_1fr_auto] items-start gap-2"
+                    className="editor-row grid grid-cols-[2.5rem_1fr_auto] items-start gap-3"
                   >
                     <span
-                      className="grid size-10 place-items-center rounded-lg font-display text-[18px] tabular-nums"
+                      className="grid size-10 place-items-center rounded-xl font-display text-[18px] tabular-nums"
                       style={{
                         background: pack.mood.background,
                         color: pack.mood.ink,
@@ -492,13 +600,9 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                         next[idx] = e.target.value;
                         setSteps(next);
                       }}
-                      placeholder="Was tut man jetzt?"
+                      placeholder={`Schritt ${idx + 1}: was tut man jetzt?`}
                       rows={2}
-                      className="rounded-lg border bg-white px-3 py-2 text-[13px] outline-none focus:border-current"
-                      style={{
-                        borderColor: brand.tokens.line,
-                        color: brand.tokens.ink,
-                      }}
+                      className="editor-input resize-none"
                     />
                     <button
                       type="button"
@@ -507,7 +611,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                         setSteps(steps.filter((_, i) => i !== idx));
                       }}
                       disabled={steps.length === 1}
-                      className="grid size-10 place-items-center rounded-lg border text-[16px] disabled:opacity-30"
+                      className="grid size-10 place-items-center rounded-xl border text-[16px] transition-colors hover:bg-canvas-alt disabled:opacity-30"
                       style={{
                         borderColor: brand.tokens.line,
                         color: brand.tokens.inkMuted,
@@ -521,7 +625,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                 <button
                   type="button"
                   onClick={() => setSteps([...steps, ""])}
-                  className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold uppercase tracking-[0.12em] transition-colors"
+                  className="editor-button-primary mt-1 self-start"
                   style={{
                     background: pack.mood.background,
                     color: pack.mood.ink,
@@ -530,175 +634,151 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                   + Schritt hinzufügen
                 </button>
               </div>
-            </Section>
+            </section>
 
-            {/* Section: Macros */}
-            <Section
-              title="Nährwerte pro Portion *"
-              subtitle="Makros — kcal ist Pflicht"
-              pack={pack}
-            >
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <Field label="Kalorien (kcal) *">
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={kcal}
-                    onChange={(e) => setKcal(e.target.value)}
-                    className="w-full rounded-lg border bg-white px-4 py-2.5 text-[14px] tabular-nums outline-none focus:border-current"
-                    style={{
-                      borderColor: brand.tokens.line,
-                      color: brand.tokens.ink,
-                    }}
-                  />
-                </Field>
-                <Field label="Eiweiß (g)">
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={protein}
-                    onChange={(e) => setProtein(e.target.value)}
-                    className="w-full rounded-lg border bg-white px-4 py-2.5 text-[14px] tabular-nums outline-none focus:border-current"
-                    style={{
-                      borderColor: brand.tokens.line,
-                      color: brand.tokens.ink,
-                    }}
-                  />
-                </Field>
-                <Field label="Kohlenhydrate (g)">
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={carbs}
-                    onChange={(e) => setCarbs(e.target.value)}
-                    className="w-full rounded-lg border bg-white px-4 py-2.5 text-[14px] tabular-nums outline-none focus:border-current"
-                    style={{
-                      borderColor: brand.tokens.line,
-                      color: brand.tokens.ink,
-                    }}
-                  />
-                </Field>
-                <Field label="Fett (g)">
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={fat}
-                    onChange={(e) => setFat(e.target.value)}
-                    className="w-full rounded-lg border bg-white px-4 py-2.5 text-[14px] tabular-nums outline-none focus:border-current"
-                    style={{
-                      borderColor: brand.tokens.line,
-                      color: brand.tokens.ink,
-                    }}
-                  />
-                </Field>
+            {/* Section 5: Nährwerte */}
+            <section className="editor-section editor-card">
+              <SectionHeader number={5} title="Nährwerte" pack={pack} required>
+                Pro Portion · kcal ist Pflicht
+              </SectionHeader>
+
+              <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <NutriField
+                  label="Kalorien"
+                  unit="kcal"
+                  value={kcal}
+                  onChange={setKcal}
+                  required
+                />
+                <NutriField
+                  label="Eiweiß"
+                  unit="g"
+                  value={protein}
+                  onChange={setProtein}
+                />
+                <NutriField
+                  label="Kohlenh."
+                  unit="g"
+                  value={carbs}
+                  onChange={setCarbs}
+                />
+                <NutriField
+                  label="Fett"
+                  unit="g"
+                  value={fat}
+                  onChange={setFat}
+                />
               </div>
-            </Section>
+            </section>
 
-            {/* Section: Micros */}
-            <Section
-              title="Mikronährstoffe"
-              subtitle="Optional — Vitamine, Mineralien"
-              pack={pack}
-            >
-              <div className="flex flex-col gap-2">
-                {micros.map((micro, idx) => (
-                  <div
-                    key={idx}
-                    className="grid grid-cols-[1.4fr_1fr_5rem_auto] gap-2"
+            {/* Section 6: Mikros */}
+            <section className="editor-section editor-card">
+              <SectionHeader number={6} title="Mikronährstoffe" pack={pack}>
+                Optional · Vitamine & Mineralien
+              </SectionHeader>
+
+              <div className="mt-5 flex flex-col gap-4">
+                <div>
+                  <span
+                    className="mb-2 inline-block text-[11px] font-semibold uppercase tracking-[0.14em]"
+                    style={{ color: pack.mood.inkSoft }}
                   >
-                    <input
-                      type="text"
-                      value={micro.name}
-                      onChange={(e) => {
-                        const next = [...micros];
-                        next[idx] = { ...next[idx], name: e.target.value };
-                        setMicros(next);
-                      }}
-                      placeholder="z. B. Vitamin C"
-                      className="rounded-lg border bg-white px-3 py-2 text-[13px] outline-none focus:border-current"
-                      style={{
-                        borderColor: brand.tokens.line,
-                        color: brand.tokens.ink,
-                      }}
-                    />
-                    <input
-                      type="text"
-                      value={micro.amount}
-                      onChange={(e) => {
-                        const next = [...micros];
-                        next[idx] = { ...next[idx], amount: e.target.value };
-                        setMicros(next);
-                      }}
-                      placeholder="80 mg"
-                      className="rounded-lg border bg-white px-3 py-2 text-[13px] tabular-nums outline-none focus:border-current"
-                      style={{
-                        borderColor: brand.tokens.line,
-                        color: brand.tokens.ink,
-                      }}
-                    />
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={micro.pctDaily}
-                      onChange={(e) => {
-                        const next = [...micros];
-                        next[idx] = { ...next[idx], pctDaily: e.target.value };
-                        setMicros(next);
-                      }}
-                      placeholder="% TB"
-                      className="rounded-lg border bg-white px-3 py-2 text-[13px] tabular-nums outline-none focus:border-current"
-                      style={{
-                        borderColor: brand.tokens.line,
-                        color: brand.tokens.ink,
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setMicros(micros.filter((_, i) => i !== idx))
-                      }
-                      className="grid size-10 place-items-center rounded-lg border text-[16px]"
-                      style={{
-                        borderColor: brand.tokens.line,
-                        color: brand.tokens.inkMuted,
-                      }}
-                      aria-label="Mikro entfernen"
-                    >
-                      ×
-                    </button>
+                    Schnell hinzufügen:
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {microQuickPicks.map((pick) => {
+                      const added = micros.some((m) => m.name === pick.name);
+                      return (
+                        <button
+                          key={pick.name}
+                          type="button"
+                          onClick={() => addMicroQuickPick(pick)}
+                          disabled={added}
+                          className={`editor-chip ${
+                            added ? "opacity-40" : ""
+                          }`}
+                        >
+                          {added ? "✓" : "+"} {pick.name}
+                        </button>
+                      );
+                    })}
                   </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() =>
-                    setMicros([
-                      ...micros,
-                      { name: "", amount: "", pctDaily: "" },
-                    ])
-                  }
-                  className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold uppercase tracking-[0.12em]"
-                  style={{
-                    background: pack.mood.background,
-                    color: pack.mood.ink,
-                  }}
-                >
-                  + Mikro hinzufügen
-                </button>
+                </div>
+
+                {micros.length > 0 ? (
+                  <div className="flex flex-col gap-2 border-t pt-4" style={{ borderColor: brand.tokens.line }}>
+                    {micros.map((micro, idx) => (
+                      <div
+                        key={idx}
+                        className="editor-row grid grid-cols-[1.4fr_1fr_5rem_auto] gap-2"
+                      >
+                        <input
+                          type="text"
+                          value={micro.name}
+                          onChange={(e) => {
+                            const next = [...micros];
+                            next[idx] = { ...next[idx], name: e.target.value };
+                            setMicros(next);
+                          }}
+                          placeholder="Vitamin C"
+                          className="editor-input"
+                        />
+                        <input
+                          type="text"
+                          value={micro.amount}
+                          onChange={(e) => {
+                            const next = [...micros];
+                            next[idx] = { ...next[idx], amount: e.target.value };
+                            setMicros(next);
+                          }}
+                          placeholder="80 mg"
+                          className="editor-input"
+                        />
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={micro.pctDaily}
+                          onChange={(e) => {
+                            const next = [...micros];
+                            next[idx] = { ...next[idx], pctDaily: e.target.value };
+                            setMicros(next);
+                          }}
+                          placeholder="% TB"
+                          className="editor-input"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMicros(micros.filter((_, i) => i !== idx))
+                          }
+                          className="grid size-10 place-items-center rounded-xl border text-[16px] transition-colors hover:bg-canvas-alt"
+                          style={{
+                            borderColor: brand.tokens.line,
+                            color: brand.tokens.inkMuted,
+                          }}
+                          aria-label="Mikro entfernen"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
-            </Section>
+            </section>
           </div>
 
-          {/* PREVIEW */}
-          <aside className="lg:sticky lg:top-24 lg:self-start">
+          {/* PREVIEW COLUMN */}
+          <aside className="lg:sticky lg:top-[148px] lg:self-start">
             <div className="mb-4 flex items-baseline justify-between gap-3">
-              <h2
-                className="font-display text-[20px]"
-                style={{ color: brand.tokens.ink }}
+              <span
+                className="text-[11px] font-semibold uppercase tracking-[0.18em]"
+                style={{ color: brand.tokens.inkMuted }}
               >
                 Live-Vorschau
-              </h2>
+              </span>
               <span
-                className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+                className="text-[11px]"
                 style={{ color: brand.tokens.inkMuted }}
               >
                 so erscheint sie im Pack
@@ -713,13 +793,52 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
               />
             ) : null}
 
+            {/* Pflicht-Checklist */}
+            <div
+              className="mt-5 rounded-2xl border p-4"
+              style={{
+                borderColor: brand.tokens.line,
+                background: brand.tokens.surface,
+              }}
+            >
+              <span
+                className="mb-3 inline-block text-[11px] font-semibold uppercase tracking-[0.16em]"
+                style={{ color: brand.tokens.inkMuted }}
+              >
+                Pflichtfelder
+              </span>
+              <ul className="flex flex-col gap-2 text-[13px]">
+                {requirements.map((req) => (
+                  <li
+                    key={req.label}
+                    className="flex items-center gap-2"
+                    style={{
+                      color: req.ok ? pack.mood.ink : brand.tokens.inkMuted,
+                    }}
+                  >
+                    <span
+                      className="grid size-4 place-items-center rounded-full text-[10px]"
+                      style={{
+                        background: req.ok
+                          ? pack.mood.accent
+                          : brand.tokens.line,
+                        color: req.ok ? "white" : brand.tokens.inkMuted,
+                      }}
+                    >
+                      {req.ok ? "✓" : ""}
+                    </span>
+                    {req.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
             <p
               className="mt-4 text-[12px] leading-relaxed"
               style={{ color: brand.tokens.inkMuted }}
             >
-              Die Karte wird in der Datenbank gespeichert und ist sofort für
-              alle sichtbar — auch in anderen Browsern. Sobald du speicherst,
-              landest du direkt auf der Vollansicht.
+              Karte wird in der Datenbank gespeichert — sofort für alle
+              sichtbar. Sobald du speicherst, landest du auf der Vollansicht.
             </p>
           </aside>
         </div>
@@ -728,46 +847,58 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   );
 }
 
-function Section({
+function SectionHeader({
+  number,
   title,
-  subtitle,
   pack,
+  required,
   children,
 }: {
+  number: number;
   title: string;
-  subtitle: string;
   pack: NonNullable<ReturnType<typeof getPack>>;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2
-          className="font-display text-[22px] leading-none"
-          style={{ color: pack.mood.ink }}
-        >
-          {title}
-        </h2>
-        <p
-          className="text-[12px]"
-          style={{ color: pack.mood.inkSoft }}
-        >
-          {subtitle}
-        </p>
+    <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <span className="editor-section-number">
+          {String(number).padStart(2, "0")}
+        </span>
+        <div className="flex flex-col leading-tight">
+          <h2
+            className="font-display text-[22px]"
+            style={{ color: pack.mood.ink }}
+          >
+            {title}
+            {required ? (
+              <span
+                className="ml-1 text-[14px]"
+                style={{ color: pack.mood.accent }}
+              >
+                *
+              </span>
+            ) : null}
+          </h2>
+          <span
+            className="mt-0.5 text-[12px]"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            {children}
+          </span>
+        </div>
       </div>
-      {children}
-    </section>
+    </div>
   );
 }
 
 function Field({
   label,
-  hint,
   required,
   children,
 }: {
   label: string;
-  hint?: string;
   required?: boolean;
   children: React.ReactNode;
 }) {
@@ -778,9 +909,44 @@ function Field({
         {required ? <span className="text-accent">{" *"}</span> : null}
       </span>
       {children}
-      {hint ? (
-        <span className="text-[11px] text-ink-subtle">{hint}</span>
-      ) : null}
     </label>
+  );
+}
+
+function UnitSuffix({ label }: { label: string }) {
+  return (
+    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-ink-subtle">
+      {label}
+    </span>
+  );
+}
+
+function NutriField({
+  label,
+  unit,
+  value,
+  onChange,
+  required,
+}: {
+  label: string;
+  unit: string;
+  value: string;
+  onChange: (v: string) => void;
+  required?: boolean;
+}) {
+  return (
+    <Field label={label} required={required}>
+      <div className="relative">
+        <input
+          type="number"
+          inputMode="numeric"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="0"
+          className="editor-input pr-12 tabular-nums"
+        />
+        <UnitSuffix label={unit} />
+      </div>
+    </Field>
   );
 }
