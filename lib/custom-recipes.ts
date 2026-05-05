@@ -1,6 +1,7 @@
 "use client";
 
 import type { Recipe } from "./recipes";
+import { getSupabase } from "./supabase";
 
 export type CustomRecipe = Recipe & {
   id: string;
@@ -8,62 +9,107 @@ export type CustomRecipe = Recipe & {
   createdAt: number;
 };
 
-const STORAGE_KEY = "rcb:custom-recipes:v1";
+type RecipeRow = {
+  id: string;
+  brand_slug: string;
+  pack_slug: string;
+  recipe_slug: string;
+  data: Recipe;
+  is_custom: boolean;
+  created_at: string;
+};
 
-function isBrowser() {
-  return typeof window !== "undefined" && typeof localStorage !== "undefined";
+function rowToCustomRecipe(row: RecipeRow): CustomRecipe {
+  return {
+    ...row.data,
+    slug: row.recipe_slug,
+    packSlug: row.pack_slug,
+    id: row.id,
+    isCustom: true,
+    createdAt: new Date(row.created_at).getTime(),
+  };
 }
 
-export function getAllCustomRecipes(): CustomRecipe[] {
-  if (!isBrowser()) return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as CustomRecipe[];
-    if (!Array.isArray(parsed)) return [];
-    return parsed;
-  } catch {
+export async function getCustomRecipesForPack(
+  packSlug: string
+): Promise<CustomRecipe[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("recipes")
+    .select("*")
+    .eq("pack_slug", packSlug)
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("[recipes-db] getCustomRecipesForPack", error);
     return [];
   }
+  return (data ?? []).map(rowToCustomRecipe);
 }
 
-export function getCustomRecipesForPack(packSlug: string): CustomRecipe[] {
-  return getAllCustomRecipes()
-    .filter((r) => r.packSlug === packSlug)
-    .sort((a, b) => b.createdAt - a.createdAt);
-}
-
-export function getCustomRecipe(
+export async function getCustomRecipe(
   packSlug: string,
   recipeSlug: string
-): CustomRecipe | undefined {
-  return getAllCustomRecipes().find(
-    (r) => r.packSlug === packSlug && r.slug === recipeSlug
-  );
-}
-
-export function addCustomRecipe(
-  recipe: Omit<CustomRecipe, "id" | "isCustom" | "createdAt">
-): CustomRecipe {
-  const id = `custom_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-  const stored: CustomRecipe = {
-    ...recipe,
-    id,
-    isCustom: true,
-    createdAt: Date.now(),
-  };
-  const all = getAllCustomRecipes();
-  all.push(stored);
-  if (isBrowser()) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+): Promise<CustomRecipe | undefined> {
+  const supabase = getSupabase();
+  if (!supabase) return undefined;
+  const { data, error } = await supabase
+    .from("recipes")
+    .select("*")
+    .eq("pack_slug", packSlug)
+    .eq("recipe_slug", recipeSlug)
+    .maybeSingle();
+  if (error) {
+    console.error("[recipes-db] getCustomRecipe", error);
+    return undefined;
   }
-  return stored;
+  return data ? rowToCustomRecipe(data) : undefined;
 }
 
-export function removeCustomRecipe(id: string): void {
-  if (!isBrowser()) return;
-  const all = getAllCustomRecipes().filter((r) => r.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+export async function addCustomRecipe(
+  recipe: Omit<CustomRecipe, "id" | "isCustom" | "createdAt"> & {
+    brandSlug: string;
+  }
+): Promise<CustomRecipe | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
+  const { brandSlug, slug: recipeSlug, packSlug, ...rest } = recipe;
+
+  const dataPayload: Recipe = {
+    ...rest,
+    slug: recipeSlug,
+    packSlug,
+  };
+
+  const { data, error } = await supabase
+    .from("recipes")
+    .insert({
+      brand_slug: brandSlug,
+      pack_slug: packSlug,
+      recipe_slug: recipeSlug,
+      data: dataPayload,
+      is_custom: true,
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("[recipes-db] addCustomRecipe", error);
+    return null;
+  }
+  return rowToCustomRecipe(data);
+}
+
+export async function removeCustomRecipe(id: string): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const { error } = await supabase.from("recipes").delete().eq("id", id);
+  if (error) {
+    console.error("[recipes-db] removeCustomRecipe", error);
+    return false;
+  }
+  return true;
 }
 
 export function slugify(input: string): string {

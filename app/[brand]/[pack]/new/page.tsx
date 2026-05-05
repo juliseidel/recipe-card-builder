@@ -43,6 +43,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     { name: string; amount: string; pctDaily: string }[]
   >([{ name: "", amount: "", pctDaily: "" }]);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const previewRecipe: Recipe | null = useMemo(() => {
     if (!pack) return null;
@@ -123,11 +124,13 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     cleanSteps.length >= 1 &&
     parseInt(kcal) > 0;
 
-  const handleSave = () => {
-    if (!isValid || !pack || !previewRecipe) return;
+  const handleSave = async () => {
+    if (!isValid || !pack || !brand || !previewRecipe) return;
     setSaving(true);
-    const slug = slugify(title);
-    const saved = addCustomRecipe({
+    setError(null);
+    const slug = `${slugify(title)}-${Date.now().toString(36).slice(-4)}`;
+    const saved = await addCustomRecipe({
+      brandSlug: brand.slug,
       slug,
       packSlug: pack.slug,
       number: 99,
@@ -152,9 +155,14 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
         micros: cleanMicros,
       },
     });
-    setTimeout(() => {
-      router.push(`/${brand.slug}/${pack.slug}/${saved.slug}`);
-    }, 200);
+    if (!saved) {
+      setSaving(false);
+      setError(
+        "Konnte die Karte nicht speichern. Bitte Verbindung prüfen oder erneut versuchen."
+      );
+      return;
+    }
+    router.push(`/${brand.slug}/${pack.slug}/${saved.slug}`);
   };
 
   return (
@@ -204,6 +212,14 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
           </div>
 
           <div className="flex items-center gap-2">
+            {error ? (
+              <span
+                className="text-[12px] font-medium"
+                style={{ color: "#b91c1c" }}
+              >
+                {error}
+              </span>
+            ) : null}
             <Link
               href={`/${brand.slug}/${pack.slug}`}
               className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-medium transition-colors"
@@ -701,8 +717,9 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
               className="mt-4 text-[12px] leading-relaxed"
               style={{ color: brand.tokens.inkMuted }}
             >
-              Die Karte wird in deinem Browser gespeichert (LocalStorage).
-              Sobald du speicherst, landest du direkt auf der Vollansicht.
+              Die Karte wird in der Datenbank gespeichert und ist sofort für
+              alle sichtbar — auch in anderen Browsern. Sobald du speicherst,
+              landest du direkt auf der Vollansicht.
             </p>
           </aside>
         </div>

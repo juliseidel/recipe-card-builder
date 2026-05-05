@@ -31,13 +31,20 @@ export function CustomRecipeView({
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    const found = getCustomRecipe(pack.slug, recipeSlug);
-    setRecipe(found ?? null);
-
-    const customRecipes = getCustomRecipesForPack(pack.slug);
-    // Custom recipes appear first (newest first), then static
-    setAllRecipes([...customRecipes, ...staticRecipes]);
-    setLoaded(true);
+    let active = true;
+    (async () => {
+      const [found, customList] = await Promise.all([
+        getCustomRecipe(pack.slug, recipeSlug),
+        getCustomRecipesForPack(pack.slug),
+      ]);
+      if (!active) return;
+      setRecipe(found ?? null);
+      setAllRecipes([...customList, ...staticRecipes]);
+      setLoaded(true);
+    })();
+    return () => {
+      active = false;
+    };
   }, [pack.slug, recipeSlug, staticRecipes]);
 
   if (!loaded) {
@@ -73,11 +80,8 @@ export function CustomRecipeView({
           >
             Karte nicht gefunden
           </span>
-          <p
-            className="text-[14px]"
-            style={{ color: pack.mood.inkSoft }}
-          >
-            Diese Karte gibt es in deinem Browser nicht (mehr).
+          <p className="text-[14px]" style={{ color: pack.mood.inkSoft }}>
+            Diese Karte existiert nicht (mehr).
           </p>
           <Link
             href={`/${brand.slug}/${pack.slug}`}

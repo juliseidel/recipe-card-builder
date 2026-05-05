@@ -17,25 +17,36 @@ type RecipeGridProps = {
 
 export function RecipeGrid({ brand, pack, staticRecipes }: RecipeGridProps) {
   const [customRecipes, setCustomRecipes] = useState<CustomRecipe[]>([]);
-  const [hydrated, setHydrated] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    setCustomRecipes(getCustomRecipesForPack(pack.slug));
-    setHydrated(true);
-
-    // Listen for storage changes from other tabs
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "rcb:custom-recipes:v1") {
-        setCustomRecipes(getCustomRecipesForPack(pack.slug));
-      }
+    let active = true;
+    (async () => {
+      const custom = await getCustomRecipesForPack(pack.slug);
+      if (!active) return;
+      setCustomRecipes(custom);
+      setLoaded(true);
+    })();
+    return () => {
+      active = false;
     };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
   }, [pack.slug]);
 
   return (
     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       <NewRecipeCard brand={brand} pack={pack} />
+
+      {!loaded ? (
+        <div
+          className="flex aspect-[3/4] items-center justify-center rounded-[var(--radius-card)] border-2 border-dashed text-[12px] uppercase tracking-[0.18em]"
+          style={{
+            borderColor: pack.mood.ink + "20",
+            color: pack.mood.inkSoft,
+          }}
+        >
+          Lade eigene Karten…
+        </div>
+      ) : null}
 
       {customRecipes.map((recipe) => (
         <RecipeCardPreview
@@ -54,8 +65,6 @@ export function RecipeGrid({ brand, pack, staticRecipes }: RecipeGridProps) {
           recipe={recipe}
         />
       ))}
-
-      {!hydrated ? null : null}
     </div>
   );
 }
