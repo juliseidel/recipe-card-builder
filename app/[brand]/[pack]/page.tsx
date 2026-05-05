@@ -5,7 +5,7 @@ import { getRecipesForPack } from "@/lib/recipes";
 import { SiteHeader } from "@/components/site-header";
 import { PackCover } from "@/components/pack-cover";
 import { PackActions } from "@/components/pack-actions";
-import { RecipeCardPreview } from "@/components/recipe-card-preview";
+import { RecipeGrid } from "@/components/recipe-grid";
 import { NutritionOverview } from "@/components/nutrition-overview";
 
 type PackPageProps = {
@@ -67,16 +67,7 @@ export default async function PackPage({ params }: PackPageProps) {
             </span>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {recipes.map((recipe) => (
-              <RecipeCardPreview
-                key={recipe.slug}
-                brand={brand}
-                pack={pack}
-                recipe={recipe}
-              />
-            ))}
-          </div>
+          <RecipeGrid brand={brand} pack={pack} staticRecipes={recipes} />
         </section>
 
         <NutritionOverview brand={brand} pack={pack} recipes={recipes} />
