@@ -18,6 +18,7 @@ type Props = {
   previous: NavTarget;
   next: NavTarget;
   isCustom?: boolean;
+  deleteAction?: React.ReactNode;
 };
 
 export function RecipeDetailLayout({
@@ -28,6 +29,7 @@ export function RecipeDetailLayout({
   previous,
   next,
   isCustom = false,
+  deleteAction,
 }: Props) {
   return (
     <div
@@ -81,6 +83,7 @@ export function RecipeDetailLayout({
           </nav>
 
           <div className="flex items-center gap-2">
+            {deleteAction}
             <button
               type="button"
               className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[12px] font-semibold transition-transform hover:scale-[1.02]"

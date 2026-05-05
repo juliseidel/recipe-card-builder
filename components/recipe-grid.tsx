@@ -4,7 +4,10 @@ import { useEffect, useState } from "react";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
 import type { Recipe } from "@/lib/recipes";
-import { getCustomRecipesForPack } from "@/lib/custom-recipes";
+import {
+  getCustomRecipesForPack,
+  removeCustomRecipe,
+} from "@/lib/custom-recipes";
 import type { CustomRecipe } from "@/lib/custom-recipes";
 import { NewRecipeCard } from "./new-recipe-card";
 import { RecipeCardPreview } from "./recipe-card-preview";
@@ -54,6 +57,16 @@ export function RecipeGrid({ brand, pack, staticRecipes }: RecipeGridProps) {
           brand={brand}
           pack={pack}
           recipe={recipe}
+          onDelete={async (id) => {
+            // Optimistic UI: remove immediately, then sync to DB
+            setCustomRecipes((prev) => prev.filter((r) => r.id !== id));
+            const ok = await removeCustomRecipe(id);
+            if (!ok) {
+              // Rollback by re-fetching
+              const fresh = await getCustomRecipesForPack(pack.slug);
+              setCustomRecipes(fresh);
+            }
+          }}
         />
       ))}
 

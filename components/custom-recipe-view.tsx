@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
 import type { Recipe } from "@/lib/recipes";
 import {
   getCustomRecipe,
   getCustomRecipesForPack,
+  removeCustomRecipe,
 } from "@/lib/custom-recipes";
 import type { CustomRecipe } from "@/lib/custom-recipes";
 import { SiteHeader } from "./site-header";
@@ -29,6 +31,10 @@ export function CustomRecipeView({
   const [recipe, setRecipe] = useState<CustomRecipe | null>(null);
   const [allRecipes, setAllRecipes] = useState<(Recipe | CustomRecipe)[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const confirmTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     let active = true;
@@ -114,6 +120,66 @@ export function CustomRecipeView({
         }
       : null;
 
+  const handleDeleteClick = async () => {
+    if (!recipe) return;
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      if (confirmTimeout.current) clearTimeout(confirmTimeout.current);
+      confirmTimeout.current = setTimeout(
+        () => setConfirmingDelete(false),
+        3000
+      );
+      return;
+    }
+    setDeleting(true);
+    await removeCustomRecipe(recipe.id);
+    router.push(`/${brand.slug}/${pack.slug}`);
+  };
+
+  const deleteAction = (
+    <button
+      type="button"
+      onClick={handleDeleteClick}
+      onMouseLeave={() => {
+        if (!deleting) setConfirmingDelete(false);
+      }}
+      disabled={deleting}
+      className="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[12px] font-medium transition-colors"
+      style={
+        confirmingDelete
+          ? {
+              borderColor: "transparent",
+              background: "#dc2626",
+              color: "white",
+            }
+          : {
+              borderColor: pack.mood.ink + "20",
+              color: pack.mood.inkSoft,
+              background: "rgba(255,255,255,0.6)",
+            }
+      }
+    >
+      {deleting ? (
+        <span className="size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      ) : (
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden>
+          <path
+            d="M3 4h8m-7 0v7a1 1 0 001 1h4a1 1 0 001-1V4M5.5 4V2.5h3V4M6 6.5v3M8 6.5v3"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      )}
+      {deleting
+        ? "Lösche…"
+        : confirmingDelete
+        ? "Wirklich löschen?"
+        : "Löschen"}
+    </button>
+  );
+
   return (
     <RecipeDetailLayout
       brand={brand}
@@ -123,6 +189,7 @@ export function CustomRecipeView({
       previous={previous}
       next={next}
       isCustom
+      deleteAction={deleteAction}
     />
   );
 }
