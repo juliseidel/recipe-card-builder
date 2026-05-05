@@ -38,8 +38,6 @@ export default async function PackPage({ params }: PackPageProps) {
   }
 
   const recipes = getRecipesForPack(pack.slug);
-  const totalKcal = recipes.reduce((sum, r) => sum + r.nutrition.kcal, 0);
-  const totalProtein = recipes.reduce((sum, r) => sum + r.nutrition.protein, 0);
 
   return (
     <div
@@ -47,49 +45,28 @@ export default async function PackPage({ params }: PackPageProps) {
       style={{ background: brand.tokens.background }}
     >
       <SiteHeader />
-      <PackCover
-        brand={brand}
-        pack={pack}
-        totalRecipes={recipes.length}
-        totalKcal={totalKcal}
-        totalProtein={totalProtein}
-      />
+      <PackCover brand={brand} pack={pack} totalRecipes={recipes.length} />
       <PackActions brand={brand} pack={pack} />
 
       <main className="flex-1">
         <RecipeTableOfContents brand={brand} pack={pack} recipes={recipes} />
 
-        <section className="mx-auto max-w-[1400px] px-6 pt-12 pb-2 lg:px-10 lg:pt-16">
+        <section className="mx-auto max-w-[1400px] px-6 pt-14 pb-2 lg:px-10 lg:pt-20">
           <div
-            className="mb-6 flex flex-col gap-2 border-b pb-5 sm:flex-row sm:items-end sm:justify-between"
+            className="mb-7 flex items-end justify-between gap-3 border-b pb-5"
             style={{ borderColor: brand.tokens.line }}
           >
-            <div className="flex flex-col gap-1.5">
-              <span
-                className="text-[11px] font-semibold uppercase tracking-[0.18em]"
-                style={{ color: brand.tokens.inkMuted }}
-              >
-                Pack-Inhalt · Alle Karten
-              </span>
-              <h2
-                className="font-display text-[32px] leading-none tracking-[-0.01em]"
-                style={{ color: brand.tokens.ink }}
-              >
-                Rezeptkarten
-              </h2>
-              <p
-                className="mt-1 text-[14px]"
-                style={{ color: brand.tokens.inkMuted }}
-              >
-                Vorschau jeder Karte mit Zutaten, Makros und Zubereitungszeit.
-                Klick auf eine Karte für die Vollansicht.
-              </p>
-            </div>
+            <h2
+              className="font-display text-[28px] leading-none tracking-[-0.01em]"
+              style={{ color: brand.tokens.ink }}
+            >
+              Alle Rezeptkarten
+            </h2>
             <span
-              className="font-mono text-[11px] uppercase tracking-[0.14em]"
+              className="text-[13px]"
               style={{ color: brand.tokens.inkMuted }}
             >
-              {recipes.length} Karten · {pack.mood.accent}
+              Klick auf eine Karte für die Vollansicht
             </span>
           </div>
 
@@ -123,10 +100,10 @@ export default async function PackPage({ params }: PackPageProps) {
             · Pack &quot;{pack.title}&quot; · gebaut mit Recipe Card Builder
           </p>
           <p
-            className="font-mono text-[11px] uppercase tracking-[0.14em]"
+            className="text-[12px]"
             style={{ color: brand.tokens.inkMuted }}
           >
-            {brand.handle} · {pack.category}
+            {brand.handle}
           </p>
         </div>
       </footer>

@@ -34,7 +34,7 @@ export const packs: Pack[] = [
       "Deftige Familien-Klassiker, die Biene kalorienarm umbaut. Ohne Verzicht, mit Geschmack.",
     recipeCount: 6,
     coverImage: "/brands/biene/packs/pack-1.jpg",
-    edgeCase: "Edge-Case · Lange Rezepte mit 15+ Zutaten",
+    edgeCase: "Mit ausführlichen Familien-Rezepten",
     mood: {
       background: "#f4d88d",
       accent: "#b07a2a",
@@ -75,7 +75,7 @@ export const packs: Pack[] = [
       "Protein-Fluff, Bananen-Pancakes, Quark-Cups — drei Zutaten, fünf Minuten, maximaler Soforteffekt.",
     recipeCount: 8,
     coverImage: "/brands/biene/packs/pack-3.jpg",
-    edgeCase: "Edge-Case · Kurze Rezepte mit nur 3 Zutaten",
+    edgeCase: "Alle Rezepte mit nur 3 Zutaten",
     mood: {
       background: "#b8dcc9",
       accent: "#3f7560",

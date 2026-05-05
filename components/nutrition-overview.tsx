@@ -43,32 +43,15 @@ export function NutritionOverview({
           className="flex flex-col gap-1 border-b px-6 py-5 sm:flex-row sm:items-end sm:justify-between"
           style={{ borderColor: brand.tokens.line }}
         >
-          <div className="flex flex-col gap-1">
-            <span
-              className="text-[11px] font-semibold uppercase tracking-[0.18em]"
-              style={{ color: brand.tokens.inkMuted }}
-            >
-              Pflicht-Element · Makro-Übersicht
-            </span>
-            <h2
-              className="font-display text-[28px] leading-none tracking-[-0.01em]"
-              style={{ color: brand.tokens.ink }}
-            >
-              Nährwerte im Überblick
-            </h2>
-          </div>
-          <div className="flex items-center gap-4 text-[12px]">
-            <span
-              className="inline-flex items-center gap-1.5"
-              style={{ color: brand.tokens.inkMuted }}
-            >
-              <span
-                className="size-1.5 rounded-full"
-                style={{ background: pack.mood.accent }}
-              />
-              Ø {averages.kcal} kcal · Ø {averages.protein}g Eiweiß pro Portion
-            </span>
-          </div>
+          <h2
+            className="font-display text-[28px] leading-none tracking-[-0.01em]"
+            style={{ color: brand.tokens.ink }}
+          >
+            Nährwerte im Überblick
+          </h2>
+          <span className="text-[13px]" style={{ color: brand.tokens.inkMuted }}>
+            Ø {averages.kcal} kcal · Ø {averages.protein}g Eiweiß pro Portion
+          </span>
         </div>
 
         <div className="overflow-x-auto">

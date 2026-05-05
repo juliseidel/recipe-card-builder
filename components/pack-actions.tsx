@@ -16,51 +16,15 @@ export function PackActions({ brand, pack }: PackActionsProps) {
         borderColor: brand.tokens.line,
       }}
     >
-      <div className="mx-auto flex max-w-[1400px] flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between lg:px-10">
-        <div className="flex items-center gap-3 text-[13px]">
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]"
-            style={{
-              background: pack.mood.accent + "20",
-              color: pack.mood.accent,
-            }}
-          >
-            <span
-              className="size-1.5 rounded-full"
-              style={{ background: pack.mood.accent }}
-            />
-            Status · druckfertig
-          </span>
-          <span style={{ color: brand.tokens.inkMuted }}>
-            Letzte Bearbeitung · Heute 14:32
-          </span>
-        </div>
+      <div className="mx-auto flex max-w-[1400px] flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-10">
+        <span className="text-[13px]" style={{ color: brand.tokens.inkMuted }}>
+          Letzte Bearbeitung · Heute, 14:32
+        </span>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            disabled
-            className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-[13px] font-medium opacity-60"
-            style={{
-              background: brand.tokens.background,
-              color: brand.tokens.inkMuted,
-              border: `1px solid ${brand.tokens.line}`,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-              <path
-                d="M3 5h8M3 7h8M3 9h5"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-            Duplizieren
-          </button>
-
+        <div className="flex items-center gap-2">
           <Link
             href={`/${brand.slug}/${pack.slug}/edit`}
-            className="inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[13px] font-medium transition-colors"
+            className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-medium transition-colors"
             style={{
               background: brand.tokens.background,
               color: brand.tokens.ink,
@@ -75,7 +39,7 @@ export function PackActions({ brand, pack }: PackActionsProps) {
                 strokeLinejoin="round"
               />
             </svg>
-            Pack bearbeiten
+            Bearbeiten
           </Link>
 
           <button
@@ -95,7 +59,7 @@ export function PackActions({ brand, pack }: PackActionsProps) {
                 strokeLinejoin="round"
               />
             </svg>
-            PDF exportieren ({pack.recipeCount} Karten)
+            Als PDF speichern
           </button>
         </div>
       </div>

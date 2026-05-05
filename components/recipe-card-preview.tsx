@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
 import type { Recipe } from "@/lib/recipes";
@@ -17,7 +18,8 @@ export function RecipeCardPreview({
   const topIngredients = recipe.ingredients.slice(0, 4);
 
   return (
-    <article
+    <Link
+      href={`/${brand.slug}/${pack.slug}/${recipe.slug}`}
       className="group flex flex-col overflow-hidden rounded-[var(--radius-card)] border transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[var(--shadow-card-hover)]"
       style={{
         borderColor: brand.tokens.line,
@@ -153,7 +155,7 @@ export function RecipeCardPreview({
           </svg>
         </span>
       </div>
-    </article>
+    </Link>
   );
 }
 

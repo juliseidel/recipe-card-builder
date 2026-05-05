@@ -23,29 +23,21 @@ export function RecipeTableOfContents({
         }}
       >
         <div
-          className="flex flex-col gap-1 border-b px-6 py-5"
+          className="flex items-end justify-between gap-3 border-b px-6 py-5"
           style={{ borderColor: brand.tokens.line }}
         >
-          <div className="flex items-baseline justify-between gap-3">
-            <span
-              className="text-[11px] font-semibold uppercase tracking-[0.18em]"
-              style={{ color: brand.tokens.inkMuted }}
-            >
-              Pack-Inhalt · {recipes.length} Karten
-            </span>
-            <span
-              className="font-mono text-[11px] uppercase tracking-[0.14em]"
-              style={{ color: brand.tokens.inkMuted }}
-            >
-              Cover · Index · Rezepte · Nährwerte
-            </span>
-          </div>
           <h2
             className="font-display text-[28px] leading-none tracking-[-0.01em]"
             style={{ color: brand.tokens.ink }}
           >
             Inhaltsverzeichnis
           </h2>
+          <span
+            className="text-[13px]"
+            style={{ color: brand.tokens.inkMuted }}
+          >
+            {recipes.length} Karten
+          </span>
         </div>
 
         <ul className="divide-y" style={{ borderColor: brand.tokens.line }}>
