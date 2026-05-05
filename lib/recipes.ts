@@ -17,7 +17,7 @@ export type Nutrition = {
   fat: number;
   fiber?: number;
   sugar?: number;
-  micros: Micronutrient[];
+  micros?: Micronutrient[];
 };
 
 export type Recipe = {
@@ -81,12 +81,6 @@ export const recipes: Recipe[] = [
       carbs: 34,
       fat: 12,
       fiber: 4,
-      micros: [
-        { name: "Kalium", amount: "820 mg", pctDaily: 41 },
-        { name: "Vitamin C", amount: "26 mg", pctDaily: 33 },
-        { name: "Vitamin B12", amount: "0,8 µg", pctDaily: 32 },
-        { name: "Selen", amount: "24 µg", pctDaily: 44 },
-      ],
     },
     sourceUrl: "https://www.instagram.com/reel/DW_GD7buV5s/",
     sourceLabel: "Original-Reel @bienesfitlife",
@@ -131,12 +125,6 @@ export const recipes: Recipe[] = [
       carbs: 75,
       fat: 24,
       fiber: 4,
-      micros: [
-        { name: "Calcium", amount: "420 mg", pctDaily: 53 },
-        { name: "Vitamin B12", amount: "1,4 µg", pctDaily: 56 },
-        { name: "Phosphor", amount: "480 mg", pctDaily: 69 },
-        { name: "Magnesium", amount: "85 mg", pctDaily: 23 },
-      ],
     },
     sourceUrl: "https://www.instagram.com/reel/DV9J1iBDuIJ/",
     sourceLabel: "Original-Reel @bienesfitlife",
@@ -177,12 +165,6 @@ export const recipes: Recipe[] = [
       carbs: 92,
       fat: 12,
       fiber: 6,
-      micros: [
-        { name: "Calcium", amount: "340 mg", pctDaily: 43 },
-        { name: "Vitamin C", amount: "48 mg", pctDaily: 60 },
-        { name: "Lycopin", amount: "18 mg" },
-        { name: "Kalium", amount: "880 mg", pctDaily: 44 },
-      ],
     },
     sourceUrl: "https://www.instagram.com/reel/DVTnnPEDJPz/",
     sourceLabel: "Original-Reel @bienesfitlife",
@@ -226,12 +208,6 @@ export const recipes: Recipe[] = [
       carbs: 87,
       fat: 23,
       fiber: 7,
-      micros: [
-        { name: "Vitamin C", amount: "60 mg", pctDaily: 75 },
-        { name: "Lycopin", amount: "22 mg" },
-        { name: "Eisen", amount: "5 mg", pctDaily: 36 },
-        { name: "Calcium", amount: "280 mg", pctDaily: 35 },
-      ],
     },
     sourceUrl: "https://www.instagram.com/reel/DU_csfmDmzO/",
     sourceLabel: "Original-Reel @bienesfitlife",
@@ -272,12 +248,6 @@ export const recipes: Recipe[] = [
       protein: 28,
       carbs: 11,
       fat: 8,
-      micros: [
-        { name: "Vitamin B12", amount: "1,8 µg", pctDaily: 72 },
-        { name: "Selen", amount: "30 µg", pctDaily: 55 },
-        { name: "Riboflavin", amount: "0,6 mg", pctDaily: 43 },
-        { name: "Phosphor", amount: "180 mg", pctDaily: 26 },
-      ],
     },
     sourceUrl: "https://www.instagram.com/reel/DUqnNhMjIKL/",
     sourceLabel: "Original-Reel @bienesfitlife",
@@ -319,12 +289,6 @@ export const recipes: Recipe[] = [
       carbs: 69,
       fat: 25,
       fiber: 8,
-      micros: [
-        { name: "Kalium", amount: "1100 mg", pctDaily: 55 },
-        { name: "Vitamin C", amount: "36 mg", pctDaily: 45 },
-        { name: "Calcium", amount: "320 mg", pctDaily: 40 },
-        { name: "Eisen", amount: "4,5 mg", pctDaily: 32 },
-      ],
     },
     sourceUrl: "https://www.instagram.com/reel/DUoK7j1jtnd/",
     sourceLabel: "Original-Reel @bienesfitlife",
@@ -368,12 +332,6 @@ export const recipes: Recipe[] = [
       carbs: 60,
       fat: 6,
       fiber: 6,
-      micros: [
-        { name: "Calcium", amount: "260 mg", pctDaily: 33 },
-        { name: "Vitamin B12", amount: "1,8 µg", pctDaily: 72 },
-        { name: "Phosphor", amount: "390 mg", pctDaily: 56 },
-        { name: "Magnesium", amount: "70 mg", pctDaily: 19 },
-      ],
     },
     sourceUrl: "https://www.instagram.com/reel/DUfO5PCDImH/",
     sourceLabel: "Original-Reel @bienesfitlife",
@@ -414,12 +372,6 @@ export const recipes: Recipe[] = [
       carbs: 9,
       fat: 5,
       sugar: 4,
-      micros: [
-        { name: "Calcium", amount: "240 mg", pctDaily: 30 },
-        { name: "Vitamin B12", amount: "1,2 µg", pctDaily: 48 },
-        { name: "Phosphor", amount: "260 mg", pctDaily: 37 },
-        { name: "Vitamin C", amount: "12 mg", pctDaily: 15 },
-      ],
     },
   },
   {
@@ -457,12 +409,6 @@ export const recipes: Recipe[] = [
       carbs: 14,
       fat: 5,
       fiber: 6,
-      micros: [
-        { name: "Eisen", amount: "3 mg", pctDaily: 21 },
-        { name: "Magnesium", amount: "60 mg", pctDaily: 16 },
-        { name: "Folat", amount: "85 µg", pctDaily: 43 },
-        { name: "Antioxidantien", amount: "ORAC 2400" },
-      ],
     },
   },
   {
@@ -501,12 +447,6 @@ export const recipes: Recipe[] = [
       carbs: 12,
       fat: 4,
       sugar: 6,
-      micros: [
-        { name: "Vitamin C", amount: "45 mg", pctDaily: 56 },
-        { name: "Calcium", amount: "180 mg", pctDaily: 22 },
-        { name: "Vitamin B12", amount: "0,9 µg", pctDaily: 36 },
-        { name: "Folat", amount: "30 µg", pctDaily: 15 },
-      ],
     },
   },
   {
@@ -545,12 +485,6 @@ export const recipes: Recipe[] = [
       carbs: 38,
       fat: 5,
       sugar: 7,
-      micros: [
-        { name: "Calcium", amount: "120 mg", pctDaily: 15 },
-        { name: "Eisen", amount: "2 mg", pctDaily: 14 },
-        { name: "Vitamin B12", amount: "0,8 µg", pctDaily: 32 },
-        { name: "Mangan", amount: "1,2 mg", pctDaily: 60 },
-      ],
     },
   },
   {
@@ -587,12 +521,6 @@ export const recipes: Recipe[] = [
       carbs: 24,
       fat: 4,
       sugar: 4,
-      micros: [
-        { name: "Vitamin C", amount: "35 mg", pctDaily: 44 },
-        { name: "Calcium", amount: "150 mg", pctDaily: 19 },
-        { name: "Vitamin B12", amount: "0,7 µg", pctDaily: 28 },
-        { name: "Phosphor", amount: "180 mg", pctDaily: 26 },
-      ],
     },
   },
   {
@@ -630,12 +558,6 @@ export const recipes: Recipe[] = [
       carbs: 18,
       fat: 14,
       sugar: 5,
-      micros: [
-        { name: "Vitamin E", amount: "4 mg", pctDaily: 33 },
-        { name: "Magnesium", amount: "80 mg", pctDaily: 21 },
-        { name: "Calcium", amount: "200 mg", pctDaily: 25 },
-        { name: "Kalium", amount: "320 mg", pctDaily: 16 },
-      ],
     },
   },
   {
@@ -670,12 +592,6 @@ export const recipes: Recipe[] = [
       carbs: 14,
       fat: 6,
       sugar: 5,
-      micros: [
-        { name: "Calcium", amount: "180 mg", pctDaily: 22 },
-        { name: "Vitamin B12", amount: "1,1 µg", pctDaily: 44 },
-        { name: "Magnesium", amount: "75 mg", pctDaily: 20 },
-        { name: "Eisen", amount: "2 mg", pctDaily: 14 },
-      ],
     },
   },
   {
@@ -711,12 +627,6 @@ export const recipes: Recipe[] = [
       carbs: 26,
       fat: 6,
       fiber: 5,
-      micros: [
-        { name: "Vitamin C", amount: "55 mg", pctDaily: 69 },
-        { name: "Calcium", amount: "150 mg", pctDaily: 19 },
-        { name: "Mangan", amount: "1,5 mg", pctDaily: 75 },
-        { name: "Antioxidantien", amount: "ORAC 3200" },
-      ],
     },
   },
 
@@ -748,12 +658,6 @@ export const recipes: Recipe[] = [
       protein: 28,
       carbs: 8,
       fat: 1,
-      micros: [
-        { name: "Calcium", amount: "275 mg", pctDaily: 34 },
-        { name: "Vitamin B12", amount: "1,5 µg", pctDaily: 60 },
-        { name: "Phosphor", amount: "320 mg", pctDaily: 46 },
-        { name: "Riboflavin", amount: "0,5 mg", pctDaily: 36 },
-      ],
     },
   },
   {
@@ -784,12 +688,6 @@ export const recipes: Recipe[] = [
       protein: 28,
       carbs: 28,
       fat: 9,
-      micros: [
-        { name: "Kalium", amount: "420 mg", pctDaily: 21 },
-        { name: "Vitamin B6", amount: "0,5 mg", pctDaily: 36 },
-        { name: "Vitamin B12", amount: "1,1 µg", pctDaily: 44 },
-        { name: "Magnesium", amount: "60 mg", pctDaily: 16 },
-      ],
     },
   },
   {
@@ -819,12 +717,6 @@ export const recipes: Recipe[] = [
       protein: 22,
       carbs: 22,
       fat: 3,
-      micros: [
-        { name: "Vitamin C", amount: "30 mg", pctDaily: 38 },
-        { name: "Calcium", amount: "200 mg", pctDaily: 25 },
-        { name: "Mangan", amount: "0,8 mg", pctDaily: 40 },
-        { name: "Antioxidantien", amount: "ORAC 1800" },
-      ],
     },
   },
   {
@@ -855,12 +747,6 @@ export const recipes: Recipe[] = [
       carbs: 12,
       fat: 4,
       fiber: 1,
-      micros: [
-        { name: "Vitamin E", amount: "1,8 mg", pctDaily: 15 },
-        { name: "Magnesium", amount: "35 mg", pctDaily: 9 },
-        { name: "Kalium", amount: "150 mg", pctDaily: 8 },
-        { name: "Niacin", amount: "2 mg", pctDaily: 13 },
-      ],
     },
   },
   {
@@ -890,12 +776,6 @@ export const recipes: Recipe[] = [
       protein: 32,
       carbs: 14,
       fat: 3,
-      micros: [
-        { name: "Calcium", amount: "320 mg", pctDaily: 40 },
-        { name: "Vitamin B12", amount: "1,8 µg", pctDaily: 72 },
-        { name: "Phosphor", amount: "380 mg", pctDaily: 54 },
-        { name: "Riboflavin", amount: "0,6 mg", pctDaily: 43 },
-      ],
     },
   },
   {
@@ -925,12 +805,6 @@ export const recipes: Recipe[] = [
       protein: 22,
       carbs: 14,
       fat: 5,
-      micros: [
-        { name: "Calcium", amount: "210 mg", pctDaily: 26 },
-        { name: "Vitamin B12", amount: "1,2 µg", pctDaily: 48 },
-        { name: "Magnesium", amount: "55 mg", pctDaily: 15 },
-        { name: "Phosphor", amount: "240 mg", pctDaily: 34 },
-      ],
     },
   },
   {
@@ -960,12 +834,6 @@ export const recipes: Recipe[] = [
       protein: 8,
       carbs: 9,
       fat: 2,
-      micros: [
-        { name: "Vitamin C", amount: "20 mg", pctDaily: 25 },
-        { name: "Calcium", amount: "120 mg", pctDaily: 15 },
-        { name: "Mangan", amount: "0,4 mg", pctDaily: 20 },
-        { name: "Antioxidantien", amount: "ORAC 1500" },
-      ],
     },
   },
   {
@@ -996,12 +864,6 @@ export const recipes: Recipe[] = [
       carbs: 22,
       fat: 2,
       fiber: 3,
-      micros: [
-        { name: "Calcium", amount: "150 mg", pctDaily: 19 },
-        { name: "Magnesium", amount: "65 mg", pctDaily: 17 },
-        { name: "Mangan", amount: "1,4 mg", pctDaily: 70 },
-        { name: "Eisen", amount: "1,8 mg", pctDaily: 13 },
-      ],
     },
   },
 
@@ -1039,12 +901,6 @@ export const recipes: Recipe[] = [
       carbs: 18,
       fat: 12,
       fiber: 8,
-      micros: [
-        { name: "Vitamin C", amount: "65 mg", pctDaily: 81 },
-        { name: "Vitamin K", amount: "85 µg", pctDaily: 113 },
-        { name: "Vitamin B6", amount: "1,1 mg", pctDaily: 79 },
-        { name: "Folat", amount: "120 µg", pctDaily: 60 },
-      ],
     },
   },
   {
@@ -1082,12 +938,6 @@ export const recipes: Recipe[] = [
       carbs: 32,
       fat: 14,
       fiber: 11,
-      micros: [
-        { name: "Vitamin C", amount: "55 mg", pctDaily: 69 },
-        { name: "Vitamin A", amount: "850 µg", pctDaily: 106 },
-        { name: "Folat", amount: "200 µg", pctDaily: 100 },
-        { name: "Kalium", amount: "920 mg", pctDaily: 46 },
-      ],
     },
   },
   {
@@ -1124,12 +974,6 @@ export const recipes: Recipe[] = [
       carbs: 24,
       fat: 4,
       fiber: 12,
-      micros: [
-        { name: "Vitamin C", amount: "75 mg", pctDaily: 94 },
-        { name: "Vitamin K", amount: "65 µg", pctDaily: 87 },
-        { name: "Eisen", amount: "5 mg", pctDaily: 36 },
-        { name: "Folat", amount: "180 µg", pctDaily: 90 },
-      ],
     },
   },
   {
@@ -1164,12 +1008,6 @@ export const recipes: Recipe[] = [
       carbs: 18,
       fat: 11,
       fiber: 6,
-      micros: [
-        { name: "Vitamin D", amount: "8 µg", pctDaily: 160 },
-        { name: "Vitamin B12", amount: "1,4 µg", pctDaily: 56 },
-        { name: "Selen", amount: "32 µg", pctDaily: 58 },
-        { name: "Calcium", amount: "240 mg", pctDaily: 30 },
-      ],
     },
   },
   {
@@ -1206,12 +1044,6 @@ export const recipes: Recipe[] = [
       carbs: 38,
       fat: 8,
       fiber: 9,
-      micros: [
-        { name: "Vitamin C", amount: "120 mg", pctDaily: 150 },
-        { name: "Vitamin K", amount: "95 µg", pctDaily: 127 },
-        { name: "Folat", amount: "160 µg", pctDaily: 80 },
-        { name: "Eisen", amount: "4 mg", pctDaily: 29 },
-      ],
     },
   },
   {
@@ -1247,12 +1079,6 @@ export const recipes: Recipe[] = [
       carbs: 42,
       fat: 10,
       fiber: 9,
-      micros: [
-        { name: "Vitamin A", amount: "1200 µg", pctDaily: 150 },
-        { name: "Vitamin C", amount: "45 mg", pctDaily: 56 },
-        { name: "Vitamin B6", amount: "1,2 mg", pctDaily: 86 },
-        { name: "Kalium", amount: "1100 mg", pctDaily: 55 },
-      ],
     },
   },
 
@@ -1287,12 +1113,6 @@ export const recipes: Recipe[] = [
       carbs: 42,
       fat: 7,
       fiber: 8,
-      micros: [
-        { name: "Calcium", amount: "260 mg", pctDaily: 33 },
-        { name: "Magnesium", amount: "95 mg", pctDaily: 25 },
-        { name: "Mangan", amount: "1,8 mg", pctDaily: 90 },
-        { name: "Vitamin C", amount: "30 mg", pctDaily: 38 },
-      ],
     },
   },
   {
@@ -1330,12 +1150,6 @@ export const recipes: Recipe[] = [
       carbs: 40,
       fat: 10,
       fiber: 9,
-      micros: [
-        { name: "Vitamin C", amount: "40 mg", pctDaily: 50 },
-        { name: "Vitamin K", amount: "55 µg", pctDaily: 73 },
-        { name: "Eisen", amount: "4 mg", pctDaily: 29 },
-        { name: "Folat", amount: "200 µg", pctDaily: 100 },
-      ],
     },
   },
   {
@@ -1372,12 +1186,6 @@ export const recipes: Recipe[] = [
       carbs: 50,
       fat: 16,
       fiber: 8,
-      micros: [
-        { name: "Vitamin K", amount: "60 µg", pctDaily: 80 },
-        { name: "Magnesium", amount: "110 mg", pctDaily: 29 },
-        { name: "Mangan", amount: "1,5 mg", pctDaily: 75 },
-        { name: "Folat", amount: "150 µg", pctDaily: 75 },
-      ],
     },
   },
   {
@@ -1414,12 +1222,6 @@ export const recipes: Recipe[] = [
       carbs: 48,
       fat: 13,
       fiber: 5,
-      micros: [
-        { name: "Vitamin C", amount: "90 mg", pctDaily: 113 },
-        { name: "Vitamin B6", amount: "1,3 mg", pctDaily: 93 },
-        { name: "Mangan", amount: "1,2 mg", pctDaily: 60 },
-        { name: "Eisen", amount: "3 mg", pctDaily: 21 },
-      ],
     },
   },
   {
@@ -1455,12 +1257,6 @@ export const recipes: Recipe[] = [
       carbs: 42,
       fat: 14,
       fiber: 8,
-      micros: [
-        { name: "Vitamin C", amount: "75 mg", pctDaily: 94 },
-        { name: "Calcium", amount: "240 mg", pctDaily: 30 },
-        { name: "Eisen", amount: "3 mg", pctDaily: 21 },
-        { name: "Vitamin K", amount: "120 µg", pctDaily: 160 },
-      ],
     },
   },
   {
@@ -1496,12 +1292,6 @@ export const recipes: Recipe[] = [
       carbs: 48,
       fat: 18,
       fiber: 8,
-      micros: [
-        { name: "Vitamin D", amount: "12 µg", pctDaily: 240 },
-        { name: "Omega-3", amount: "2,1 g" },
-        { name: "Vitamin B12", amount: "3,5 µg", pctDaily: 140 },
-        { name: "Vitamin A", amount: "920 µg", pctDaily: 115 },
-      ],
     },
   },
   {
@@ -1537,12 +1327,6 @@ export const recipes: Recipe[] = [
       carbs: 35,
       fat: 13,
       fiber: 6,
-      micros: [
-        { name: "Vitamin B12", amount: "1,3 µg", pctDaily: 52 },
-        { name: "Niacin", amount: "11 mg", pctDaily: 69 },
-        { name: "Selen", amount: "28 µg", pctDaily: 51 },
-        { name: "Kalium", amount: "560 mg", pctDaily: 28 },
-      ],
     },
   },
 ];

@@ -12,7 +12,6 @@ import {
   commonUnits,
 } from "@/lib/ingredient-suggestions";
 import { tagSuggestions } from "@/lib/common-tags";
-import { microQuickPicks } from "@/lib/common-micros";
 import { SiteHeader } from "@/components/site-header";
 import { RecipeCardPreview } from "@/components/recipe-card-preview";
 import { IngredientCombobox } from "@/components/ingredient-combobox";
@@ -46,9 +45,6 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   const [protein, setProtein] = useState("");
   const [carbs, setCarbs] = useState("");
   const [fat, setFat] = useState("");
-  const [micros, setMicros] = useState<
-    { name: string; amount: string; pctDaily: string }[]
-  >([]);
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,13 +54,6 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
 
   const cleanIngredients = ingredients.filter((i) => i.amount || i.name);
   const cleanSteps = steps.filter((s) => s.trim());
-  const cleanMicros = micros
-    .filter((m) => m.name && m.amount)
-    .map((m) => ({
-      name: m.name,
-      amount: m.amount,
-      pctDaily: m.pctDaily ? parseInt(m.pctDaily) : undefined,
-    }));
 
   const previewRecipe: Recipe | null = useMemo(() => {
     if (!pack) return null;
@@ -89,7 +78,6 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
         protein: parseInt(protein) || 0,
         carbs: parseInt(carbs) || 0,
         fat: parseInt(fat) || 0,
-        micros: cleanMicros,
       },
     };
   }, [
@@ -108,7 +96,6 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     protein,
     carbs,
     fat,
-    cleanMicros,
   ]);
 
   // Required fields tracking — used for save-button counter
@@ -163,7 +150,6 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
         protein: parseInt(protein) || 0,
         carbs: parseInt(carbs) || 0,
         fat: parseInt(fat) || 0,
-        micros: cleanMicros,
       },
     });
     if (!saved) {
@@ -187,18 +173,6 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     setIngredients((prev) =>
       prev.map((i, k) => (k === idx ? { ...i, ...patch } : i))
     );
-  };
-
-  const addMicroQuickPick = (pick: (typeof microQuickPicks)[number]) => {
-    if (micros.some((m) => m.name === pick.name)) return;
-    setMicros([
-      ...micros,
-      {
-        name: pick.name,
-        amount: pick.amount,
-        pctDaily: pick.pctDaily.toString(),
-      },
-    ]);
   };
 
   return (
@@ -706,101 +680,6 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
               </div>
             </section>
 
-            {/* Section 6: Mikros */}
-            <section className="editor-section editor-card">
-              <SectionHeader number={6} title="Mikronährstoffe" pack={pack}>
-                Optional · Vitamine & Mineralien
-              </SectionHeader>
-
-              <div className="mt-5 flex flex-col gap-4">
-                <div>
-                  <span
-                    className="mb-2 inline-block text-[11px] font-semibold uppercase tracking-[0.14em]"
-                    style={{ color: pack.mood.inkSoft }}
-                  >
-                    Schnell hinzufügen:
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    {microQuickPicks.map((pick) => {
-                      const added = micros.some((m) => m.name === pick.name);
-                      return (
-                        <button
-                          key={pick.name}
-                          type="button"
-                          onClick={() => addMicroQuickPick(pick)}
-                          disabled={added}
-                          className={`editor-chip ${
-                            added ? "opacity-40" : ""
-                          }`}
-                        >
-                          {added ? "✓" : "+"} {pick.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {micros.length > 0 ? (
-                  <div className="flex flex-col gap-2 border-t pt-4" style={{ borderColor: brand.tokens.line }}>
-                    {micros.map((micro, idx) => (
-                      <div
-                        key={idx}
-                        className="editor-row grid grid-cols-[1.4fr_1fr_5rem_auto] gap-2"
-                      >
-                        <input
-                          type="text"
-                          value={micro.name}
-                          onChange={(e) => {
-                            const next = [...micros];
-                            next[idx] = { ...next[idx], name: e.target.value };
-                            setMicros(next);
-                          }}
-                          placeholder="Vitamin C"
-                          className="editor-input"
-                        />
-                        <input
-                          type="text"
-                          value={micro.amount}
-                          onChange={(e) => {
-                            const next = [...micros];
-                            next[idx] = { ...next[idx], amount: e.target.value };
-                            setMicros(next);
-                          }}
-                          placeholder="80 mg"
-                          className="editor-input"
-                        />
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          value={micro.pctDaily}
-                          onChange={(e) => {
-                            const next = [...micros];
-                            next[idx] = { ...next[idx], pctDaily: e.target.value };
-                            setMicros(next);
-                          }}
-                          placeholder="% TB"
-                          className="editor-input"
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setMicros(micros.filter((_, i) => i !== idx))
-                          }
-                          className="grid size-10 place-items-center rounded-xl border text-[16px] transition-colors hover:bg-canvas-alt"
-                          style={{
-                            borderColor: brand.tokens.line,
-                            color: brand.tokens.inkMuted,
-                          }}
-                          aria-label="Mikro entfernen"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            </section>
           </div>
 
           {/* PREVIEW COLUMN */}

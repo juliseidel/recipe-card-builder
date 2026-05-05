@@ -384,9 +384,6 @@ function EditorialLayout({
       {/* MACROS — Premium Bar */}
       <MacrosBlock recipe={recipe} pack={pack} variant="hero" />
 
-      {/* MICROS */}
-      <MicrosBlock recipe={recipe} pack={pack} brand={brand} variant="grid" />
-
       <CardFooter brand={brand} pack={pack} recipe={recipe} />
     </article>
   );
@@ -488,7 +485,6 @@ function PatisserieLayout({
         />
       </div>
 
-      <MicrosBlock recipe={recipe} pack={pack} brand={brand} variant="tags" />
       <CardFooter brand={brand} pack={pack} recipe={recipe} italic />
     </article>
   );
@@ -587,8 +583,6 @@ function MinimalLayout({
         <SectionList recipe={recipe} pack={pack} kind="ingredients" minimal />
         <SectionList recipe={recipe} pack={pack} kind="steps" minimal />
       </div>
-
-      <MicrosBlock recipe={recipe} pack={pack} brand={brand} variant="minimal" />
 
       <CardFooter brand={brand} pack={pack} recipe={recipe} />
     </article>
@@ -697,7 +691,6 @@ function SportLayout({
         <SectionList recipe={recipe} pack={pack} kind="steps" bold />
       </div>
 
-      <MicrosBlock recipe={recipe} pack={pack} brand={brand} variant="grid" />
       <CardFooter brand={brand} pack={pack} recipe={recipe} />
     </article>
   );
@@ -830,12 +823,6 @@ function DashboardLayout({
         <SectionList recipe={recipe} pack={pack} kind="steps" checklist />
       </div>
 
-      <MicrosBlock
-        recipe={recipe}
-        pack={pack}
-        brand={brand}
-        variant="dashboard"
-      />
       <CardFooter brand={brand} pack={pack} recipe={recipe} />
     </article>
   );
@@ -1178,224 +1165,6 @@ function MacroCell({
       >
         {label}
       </span>
-    </div>
-  );
-}
-
-function MicrosBlock({
-  recipe,
-  pack,
-  brand,
-  variant,
-}: {
-  recipe: Recipe;
-  pack: Pack;
-  brand: Brand;
-  variant: "grid" | "tags" | "minimal" | "dashboard";
-}) {
-  if (!recipe.nutrition.micros?.length) return null;
-
-  if (variant === "tags") {
-    return (
-      <div
-        className="flex flex-wrap items-center gap-2 px-10 py-6"
-        style={{ background: pack.mood.background + "50" }}
-      >
-        <span
-          className="text-[11px] font-semibold uppercase italic tracking-[0.18em]"
-          style={{ color: pack.mood.inkSoft }}
-        >
-          Mikronährstoffe ·
-        </span>
-        {recipe.nutrition.micros.map((micro) => (
-          <span
-            key={micro.name}
-            className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-medium"
-            style={{
-              background: "rgba(255,255,255,0.7)",
-              color: pack.mood.ink,
-            }}
-          >
-            {micro.name}
-            <span
-              className="font-mono text-[10px] tabular-nums"
-              style={{ color: pack.mood.inkSoft }}
-            >
-              {micro.amount}
-              {micro.pctDaily !== undefined ? ` (${micro.pctDaily}%)` : ""}
-            </span>
-          </span>
-        ))}
-      </div>
-    );
-  }
-
-  if (variant === "minimal") {
-    return (
-      <div
-        className="border-t px-12 py-8"
-        style={{ borderColor: brand.tokens.line }}
-      >
-        <h2
-          className="text-[11px] font-semibold uppercase tracking-[0.22em]"
-          style={{ color: pack.mood.inkSoft }}
-        >
-          Mikronährstoffe
-        </h2>
-        <table className="mt-4 w-full text-[13px]">
-          <tbody>
-            {recipe.nutrition.micros.map((micro) => (
-              <tr
-                key={micro.name}
-                className="border-b last:border-b-0"
-                style={{ borderColor: pack.mood.ink + "10" }}
-              >
-                <td className="py-2.5" style={{ color: pack.mood.ink }}>
-                  {micro.name}
-                </td>
-                <td
-                  className="py-2.5 text-right font-mono tabular-nums"
-                  style={{ color: pack.mood.inkSoft }}
-                >
-                  {micro.amount}
-                </td>
-                <td
-                  className="py-2.5 pl-4 text-right font-mono tabular-nums"
-                  style={{ color: pack.mood.accent }}
-                >
-                  {micro.pctDaily !== undefined ? `${micro.pctDaily}%` : "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
-
-  if (variant === "dashboard") {
-    return (
-      <div
-        className="border-t px-8 py-6"
-        style={{ borderColor: brand.tokens.line, background: pack.mood.background + "30" }}
-      >
-        <div className="flex items-center justify-between gap-3">
-          <h2
-            className="text-[11px] font-semibold uppercase tracking-[0.18em]"
-            style={{ color: pack.mood.ink }}
-          >
-            🧪 Mikronährstoff-Datenbank
-          </h2>
-          <span
-            className="font-mono text-[10px] uppercase tracking-[0.14em]"
-            style={{ color: pack.mood.inkSoft }}
-          >
-            {recipe.nutrition.micros.length} Properties
-          </span>
-        </div>
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {recipe.nutrition.micros.map((micro) => (
-            <div
-              key={micro.name}
-              className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2"
-              style={{
-                borderColor: pack.mood.ink + "1a",
-                background: brand.tokens.surface,
-              }}
-            >
-              <span
-                className="text-[11px] font-medium"
-                style={{ color: pack.mood.inkSoft }}
-              >
-                {micro.name}
-              </span>
-              <span
-                className="font-mono text-[11px] font-semibold tabular-nums"
-                style={{ color: pack.mood.ink }}
-              >
-                {micro.amount}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // grid variant (editorial / sport)
-  return (
-    <div className="px-8 pb-10 sm:px-12">
-      <div
-        className="overflow-hidden rounded-2xl border"
-        style={{
-          borderColor: pack.mood.ink + "20",
-          background: pack.mood.background + "60",
-        }}
-      >
-        <div
-          className="flex items-center justify-between gap-3 border-b px-5 py-3"
-          style={{ borderColor: pack.mood.ink + "1a" }}
-        >
-          <h2
-            className="text-[12px] font-semibold uppercase tracking-[0.22em]"
-            style={{ color: pack.mood.accent }}
-          >
-            Mikronährstoffe
-          </h2>
-          <span
-            className="text-[10px] font-medium uppercase tracking-[0.14em]"
-            style={{ color: pack.mood.inkSoft }}
-          >
-            pro Portion · % vom Tagesbedarf
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-px sm:grid-cols-4">
-          {recipe.nutrition.micros.map((micro) => (
-            <div
-              key={micro.name}
-              className="flex flex-col gap-1 px-4 py-4"
-              style={{ background: brand.tokens.surface }}
-            >
-              <div className="flex items-baseline justify-between gap-2">
-                <span
-                  className="text-[11px] font-semibold uppercase tracking-[0.14em]"
-                  style={{ color: pack.mood.inkSoft }}
-                >
-                  {micro.name}
-                </span>
-                {micro.pctDaily !== undefined ? (
-                  <span
-                    className="font-mono text-[11px] font-semibold tabular-nums"
-                    style={{ color: pack.mood.accent }}
-                  >
-                    {micro.pctDaily}%
-                  </span>
-                ) : null}
-              </div>
-              <span
-                className="font-display text-[18px] leading-none tabular-nums"
-                style={{ color: pack.mood.ink }}
-              >
-                {micro.amount}
-              </span>
-              {micro.pctDaily !== undefined ? (
-                <div
-                  className="mt-1 h-1 overflow-hidden rounded-full"
-                  style={{ background: pack.mood.ink + "12" }}
-                >
-                  <div
-                    className="h-full"
-                    style={{
-                      width: `${Math.min(micro.pctDaily, 100)}%`,
-                      background: pack.mood.accent,
-                    }}
-                  />
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
