@@ -120,12 +120,12 @@ export const packs: Pack[] = [
     brandSlug: "biene",
     number: 5,
     title: "Meal-Prep Heroes",
-    subtitle: "Vorkochen für die Arbeit",
+    subtitle: "Vorkochen für die ganze Woche",
     category: "Wochenplanung",
-    tagline: "Ein Sonntag, fünf Tage Versorgung",
+    tagline: "Löffelkuchen, Tarte, Lasagne, Tiramisu — Bienes virale Mealpreps",
     description:
-      "Overnight-Oats, Schichtsalate, Bowls — fertig in der Tupperdose, perfekt für den Bürotag.",
-    recipeCount: 7,
+      "Bienes Mealprep-Hits aus den Reels: süße Löffelkuchen, herzhafte Tarte, Lasagne und Tiramisu — vorgekocht für 2 bis 4 Tage, perfekt für den Bürotag.",
+    recipeCount: 8,
     coverImage: "/brands/biene/packs/pack-5.jpg",
     mood: {
       background: "#b4cde4",

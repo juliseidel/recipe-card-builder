@@ -722,10 +722,11 @@ function SportLayout({
   );
 }
 
+
 // ════════════════════════════════════════════════
 // LAYOUT 5: DASHBOARD — Pack 5 (Meal-Prep, Sky Blue)
-// Notion-Template: data-rows mit klarer Pro-Portion-Annotation,
-// checklist-style Zutaten, Subgruppen-aware
+// Notion-Template: strukturiert, day-of-week tags,
+// data-rows, checklist style
 // ════════════════════════════════════════════════
 function DashboardLayout({
   brand,
@@ -734,30 +735,19 @@ function DashboardLayout({
   totalRecipes,
 }: RecipeCardFullProps) {
   const totalTime = recipe.prepTime + (recipe.cookTime ?? 0);
-  const grouped = groupIngredients(recipe.ingredients);
   const portionsLabel = recipe.servings === 1 ? "Portion" : "Portionen";
-  const weekDay = [
-    "Montag",
-    "Dienstag",
-    "Mittwoch",
-    "Donnerstag",
-    "Freitag",
-    "Samstag",
-    "Sonntag",
-  ][(recipe.number - 1) % 7];
-
+  const weekDay = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"][
+    (recipe.number - 1) % 7
+  ];
   return (
     <article
-      className="mx-auto w-full max-w-[940px] overflow-hidden rounded-[var(--radius-card)] border bg-white"
+      className="mx-auto w-full max-w-[860px] overflow-hidden rounded-[var(--radius-card)] border bg-white"
       style={baseShellStyle(pack, brand)}
     >
       {/* Notion-like header */}
       <div
         className="flex flex-wrap items-center gap-3 border-b px-8 py-4 text-[12px]"
-        style={{
-          borderColor: brand.tokens.line,
-          background: pack.mood.background + "40",
-        }}
+        style={{ borderColor: brand.tokens.line, background: pack.mood.background + "40" }}
       >
         <span
           className="rounded-md px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.16em]"
@@ -770,8 +760,7 @@ function DashboardLayout({
         </span>
         <span style={{ color: pack.mood.inkSoft, opacity: 0.5 }}>·</span>
         <span style={{ color: pack.mood.inkSoft }}>
-          Karte {String(recipe.number).padStart(2, "0")} /{" "}
-          {String(totalRecipes).padStart(2, "0")}
+          Karte {String(recipe.number).padStart(2, "0")} / {String(totalRecipes).padStart(2, "0")}
         </span>
         <span className="ml-auto" style={{ color: pack.mood.accent }}>
           ✓ Mealprep-Ready
@@ -782,7 +771,7 @@ function DashboardLayout({
       <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr]">
         <div className="flex flex-col gap-3 px-8 pt-10 pb-8">
           <h1
-            className="font-display text-[36px] leading-[1.02] tracking-[-0.01em] sm:text-[44px]"
+            className="font-display text-[40px] leading-[1.02] tracking-[-0.01em] sm:text-[48px]"
             style={{ color: pack.mood.ink }}
           >
             {recipe.title}
@@ -794,33 +783,7 @@ function DashboardLayout({
             {recipe.subtitle}
           </p>
 
-          {recipe.description ? (
-            <p
-              className="mt-1 max-w-[60ch] text-[13px] leading-relaxed"
-              style={{ color: pack.mood.ink, opacity: 0.8 }}
-            >
-              {recipe.description}
-            </p>
-          ) : null}
-
-          {recipe.tags?.length ? (
-            <div className="mt-1 flex flex-wrap gap-1.5">
-              {recipe.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-md px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.1em]"
-                  style={{
-                    background: pack.mood.background + "70",
-                    color: pack.mood.ink,
-                  }}
-                >
-                  #{tag}
-                </span>
-              ))}
-            </div>
-          ) : null}
-
-          {/* Notion-style data rows — alle Werte explizit pro Portion */}
+          {/* Notion-style data rows — Pro-Portion explizit */}
           <div
             className="mt-4 flex flex-col gap-px overflow-hidden rounded-lg border"
             style={{ borderColor: brand.tokens.line }}
@@ -845,20 +808,8 @@ function DashboardLayout({
               pack={pack}
             />
             <DashRow
-              icon="🌾"
-              label="Kohlenhydrate / Portion"
-              value={`${recipe.nutrition.carbs} g`}
-              pack={pack}
-            />
-            <DashRow
-              icon="🥑"
-              label="Fett / Portion"
-              value={`${recipe.nutrition.fat} g`}
-              pack={pack}
-            />
-            <DashRow
               icon="⏱"
-              label="Zubereitungszeit"
+              label="Zubereitung"
               value={`${totalTime} Min`}
               pack={pack}
             />
@@ -876,7 +827,7 @@ function DashboardLayout({
             src={recipe.hero ?? pack.coverImage}
             alt={recipe.title}
             fill
-            sizes="(min-width: 1024px) 380px, 100vw"
+            sizes="(min-width: 1024px) 360px, 100vw"
             className="object-cover"
             priority
           />
@@ -887,135 +838,18 @@ function DashboardLayout({
         </div>
       </div>
 
-      {/* BODY: Subgruppen-aware Zutaten (checklist) + Steps */}
+      {/* Body as checklist */}
       <div
-        className="grid grid-cols-1 gap-10 border-t px-8 py-10 sm:px-10 lg:grid-cols-[0.95fr_1.1fr] lg:gap-14"
+        className="grid grid-cols-1 gap-10 border-t px-8 pt-10 pb-10 lg:grid-cols-[1fr_1.4fr] lg:gap-14"
         style={{ borderColor: brand.tokens.line }}
       >
-        {/* INGREDIENTS — checklist */}
-        <section>
-          <div
-            className="flex items-baseline justify-between gap-3 border-b pb-3"
-            style={{ borderColor: pack.mood.ink + "20" }}
-          >
-            <h2
-              className="text-[12px] font-semibold uppercase tracking-[0.22em]"
-              style={{ color: pack.mood.accent }}
-            >
-              Einkaufsliste
-            </h2>
-            <span
-              className="text-[10px] font-medium uppercase tracking-[0.14em]"
-              style={{ color: pack.mood.inkSoft }}
-            >
-              {recipe.ingredients.length} Items · für {recipe.servings}{" "}
-              {portionsLabel}
-            </span>
-          </div>
-
-          <div className="mt-5 flex flex-col gap-6">
-            {grouped.map((group, gIdx) => {
-              const useTwoCol = !group.name && group.items.length > 8;
-              return (
-                <div key={group.name ?? `main-${gIdx}`}>
-                  {group.name ? (
-                    <h3
-                      className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em]"
-                      style={{ color: pack.mood.inkSoft }}
-                    >
-                      Für {group.name.toLowerCase()}
-                    </h3>
-                  ) : null}
-                  <ul
-                    className={
-                      useTwoCol
-                        ? "grid grid-cols-1 gap-x-6 sm:grid-cols-2"
-                        : "flex flex-col"
-                    }
-                  >
-                    {group.items.map((ing, iIdx) => (
-                      <li
-                        key={`${ing.name}-${iIdx}`}
-                        className="grid grid-cols-[1.4rem_4.5rem_1fr] items-baseline gap-2 border-b py-2"
-                        style={{
-                          borderColor: pack.mood.ink + "10",
-                          color: pack.mood.ink,
-                        }}
-                      >
-                        <span
-                          className="text-[14px] opacity-50"
-                          style={{ color: pack.mood.inkSoft }}
-                          aria-hidden
-                        >
-                          ☐
-                        </span>
-                        <span
-                          className="font-mono text-[12px] tabular-nums"
-                          style={{ color: pack.mood.inkSoft }}
-                        >
-                          {ing.amount}
-                        </span>
-                        <span className="text-[14px] leading-snug">
-                          {ing.name}
-                          {ing.note ? (
-                            <span
-                              className="block text-[11px] italic"
-                              style={{ color: pack.mood.inkSoft }}
-                            >
-                              {ing.note}
-                            </span>
-                          ) : null}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* STEPS — workflow */}
-        <section>
-          <div
-            className="flex items-baseline justify-between gap-3 border-b pb-3"
-            style={{ borderColor: pack.mood.ink + "20" }}
-          >
-            <h2
-              className="text-[12px] font-semibold uppercase tracking-[0.22em]"
-              style={{ color: pack.mood.accent }}
-            >
-              Workflow
-            </h2>
-            <span
-              className="text-[10px] font-medium uppercase tracking-[0.14em]"
-              style={{ color: pack.mood.inkSoft }}
-            >
-              {recipe.steps.length} Schritte
-            </span>
-          </div>
-          <ol className="mt-5 flex flex-col gap-5">
-            {recipe.steps.map((step, idx) => (
-              <li
-                key={idx}
-                className="grid grid-cols-[2rem_1fr] items-baseline gap-3"
-              >
-                <span
-                  className="font-mono text-[14px] font-semibold tabular-nums"
-                  style={{ color: pack.mood.accent }}
-                >
-                  {String(idx + 1).padStart(2, "0")}
-                </span>
-                <span
-                  className="text-[15px] leading-[1.55]"
-                  style={{ color: pack.mood.ink }}
-                >
-                  {step}
-                </span>
-              </li>
-            ))}
-          </ol>
-        </section>
+        <SectionList
+          recipe={recipe}
+          pack={pack}
+          kind="ingredients"
+          checklist
+        />
+        <SectionList recipe={recipe} pack={pack} kind="steps" checklist />
       </div>
 
       <CardFooter brand={brand} pack={pack} recipe={recipe} />
