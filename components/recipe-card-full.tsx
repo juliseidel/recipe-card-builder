@@ -33,8 +33,8 @@ const baseShellStyle = (pack: Pack, brand: Brand): React.CSSProperties => ({
 
 // ════════════════════════════════════════════════
 // LAYOUT 1: EDITORIAL — Pack 1 (Feierabend, Honey)
-// Klassisches Cookbook-Magazin: Hero-Bild full-width oben,
-// klassische serif Typografie, viel Whitespace
+// Typografisches Cookbook-Spread: Title dominiert, Bild als
+// kleiner quadratischer Akzent in der Zutaten-Spalte
 // ════════════════════════════════════════════════
 function EditorialLayout({
   brand,
@@ -48,71 +48,104 @@ function EditorialLayout({
       className="mx-auto w-full max-w-[860px] overflow-hidden rounded-[var(--radius-card)] border bg-white"
       style={baseShellStyle(pack, brand)}
     >
-      {/* Hero image full-width */}
-      <div className="relative aspect-[16/9] overflow-hidden">
-        <Image
-          src={recipe.hero ?? pack.coverImage}
-          alt={recipe.title}
-          fill
-          sizes="(min-width: 1024px) 860px, 100vw"
-          className="object-cover"
-          priority
-        />
-        <div
-          className="absolute inset-0 mix-blend-multiply"
-          style={{ background: pack.mood.background, opacity: 0.18 }}
-        />
-        <span
-          className="absolute left-6 top-6 rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] backdrop-blur"
-          style={{ background: "rgba(255,255,255,0.92)", color: pack.mood.ink }}
-        >
-          Pack {String(pack.number).padStart(2, "0")} · Karte{" "}
-          {String(recipe.number).padStart(2, "0")} / {String(totalRecipes).padStart(2, "0")}
-        </span>
-      </div>
+      {/* Title-driven header: kein Hero-Image, nur Typo */}
+      <div
+        className="border-b px-10 pt-12 pb-10 sm:px-14 sm:pt-14"
+        style={{
+          borderColor: pack.mood.ink + "1a",
+          background: pack.mood.background + "30",
+        }}
+      >
+        <div className="flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.22em]">
+          <span style={{ color: pack.mood.inkSoft }}>
+            Pack {String(pack.number).padStart(2, "0")} · {pack.title}
+          </span>
+          <span
+            className="font-mono"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            Karte {String(recipe.number).padStart(2, "0")} / {String(totalRecipes).padStart(2, "0")}
+          </span>
+        </div>
 
-      {/* Title block centered */}
-      <div className="px-12 pt-12 pb-8 text-center">
-        <span
-          className="text-[11px] font-semibold uppercase tracking-[0.22em]"
-          style={{ color: pack.mood.inkSoft }}
-        >
-          {pack.title}
-        </span>
         <h1
-          className="mx-auto mt-4 max-w-[18ch] font-display text-[52px] uppercase leading-[1.0] tracking-[-0.01em] sm:text-[64px]"
+          className="mt-7 max-w-[20ch] font-display text-[48px] uppercase leading-[0.96] tracking-[-0.01em] sm:text-[64px]"
           style={{ color: pack.mood.ink }}
         >
           {recipe.title}
         </h1>
         <p
-          className="mx-auto mt-4 max-w-[42ch] font-display text-[20px] italic leading-snug"
+          className="mt-4 max-w-[48ch] font-display text-[20px] italic leading-snug"
           style={{ color: pack.mood.inkSoft }}
         >
           {recipe.subtitle}
         </p>
 
-        {/* Stats inline */}
+        {/* Stats row */}
         <div
-          className="mx-auto mt-8 inline-flex flex-wrap items-center justify-center gap-x-7 gap-y-2 border-t border-b py-4 text-[11px] font-semibold uppercase tracking-[0.16em]"
-          style={{
-            borderColor: pack.mood.ink + "22",
-            color: pack.mood.inkSoft,
-          }}
+          className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-2 text-[11px] font-semibold uppercase tracking-[0.18em]"
+          style={{ color: pack.mood.inkSoft }}
         >
           <span>{totalTime} Min</span>
-          <span>·</span>
+          <span style={{ opacity: 0.4 }}>·</span>
           <span>
             {recipe.servings} Portion{recipe.servings === 1 ? "" : "en"}
           </span>
-          <span>·</span>
+          <span style={{ opacity: 0.4 }}>·</span>
           <span>{recipe.difficulty}</span>
+          <span style={{ opacity: 0.4 }}>·</span>
+          <span style={{ color: pack.mood.accent }}>
+            {recipe.nutrition.kcal} kcal
+          </span>
         </div>
       </div>
 
-      {/* Body 2-column */}
-      <div className="grid grid-cols-1 gap-12 px-12 pb-10 lg:grid-cols-[1fr_1.4fr] lg:gap-16">
-        <SectionList recipe={recipe} pack={pack} kind="ingredients" />
+      {/* Body 2-column: image as small accent in the ingredients column */}
+      <div className="grid grid-cols-1 gap-12 px-10 pt-10 pb-8 sm:px-14 lg:grid-cols-[1fr_1.4fr] lg:gap-16">
+        <div className="flex flex-col gap-6">
+          {/* Compact image as visual anchor — square polaroid */}
+          <div className="relative">
+            <div
+              className="relative aspect-square w-full max-w-[300px] overflow-hidden rounded-2xl"
+              style={{
+                boxShadow:
+                  "0 1px 0 rgba(43,31,25,0.05), 0 18px 32px -16px rgba(43,31,25,0.25)",
+              }}
+            >
+              <Image
+                src={recipe.hero ?? pack.coverImage}
+                alt={recipe.title}
+                fill
+                sizes="300px"
+                className="object-cover"
+                priority
+              />
+              <div
+                className="absolute inset-0 mix-blend-multiply"
+                style={{ background: pack.mood.background, opacity: 0.15 }}
+              />
+            </div>
+            {recipe.tags.length ? (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {recipe.tags.slice(0, 3).map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full px-2.5 py-1 text-[10px] font-medium"
+                    style={{
+                      background: pack.mood.background + "70",
+                      color: pack.mood.ink,
+                    }}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <SectionList recipe={recipe} pack={pack} kind="ingredients" />
+        </div>
+
         <SectionList recipe={recipe} pack={pack} kind="steps" />
       </div>
 
