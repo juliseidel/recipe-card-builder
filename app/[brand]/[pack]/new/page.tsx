@@ -15,6 +15,7 @@ import { tagSuggestions } from "@/lib/common-tags";
 import { microQuickPicks } from "@/lib/common-micros";
 import { SiteHeader } from "@/components/site-header";
 import { RecipeCardPreview } from "@/components/recipe-card-preview";
+import { IngredientCombobox } from "@/components/ingredient-combobox";
 
 type NewRecipePageProps = {
   params: Promise<{ brand: string; pack: string }>;
@@ -51,6 +52,9 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [focusedIngredientIdx, setFocusedIngredientIdx] = useState<number | null>(
+    null
+  );
 
   const cleanIngredients = ingredients.filter((i) => i.amount || i.name);
   const cleanSteps = steps.filter((s) => s.trim());
@@ -420,17 +424,26 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                     </div>
                   </Field>
                   <Field label="Schwierigkeit">
-                    <select
-                      value={difficulty}
-                      onChange={(e) =>
-                        setDifficulty(e.target.value as Recipe["difficulty"])
-                      }
-                      className="editor-input"
-                    >
-                      <option value="Einfach">Einfach</option>
-                      <option value="Mittel">Mittel</option>
-                      <option value="Aufwendig">Aufwendig</option>
-                    </select>
+                    <div className="pill-group" role="radiogroup">
+                      {(["Einfach", "Mittel", "Aufwendig"] as const).map(
+                        (level) => (
+                          <button
+                            key={level}
+                            type="button"
+                            role="radio"
+                            aria-checked={difficulty === level}
+                            onClick={() => setDifficulty(level)}
+                            className={`pill-group-btn ${
+                              difficulty === level
+                                ? "pill-group-btn-active"
+                                : ""
+                            }`}
+                          >
+                            {level}
+                          </button>
+                        )
+                      )}
+                    </div>
                   </Field>
                 </div>
               </div>
@@ -479,61 +492,71 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
             {/* Section 3: Zutaten */}
             <section className="editor-section editor-card">
               <SectionHeader number={3} title="Zutaten" pack={pack} required>
-                Tipp: anfangen zu tippen, Vorschläge erscheinen automatisch
+                Tippe an — passende Vorschläge erscheinen automatisch
               </SectionHeader>
 
-              <div className="mt-5 flex flex-col gap-2">
-                {ingredients.map((ingredient, idx) => (
-                  <div
-                    key={idx}
-                    className="editor-row grid grid-cols-[1fr_auto] items-center gap-2 sm:grid-cols-[7rem_1fr_auto]"
-                  >
-                    <input
-                      type="text"
-                      value={ingredient.amount}
-                      onChange={(e) =>
-                        setIngredientAt(idx, { amount: e.target.value })
-                      }
-                      placeholder="200 g"
-                      className="editor-input col-span-1 sm:col-auto"
-                      aria-label={`Menge Zutat ${idx + 1}`}
-                    />
-                    <input
-                      type="text"
-                      list="ingredient-suggestions"
-                      value={ingredient.name}
-                      onChange={(e) =>
-                        setIngredientAt(idx, { name: e.target.value })
-                      }
-                      placeholder="Zutat — z. B. Magerquark"
-                      className="editor-input col-span-1 sm:col-auto"
-                      aria-label={`Name Zutat ${idx + 1}`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (ingredients.length === 1) return;
-                        setIngredients(ingredients.filter((_, i) => i !== idx));
-                      }}
-                      disabled={ingredients.length === 1}
-                      className="grid size-10 place-items-center rounded-xl border text-[16px] transition-colors hover:bg-canvas-alt disabled:opacity-30"
-                      style={{
-                        borderColor: brand.tokens.line,
-                        color: brand.tokens.inkMuted,
-                      }}
-                      aria-label="Zutat entfernen"
+              <div className="mt-5 flex flex-col gap-2.5">
+                {ingredients.map((ingredient, idx) => {
+                  const isFocused = focusedIngredientIdx === idx;
+                  return (
+                    <div
+                      key={idx}
+                      className={`editor-row grid grid-cols-[7rem_1fr_auto] items-start gap-2 rounded-2xl p-2 transition-colors ${
+                        isFocused ? "bg-canvas-alt/40" : ""
+                      }`}
                     >
-                      ×
-                    </button>
-                  </div>
-                ))}
+                      <input
+                        type="text"
+                        value={ingredient.amount}
+                        onChange={(e) =>
+                          setIngredientAt(idx, { amount: e.target.value })
+                        }
+                        onFocus={() => setFocusedIngredientIdx(idx)}
+                        placeholder="200 g"
+                        className="editor-input"
+                        aria-label={`Menge Zutat ${idx + 1}`}
+                      />
+                      <IngredientCombobox
+                        value={ingredient.name}
+                        onChange={(v) => setIngredientAt(idx, { name: v })}
+                        onFocus={() => setFocusedIngredientIdx(idx)}
+                        suggestions={ingredientSuggestions}
+                        pack={pack}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (ingredients.length === 1) return;
+                          setIngredients(
+                            ingredients.filter((_, i) => i !== idx)
+                          );
+                          if (focusedIngredientIdx === idx)
+                            setFocusedIngredientIdx(null);
+                        }}
+                        disabled={ingredients.length === 1}
+                        className="grid size-[42px] place-items-center rounded-xl border text-[15px] transition-colors hover:bg-canvas-alt disabled:opacity-30"
+                        style={{
+                          borderColor: brand.tokens.line,
+                          color: brand.tokens.inkMuted,
+                        }}
+                        aria-label="Zutat entfernen"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
 
-                <div className="mt-2 flex flex-wrap items-center gap-2">
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-4" style={{ borderColor: brand.tokens.line }}>
                   <button
                     type="button"
-                    onClick={() =>
-                      setIngredients([...ingredients, { amount: "", name: "" }])
-                    }
+                    onClick={() => {
+                      setIngredients([
+                        ...ingredients,
+                        { amount: "", name: "" },
+                      ]);
+                      setFocusedIngredientIdx(ingredients.length);
+                    }}
                     className="editor-button-primary"
                     style={{
                       background: pack.mood.background,
@@ -543,25 +566,37 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                     + Zutat hinzufügen
                   </button>
                   <span
-                    className="text-[11px] font-medium uppercase tracking-[0.14em]"
+                    className="text-[11px] font-semibold uppercase tracking-[0.14em]"
                     style={{ color: pack.mood.inkSoft }}
                   >
-                    Schnell-Einheit:
+                    Schnell-Einheit
+                    {focusedIngredientIdx !== null
+                      ? ` (Zeile ${focusedIngredientIdx + 1})`
+                      : ""}
+                    :
                   </span>
                   {commonUnits.map((unit) => (
                     <button
                       key={unit}
                       type="button"
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
-                        // Append unit to last empty amount field
-                        const lastEmptyIdx = ingredients
-                          .map((i, idx) => ({ i, idx }))
-                          .reverse()
-                          .find(({ i }) => i.amount === "")?.idx;
-                        if (lastEmptyIdx === undefined) return;
-                        setIngredientAt(lastEmptyIdx, {
-                          amount: `1 ${unit}`,
-                        });
+                        // Apply to focused ingredient row, or last empty row as fallback
+                        let targetIdx = focusedIngredientIdx;
+                        if (targetIdx === null) {
+                          targetIdx = ingredients
+                            .map((i, idx) => ({ i, idx }))
+                            .reverse()
+                            .find(({ i }) => i.amount === "")?.idx ?? null;
+                        }
+                        if (targetIdx === null) return;
+                        const current = ingredients[targetIdx]?.amount || "";
+                        // If amount already has a number, keep it and replace unit; else "1 unit"
+                        const numMatch = current.match(/^(\d+(?:[.,]\d+)?)/);
+                        const newAmount = numMatch
+                          ? `${numMatch[1]} ${unit}`
+                          : `1 ${unit}`;
+                        setIngredientAt(targetIdx, { amount: newAmount });
                       }}
                       className="editor-chip"
                     >
