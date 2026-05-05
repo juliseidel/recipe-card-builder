@@ -1,65 +1,77 @@
-import Image from "next/image";
+import { brands } from "@/lib/brands";
+import { BrandCard } from "@/components/brand-card";
+import { NewBrandCard } from "@/components/new-brand-card";
+import { SiteHeader } from "@/components/site-header";
 
 export default function Home() {
+  const totalPacks = brands.reduce((sum, brand) => sum + brand.packCount, 0);
+  const totalRecipes = brands.reduce((sum, brand) => sum + brand.recipeCount, 0);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="bg-paper flex min-h-screen flex-col">
+      <SiteHeader />
+
+      <main className="flex-1">
+        <section className="mx-auto max-w-[1400px] px-6 pt-14 pb-8 lg:px-10 lg:pt-20 lg:pb-12">
+          <div className="flex flex-col gap-5 max-w-3xl">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-muted backdrop-blur">
+                <span className="size-1.5 rounded-full bg-honey" />
+                Creator-Studio · Beta
+              </span>
+              <span className="text-[12px] text-ink-subtle">
+                Heute aktiv: {brands.length} Workspace · {totalPacks} Packs · {totalRecipes} Rezepte
+              </span>
+            </div>
+
+            <h1 className="font-display text-[52px] font-normal leading-[1.02] tracking-[-0.02em] text-ink sm:text-[64px] lg:text-[76px]">
+              Bau dein nächstes
+              <br />
+              <span className="italic text-ink-muted">Recipe-Pack.</span>
+            </h1>
+
+            <p className="max-w-2xl text-[18px] leading-relaxed text-ink-muted">
+              Wähle einen Workspace, lege ein neues Pack an, generiere deine
+              Karten — fertig zum Posten oder Drucken. In deinem Look,
+              mit deinen Nährwerten, in deiner Sprache.
+            </p>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-[1400px] px-6 pb-24 lg:px-10 lg:pb-32">
+          <div className="mb-7 flex items-end justify-between border-b border-line pb-5">
+            <div className="flex flex-col gap-1.5">
+              <h2 className="font-display text-[26px] leading-none text-ink">
+                Workspaces
+              </h2>
+              <p className="text-[14px] text-ink-muted">
+                Jeder Creator hat ein eigenes Setup — eigene Farben, Schriften, Pack-Sammlung.
+              </p>
+            </div>
+            <span className="hidden font-mono text-[12px] uppercase tracking-[0.12em] text-ink-subtle sm:block">
+              {brands.length} Workspace{brands.length === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
+            {brands.map((brand) => (
+              <BrandCard key={brand.slug} brand={brand} />
+            ))}
+            <NewBrandCard />
+          </div>
+        </section>
+      </main>
+
+      <footer className="border-t border-line bg-canvas/60">
+        <div className="mx-auto flex max-w-[1400px] flex-col items-start justify-between gap-3 px-6 py-8 text-sm text-ink-subtle sm:flex-row sm:items-center lg:px-10">
+          <p>
+            Gebaut von Julian Seidel · Wolf Family Office Test Week · Mai 2026
+          </p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.14em]">
+            Recipe Card Builder · v0.1
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </footer>
     </div>
   );
 }

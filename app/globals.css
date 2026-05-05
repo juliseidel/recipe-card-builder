@@ -1,26 +1,67 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-canvas: #f8f5ee;
+  --color-canvas-alt: #f2ede2;
+  --color-surface: #ffffff;
+  --color-surface-warm: #fbf7f0;
+  --color-ink: #1a120b;
+  --color-ink-muted: #6b5444;
+  --color-ink-subtle: #a39280;
+  --color-line: #e8dfcd;
+  --color-line-strong: #d6cab1;
+  --color-accent: #c2410c;
+  --color-accent-soft: #fff1e6;
+  --color-honey: #f4c44a;
+
+  --font-display: var(--font-fraunces), ui-serif, "Iowan Old Style", Georgia, serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-card: 1.5rem;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 0 rgba(26, 18, 11, 0.04), 0 12px 28px -16px rgba(26, 18, 11, 0.12);
+  --shadow-card-hover: 0 1px 0 rgba(26, 18, 11, 0.05), 0 24px 48px -20px rgba(26, 18, 11, 0.22);
+  --shadow-soft: 0 1px 0 rgba(26, 18, 11, 0.04), 0 4px 14px -4px rgba(26, 18, 11, 0.08);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  color-scheme: light;
 }
 
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01", "cv11";
+}
+
+::selection {
+  background: var(--color-ink);
+  color: var(--color-canvas);
+}
+
+.font-display {
+  font-family: var(--font-display);
+  font-feature-settings: "ss01";
+}
+
+/* Subtle paper texture for warm background depth */
+.bg-paper {
+  background-color: var(--color-canvas);
+  background-image: radial-gradient(
+      ellipse 80% 60% at 20% 0%,
+      rgba(244, 196, 74, 0.06),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 60% 40% at 90% 30%,
+      rgba(232, 136, 155, 0.05),
+      transparent 60%
+    );
 }
