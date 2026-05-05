@@ -112,7 +112,7 @@ body {
 
 .editor-row {
   animation: editor-row-in 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  overflow: hidden;
+  /* overflow: visible — needed so combobox-popover and other absolute children show outside the row */
 }
 
 .editor-input {

@@ -385,7 +385,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                   />
                 </Field>
 
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <div className="grid grid-cols-3 gap-4">
                   <Field label="Vorbereitung">
                     <div className="relative">
                       <input
@@ -393,7 +393,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                         inputMode="numeric"
                         value={prepTime}
                         onChange={(e) => setPrepTime(e.target.value)}
-                        className="editor-input pr-9"
+                        className="editor-input pr-12"
                       />
                       <UnitSuffix label="Min" />
                     </div>
@@ -406,7 +406,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                         value={cookTime}
                         onChange={(e) => setCookTime(e.target.value)}
                         placeholder="optional"
-                        className="editor-input pr-9"
+                        className="editor-input pr-12"
                       />
                       <UnitSuffix label="Min" />
                     </div>
@@ -423,29 +423,29 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                       <UnitSuffix label="×" />
                     </div>
                   </Field>
-                  <Field label="Schwierigkeit">
-                    <div className="pill-group" role="radiogroup">
-                      {(["Einfach", "Mittel", "Aufwendig"] as const).map(
-                        (level) => (
-                          <button
-                            key={level}
-                            type="button"
-                            role="radio"
-                            aria-checked={difficulty === level}
-                            onClick={() => setDifficulty(level)}
-                            className={`pill-group-btn ${
-                              difficulty === level
-                                ? "pill-group-btn-active"
-                                : ""
-                            }`}
-                          >
-                            {level}
-                          </button>
-                        )
-                      )}
-                    </div>
-                  </Field>
                 </div>
+                <Field label="Schwierigkeit">
+                  <div className="pill-group flex-wrap" role="radiogroup">
+                    {(["Einfach", "Mittel", "Aufwendig"] as const).map(
+                      (level) => (
+                        <button
+                          key={level}
+                          type="button"
+                          role="radio"
+                          aria-checked={difficulty === level}
+                          onClick={() => setDifficulty(level)}
+                          className={`pill-group-btn ${
+                            difficulty === level
+                              ? "pill-group-btn-active"
+                              : ""
+                          }`}
+                        >
+                          {level}
+                        </button>
+                      )
+                    )}
+                  </div>
+                </Field>
               </div>
             </section>
 
