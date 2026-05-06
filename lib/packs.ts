@@ -60,8 +60,8 @@ export const packs: Pack[] = [
     category: "Diät-Fokus",
     tagline: "Frittata, XL-Wraps, Cookie-Crumble — Bienes WPF-Mahlzeiten",
     description:
-      "Bienes voluminöse WPF-Mahlzeiten aus den Reels: optisch riesig, kalorisch fair. Frittata, XL-Wraps, der virale 'lebensverändernde' Salat, Beeren-Cookie-Crumble.",
-    recipeCount: 5,
+      "Bienes voluminöse WPF-Mahlzeiten aus den Reels: optisch riesig, kalorisch fair. Frittata, XL-Wraps, der virale 'lebensverändernde' Salat, Beeren-Cookie-Crumble. Plus zwei Edge-Case-Rezepte: 3-Zutaten-Eisbowl und 16-Zutaten-Mexican-Bowl.",
+    recipeCount: 7,
     coverImage: "/brands/biene/packs/pack-4.jpg",
     mood: {
       background: "#c8e2a8",

@@ -117,10 +117,15 @@ export async function generateMicros(recipe: Recipe): Promise<Micronutrient[]> {
 // normalises whitespace + decimal separators so the UI shows clean labels.
 function normalizeAmount(raw: string): string {
   let s = raw.trim();
-  // µg variants that came back broken: `,",g`, `","g`, `\",\"g` etc.
+  // Strip Unicode BACKSPACE () — Gemini occasionally injects these in
+  // front of µ when echoing back the response, leading to "\b\bµg" artefacts.
+  s = s.replace(//g, "");
+  // µg variants that came back broken: `,",g`, `","g`, `\",\"g`, `5g` etc.
   s = s.replace(/[",\\]+g\b/g, "µg");
   // mcg → µg for visual consistency (after the broken-µ fix)
   s = s.replace(/\bmcg\b/g, "µg");
+  // Stray digit "5" or "6" before "g" where µ got mistyped (e.g. "1,5 5g µg")
+  s = s.replace(/\b\d+g\s+µg\b/g, "µg");
   // Stray double-quotes inside the value
   s = s.replace(/"/g, "");
   // Collapse double spaces
