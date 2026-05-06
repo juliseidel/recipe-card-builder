@@ -1,6 +1,6 @@
-import Link from "next/link";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
+import { PdfExportButton } from "./pdf-export-button";
 
 type PackActionsProps = {
   brand: Brand;
@@ -17,51 +17,31 @@ export function PackActions({ brand, pack }: PackActionsProps) {
       }}
     >
       <div className="mx-auto flex max-w-[1400px] flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-10">
-        <span className="text-[13px]" style={{ color: brand.tokens.inkMuted }}>
-          Letzte Bearbeitung · Heute, 14:32
-        </span>
-
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/${brand.slug}/${pack.slug}/edit`}
-            className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-medium transition-colors"
-            style={{
-              background: brand.tokens.background,
-              color: brand.tokens.ink,
-              border: `1px solid ${brand.tokens.line}`,
-            }}
+        <div className="flex flex-col gap-0.5">
+          <span
+            className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+            style={{ color: brand.tokens.inkMuted }}
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-              <path
-                d="M2 12V9.5L9.5 2L12 4.5L4.5 12H2Z"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Bearbeiten
-          </Link>
-
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-semibold transition-transform hover:scale-[1.02]"
-            style={{
-              background: pack.mood.ink,
-              color: pack.mood.background,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-              <path
-                d="M7 1.5v8m0 0L4 6.5m3 3l3-3M2 11h10"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Als PDF speichern
-          </button>
+            Pack-Export
+          </span>
+          <span className="text-[13px]" style={{ color: brand.tokens.inkMuted }}>
+            Cover, Inhaltsverzeichnis, alle Karten und Nährwert-Übersicht in
+            einem druckfertigen PDF.
+          </span>
         </div>
+
+        <PdfExportButton
+          type="pack"
+          brandSlug={brand.slug}
+          packSlug={pack.slug}
+          variant="hero"
+          label="Komplettes Pack als PDF"
+          tint={{
+            bg: pack.mood.background,
+            ink: pack.mood.ink,
+            accent: pack.mood.accent,
+          }}
+        />
       </div>
     </section>
   );

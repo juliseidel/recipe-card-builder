@@ -4,6 +4,7 @@ import type { Pack } from "@/lib/packs";
 import type { Recipe } from "@/lib/recipes";
 import { SiteHeader } from "./site-header";
 import { RecipeCardFull } from "./recipe-card-full";
+import { PdfExportButton } from "./pdf-export-button";
 
 type NavTarget = {
   href: string;
@@ -84,25 +85,19 @@ export function RecipeDetailLayout({
 
           <div className="flex items-center gap-2">
             {deleteAction}
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[12px] font-semibold transition-transform hover:scale-[1.02]"
-              style={{
-                background: pack.mood.ink,
-                color: pack.mood.background,
+            <PdfExportButton
+              type="recipe"
+              brandSlug={brand.slug}
+              packSlug={pack.slug}
+              recipeSlug={recipe.slug}
+              variant="subtle"
+              label="Karte als PDF"
+              tint={{
+                bg: pack.mood.background,
+                ink: pack.mood.ink,
+                accent: pack.mood.accent,
               }}
-            >
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                <path
-                  d="M7 1.5v8m0 0L4 6.5m3 3l3-3M2 11h10"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              Karte als PDF
-            </button>
+            />
           </div>
         </div>
       </section>
