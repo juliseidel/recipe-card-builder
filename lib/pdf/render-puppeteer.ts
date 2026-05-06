@@ -16,10 +16,26 @@ export type RenderProgress = (stage: string, percent: number) => void;
 // premium two-column treatment, then we scale down to fit A4.
 const PRINT_VIEWPORT_WIDTH = 1024;
 const PRINT_VIEWPORT_HEIGHT = 1500;
-// 794px / 1024px ≈ 0.776 — A4 portrait width at 96 DPI divided by the
-// viewport width above. Puppeteer's `scale` shrinks the rendered content to
-// match A4 width without changing the layout.
-const PRINT_SCALE = 794 / PRINT_VIEWPORT_WIDTH;
+// A4 portrait at 96 DPI in viewport pixels. The PDF "scale" param shrinks
+// the rendered content by this much to match A4.
+const A4_WIDTH_PX = 794;
+const A4_HEIGHT_PX = 1123;
+const WIDTH_FIT_SCALE = A4_WIDTH_PX / PRINT_VIEWPORT_WIDTH; // ~0.776
+// Hard floor — below this fonts get unreadable. Recipes that need more
+// aggressive shrinking probably should be split into two pages by hand
+// rather than rendered at 35% size.
+const MIN_SCALE = 0.5;
+
+// Computes a PDF scale factor that ALWAYS keeps the rendered page on one
+// A4 sheet. Width is fixed at WIDTH_FIT_SCALE; if the content overflows the
+// vertical budget, we scale further so it fits. Single-page guarantee was
+// the original design promise of the @react-pdf renderer; this preserves it
+// in the new headless-Chromium pipeline.
+function computeFitScale(contentHeightPx: number): number {
+  const heightFitScale = A4_HEIGHT_PX / contentHeightPx;
+  const fit = Math.min(WIDTH_FIT_SCALE, heightFitScale);
+  return Math.max(MIN_SCALE, fit);
+}
 
 export async function renderRecipePdf(args: {
   brand: Brand;
@@ -46,12 +62,21 @@ export async function renderRecipePdf(args: {
     // Belt-and-braces: wait for fonts to settle in case `networkidle0` raced.
     await page.evaluate(() => document.fonts.ready);
 
+    // Measure the actual rendered card so we can compute a fit-scale. Long
+    // recipes (14+ ingredients) overflow the default 0.776× scale and would
+    // spill onto a second page; this brings them back to one.
+    const contentHeight = await page.evaluate(() => {
+      const wrapper = document.querySelector(".print-canvas");
+      return wrapper ? (wrapper as HTMLElement).scrollHeight : 0;
+    });
+    const scale = computeFitScale(contentHeight || PRINT_VIEWPORT_HEIGHT);
+
     args.onProgress?.("rendering", 70);
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
       margin: { top: 0, bottom: 0, left: 0, right: 0 },
-      scale: PRINT_SCALE,
+      scale,
     });
 
     args.onProgress?.("done", 100);
@@ -86,11 +111,13 @@ export async function renderPackPdf(args: {
     await page.evaluate(() => document.fonts.ready);
 
     args.onProgress?.("rendering", 70);
+    // Pack PDFs span multiple pages by design (one card per A4 sheet), so we
+    // stick with the width-fit scale rather than measuring total height.
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
       margin: { top: 0, bottom: 0, left: 0, right: 0 },
-      scale: PRINT_SCALE,
+      scale: WIDTH_FIT_SCALE,
     });
 
     args.onProgress?.("done", 100);
