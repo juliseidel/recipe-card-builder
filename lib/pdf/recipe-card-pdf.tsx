@@ -253,6 +253,8 @@ function PatisseriePage({
   const t = packTheme(pack);
   const time = totalTime(recipe);
   const stueck = recipe.servings === 1 ? "Stück" : "Stücke";
+  const density = getDensity(recipe);
+  const d = PATISSERIE_DENSITY[density];
 
   return (
     <Page
@@ -264,8 +266,8 @@ function PatisseriePage({
         style={{
           flexDirection: "row",
           paddingHorizontal: 36,
-          paddingTop: 28,
-          paddingBottom: 16,
+          paddingTop: d.headPadTop,
+          paddingBottom: d.headPadBottom,
           gap: 20,
         }}
         wrap={false}
@@ -286,7 +288,7 @@ function PatisseriePage({
             style={{
               fontFamily: "Fraunces",
               fontStyle: "italic",
-              fontSize: 36,
+              fontSize: d.titleFontSize,
               lineHeight: 1,
               letterSpacing: -0.4,
               color: t.ink,
@@ -299,7 +301,7 @@ function PatisseriePage({
             style={{
               fontFamily: "Fraunces",
               fontStyle: "italic",
-              fontSize: 14,
+              fontSize: d.subtitleFontSize,
               lineHeight: 1.3,
               color: t.inkSoft,
               marginTop: 6,
@@ -402,8 +404,8 @@ function PatisseriePage({
           flexDirection: "row",
           gap: 22,
           paddingHorizontal: 36,
-          paddingTop: 18,
-          paddingBottom: 16,
+          paddingTop: d.bodyPadTop,
+          paddingBottom: d.bodyPadBottom,
         }}
       >
         <View style={{ width: 220 }}>
@@ -411,15 +413,32 @@ function PatisseriePage({
           <IngredientsList
             grouped={[{ name: null, items: recipe.ingredients }]}
             theme={t}
+            rowPadV={d.ingRowPadV}
+            nameFontSize={d.ingFontSize}
+            noteFontSize={d.ingNoteFontSize}
           />
         </View>
         <View style={{ flex: 1 }}>
           <SectionHeader label="ZUBEREITUNG" theme={t} italic />
-          <StepsList steps={recipe.steps} theme={t} />
+          <StepsList
+            steps={recipe.steps}
+            theme={t}
+            stepMarginBottom={d.stepMarginBottom}
+            stepFontSize={d.stepFontSize}
+            stepNumFontSize={d.stepNumFontSize}
+          />
         </View>
       </View>
 
-      <CardFooter brand={brand} pack={pack} recipe={recipe} theme={t} italic />
+      <CardFooter
+        brand={brand}
+        pack={pack}
+        recipe={recipe}
+        theme={t}
+        italic
+        microsPadTop={d.microsPadTop}
+        microsPadBottom={d.microsPadBottom}
+      />
     </Page>
   );
 }
@@ -608,16 +627,21 @@ function MinimalPage({
 // nieren" requirement. Subtle adjustments only — the layout structure is
 // identical across modes, just slightly tighter or looser typography.
 // ═════════════════════════════════════════════════════════════════════════════
-type SportDensity = "compact" | "balanced" | "spacious";
+// Generic density classifier — used by every layout that opts in (Sport &
+// Patisserie today; remaining layouts can adopt it incrementally). Each
+// layout owns its own DENSITY-tuning table so the visual character stays
+// pack-specific. New custom recipes pick up the right mode automatically
+// based on ingredient count — no manual configuration needed.
+export type Density = "compact" | "balanced" | "spacious";
 
-function getSportDensity(recipe: Recipe): SportDensity {
+export function getDensity(recipe: Recipe): Density {
   if (recipe.ingredients.length >= 13) return "compact";
   if (recipe.ingredients.length <= 6) return "spacious";
   return "balanced";
 }
 
 const SPORT_DENSITY: Record<
-  SportDensity,
+  Density,
   {
     heroPadTop: number;
     heroPadBottom: number;
@@ -685,6 +709,85 @@ const SPORT_DENSITY: Record<
   },
 };
 
+// Patisserie tuning — calibrated more conservatively than Sport because the
+// Backwelt layout is simpler (no macro bars, no stat tiles, no story block).
+// Compact mode is mainly there to give the micros band breathing room on
+// the long bake recipes (Schoko-Biskuitrolle, Oster-Zupfkuchen) without
+// changing the typography character.
+const PATISSERIE_DENSITY: Record<
+  Density,
+  {
+    headPadTop: number;
+    headPadBottom: number;
+    titleFontSize: number;
+    subtitleFontSize: number;
+    bodyPadTop: number;
+    bodyPadBottom: number;
+    ingRowPadV: number;
+    ingFontSize: number;
+    ingNoteFontSize: number;
+    stepMarginBottom: number;
+    stepFontSize: number;
+    stepNumFontSize: number;
+    microsPadTop: number;
+    microsPadBottom: number;
+  }
+> = {
+  compact: {
+    headPadTop: 22,
+    headPadBottom: 12,
+    titleFontSize: 30,
+    subtitleFontSize: 12,
+    bodyPadTop: 14,
+    bodyPadBottom: 12,
+    ingRowPadV: 2.5,
+    ingFontSize: 9,
+    ingNoteFontSize: 6.5,
+    stepMarginBottom: 6,
+    stepFontSize: 9,
+    stepNumFontSize: 16,
+    microsPadTop: 9,
+    microsPadBottom: 10,
+  },
+  // balanced is the legacy default — bit-identical to the previous patisserie
+  // hard-coded values so the 3 mid-range Backwelt recipes (Süßkartoffel-
+  // Muffins, Mini Franzbrötchen, Protein-Brot) render exactly as before.
+  balanced: {
+    headPadTop: 28,
+    headPadBottom: 16,
+    titleFontSize: 36,
+    subtitleFontSize: 14,
+    bodyPadTop: 18,
+    bodyPadBottom: 16,
+    ingRowPadV: 3.5,
+    ingFontSize: 9.5,
+    ingNoteFontSize: 7,
+    stepMarginBottom: 8,
+    stepFontSize: 9.5,
+    stepNumFontSize: 18,
+    microsPadTop: 8,
+    microsPadBottom: 9,
+  },
+  // spacious — reserved for future short bake recipes; gives the body more
+  // air and a slightly larger title so the card doesn't look halbleer.
+  spacious: {
+    headPadTop: 34,
+    headPadBottom: 20,
+    titleFontSize: 40,
+    subtitleFontSize: 15,
+    bodyPadTop: 22,
+    bodyPadBottom: 20,
+    ingRowPadV: 5,
+    ingFontSize: 10,
+    ingNoteFontSize: 7.5,
+    stepMarginBottom: 10,
+    stepFontSize: 10,
+    stepNumFontSize: 20,
+    microsPadTop: 11,
+    microsPadBottom: 12,
+  },
+};
+
 function SportPage({
   brand,
   pack,
@@ -695,7 +798,7 @@ function SportPage({
   const t = packTheme(pack);
   const time = totalTime(recipe);
   const portionsLabel = recipe.servings === 1 ? "Portion" : "Portionen";
-  const density = getSportDensity(recipe);
+  const density = getDensity(recipe);
   const d = SPORT_DENSITY[density];
   const isSparse = density === "spacious";
 
@@ -1426,20 +1529,26 @@ function DashboardPage({
 
 // ─── Shared building blocks ──────────────────────────────────────────────────
 
-// Renders the ingredients list. When a single (ungrouped) list has more than
-// 8 items, automatically switches to a 2-column layout to avoid overflow on
-// long recipes (16+ ingredients still fit on one A4 page). Subgroups stack
-// vertically and each can independently flip to 2-col when long.
+// Renders the ingredients list. Optional row/font overrides let layouts
+// pick up density-aware sizing without touching internal helpers — defaults
+// match the legacy hard-coded values, so layouts that don't pass them are
+// bit-identical to before.
 function IngredientsList({
   grouped,
   theme,
   bold = false,
   checklist = false,
+  rowPadV,
+  nameFontSize,
+  noteFontSize,
 }: {
   grouped: IngredientGroup[];
   theme: ReturnType<typeof packTheme>;
   bold?: boolean;
   checklist?: boolean;
+  rowPadV?: number;
+  nameFontSize?: number;
+  noteFontSize?: number;
 }) {
   return (
     <View style={{ marginTop: 8 }}>
@@ -1464,6 +1573,9 @@ function IngredientsList({
             theme={theme}
             bold={bold}
             checklist={checklist}
+            rowPadV={rowPadV}
+            nameFontSize={nameFontSize}
+            noteFontSize={noteFontSize}
           />
         </View>
       ))}
@@ -1476,11 +1588,17 @@ function IngredientGroupBody({
   theme,
   bold,
   checklist,
+  rowPadV,
+  nameFontSize,
+  noteFontSize,
 }: {
   items: IngredientGroup["items"];
   theme: ReturnType<typeof packTheme>;
   bold: boolean;
   checklist: boolean;
+  rowPadV?: number;
+  nameFontSize?: number;
+  noteFontSize?: number;
 }) {
   // Always single-column to mirror the web layout. Long recipes (16+
   // ingredients) still fit on one A4 page with the compact row spacing.
@@ -1493,6 +1611,9 @@ function IngredientGroupBody({
           theme={theme}
           bold={bold}
           checklist={checklist}
+          rowPadV={rowPadV}
+          nameFontSize={nameFontSize}
+          noteFontSize={noteFontSize}
         />
       ))}
     </View>
@@ -1505,28 +1626,41 @@ function IngredientRow({
   bold,
   checklist,
   compact = false,
+  rowPadV,
+  nameFontSize,
+  noteFontSize,
 }: {
   ing: IngredientGroup["items"][number];
   theme: ReturnType<typeof packTheme>;
   bold: boolean;
   checklist: boolean;
   compact?: boolean;
+  rowPadV?: number;
+  nameFontSize?: number;
+  noteFontSize?: number;
 }) {
+  // Density overrides take precedence; legacy `compact` boolean kept for
+  // any callers that haven't migrated yet.
+  const padV = rowPadV ?? (compact ? 2.5 : 3.5);
+  const amountFont = compact ? 7 : 7.5;
+  const amountW = compact ? 38 : 50;
+  const nameFont = nameFontSize ?? (compact ? 8.5 : 9.5);
+  const noteFont = noteFontSize ?? (compact ? 6.5 : 7);
   return (
     <View
       style={{
         flexDirection: "row",
         borderBottomWidth: 0.5,
         borderBottomColor: withAlpha(theme.ink, 0.08),
-        paddingVertical: compact ? 2.5 : 3.5,
+        paddingVertical: padV,
         gap: 5,
       }}
     >
       <Text
         style={{
-          fontSize: compact ? 7 : 7.5,
+          fontSize: amountFont,
           color: theme.inkSoft,
-          width: compact ? 38 : 50,
+          width: amountW,
           fontWeight: bold ? 600 : 400,
         }}
       >
@@ -1535,7 +1669,7 @@ function IngredientRow({
       <View style={{ flex: 1 }}>
         <Text
           style={{
-            fontSize: compact ? 8.5 : 9.5,
+            fontSize: nameFont,
             lineHeight: 1.3,
             color: theme.ink,
             fontWeight: bold ? 600 : 400,
@@ -1547,7 +1681,7 @@ function IngredientRow({
         {ing.note ? (
           <Text
             style={{
-              fontSize: compact ? 6.5 : 7,
+              fontSize: noteFont,
               fontStyle: "italic",
               color: theme.inkSoft,
               marginTop: 0.5,
@@ -1566,23 +1700,29 @@ function StepsList({
   theme,
   bold = false,
   checklist = false,
+  stepMarginBottom = 8,
+  stepFontSize = 9.5,
+  stepNumFontSize = 18,
 }: {
   steps: string[];
   theme: ReturnType<typeof packTheme>;
   bold?: boolean;
   checklist?: boolean;
+  stepMarginBottom?: number;
+  stepFontSize?: number;
+  stepNumFontSize?: number;
 }) {
   return (
     <View style={{ marginTop: 8 }}>
       {steps.map((step, idx) => (
         <View
           key={idx}
-          style={{ flexDirection: "row", marginBottom: 8, gap: 6 }}
+          style={{ flexDirection: "row", marginBottom: stepMarginBottom, gap: 6 }}
         >
           <Text
             style={{
               fontFamily: "Fraunces",
-              fontSize: 18,
+              fontSize: stepNumFontSize,
               fontWeight: bold ? 700 : 400,
               color: theme.accent,
               width: 18,
@@ -1591,7 +1731,14 @@ function StepsList({
           >
             {idx + 1}
           </Text>
-          <Text style={{ flex: 1, fontSize: 9.5, lineHeight: 1.45, color: theme.ink }}>
+          <Text
+            style={{
+              flex: 1,
+              fontSize: stepFontSize,
+              lineHeight: 1.45,
+              color: theme.ink,
+            }}
+          >
             {checklist ? <Text style={{ color: theme.inkSubtle }}>☐ </Text> : null}
             {step}
           </Text>
@@ -1808,16 +1955,25 @@ function CardFooter({
   recipe,
   theme,
   italic = false,
+  microsPadTop,
+  microsPadBottom,
 }: {
   brand: Brand;
   pack: Pack;
   recipe?: Recipe;
   theme: ReturnType<typeof packTheme>;
   italic?: boolean;
+  microsPadTop?: number;
+  microsPadBottom?: number;
 }) {
   return (
     <>
-      <MicrosStrip recipe={recipe} theme={theme} />
+      <MicrosStrip
+        recipe={recipe}
+        theme={theme}
+        padTop={microsPadTop}
+        padBottom={microsPadBottom}
+      />
       <View
         style={{
           flexDirection: "row",
@@ -1859,13 +2015,19 @@ function CardFooter({
 }
 
 // Compact micros band for the PDF — same place across all 5 layouts. Sits
-// above the footer in normal flow. Hides if no micros yet.
+// above the footer in normal flow. Hides if no micros yet. Density-aware
+// padding lets layouts give the strip more breathing room (Patisserie
+// compact mode in particular — long bake recipes had this band squashed).
 function MicrosStrip({
   recipe,
   theme,
+  padTop = 8,
+  padBottom = 9,
 }: {
   recipe?: Recipe;
   theme: ReturnType<typeof packTheme>;
+  padTop?: number;
+  padBottom?: number;
 }) {
   const micros = recipe?.nutrition?.micros;
   if (!micros || micros.length === 0) return null;
@@ -1881,8 +2043,8 @@ function MicrosStrip({
         borderTopColor: withAlpha(theme.ink, 0.18),
         backgroundColor: blendWithWhite(theme.bg, 0.78),
         paddingHorizontal: 32,
-        paddingTop: 8,
-        paddingBottom: 9,
+        paddingTop: padTop,
+        paddingBottom: padBottom,
       }}
     >
       <View
