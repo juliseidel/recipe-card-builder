@@ -130,166 +130,162 @@ function EditorialPage({
       size="A4"
       style={{ backgroundColor: "#ffffff", fontFamily: "Inter", color: t.ink }}
     >
-      {/* HEADER BAND */}
-      <View
-        style={{
-          backgroundColor: t.paper,
-          borderBottomWidth: 1,
-          borderBottomColor: t.divider,
-          paddingHorizontal: 32,
-          paddingTop: d.headerPadTop,
-          paddingBottom: d.headerPadBottom,
-        }}
-        wrap={false}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            fontSize: 7.5,
-            letterSpacing: 1.6,
-          }}
-        >
-          <Text style={{ color: t.inkSoft, fontWeight: 600 }}>
-            PACK {pad2(pack.number)} · {pack.title.toUpperCase()}
-          </Text>
-          <Text style={{ color: t.inkSoft, fontWeight: 600 }}>
-            KARTE {pad2(recipe.number)} / {pad2(totalRecipes)}
-          </Text>
-        </View>
-
-        <Text
-          style={{
-            fontFamily: "Fraunces",
-            fontSize: d.titleFontSize,
-            lineHeight: 1.04,
-            letterSpacing: -0.3,
-            color: t.ink,
-            textTransform: "uppercase",
-            marginTop: 10,
-          }}
-        >
-          {recipe.title}
-        </Text>
-        <Text
-          style={{
-            fontFamily: "Fraunces",
-            fontStyle: "italic",
-            fontSize: d.subtitleFontSize,
-            color: t.inkSoft,
-            lineHeight: 1.3,
-            marginTop: 4,
-          }}
-        >
-          {recipe.subtitle}
-        </Text>
-
-        {recipe.tags?.length ? (
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              marginTop: 8,
-              gap: 4,
-            }}
-          >
-            {recipe.tags.slice(0, 4).map((tag) => (
-              <Text
-                key={tag}
-                style={{
-                  fontSize: 6.5,
-                  fontWeight: 600,
-                  letterSpacing: 0.8,
-                  textTransform: "uppercase",
-                  color: t.ink,
-                  backgroundColor: t.bg,
-                  paddingHorizontal: 6,
-                  paddingVertical: 2,
-                  borderRadius: 999,
-                }}
-              >
-                {tag}
-              </Text>
-            ))}
-          </View>
-        ) : null}
-      </View>
-
-      {/* HERO IMAGE — compact */}
-      {heroDataUri ? (
-        <View
-          style={{
-            paddingHorizontal: 32,
-            paddingTop: 12,
-            paddingBottom: 4,
-            backgroundColor: t.paper,
-          }}
-          wrap={false}
-        >
-          <View
-            style={{
-              borderRadius: 10,
-              overflow: "hidden",
-              alignSelf: "center",
-              width: 380,
-              height: 130,
-            }}
-          >
-            <Image
-              src={heroDataUri}
-              style={{ width: 380, height: 130, objectFit: "cover" }}
-            />
-          </View>
-        </View>
-      ) : null}
-
-      {/* PORTIONS HERO BAR — 3 tiles, compact */}
+      {/* TOP MARKER BAR — kompakt, only Pack-Info */}
       <View
         style={{
           flexDirection: "row",
-          borderTopWidth: 1,
+          justifyContent: "space-between",
+          alignItems: "center",
+          backgroundColor: blendWithWhite(t.bg, 0.6),
           borderBottomWidth: 1,
-          borderColor: t.divider,
+          borderBottomColor: t.divider,
+          paddingHorizontal: 32,
+          paddingVertical: 8,
         }}
         wrap={false}
       >
-        <PortionTile
-          label="REZEPT ERGIBT"
-          value={`${recipe.servings}×`}
-          sub={pl}
-          theme={t}
-          borderRight
-          compact
-        />
-        <PortionTile
-          label="PRO PORTION"
-          value={String(recipe.nutrition.kcal)}
-          sub={`kcal · ${recipe.nutrition.protein}g Eiweiß · ${recipe.nutrition.carbs}g KH · ${recipe.nutrition.fat}g Fett`}
-          theme={t}
-          highlight
-          borderRight
-          accentLabel
-          compact
-        />
-        <PortionTile
-          label="GESAMTZEIT"
-          value={String(time)}
-          sub={`Min · ${recipe.difficulty}`}
-          theme={t}
-          compact
-        />
+        <Text
+          style={{
+            fontSize: 7.5,
+            letterSpacing: 1.6,
+            color: t.inkSoft,
+            fontWeight: 600,
+          }}
+        >
+          PACK {pad2(pack.number)} · {pack.title.toUpperCase()}
+        </Text>
+        <Text
+          style={{
+            fontSize: 7.5,
+            letterSpacing: 1.6,
+            color: t.inkSoft,
+            fontWeight: 600,
+          }}
+        >
+          KARTE {pad2(recipe.number)} / {pad2(totalRecipes)}
+        </Text>
       </View>
 
-      {/* BIENES STORY — short Feierabend recipes (≤10 ings) get the
-          editorial pull-quote between the portions bar and the body to
-          stop the bottom of the card from running dry. */}
-      {shouldShowStory(recipe) ? (
+      {/* TITLE BLOCK — title + meta left, square photo right */}
+      <View
+        style={{
+          flexDirection: "row",
+          paddingHorizontal: 32,
+          paddingTop: d.headerPadTop,
+          paddingBottom: d.headerPadBottom,
+          gap: 18,
+          backgroundColor: t.paper,
+          borderBottomWidth: 1,
+          borderBottomColor: t.divider,
+        }}
+        wrap={false}
+      >
+        <View style={{ flex: 1.4, justifyContent: "space-between" }}>
+          <View>
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: d.titleFontSize,
+                lineHeight: 1.02,
+                letterSpacing: -0.3,
+                color: t.ink,
+                textTransform: "uppercase",
+              }}
+            >
+              {recipe.title}
+            </Text>
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontStyle: "italic",
+                fontSize: d.subtitleFontSize,
+                color: t.inkSoft,
+                lineHeight: 1.3,
+                marginTop: 6,
+              }}
+            >
+              {recipe.subtitle}
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 8,
+                marginTop: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              <Text style={{ fontSize: 8.5, color: t.inkSoft }}>
+                {time} Min
+              </Text>
+              <Text style={{ fontSize: 8.5, color: t.inkSoft }}>·</Text>
+              <Text style={{ fontSize: 8.5, color: t.inkSoft }}>
+                ergibt {recipe.servings} {pl}
+              </Text>
+              <Text style={{ fontSize: 8.5, color: t.inkSoft }}>·</Text>
+              <Text style={{ fontSize: 8.5, color: t.inkSoft }}>
+                {recipe.difficulty}
+              </Text>
+            </View>
+          </View>
+          {recipe.tags?.length ? (
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                marginTop: 10,
+                gap: 4,
+              }}
+            >
+              {recipe.tags.slice(0, 5).map((tag) => (
+                <Text
+                  key={tag}
+                  style={{
+                    fontSize: 6.5,
+                    fontWeight: 600,
+                    letterSpacing: 0.8,
+                    textTransform: "uppercase",
+                    color: t.ink,
+                    backgroundColor: t.bg,
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    borderRadius: 999,
+                  }}
+                >
+                  {tag}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+        </View>
+
+        {/* Square photo — fits portrait food shots without crop */}
+        <View style={{ width: 140 }}>
+          {heroDataUri ? (
+            <View
+              style={{
+                borderRadius: 10,
+                overflow: "hidden",
+                width: 140,
+                height: 140,
+              }}
+            >
+              <Image
+                src={heroDataUri}
+                style={{ width: 140, height: 140, objectFit: "cover" }}
+              />
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      {/* BIENES STORY — always shown for Pack 5, honey-tinted pull-quote */}
+      {recipe.description ? (
         <View
           style={{
             paddingHorizontal: 32,
-            paddingTop: 12,
-            paddingBottom: 14,
-            backgroundColor: t.paper,
+            paddingTop: 11,
+            paddingBottom: 13,
+            backgroundColor: blendWithWhite(t.bg, 0.4),
             borderBottomWidth: 1,
             borderBottomColor: t.divider,
           }}
@@ -311,15 +307,59 @@ function EditorialPage({
             style={{
               fontFamily: "Fraunces",
               fontStyle: "italic",
-              fontSize: 12,
+              fontSize: 11.5,
               lineHeight: 1.5,
               color: t.ink,
             }}
           >
-            {recipe.description}
+            «&nbsp;{recipe.description}&nbsp;»
           </Text>
         </View>
       ) : null}
+
+      {/* 4-TILE STATS BAR — Portionen · kcal · Eiweiß · Zeit */}
+      <View
+        style={{
+          flexDirection: "row",
+          borderBottomWidth: 1,
+          borderBottomColor: t.divider,
+        }}
+        wrap={false}
+      >
+        <PortionTile
+          label="REZEPT ERGIBT"
+          value={`${recipe.servings}×`}
+          sub={pl}
+          theme={t}
+          borderRight
+          compact
+        />
+        <PortionTile
+          label="PRO PORTION"
+          value={String(recipe.nutrition.kcal)}
+          sub={`kcal · ${recipe.nutrition.carbs}g KH · ${recipe.nutrition.fat}g Fett`}
+          theme={t}
+          highlight
+          borderRight
+          accentLabel
+          compact
+        />
+        <PortionTile
+          label="EIWEISS"
+          value={`${recipe.nutrition.protein}g`}
+          sub="pro Portion"
+          theme={t}
+          borderRight
+          compact
+        />
+        <PortionTile
+          label="GESAMTZEIT"
+          value={String(time)}
+          sub={`Min · ${recipe.difficulty}`}
+          theme={t}
+          compact
+        />
+      </View>
 
       {/* BODY: Ingredients (group-aware) | Steps */}
       <View
@@ -390,7 +430,6 @@ function PatisseriePage({
   const stueck = recipe.servings === 1 ? "Stück" : "Stücke";
   const density = getDensity(recipe);
   const d = PATISSERIE_DENSITY[density];
-  const isSparse = density === "spacious";
 
   return (
     <Page
@@ -715,7 +754,6 @@ function MinimalPage({
   const pl = recipe.servings === 1 ? "Portion" : "Stücke";
   const density = getDensity(recipe);
   const d = MINIMAL_DENSITY[density];
-  const isSparse = density === "spacious";
 
   return (
     <Page
@@ -1136,7 +1174,6 @@ function SportPage({
   const portionsLabel = recipe.servings === 1 ? "Portion" : "Portionen";
   const density = getDensity(recipe);
   const d = SPORT_DENSITY[density];
-  const isSparse = density === "spacious";
 
   const macroBars = [
     { label: "Eiweiß", value: recipe.nutrition.protein, max: 50, unit: "g" },
