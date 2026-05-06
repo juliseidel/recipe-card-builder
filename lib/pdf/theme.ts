@@ -44,16 +44,13 @@ export function blendWithWhite(hex: string, whiteRatio: number): string {
   return rgbToHex(blend(r), blend(g), blend(b));
 }
 
-// 8-digit hex (#RRGGBBAA) is the only color format @react-pdf/renderer parses
-// reliably across all style props. The plain `rgba(...)` form sometimes
-// renders as an unexpected coral fallback for borderColor on print PDFs.
+// @react-pdf/renderer's PDF backend renders 8-digit hex AND rgba() with
+// out-of-range stroke values (RGB > 1.0) which clamp to red on print —
+// hence the rogue "coral" lines we kept seeing. The reliable workaround is
+// to pre-mix toward white and emit a flat 6-digit hex. For overlays on
+// non-white backgrounds, use the `opacity` style prop on the View instead.
 export function withAlpha(hex: string, alpha: number): string {
-  const { r, g, b } = parseHex(hex);
-  const a = Math.max(0, Math.min(255, Math.round(alpha * 255)));
-  return (
-    "#" +
-    [r, g, b, a].map((v) => v.toString(16).padStart(2, "0")).join("")
-  );
+  return blendWithWhite(hex, 1 - alpha);
 }
 
 function parseHex(input: string): { r: number; g: number; b: number } {

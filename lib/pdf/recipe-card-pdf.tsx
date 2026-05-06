@@ -641,7 +641,8 @@ function SportPage({
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: withAlpha(pack.mood.ink, 0.55),
+            backgroundColor: pack.mood.ink,
+            opacity: 0.55,
           }}
         />
         <View
@@ -719,14 +720,14 @@ function SportPage({
                     fontSize: 9,
                     fontWeight: 600,
                     letterSpacing: 1.4,
-                    color: "#FFFFFFD9",
+                    color: "#ffffff",
                     textTransform: "uppercase",
                   }}
                 >
                   kcal pro Portion
                 </Text>
                 <Text
-                  style={{ fontSize: 8, color: "#FFFFFFA6" }}
+                  style={{ fontSize: 8, color: "#e0e0e0" }}
                 >
                   {recipe.servings === 1
                     ? "1 Portion"
@@ -1409,7 +1410,7 @@ function DashRow({
         gap: 8,
         backgroundColor: highlight
           ? blendWithWhite(theme.bg, 0.6)
-          : "#FFFFFF99",
+          : "#ffffff",
         borderBottomWidth: last ? 0 : 0.5,
         borderBottomColor: theme.divider,
       }}
@@ -1568,7 +1569,7 @@ function MicrosStrip({
               borderRadius: 999,
               paddingHorizontal: 7,
               paddingVertical: 2,
-              backgroundColor: "#FFFFFF8C",
+              backgroundColor: "#ffffff",
               gap: 4,
             }}
           >

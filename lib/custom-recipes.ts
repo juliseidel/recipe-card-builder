@@ -30,6 +30,10 @@ function rowToCustomRecipe(row: RecipeRow): CustomRecipe {
   };
 }
 
+// Both loaders explicitly filter is_custom=true. Without this filter we'd
+// pull the seeded curated recipes too — those are loaded server-side via
+// lib/recipes.ts#getRecipesForPack already, so re-fetching them client-side
+// caused every card to appear twice in the grid.
 export async function getCustomRecipesForPack(
   packSlug: string
 ): Promise<CustomRecipe[]> {
@@ -39,6 +43,7 @@ export async function getCustomRecipesForPack(
     .from("recipes")
     .select("*")
     .eq("pack_slug", packSlug)
+    .eq("is_custom", true)
     .order("created_at", { ascending: false });
   if (error) {
     console.error("[recipes-db] getCustomRecipesForPack", error);
@@ -58,6 +63,7 @@ export async function getCustomRecipe(
     .select("*")
     .eq("pack_slug", packSlug)
     .eq("recipe_slug", recipeSlug)
+    .eq("is_custom", true)
     .maybeSingle();
   if (error) {
     console.error("[recipes-db] getCustomRecipe", error);
