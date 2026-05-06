@@ -35,7 +35,12 @@ export default async function PrintRecipePage({ params }: Props) {
             html, body {
               margin: 0;
               padding: 0;
-              background: ${brand.tokens.background};
+              /* White everywhere outside the card so any unused area at the
+                 bottom (when auto-fit-scale is < 0.776) blends with the
+                 white footer of the card — gives the document the
+                 edge-to-edge "Recipe Card" feel of the original PDF, while
+                 keeping the inside identical to the web component. */
+              background: #ffffff;
             }
             *, *::before, *::after {
               -webkit-print-color-adjust: exact !important;
@@ -43,19 +48,19 @@ export default async function PrintRecipePage({ params }: Props) {
             }
             .print-canvas {
               width: 1024px;
-              padding: 36px 32px;
-              background: ${brand.tokens.background};
+              padding: 0;
+              background: #ffffff;
               box-sizing: border-box;
             }
+            /* Strip the outer card chrome — the rounded shell, drop shadow
+               and border are what made the PDF look like "a card floating
+               inside a page". On paper we want the card to BE the page. */
             .print-canvas article {
               max-width: 100% !important;
-              box-shadow:
-                0 1px 0 rgba(43,31,25,0.05),
-                0 16px 32px -16px rgba(43,31,25,0.18) !important;
+              border-radius: 0 !important;
+              border: 0 !important;
+              box-shadow: none !important;
             }
-            /* Hide elements that exist in the web view but should never
-               make it into the printable card (e.g. external links open
-               in a new tab — meaningless on paper). */
             .print-canvas a { color: inherit !important; text-decoration: none !important; }
           `,
         }}

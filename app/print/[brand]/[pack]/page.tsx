@@ -32,7 +32,7 @@ export default async function PrintPackPage({ params }: Props) {
             html, body {
               margin: 0;
               padding: 0;
-              background: ${brand.tokens.background};
+              background: #ffffff;
             }
             *, *::before, *::after {
               -webkit-print-color-adjust: exact !important;
@@ -40,16 +40,17 @@ export default async function PrintPackPage({ params }: Props) {
             }
             .pack-page {
               width: 1024px;
-              padding: 36px 32px;
-              background: ${brand.tokens.background};
+              padding: 0;
+              background: #ffffff;
               box-sizing: border-box;
             }
             .pack-page + .pack-page { break-before: page; page-break-before: always; }
+            /* Edge-to-edge: no rounded shell, no drop shadow on print. */
             .pack-page article {
               max-width: 100% !important;
-              box-shadow:
-                0 1px 0 rgba(43,31,25,0.05),
-                0 16px 32px -16px rgba(43,31,25,0.18) !important;
+              border-radius: 0 !important;
+              border: 0 !important;
+              box-shadow: none !important;
             }
             .pack-page a { color: inherit !important; text-decoration: none !important; }
           `,
