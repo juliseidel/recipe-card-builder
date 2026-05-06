@@ -1636,32 +1636,46 @@ function staticRecipe(
   return r ? withMicros(r) : undefined;
 }
 
-// DB-backed loader. Server-only — callers MUST await.
-// Falls back to the static array (with micros file merged) if Supabase is
-// unreachable or the row isn't seeded yet, so /[brand]/[pack] never breaks.
+// Code (lib/recipes.ts) is the single source of truth for curated recipes.
+// Adding a recipe to the array above makes it visible immediately — no DB
+// reseed required. The DB seed (scripts/seed-recipes-to-db.ts) is still useful
+// to mirror the catalogue for downstream consumers (admin tools, analytics),
+// but it is NOT on the read path: a stale or empty DB row never causes a
+// curated recipe to disappear from the UI.
+//
+// We additionally surface "DB-only" curated rows (is_custom=false rows whose
+// slug isn't in code yet) so an admin could add a recipe directly to the DB
+// in a pinch — e.g. for a hotfix without a code deploy. Such rows are merged
+// in alongside the code list, deduped by slug (code wins on conflict).
+//
+// Custom recipes (is_custom=true, written by the editor at /new) live ONLY
+// in the DB and are loaded via lib/custom-recipes.ts on the client.
 export async function getRecipesForPack(
   packSlug: string
 ): Promise<Recipe[]> {
+  const fromCode = staticRecipesForPack(packSlug);
+  const codeSlugs = new Set(fromCode.map((r) => r.slug));
+
   try {
     const { getServerSupabase, hasServerSupabase } = await import(
       "./supabase-server"
     );
-    if (!hasServerSupabase()) return staticRecipesForPack(packSlug);
+    if (!hasServerSupabase()) return fromCode;
     const supabase = getServerSupabase();
     const { data, error } = await supabase
       .from("recipes")
       .select("data")
       .eq("pack_slug", packSlug)
       .eq("is_custom", false);
-    if (error || !data || data.length === 0) {
-      return staticRecipesForPack(packSlug);
-    }
-    return (data as Array<{ data: Recipe }>)
+    if (error || !data) return fromCode;
+    const dbOnly = (data as Array<{ data: Recipe }>)
       .map((row) => row.data)
-      .sort((a, b) => a.number - b.number);
+      .filter((r) => !codeSlugs.has(r.slug));
+    if (dbOnly.length === 0) return fromCode;
+    return [...fromCode, ...dbOnly].sort((a, b) => a.number - b.number);
   } catch (err) {
-    console.warn("[recipes] DB load failed, using static fallback", err);
-    return staticRecipesForPack(packSlug);
+    console.warn("[recipes] DB load failed, using code only", err);
+    return fromCode;
   }
 }
 
@@ -1669,11 +1683,15 @@ export async function getRecipe(
   packSlug: string,
   recipeSlug: string
 ): Promise<Recipe | undefined> {
+  // Code wins. Only consult the DB for slugs that aren't in the static list.
+  const fromCode = staticRecipe(packSlug, recipeSlug);
+  if (fromCode) return fromCode;
+
   try {
     const { getServerSupabase, hasServerSupabase } = await import(
       "./supabase-server"
     );
-    if (!hasServerSupabase()) return staticRecipe(packSlug, recipeSlug);
+    if (!hasServerSupabase()) return undefined;
     const supabase = getServerSupabase();
     const { data, error } = await supabase
       .from("recipes")
@@ -1682,10 +1700,10 @@ export async function getRecipe(
       .eq("recipe_slug", recipeSlug)
       .eq("is_custom", false)
       .maybeSingle();
-    if (error || !data) return staticRecipe(packSlug, recipeSlug);
+    if (error || !data) return undefined;
     return (data as { data: Recipe }).data;
   } catch (err) {
-    console.warn("[recipes] DB load failed, using static fallback", err);
-    return staticRecipe(packSlug, recipeSlug);
+    console.warn("[recipes] DB load failed", err);
+    return undefined;
   }
 }
