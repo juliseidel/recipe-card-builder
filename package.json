@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "print:packs": "tsx --tsconfig ./tsconfig.json scripts/render-print-pdfs.ts",
+    "print:upscale": "tsx --tsconfig ./tsconfig.json scripts/upscale-brand-assets.ts"
   },
   "dependencies": {
     "@fontsource/fraunces": "^5.2.9",
@@ -25,6 +27,8 @@
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "pdf-lib": "^1.17.1",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",

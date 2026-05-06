@@ -94,49 +94,76 @@ Bienen-Signaturfarbe (sparsam einsetzen):
 
 ## Was das für unsere 5 Recipe-Packs bedeutet
 
-Jedes Pack soll **erkennbar Biene** sein (Cream-Base, "MAN NEHME:"-Header, ✅-Listen, persönliche Signatur), aber eine **eigenständige visuelle Stimmung** haben — als wäre es ein eigener Buchband ihrer Reihe.
+Jedes Pack soll **erkennbar Biene** sein (Cocoa-Black-Texte, "MAN NEHME:"-Header,
+"Deine Biene 🐝"-Signatur, Original-Reel-Verlinkung pro Karte), aber eine
+**eigenständige visuelle Stimmung** haben — als wäre es ein eigener Buchband
+ihrer Reihe. Das ist auch das, was der Brief explizit fordert: *"unterschiedliche
+Layouts, Farbschemata und visuelle Stile"*. Cream-Base ist der Sound ihrer
+Marken-Wurzel; die fünf Pack-Moods sind ihre Tonarten.
 
-### Die 5 Packs
+### Die fünf Packs (Stand: finale Lieferung)
 
-#### 1. **"Sweet Mornings" — High-Protein Frühstücks-Klassiker**
-- **Stimmung:** Cozy Bakery Editorial, wie ein Sonntagsfrühstück bei der Großmutter, aber modernisiert
-- **Akzent:** Warm Cream + Caramel Toffee (`#F7F1E8` / `#D4B79E`) + Honey Gold Akzent
-- **Display-Font:** Fraunces (warm, traditional)
-- **Layout:** Magazine-Editorial, großes Hero-Foto, viel Whitespace
-- **Cover-Motiv:** Cinnamon Rolls in einer warmen Form, weiches Morgenlicht
-- **Rezepte-Beispiele:** Cinnamon Rolls, Erdbeer-Mealprep-Schalen, Protein-Waffeln, Lemon-Löffel-Kuchen, Quark-Pancakes, French Toast Casserole
+#### 1. Bienes Backwelt — Süßes ohne Zuckerzusatz · 10 Rezepte
+- **Mood:** Lavender (`#ddc9e8`) — die weichste Pack-Farbe, weil hier die
+  emotional aufgeladenen Backwerke sitzen. Erdbeer-Kuppeltorte, Cheesecake,
+  Schoko-Biskuitrolle.
+- **Layout:** `patisserie` — Polaroid-Foto rechts mit -2°-Drehung, italic
+  Fraunces 72px, "Macros als Pills"-Strip statt harte Tabelle.
+- **Warum diese Wahl:** Bienes Backwerke leben vom Anrichten, vom Schichten,
+  vom Foto auf Pinterest. Polaroid-Optik gibt jeder Karte das Gefühl, sie
+  wäre gerade aus einem Kochbuch gefallen — passt zu Bienes "Cookbook-Vibe".
+- **Edge-Case-Trick:** Sub-Gruppen ("Für den Teig", "Für die Glasur") werden
+  automatisch erkannt und gerendert — sonst würden 13 Zutaten ohne
+  Strukturierung überfordern.
 
-#### 2. **"15-Minuten Snacks für unterwegs"**
-- **Stimmung:** Minimal, schnell, urban-clean, "Apple-Vibe"
-- **Akzent:** Off-White + Soft Rose (`#FBF7F0` / `#E8C9D0`)
-- **Display-Font:** Inter Tight (modern, klar)
-- **Layout:** Reduziert, Grid-orientiert, klare Hierarchie, Timer-Icons (⏱)
-- **Cover-Motiv:** Mehrere Snacks im Grid auf weißem Marble
-- **Rezepte-Beispiele:** Protein-Riegel-Bites, Cookie Dough Bars, Quark-Cups, Energieballs
+#### 2. Volumen-Wunder — XL-Mahlzeiten unter 450 kcal · 7 Rezepte
+- **Mood:** Sage Green (`#c8e2a8`) — frisch, fitness-konnotiert, ohne in
+  Neon-Gym-Optik abzurutschen. Bienes Volumen-Versprechen ist Greens-affin.
+- **Layout:** `sport` — Macro-Bars mit Emojis (💪🌾🥑), "Zutaten-Cart" mit
+  ☐-Checkboxen, Schritt-Timeline mit Verbindungslinien.
+- **Warum diese Wahl:** Das Pack zeigt Bienes WPF-Mahlzeiten — XL-Wraps,
+  Frittata, der virale "lebensverändernde" Salat. Macro-Bars vermitteln das
+  Protein-Density-Versprechen visuell, was ihre Reels mit "✅ 31g Protein"
+  textuell tun.
+- **Edge-Case-Trick:** *3-Zutaten-Eisbowl* + *16-Zutaten-Mexican-Bowl* sind
+  bewusst beide drin. Layout schaltet bei ≤6 Zutaten auf "Bienes Story"-Block
+  + größere Rows; bei 16 Zutaten bleibt es dicht.
 
-#### 3. **"Cozy Sweet Treats" — Süße Verführungen ohne Reue**
-- **Stimmung:** Verspielt, weich, romantisch, "Fitness-Patisserie"
-- **Akzent:** Cream + Lavender + Soft Rose Mix
-- **Display-Font:** DM Serif Display + Caveat (Mix aus Editorial und Handschrift)
-- **Layout:** Editorial mit Bezug auf französische Patisserie-Bücher, kleine handgeschriebene Notes
-- **Cover-Motiv:** Pistazien-Cheesecake mit Garnish
-- **Rezepte-Beispiele:** Pistazien Cheesecake, Lotus Protein Cheesecake, Schoko Lava Cake, Himbeer-Crumble, Brownies, Biskuitrolle
+#### 3. Bienes Snacks — Süßes für zwischendurch · 5 Rezepte
+- **Mood:** Mint (`#b8dcc9`) — Apple-Store-Aesthetik, kühl, urban.
+- **Layout:** `minimal` — eine 140-px-Recipe-Number als visueller Anker, Bold
+  Sans-Serif Title, kompakte 3-Stat-Box, viel Whitespace.
+- **Warum diese Wahl:** Snacks sind das Pack mit den wenigsten Rezepten und
+  den kürzesten Zutatenlisten. Minimalismus räumt die Bühne frei statt
+  Halb-Leere zu kaschieren — die kleinste Karte ist hier die schönste.
 
-#### 4. **"Pizza Night & Hearty Bites" — Herzhaft & High-Protein**
-- **Stimmung:** Earthy, etwas dunkler, rustikal-modern
-- **Akzent:** Cream + Sage Green + Cocoa
-- **Display-Font:** Fraunces Bold + Inter
-- **Layout:** Cookbook-Stil mit Zutaten-Grid, dunklerer Akzent oben
-- **Cover-Motiv:** Proteinpizza auf rustikalem Holzbrett mit Käse-Pull
-- **Rezepte-Beispiele:** Protein Pizza, Zucchini-Feta-Bällchen, Käse-Kräuter-Brötchen, Spätzle-Auflauf, Bowl-Rezepte
+#### 4. Meal-Prep Heroes — Vorkochen für die Woche · 8 Rezepte
+- **Mood:** Sky Blue (`#b4cde4`) — Funktional-strukturiert, "Notion-Vibe".
+- **Layout:** `dashboard` — Wochentag-Tag links oben, Notion-Style Data-Rows
+  mit Icons (🍴🔥💪⏱📊), "✓ Mealprep-Ready"-Marker rechts oben.
+- **Warum diese Wahl:** Meal-Prep ist ein **Plan**, kein Anlass. Das Pack
+  fühlt sich wie ein Wochenplaner an — man liest es operativ, nicht
+  emotional. Das Layout signalisiert Klarheit über Verzauberung.
 
-#### 5. **"Meal Prep Sunday — Die ganze Woche organisiert"**
-- **Stimmung:** Funktional, strukturiert, "Notion-Premium-Template", aber warm
-- **Akzent:** Cream + Dusty Blue + Honey Yellow
-- **Display-Font:** Inter Display + Tabellen-Sans
-- **Layout:** Plan-Layout, Wochen-Cover mit Day-by-Day, Einkaufslisten, Macro-Übersicht
-- **Cover-Motiv:** Aufgereihte Mealprep-Boxen, Top-Down
-- **Rezepte-Beispiele:** Wochenplan-Rezepte, große Batches, Proteinpfannen, Bowls
+#### 5. Feierabend-Klassiker — Herzhaft & Sattmacher · 7 Rezepte
+- **Mood:** Honey (`#f4d88d`) — Bienen-Signaturfarbe, warm, hauptmahlzeit-würdig.
+- **Layout:** `editorial` — der Signature-Move ist hier oben: ein
+  **Mikronährstoff-Banner** *vor* dem Body (statt im Footer wie in den
+  anderen Packs), animierte Bars, 4-Tile-Stats, "Bienes Story" als
+  Pull-Quote.
+- **Warum diese Wahl:** Hauptgerichte ("WPF-Mahlzeiten" mit 30-55g Protein
+  pro Portion) sind Bienes ernährungsphysiologisches Zugpferd. Mikros
+  prominent oben statt versteckt unten — das ist ein bewusstes Statement
+  und differenziert dieses Pack visuell von den anderen vier.
+
+### Warum Cream-Base nicht durchgehend
+
+Die Recherche oben dokumentiert Bienes Cream-Heritage. Wir setzen sie als
+**Brand-Token** (`brand.tokens.background = #fbf7f0`) im Workspace-Layout
+und in allen Footer-Bereichen. In den **Pack-Layouts** weichen wir ab, weil
+der Brief diversifizierte Farben verlangt und ein durchgängiges Cream-Pack-Set
+visuell flach würde. Bienes Cream bleibt der Boden, auf dem die fünf
+Mood-Farben sitzen.
 
 ## Pflichtelemente pro Pack
 
