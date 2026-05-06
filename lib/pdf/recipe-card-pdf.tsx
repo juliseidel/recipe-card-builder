@@ -491,6 +491,83 @@ function PatisseriePage({
 // ═════════════════════════════════════════════════════════════════════════════
 // LAYOUT 3: MINIMAL — Pack 3 (Snacks, Pistachio)
 // ═════════════════════════════════════════════════════════════════════════════
+// Minimal tuning — Apple-vibe layout. Compact pulls in padding/fonts a touch
+// for long snack recipes; spacious adds breathing room and renders a Bienes
+// Story block since most snacks are short (≤8 ings) and the steps column
+// runs out fast otherwise. Pack 3 has 2 spacious + 3 balanced today.
+const MINIMAL_DENSITY: Record<
+  Density,
+  {
+    headPadTop: number;
+    headPadBottom: number;
+    bigNumberFontSize: number;
+    titleFontSize: number;
+    subtitleFontSize: number;
+    bodyPadTop: number;
+    bodyPadBottom: number;
+    ingRowPadV: number;
+    ingFontSize: number;
+    ingNoteFontSize: number;
+    stepMarginBottom: number;
+    stepFontSize: number;
+    stepNumFontSize: number;
+    microsPadTop: number;
+    microsPadBottom: number;
+  }
+> = {
+  compact: {
+    headPadTop: 24,
+    headPadBottom: 12,
+    bigNumberFontSize: 64,
+    titleFontSize: 21,
+    subtitleFontSize: 10,
+    bodyPadTop: 14,
+    bodyPadBottom: 12,
+    ingRowPadV: 2.5,
+    ingFontSize: 9,
+    ingNoteFontSize: 6.5,
+    stepMarginBottom: 6,
+    stepFontSize: 9,
+    stepNumFontSize: 16,
+    microsPadTop: 9,
+    microsPadBottom: 10,
+  },
+  balanced: {
+    headPadTop: 32,
+    headPadBottom: 16,
+    bigNumberFontSize: 76,
+    titleFontSize: 24,
+    subtitleFontSize: 11,
+    bodyPadTop: 18,
+    bodyPadBottom: 16,
+    ingRowPadV: 3.5,
+    ingFontSize: 9.5,
+    ingNoteFontSize: 7,
+    stepMarginBottom: 8,
+    stepFontSize: 9.5,
+    stepNumFontSize: 18,
+    microsPadTop: 8,
+    microsPadBottom: 9,
+  },
+  spacious: {
+    headPadTop: 38,
+    headPadBottom: 18,
+    bigNumberFontSize: 84,
+    titleFontSize: 26,
+    subtitleFontSize: 12,
+    bodyPadTop: 22,
+    bodyPadBottom: 18,
+    ingRowPadV: 5,
+    ingFontSize: 10,
+    ingNoteFontSize: 7.5,
+    stepMarginBottom: 10,
+    stepFontSize: 10,
+    stepNumFontSize: 20,
+    microsPadTop: 11,
+    microsPadBottom: 12,
+  },
+};
+
 function MinimalPage({
   brand,
   pack,
@@ -501,6 +578,9 @@ function MinimalPage({
   const t = packTheme(pack);
   const time = totalTime(recipe);
   const pl = recipe.servings === 1 ? "Portion" : "Stücke";
+  const density = getDensity(recipe);
+  const d = MINIMAL_DENSITY[density];
+  const isSparse = density === "spacious";
 
   return (
     <Page
@@ -511,8 +591,8 @@ function MinimalPage({
         style={{
           flexDirection: "row",
           paddingHorizontal: 36,
-          paddingTop: 32,
-          paddingBottom: 16,
+          paddingTop: d.headPadTop,
+          paddingBottom: d.headPadBottom,
           gap: 20,
         }}
         wrap={false}
@@ -532,7 +612,7 @@ function MinimalPage({
           <Text
             style={{
               fontFamily: "Fraunces",
-              fontSize: 76,
+              fontSize: d.bigNumberFontSize,
               color: t.accent,
               lineHeight: 0.86,
               marginTop: 10,
@@ -543,7 +623,7 @@ function MinimalPage({
           </Text>
           <Text
             style={{
-              fontSize: 24,
+              fontSize: d.titleFontSize,
               fontWeight: 700,
               textTransform: "uppercase",
               letterSpacing: -0.4,
@@ -556,7 +636,7 @@ function MinimalPage({
           </Text>
           <Text
             style={{
-              fontSize: 11,
+              fontSize: d.subtitleFontSize,
               color: t.inkSoft,
               marginTop: 4,
               lineHeight: 1.35,
@@ -627,14 +707,56 @@ function MinimalPage({
         </View>
       </View>
 
+      {/* BIENES STORY — only for sparse snacks (≤14 score). Most Bienes
+          snacks are short (5–7 ings + 3–5 steps) which leaves the body
+          empty; rendering recipe.description as an editorial pull-quote
+          fills that space with brand-on content. */}
+      {isSparse && recipe.description ? (
+        <View
+          style={{
+            paddingHorizontal: 36,
+            paddingTop: 12,
+            paddingBottom: 14,
+            backgroundColor: blendWithWhite(t.bg, 0.5),
+            borderTopWidth: 1,
+            borderTopColor: t.divider,
+          }}
+          wrap={false}
+        >
+          <Text
+            style={{
+              fontSize: 7,
+              fontWeight: 700,
+              letterSpacing: 1.6,
+              color: t.accent,
+              textTransform: "uppercase",
+              marginBottom: 5,
+            }}
+          >
+            Bienes Story
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontStyle: "italic",
+              fontSize: 12,
+              lineHeight: 1.5,
+              color: t.ink,
+            }}
+          >
+            {recipe.description}
+          </Text>
+        </View>
+      ) : null}
+
       <View
         style={{
           flex: 1,
           flexDirection: "row",
           gap: 24,
           paddingHorizontal: 36,
-          paddingTop: 18,
-          paddingBottom: 16,
+          paddingTop: d.bodyPadTop,
+          paddingBottom: d.bodyPadBottom,
           borderTopWidth: 1,
           borderTopColor: t.divider,
         }}
@@ -644,15 +766,31 @@ function MinimalPage({
           <IngredientsList
             grouped={[{ name: null, items: recipe.ingredients }]}
             theme={t}
+            rowPadV={d.ingRowPadV}
+            nameFontSize={d.ingFontSize}
+            noteFontSize={d.ingNoteFontSize}
           />
         </View>
         <View style={{ flex: 1 }}>
           <SectionHeader label="ZUBEREITUNG" theme={t} bold />
-          <StepsList steps={recipe.steps} theme={t} />
+          <StepsList
+            steps={recipe.steps}
+            theme={t}
+            stepMarginBottom={d.stepMarginBottom}
+            stepFontSize={d.stepFontSize}
+            stepNumFontSize={d.stepNumFontSize}
+          />
         </View>
       </View>
 
-      <CardFooter brand={brand} pack={pack} recipe={recipe} theme={t} />
+      <CardFooter
+        brand={brand}
+        pack={pack}
+        recipe={recipe}
+        theme={t}
+        microsPadTop={d.microsPadTop}
+        microsPadBottom={d.microsPadBottom}
+      />
     </Page>
   );
 }
