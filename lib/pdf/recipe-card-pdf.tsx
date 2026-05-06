@@ -1754,14 +1754,20 @@ function DashboardPage({
           style={{
             flex: 1,
             backgroundColor: t.bg,
-            minHeight: 180,
+            // Hard-cap the image height. Without this, the @react-pdf
+            // flexbox stretches the right column to fit the source image's
+            // intrinsic height (often 1500+ px) and pushes the body off
+            // the page. 220 pt matches the height the left column lands at
+            // with the dash-row table, so the strip looks balanced.
+            height: 220,
             position: "relative",
+            overflow: "hidden",
           }}
         >
           {heroDataUri ? (
             <Image
               src={heroDataUri}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              style={{ width: "100%", height: 220, objectFit: "cover" }}
             />
           ) : null}
         </View>
