@@ -318,14 +318,14 @@ function EditorialLayout({
                     {group.items.map((ing, iIdx) => (
                       <li
                         key={`${ing.name}-${iIdx}`}
-                        className="grid grid-cols-[4.5rem_1fr] items-baseline gap-3 border-b py-2"
+                        className="grid grid-cols-[4.5rem_1fr] items-start gap-3 border-b py-2"
                         style={{
                           borderColor: pack.mood.ink + "10",
                           color: pack.mood.ink,
                         }}
                       >
                         <span
-                          className="font-mono text-[12px] tabular-nums"
+                          className="font-mono text-[12px] tabular-nums break-words"
                           style={{ color: pack.mood.inkSoft }}
                         >
                           {ing.amount}
@@ -961,7 +961,7 @@ function SectionList({
           {recipe.ingredients.map((ingredient, idx) => (
             <li
               key={`${ingredient.name}-${idx}`}
-              className={`grid grid-cols-[4.2rem_1fr] items-baseline gap-3 ${
+              className={`grid grid-cols-[4.2rem_1fr] items-start gap-3 ${
                 minimal ? "py-2" : "border-b py-2.5"
               }`}
               style={{
@@ -970,7 +970,7 @@ function SectionList({
               }}
             >
               <span
-                className={`font-mono text-[12px] tabular-nums ${
+                className={`font-mono text-[12px] tabular-nums break-words leading-snug ${
                   bold ? "font-semibold" : ""
                 }`}
                 style={{ color: pack.mood.inkSoft }}

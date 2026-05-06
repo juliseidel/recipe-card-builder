@@ -247,7 +247,8 @@ async function countCustomRecipes(
   const { count, error } = await supabase
     .from("recipes")
     .select("*", { count: "exact", head: true })
-    .eq("pack_slug", packSlug);
+    .eq("pack_slug", packSlug)
+    .eq("is_custom", true);
   if (error) return 0;
   return count ?? 0;
 }

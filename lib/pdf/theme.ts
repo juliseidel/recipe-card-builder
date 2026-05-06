@@ -44,9 +44,16 @@ export function blendWithWhite(hex: string, whiteRatio: number): string {
   return rgbToHex(blend(r), blend(g), blend(b));
 }
 
+// 8-digit hex (#RRGGBBAA) is the only color format @react-pdf/renderer parses
+// reliably across all style props. The plain `rgba(...)` form sometimes
+// renders as an unexpected coral fallback for borderColor on print PDFs.
 export function withAlpha(hex: string, alpha: number): string {
   const { r, g, b } = parseHex(hex);
-  return `rgba(${r},${g},${b},${alpha})`;
+  const a = Math.max(0, Math.min(255, Math.round(alpha * 255)));
+  return (
+    "#" +
+    [r, g, b, a].map((v) => v.toString(16).padStart(2, "0")).join("")
+  );
 }
 
 function parseHex(input: string): { r: number; g: number; b: number } {
