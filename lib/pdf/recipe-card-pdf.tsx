@@ -594,7 +594,13 @@ function MinimalPage({
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// LAYOUT 4: SPORT — Pack 4 (Volumen, Sage Green)
+// LAYOUT 4: SPORT (Volumen-Editorial) — Pack 2 (Volumen-Wunder, Sage Green)
+//
+// Mirrors components/recipe-card-full.tsx#SportLayout. The web uses emoji
+// glyphs in stat tiles + macro bars, but the bundled @react-pdf fonts
+// (Inter/Fraunces) don't carry an emoji table — they'd render as tofu. So
+// the PDF version replaces emojis with a tinted accent dot beside each row,
+// keeping the same hierarchy and visual rhythm.
 // ═════════════════════════════════════════════════════════════════════════════
 function SportPage({
   brand,
@@ -605,195 +611,232 @@ function SportPage({
 }: RecipeCardPdfProps) {
   const t = packTheme(pack);
   const time = totalTime(recipe);
+  const portionsLabel = recipe.servings === 1 ? "Portion" : "Portionen";
+  const isSparse = recipe.ingredients.length <= 6;
+
+  const macroBars = [
+    { label: "Eiweiß", value: recipe.nutrition.protein, max: 50, unit: "g" },
+    { label: "Kohlenhydrate", value: recipe.nutrition.carbs, max: 80, unit: "g" },
+    { label: "Fett", value: recipe.nutrition.fat, max: 35, unit: "g" },
+  ];
 
   return (
     <Page
       size="A4"
       style={{ backgroundColor: "#ffffff", fontFamily: "Inter", color: t.ink }}
     >
-      {/* HERO — compact dark overlay */}
-      <View
-        style={{
-          height: 200,
-          position: "relative",
-          backgroundColor: t.ink,
-        }}
-        wrap={false}
-      >
-        {heroDataUri ? (
-          <Image
-            src={heroDataUri}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              opacity: 0.55,
-            }}
-          />
-        ) : null}
-        <View
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: pack.mood.ink,
-            opacity: 0.55,
-          }}
-        />
-        <View
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            padding: 24,
-            justifyContent: "space-between",
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 7.5,
-                letterSpacing: 1.8,
-                color: "#ffffff",
-                fontWeight: 600,
-              }}
-            >
-              PACK {pad2(pack.number)} · KARTE {pad2(recipe.number)} /{" "}
-              {pad2(totalRecipes)}
-            </Text>
-            <View
-              style={{
-                backgroundColor: "#ffffff",
-                paddingHorizontal: 10,
-                paddingVertical: 4,
-                borderRadius: 999,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 7.5,
-                  fontWeight: 700,
-                  letterSpacing: 1.2,
-                  color: t.ink,
-                }}
-              >
-                {time} MIN · {recipe.difficulty.toUpperCase()}
-              </Text>
-            </View>
-          </View>
-
-          <View>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "baseline",
-                gap: 10,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 50,
-                  fontWeight: 700,
-                  color: "#ffffff",
-                  letterSpacing: -1.2,
-                  lineHeight: 1,
-                }}
-              >
-                {recipe.nutrition.kcal}
-              </Text>
-              <View>
-                <Text
-                  style={{
-                    fontSize: 9,
-                    fontWeight: 600,
-                    letterSpacing: 1.4,
-                    color: "#ffffff",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  kcal pro Portion
-                </Text>
-                <Text
-                  style={{ fontSize: 8, color: "#e0e0e0" }}
-                >
-                  {recipe.servings === 1
-                    ? "1 Portion"
-                    : `Rezept ergibt ${recipe.servings} Portionen`}
-                </Text>
-              </View>
-            </View>
-            <Text
-              style={{
-                fontSize: 26,
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: -0.4,
-                color: "#ffffff",
-                marginTop: 6,
-                lineHeight: 1,
-              }}
-            >
-              {recipe.title}
-            </Text>
-            <Text
-              style={{
-                fontSize: 9,
-                letterSpacing: 1.2,
-                color: "#FFFFFFD9",
-                marginTop: 4,
-                textTransform: "uppercase",
-              }}
-            >
-              {recipe.subtitle}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* MACROS — bold strip */}
+      {/* HERO — title left (italic Fraunces), square photo right, no overlay */}
       <View
         style={{
           flexDirection: "row",
-          backgroundColor: t.bg,
+          paddingHorizontal: 32,
+          paddingTop: 24,
+          paddingBottom: 16,
+          gap: 18,
+          backgroundColor: blendWithWhite(t.bg, 0.7),
           borderBottomWidth: 1,
           borderBottomColor: t.divider,
         }}
         wrap={false}
       >
-        {[
-          { label: "Eiweiß", value: `${recipe.nutrition.protein}g` },
-          { label: "Kohlenhydrate", value: `${recipe.nutrition.carbs}g` },
-          { label: "Fett", value: `${recipe.nutrition.fat}g` },
-        ].map((m, i, arr) => (
+        <View style={{ flex: 1.4 }}>
+          <Text
+            style={{
+              fontSize: 7.5,
+              letterSpacing: 1.6,
+              fontWeight: 600,
+              color: t.inkSoft,
+            }}
+          >
+            PACK {pad2(pack.number)} · {pack.title.toUpperCase()} · KARTE{" "}
+            {pad2(recipe.number)} / {pad2(totalRecipes)}
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontStyle: "italic",
+              fontSize: 30,
+              lineHeight: 1.02,
+              letterSpacing: -0.3,
+              color: t.ink,
+              marginTop: 10,
+            }}
+          >
+            {recipe.title}
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontStyle: "italic",
+              fontSize: 12,
+              lineHeight: 1.3,
+              color: t.inkSoft,
+              marginTop: 6,
+            }}
+          >
+            «&nbsp;{recipe.subtitle}&nbsp;»
+          </Text>
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 8,
+              marginTop: 8,
+              flexWrap: "wrap",
+            }}
+          >
+            <Text style={{ fontSize: 8.5, color: t.inkSoft }}>{time} Min</Text>
+            <Text style={{ fontSize: 8.5, color: t.inkSoft }}>·</Text>
+            <Text style={{ fontSize: 8.5, color: t.inkSoft }}>
+              {recipe.difficulty}
+            </Text>
+            <Text style={{ fontSize: 8.5, color: t.inkSoft }}>·</Text>
+            <Text style={{ fontSize: 8.5, color: t.inkSoft }}>
+              ergibt {recipe.servings} {portionsLabel}
+            </Text>
+          </View>
+        </View>
+
+        <View style={{ width: 130 }}>
+          {heroDataUri ? (
+            <View
+              style={{
+                borderRadius: 8,
+                overflow: "hidden",
+                width: 130,
+                height: 130,
+              }}
+            >
+              <Image
+                src={heroDataUri}
+                style={{ width: 130, height: 130, objectFit: "cover" }}
+              />
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      {/* BIENES STORY (sparse only) — fills the gap short recipes leave */}
+      {isSparse && recipe.description ? (
+        <View
+          style={{
+            paddingHorizontal: 32,
+            paddingTop: 10,
+            paddingBottom: 12,
+            backgroundColor: blendWithWhite(t.bg, 0.85),
+            borderBottomWidth: 1,
+            borderBottomColor: t.divider,
+          }}
+          wrap={false}
+        >
+          <Text
+            style={{
+              fontSize: 7,
+              fontWeight: 700,
+              letterSpacing: 1.6,
+              color: t.accent,
+              textTransform: "uppercase",
+              marginBottom: 4,
+            }}
+          >
+            Bienes Story
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontStyle: "italic",
+              fontSize: 10.5,
+              lineHeight: 1.5,
+              color: t.ink,
+            }}
+          >
+            {recipe.description}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* VOLUMEN-STATS — 3 prominent tiles with accent dots (emojis on web) */}
+      <View
+        style={{
+          flexDirection: "row",
+          borderBottomWidth: 1,
+          borderBottomColor: t.divider,
+        }}
+        wrap={false}
+      >
+        <VolumenStatTile
+          dotColor={t.accent}
+          value={`${recipe.servings}×`}
+          label={portionsLabel}
+          theme={t}
+          borderRight
+        />
+        <VolumenStatTile
+          dotColor={t.accent}
+          value={String(recipe.nutrition.kcal)}
+          label="kcal pro Portion"
+          theme={t}
+          borderRight
+          highlight
+        />
+        <VolumenStatTile
+          dotColor={t.accent}
+          value={`${recipe.nutrition.protein}g`}
+          label="Eiweiß pro Portion"
+          theme={t}
+        />
+      </View>
+
+      {/* MACRO BARS — visual protein-density */}
+      <View
+        style={{
+          paddingHorizontal: 32,
+          paddingTop: 11,
+          paddingBottom: 13,
+          borderBottomWidth: 1,
+          borderBottomColor: t.divider,
+        }}
+        wrap={false}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            marginBottom: 6,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 8,
+              fontWeight: 700,
+              letterSpacing: 1.6,
+              color: t.accent,
+              textTransform: "uppercase",
+            }}
+          >
+            Makros
+          </Text>
+          <Text
+            style={{
+              fontSize: 6.5,
+              letterSpacing: 1,
+              color: t.inkSoft,
+              textTransform: "uppercase",
+            }}
+          >
+            pro Portion · von 50 / 80 / 35 g Skala
+          </Text>
+        </View>
+        {macroBars.map((m) => (
           <View
             key={m.label}
             style={{
-              flex: 1,
               flexDirection: "row",
-              justifyContent: "center",
-              alignItems: "baseline",
-              gap: 6,
-              paddingVertical: 10,
-              borderRightWidth: i === arr.length - 1 ? 0 : 1,
-              borderRightColor: t.divider,
+              alignItems: "center",
+              gap: 8,
+              marginTop: 4,
             }}
           >
-            <Text style={{ fontSize: 16, fontWeight: 700, color: t.ink }}>
-              {m.value}
-            </Text>
             <Text
               style={{
                 fontSize: 7.5,
@@ -801,41 +844,305 @@ function SportPage({
                 letterSpacing: 1.2,
                 color: t.inkSoft,
                 textTransform: "uppercase",
+                width: 90,
               }}
             >
               {m.label}
+            </Text>
+            <View
+              style={{
+                flex: 1,
+                height: 5,
+                borderRadius: 999,
+                backgroundColor: withAlpha(t.ink, 0.08),
+                overflow: "hidden",
+              }}
+            >
+              <View
+                style={{
+                  width: `${Math.min((m.value / m.max) * 100, 100)}%`,
+                  height: 5,
+                  backgroundColor: t.accent,
+                  borderRadius: 999,
+                }}
+              />
+            </View>
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: 13,
+                color: t.ink,
+                width: 36,
+                textAlign: "right",
+              }}
+            >
+              {m.value}
+              {m.unit}
             </Text>
           </View>
         ))}
       </View>
 
-      {/* BODY */}
+      {/* BODY — Zutaten-Cart (☐) + Schritt-Timeline */}
       <View
         style={{
           flex: 1,
           flexDirection: "row",
           gap: 22,
           paddingHorizontal: 32,
-          paddingTop: 18,
-          paddingBottom: 14,
+          paddingTop: 14,
+          paddingBottom: 12,
         }}
       >
+        {/* Zutaten-Cart with checkboxes */}
         <View style={{ width: 220 }}>
-          <SectionHeader label="MAN NEHME" theme={t} bold />
-          <IngredientsList
-            grouped={[{ name: null, items: recipe.ingredients }]}
-            theme={t}
-            bold
-          />
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "flex-end",
+              justifyContent: "space-between",
+              borderBottomWidth: 1,
+              borderBottomColor: withAlpha(t.ink, 0.15),
+              paddingBottom: 3,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 8.5,
+                fontWeight: 700,
+                letterSpacing: 1.6,
+                color: t.accent,
+                textTransform: "uppercase",
+              }}
+            >
+              Zutaten-Cart
+            </Text>
+            <Text
+              style={{
+                fontSize: 6.5,
+                fontWeight: 500,
+                letterSpacing: 1,
+                color: t.inkSoft,
+                textTransform: "uppercase",
+              }}
+            >
+              {recipe.ingredients.length} Items
+            </Text>
+          </View>
+          <View style={{ marginTop: 8 }}>
+            {recipe.ingredients.map((ing, i) => (
+              <View
+                key={`${ing.name}-${i}`}
+                style={{
+                  flexDirection: "row",
+                  borderBottomWidth: 0.5,
+                  borderBottomColor: withAlpha(t.ink, 0.08),
+                  paddingVertical: isSparse ? 5 : 3.5,
+                  gap: 5,
+                  alignItems: "flex-start",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 10,
+                    color: withAlpha(t.accent, 0.7),
+                    width: 12,
+                    lineHeight: 1.2,
+                  }}
+                >
+                  ☐
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 7.5,
+                    color: t.inkSoft,
+                    width: 50,
+                  }}
+                >
+                  {ing.amount}
+                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: isSparse ? 10 : 9.5,
+                      lineHeight: 1.3,
+                      color: t.ink,
+                    }}
+                  >
+                    {ing.name}
+                  </Text>
+                  {ing.note ? (
+                    <Text
+                      style={{
+                        fontSize: 7,
+                        fontStyle: "italic",
+                        color: t.inkSoft,
+                        marginTop: 0.5,
+                      }}
+                    >
+                      {ing.note}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            ))}
+          </View>
         </View>
+
+        {/* Timeline-Steps with connecting lines */}
         <View style={{ flex: 1 }}>
-          <SectionHeader label="ZUBEREITUNG" theme={t} bold />
-          <StepsList steps={recipe.steps} theme={t} bold />
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "flex-end",
+              justifyContent: "space-between",
+              borderBottomWidth: 1,
+              borderBottomColor: withAlpha(t.ink, 0.15),
+              paddingBottom: 3,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 8.5,
+                fontWeight: 700,
+                letterSpacing: 1.6,
+                color: t.accent,
+                textTransform: "uppercase",
+              }}
+            >
+              Timeline
+            </Text>
+            <Text
+              style={{
+                fontSize: 6.5,
+                fontWeight: 500,
+                letterSpacing: 1,
+                color: t.inkSoft,
+                textTransform: "uppercase",
+              }}
+            >
+              {recipe.steps.length} Schritte · {time} Min
+            </Text>
+          </View>
+          <View style={{ marginTop: 8 }}>
+            {recipe.steps.map((step, idx) => (
+              <View
+                key={idx}
+                style={{
+                  flexDirection: "row",
+                  marginBottom: 5,
+                  gap: 8,
+                }}
+              >
+                <View style={{ width: 22, alignItems: "center" }}>
+                  <Text
+                    style={{
+                      fontFamily: "Fraunces",
+                      fontSize: 18,
+                      color: t.accent,
+                      lineHeight: 1,
+                    }}
+                  >
+                    {idx + 1}
+                  </Text>
+                  {idx < recipe.steps.length - 1 ? (
+                    <View
+                      style={{
+                        marginTop: 4,
+                        width: 1.5,
+                        flex: 1,
+                        minHeight: 18,
+                        backgroundColor: withAlpha(t.accent, 0.3),
+                      }}
+                    />
+                  ) : null}
+                </View>
+                <Text
+                  style={{
+                    flex: 1,
+                    fontSize: 9.5,
+                    lineHeight: 1.45,
+                    color: t.ink,
+                    paddingBottom: 4,
+                  }}
+                >
+                  {step}
+                </Text>
+              </View>
+            ))}
+          </View>
         </View>
       </View>
 
       <CardFooter brand={brand} pack={pack} recipe={recipe} theme={t} />
     </Page>
+  );
+}
+
+function VolumenStatTile({
+  dotColor,
+  value,
+  label,
+  theme,
+  highlight = false,
+  borderRight = false,
+}: {
+  dotColor: string;
+  value: string;
+  label: string;
+  theme: ReturnType<typeof packTheme>;
+  highlight?: boolean;
+  borderRight?: boolean;
+}) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        alignItems: "center",
+        paddingVertical: 14,
+        paddingHorizontal: 6,
+        backgroundColor: highlight
+          ? blendWithWhite(theme.bg, 0.65)
+          : "transparent",
+        borderRightWidth: borderRight ? 1 : 0,
+        borderRightColor: theme.divider,
+      }}
+    >
+      {/* accent dot — fills the space the web's emoji takes, since
+          @react-pdf's bundled fonts don't carry emoji glyphs. */}
+      <View
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: 999,
+          backgroundColor: dotColor,
+          marginBottom: 6,
+        }}
+      />
+      <Text
+        style={{
+          fontFamily: "Fraunces",
+          fontSize: 24,
+          color: theme.ink,
+          lineHeight: 1,
+        }}
+      >
+        {value}
+      </Text>
+      <Text
+        style={{
+          fontSize: 6.5,
+          fontWeight: 600,
+          letterSpacing: 1.4,
+          color: highlight ? theme.accent : theme.inkSoft,
+          marginTop: 4,
+          textAlign: "center",
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </Text>
+    </View>
   );
 }
 
