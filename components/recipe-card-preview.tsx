@@ -70,7 +70,7 @@ export function RecipeCardPreview({
       style={{ boxShadow: "var(--shadow-card)" }}
     >
       <Image
-        src={pack.coverImage}
+        src={recipe.hero ?? pack.coverImage}
         alt={recipe.title}
         fill
         sizes="(min-width: 1280px) 420px, (min-width: 768px) 50vw, 100vw"
