@@ -92,14 +92,15 @@ function groupIngredients(
 }
 
 // ════════════════════════════════════════════════
-// LAYOUT 1: EDITORIAL (Cookbook-Spread) — Pack 5 (Feierabend-Klassiker, Honey)
+// LAYOUT 1: EDITORIAL (Magazine-Stage) — Pack 5 (Feierabend-Klassiker, Honey)
 //
-// Magazine-Cookbook spread for Bienes Sattmacher-Hauptgerichte: square
-// photo right (no awkward crop on portrait food shots), UPPERCASE Fraunces
-// title left as the editorial anchor, prominent Bienes-Story pull-quote
-// in honey-tinted band — always shown, gives every Pack-5 card the same
-// editorial weight regardless of length. 4-tile stats bar after the
-// pull-quote, then traditional 2-col body with subgroup detection.
+// Bienes WPF-Hauptgerichte get the magazine-cover treatment: full-width
+// 3:2 hero photo at the top (no side-by-side title — Pack 1 Patisserie and
+// Pack 2 Sport already use that), title-band below the photo, and the
+// signature move — Mikronährstoffe aren't tucked into the footer like
+// every other pack but rendered as a prominent "Nutrient Banner" right
+// after the title, animated progress dots fill in on mount. Stats bar +
+// pull-quote sit below, body 2-col closes it out.
 // ════════════════════════════════════════════════
 function EditorialLayout({
   brand,
@@ -116,7 +117,7 @@ function EditorialLayout({
       className="mx-auto w-full max-w-[960px] overflow-hidden rounded-[var(--radius-card)] border bg-white"
       style={baseShellStyle(pack, brand)}
     >
-      {/* TOP MARKER BAR — kompakt, nur Pack-Info */}
+      {/* TOP MARKER BAR */}
       <header
         className="flex items-center justify-between gap-3 border-b px-8 py-4 text-[10px] font-semibold uppercase tracking-[0.22em] sm:px-12"
         style={{
@@ -133,102 +134,84 @@ function EditorialLayout({
         </span>
       </header>
 
-      {/* TITLE BLOCK — title + meta left, square photo right (no crop) */}
+      {/* HERO PHOTO — full-width 3:2 cinematic. The other 4 packs put the
+          photo to the side or as a small polaroid; here it dominates the
+          top half of the spread like a cookbook chapter opener. */}
       <div
-        className="grid grid-cols-1 gap-8 px-8 pt-10 pb-10 sm:px-12 sm:pt-12 lg:grid-cols-[1.3fr_1fr] lg:gap-12"
-        style={{ background: pack.mood.background + "20" }}
+        className="relative aspect-[16/9] w-full overflow-hidden"
+        style={{ background: pack.mood.background }}
       >
-        <div className="flex flex-col justify-between gap-6">
-          <div className="flex flex-col gap-4">
-            <h1
-              className="font-display text-[40px] uppercase leading-[0.96] tracking-[-0.01em] sm:text-[56px]"
-              style={{ color: pack.mood.ink }}
-            >
-              {recipe.title}
-            </h1>
-            <p
-              className="font-display text-[18px] italic leading-snug"
-              style={{ color: pack.mood.inkSoft }}
-            >
-              {recipe.subtitle}
-            </p>
-            <div
-              className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]"
-              style={{ color: pack.mood.inkSoft }}
-            >
-              <span>{totalTime} Minuten</span>
-              <span>·</span>
-              <span>
-                ergibt {recipe.servings} {portionsLabel}
-              </span>
-              <span>·</span>
-              <span>{recipe.difficulty}</span>
-            </div>
-          </div>
-          {recipe.tags?.length ? (
-            <div className="flex flex-wrap gap-1.5">
-              {recipe.tags.slice(0, 5).map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em]"
-                  style={{
-                    background: pack.mood.background,
-                    color: pack.mood.ink,
-                  }}
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        {/* SQUARE PHOTO — fits portrait food shots without cropping */}
-        <div className="relative">
-          <div
-            className="relative mx-auto aspect-square w-full max-w-[360px] overflow-hidden rounded-2xl lg:ml-auto"
-            style={{
-              boxShadow:
-                "0 1px 0 rgba(43,31,25,0.05), 0 28px 50px -22px rgba(43,31,25,0.28)",
-            }}
-          >
-            <Image
-              src={recipe.hero ?? pack.coverImage}
-              alt={recipe.title}
-              fill
-              sizes="(min-width: 1024px) 360px, 100vw"
-              className="object-cover"
-              priority
-            />
-          </div>
-        </div>
+        <Image
+          src={recipe.hero ?? pack.coverImage}
+          alt={recipe.title}
+          fill
+          sizes="(min-width: 1024px) 960px, 100vw"
+          className="object-cover"
+          priority
+        />
+        {/* subtle bottom gradient so the title-band edge feels like one
+            continuous editorial spread, not two stacked panels */}
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-16"
+          style={{
+            background: `linear-gradient(180deg, transparent 0%, ${pack.mood.background}40 100%)`,
+          }}
+        />
       </div>
 
-      {/* BIENES STORY — always shown on Pack 5, honey-tinted pull-quote */}
-      {recipe.description ? (
-        <div
-          className="border-t border-b px-8 py-7 sm:px-12 sm:py-8"
-          style={{
-            borderColor: pack.mood.ink + "1f",
-            background: pack.mood.background + "55",
-          }}
+      {/* TITLE BAND — beneath photo (not beside) */}
+      <div
+        className="px-8 pt-9 pb-7 sm:px-12 sm:pt-10"
+        style={{ background: pack.mood.background + "20" }}
+      >
+        <h1
+          className="font-display text-[40px] uppercase leading-[0.96] tracking-[-0.01em] sm:text-[56px]"
+          style={{ color: pack.mood.ink }}
         >
-          <div
-            className="mb-2 text-[10px] font-semibold uppercase tracking-[0.22em]"
-            style={{ color: pack.mood.accent }}
-          >
-            Bienes Story
-          </div>
-          <p
-            className="font-display text-[19px] italic leading-relaxed"
-            style={{ color: pack.mood.ink }}
-          >
-            «&nbsp;{recipe.description}&nbsp;»
-          </p>
+          {recipe.title}
+        </h1>
+        <p
+          className="mt-3 max-w-[60ch] font-display text-[18px] italic leading-snug"
+          style={{ color: pack.mood.inkSoft }}
+        >
+          {recipe.subtitle}
+        </p>
+        <div
+          className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]"
+          style={{ color: pack.mood.inkSoft }}
+        >
+          <span>{totalTime} Minuten</span>
+          <span>·</span>
+          <span>
+            ergibt {recipe.servings} {portionsLabel}
+          </span>
+          <span>·</span>
+          <span>{recipe.difficulty}</span>
         </div>
-      ) : null}
+        {recipe.tags?.length ? (
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            {recipe.tags.slice(0, 5).map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em]"
+                style={{
+                  background: pack.mood.background,
+                  color: pack.mood.ink,
+                }}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </div>
 
-      {/* 4-TILE STATS BAR — Portionen · kcal · Eiweiß · Zeit */}
+      {/* NUTRIENT BANNER — pack-5 signature move: Mikros are surfaced HERE,
+          right after the title, instead of in the footer like every other
+          pack. Bars animate in via CSS keyframe on mount. */}
+      <EditorialNutrientBanner recipe={recipe} pack={pack} />
+
+      {/* 4-TILE STATS BAR */}
       <div
         className="grid grid-cols-2 border-b sm:grid-cols-4"
         style={{ borderColor: pack.mood.ink + "1f" }}
@@ -259,6 +242,30 @@ function EditorialLayout({
           pack={pack}
         />
       </div>
+
+      {/* BIENES STORY — pull-quote with «»-quotes, honey-tinted */}
+      {recipe.description ? (
+        <div
+          className="border-b px-8 py-7 sm:px-12 sm:py-8"
+          style={{
+            borderColor: pack.mood.ink + "1f",
+            background: pack.mood.background + "30",
+          }}
+        >
+          <div
+            className="mb-2 text-[10px] font-semibold uppercase tracking-[0.22em]"
+            style={{ color: pack.mood.accent }}
+          >
+            Bienes Story
+          </div>
+          <p
+            className="font-display text-[19px] italic leading-relaxed"
+            style={{ color: pack.mood.ink }}
+          >
+            «&nbsp;{recipe.description}&nbsp;»
+          </p>
+        </div>
+      ) : null}
 
       {/* BODY: Ingredients (group-aware) + Steps */}
       <div className="grid grid-cols-1 gap-10 px-8 py-10 sm:px-12 lg:grid-cols-[0.95fr_1.1fr] lg:gap-14">
@@ -375,8 +382,97 @@ function EditorialLayout({
         </section>
       </div>
 
-      <CardFooter brand={brand} pack={pack} recipe={recipe} />
+      {/* No micros strip in footer — they live up top in the Nutrient
+          Banner instead. Pack 5's signature: Mikros are a hero element,
+          not an afterthought. */}
+      <CardFooter brand={brand} pack={pack} recipe={recipe} hideMicros />
     </article>
+  );
+}
+
+// ─── Pack-5 Nutrient Banner — Mikros at the top, animated bars on mount ──
+function EditorialNutrientBanner({
+  recipe,
+  pack,
+}: {
+  recipe: Recipe;
+  pack: Pack;
+}) {
+  const micros = recipe.nutrition.micros;
+  if (!micros || micros.length === 0) return null;
+  // Top 6 micros so the banner stays one tidy row of three columns × 2 rows
+  const top = [...micros]
+    .sort((a, b) => (b.pctDaily ?? 0) - (a.pctDaily ?? 0))
+    .slice(0, 6);
+
+  return (
+    <div
+      className="border-b px-8 py-6 sm:px-12 sm:py-7"
+      style={{
+        borderColor: pack.mood.ink + "1f",
+        background: pack.mood.background + "55",
+      }}
+    >
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <h3
+          className="text-[12px] font-semibold uppercase tracking-[0.22em]"
+          style={{ color: pack.mood.accent }}
+        >
+          Reich an
+        </h3>
+        <span
+          className="text-[10px] font-medium uppercase tracking-[0.14em]"
+          style={{ color: pack.mood.inkSoft }}
+        >
+          Mikronährstoffe pro Portion
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
+        {top.map((m, idx) => {
+          const pct = Math.min(100, m.pctDaily ?? 0);
+          // Stagger animation by index for a cascading fill effect
+          return (
+            <div key={m.name} className="flex flex-col gap-1">
+              <div className="flex items-baseline justify-between gap-2">
+                <span
+                  className="text-[12px] font-medium"
+                  style={{ color: pack.mood.ink }}
+                >
+                  {m.name}
+                </span>
+                <span
+                  className="font-mono text-[10px] tabular-nums"
+                  style={{ color: pack.mood.inkSoft }}
+                >
+                  {m.amount}
+                </span>
+              </div>
+              <div
+                className="relative h-1.5 overflow-hidden rounded-full"
+                style={{ background: pack.mood.ink + "12" }}
+              >
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full editorial-bar-fill"
+                  style={
+                    {
+                      "--bar-target": `${pct}%`,
+                      animationDelay: `${idx * 80}ms`,
+                      background: pack.mood.accent,
+                    } as React.CSSProperties
+                  }
+                />
+              </div>
+              <span
+                className="self-end font-mono text-[10px] font-bold tabular-nums"
+                style={{ color: pack.mood.accent }}
+              >
+                {pct}% Tagesbedarf
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -1591,15 +1687,19 @@ function CardFooter({
   pack,
   recipe,
   italic = false,
+  hideMicros = false,
 }: {
   brand: Brand;
   pack: Pack;
   recipe?: Recipe;
   italic?: boolean;
+  // Pack 5 (Editorial) renders the micros banner at the top instead of in
+  // the footer — set this to skip the default MicrosPanel rendering.
+  hideMicros?: boolean;
 }) {
   return (
     <>
-      <MicrosPanel recipe={recipe} pack={pack} />
+      {hideMicros ? null : <MicrosPanel recipe={recipe} pack={pack} />}
       <div
         className="flex flex-wrap items-center justify-between gap-3 border-t px-8 py-4 sm:px-10"
         style={{

@@ -316,3 +316,20 @@ select.editor-input {
   color: white;
   box-shadow: 0 4px 12px -4px var(--accent-color, var(--color-accent));
 }
+
+/* Pack-5 Editorial Nutrient Banner — bars animate from 0 to their target
+   width on mount. Each bar reads its target from --bar-target so the same
+   keyframe handles 30 % and 90 % alike. */
+@keyframes editorial-bar-fill {
+  from {
+    width: 0;
+  }
+  to {
+    width: var(--bar-target, 0%);
+  }
+}
+
+.editorial-bar-fill {
+  width: 0;
+  animation: editorial-bar-fill 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}

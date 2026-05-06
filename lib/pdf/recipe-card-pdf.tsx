@@ -166,156 +166,127 @@ function EditorialPage({
         </Text>
       </View>
 
-      {/* TITLE BLOCK — title + meta left, square photo right */}
+      {/* HERO PHOTO — full-width landscape, dominates the top of the
+          spread. Pack 5 is the only layout that puts the photo above the
+          title rather than beside it (Patisserie/Sport square right,
+          Minimal/Dashboard data-row beside). 5:2 aspect keeps food
+          recognisable while reading as cinematic. */}
       <View
         style={{
-          flexDirection: "row",
+          paddingHorizontal: 32,
+          paddingTop: 14,
+          paddingBottom: 14,
+          backgroundColor: t.paper,
+        }}
+        wrap={false}
+      >
+        <View
+          style={{
+            width: "100%",
+            height: 212,
+            borderRadius: 10,
+            overflow: "hidden",
+          }}
+        >
+          {heroDataUri ? (
+            <Image
+              src={heroDataUri}
+              style={{ width: "100%", height: 212, objectFit: "cover" }}
+            />
+          ) : null}
+        </View>
+      </View>
+
+      {/* TITLE BAND — beneath the photo, full-width */}
+      <View
+        style={{
           paddingHorizontal: 32,
           paddingTop: d.headerPadTop,
           paddingBottom: d.headerPadBottom,
-          gap: 18,
           backgroundColor: t.paper,
           borderBottomWidth: 1,
           borderBottomColor: t.divider,
         }}
         wrap={false}
       >
-        <View style={{ flex: 1.4, justifyContent: "space-between" }}>
-          <View>
-            <Text
-              style={{
-                fontFamily: "Fraunces",
-                fontSize: d.titleFontSize,
-                lineHeight: 1.02,
-                letterSpacing: -0.3,
-                color: t.ink,
-                textTransform: "uppercase",
-              }}
-            >
-              {recipe.title}
-            </Text>
-            <Text
-              style={{
-                fontFamily: "Fraunces",
-                fontStyle: "italic",
-                fontSize: d.subtitleFontSize,
-                color: t.inkSoft,
-                lineHeight: 1.3,
-                marginTop: 6,
-              }}
-            >
-              {recipe.subtitle}
-            </Text>
-            <View
-              style={{
-                flexDirection: "row",
-                gap: 8,
-                marginTop: 8,
-                flexWrap: "wrap",
-              }}
-            >
-              <Text style={{ fontSize: 8.5, color: t.inkSoft }}>
-                {time} Min
-              </Text>
-              <Text style={{ fontSize: 8.5, color: t.inkSoft }}>·</Text>
-              <Text style={{ fontSize: 8.5, color: t.inkSoft }}>
-                ergibt {recipe.servings} {pl}
-              </Text>
-              <Text style={{ fontSize: 8.5, color: t.inkSoft }}>·</Text>
-              <Text style={{ fontSize: 8.5, color: t.inkSoft }}>
-                {recipe.difficulty}
-              </Text>
-            </View>
-          </View>
-          {recipe.tags?.length ? (
-            <View
-              style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                marginTop: 10,
-                gap: 4,
-              }}
-            >
-              {recipe.tags.slice(0, 5).map((tag) => (
-                <Text
-                  key={tag}
-                  style={{
-                    fontSize: 6.5,
-                    fontWeight: 600,
-                    letterSpacing: 0.8,
-                    textTransform: "uppercase",
-                    color: t.ink,
-                    backgroundColor: t.bg,
-                    paddingHorizontal: 6,
-                    paddingVertical: 2,
-                    borderRadius: 999,
-                  }}
-                >
-                  {tag}
-                </Text>
-              ))}
-            </View>
-          ) : null}
-        </View>
-
-        {/* Square photo — fits portrait food shots without crop */}
-        <View style={{ width: 140 }}>
-          {heroDataUri ? (
-            <View
-              style={{
-                borderRadius: 10,
-                overflow: "hidden",
-                width: 140,
-                height: 140,
-              }}
-            >
-              <Image
-                src={heroDataUri}
-                style={{ width: 140, height: 140, objectFit: "cover" }}
-              />
-            </View>
-          ) : null}
-        </View>
-      </View>
-
-      {/* BIENES STORY — always shown for Pack 5, honey-tinted pull-quote */}
-      {recipe.description ? (
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontSize: d.titleFontSize,
+            lineHeight: 1.02,
+            letterSpacing: -0.3,
+            color: t.ink,
+            textTransform: "uppercase",
+          }}
+        >
+          {recipe.title}
+        </Text>
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontStyle: "italic",
+            fontSize: d.subtitleFontSize,
+            color: t.inkSoft,
+            lineHeight: 1.3,
+            marginTop: 6,
+          }}
+        >
+          {recipe.subtitle}
+        </Text>
         <View
           style={{
-            paddingHorizontal: 32,
-            paddingTop: 11,
-            paddingBottom: 13,
-            backgroundColor: blendWithWhite(t.bg, 0.4),
-            borderBottomWidth: 1,
-            borderBottomColor: t.divider,
+            flexDirection: "row",
+            gap: 8,
+            marginTop: 6,
+            flexWrap: "wrap",
           }}
-          wrap={false}
         >
-          <Text
-            style={{
-              fontSize: 7,
-              fontWeight: 700,
-              letterSpacing: 1.6,
-              color: t.accent,
-              textTransform: "uppercase",
-              marginBottom: 5,
-            }}
-          >
-            Bienes Story
+          <Text style={{ fontSize: 8.5, color: t.inkSoft }}>{time} Min</Text>
+          <Text style={{ fontSize: 8.5, color: t.inkSoft }}>·</Text>
+          <Text style={{ fontSize: 8.5, color: t.inkSoft }}>
+            ergibt {recipe.servings} {pl}
           </Text>
-          <Text
-            style={{
-              fontFamily: "Fraunces",
-              fontStyle: "italic",
-              fontSize: 11.5,
-              lineHeight: 1.5,
-              color: t.ink,
-            }}
-          >
-            «&nbsp;{recipe.description}&nbsp;»
+          <Text style={{ fontSize: 8.5, color: t.inkSoft }}>·</Text>
+          <Text style={{ fontSize: 8.5, color: t.inkSoft }}>
+            {recipe.difficulty}
           </Text>
         </View>
-      ) : null}
+        {recipe.tags?.length ? (
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              marginTop: 8,
+              gap: 4,
+            }}
+          >
+            {recipe.tags.slice(0, 5).map((tag) => (
+              <Text
+                key={tag}
+                style={{
+                  fontSize: 6.5,
+                  fontWeight: 600,
+                  letterSpacing: 0.8,
+                  textTransform: "uppercase",
+                  color: t.ink,
+                  backgroundColor: t.bg,
+                  paddingHorizontal: 6,
+                  paddingVertical: 2,
+                  borderRadius: 999,
+                }}
+              >
+                {tag}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+      </View>
+
+      {/* NUTRIENT BANNER — pack-5 signature: Mikros surfaced HERE, right
+          after the title, with mini progress bars. No other pack gives
+          micros this kind of editorial billing — they're always tucked
+          into the footer strip. */}
+      <EditorialMicrosBanner recipe={recipe} theme={t} />
 
       {/* 4-TILE STATS BAR — Portionen · kcal · Eiweiß · Zeit */}
       <View
@@ -360,6 +331,45 @@ function EditorialPage({
           compact
         />
       </View>
+
+      {/* BIENES STORY — pull-quote with «»-quotes, honey-tinted */}
+      {recipe.description ? (
+        <View
+          style={{
+            paddingHorizontal: 32,
+            paddingTop: 11,
+            paddingBottom: 13,
+            backgroundColor: blendWithWhite(t.bg, 0.4),
+            borderBottomWidth: 1,
+            borderBottomColor: t.divider,
+          }}
+          wrap={false}
+        >
+          <Text
+            style={{
+              fontSize: 7,
+              fontWeight: 700,
+              letterSpacing: 1.6,
+              color: t.accent,
+              textTransform: "uppercase",
+              marginBottom: 5,
+            }}
+          >
+            Bienes Story
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontStyle: "italic",
+              fontSize: 11.5,
+              lineHeight: 1.5,
+              color: t.ink,
+            }}
+          >
+            «&nbsp;{recipe.description}&nbsp;»
+          </Text>
+        </View>
+      ) : null}
 
       {/* BODY: Ingredients (group-aware) | Steps */}
       <View
@@ -408,10 +418,122 @@ function EditorialPage({
         pack={pack}
         recipe={recipe}
         theme={t}
-        microsPadTop={d.microsPadTop}
-        microsPadBottom={d.microsPadBottom}
+        hideMicros
       />
     </Page>
+  );
+}
+
+// Pack-5 nutrient banner — 6-column grid with mini progress bars. Each
+// micro shows name, amount, a tiny pack-accent bar and the % daily value.
+// Renders in the position usually reserved for a hero strip, making it
+// the most visible piece of micronutrient data in the whole document.
+function EditorialMicrosBanner({
+  recipe,
+  theme,
+}: {
+  recipe: Recipe;
+  theme: ReturnType<typeof packTheme>;
+}) {
+  const micros = recipe.nutrition.micros;
+  if (!micros || micros.length === 0) return null;
+  const top = [...micros]
+    .sort((a, b) => (b.pctDaily ?? 0) - (a.pctDaily ?? 0))
+    .slice(0, 6);
+
+  return (
+    <View
+      style={{
+        paddingHorizontal: 32,
+        paddingTop: 10,
+        paddingBottom: 12,
+        backgroundColor: blendWithWhite(theme.bg, 0.55),
+        borderBottomWidth: 1,
+        borderBottomColor: theme.divider,
+      }}
+      wrap={false}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          marginBottom: 7,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 8,
+            fontWeight: 700,
+            letterSpacing: 1.6,
+            color: theme.accent,
+            textTransform: "uppercase",
+          }}
+        >
+          Reich an
+        </Text>
+        <Text
+          style={{
+            fontSize: 6.5,
+            letterSpacing: 1,
+            color: theme.inkSoft,
+            textTransform: "uppercase",
+          }}
+        >
+          Mikronährstoffe pro Portion · % Tagesbedarf
+        </Text>
+      </View>
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        {top.map((m) => {
+          const pct = Math.min(100, Math.max(0, m.pctDaily ?? 0));
+          return (
+            <View
+              key={m.name}
+              style={{ flex: 1, justifyContent: "flex-start" }}
+            >
+              <Text
+                style={{ fontSize: 7, fontWeight: 600, color: theme.ink }}
+              >
+                {m.name}
+              </Text>
+              <Text
+                style={{ fontSize: 6, color: theme.inkSoft, marginTop: 1 }}
+              >
+                {m.amount}
+              </Text>
+              <View
+                style={{
+                  marginTop: 3,
+                  height: 3,
+                  backgroundColor: withAlpha(theme.ink, 0.1),
+                  borderRadius: 999,
+                  overflow: "hidden",
+                }}
+              >
+                <View
+                  style={{
+                    width: `${pct}%`,
+                    height: 3,
+                    backgroundColor: theme.accent,
+                    borderRadius: 999,
+                  }}
+                />
+              </View>
+              <Text
+                style={{
+                  fontSize: 7,
+                  fontWeight: 700,
+                  color: theme.accent,
+                  marginTop: 2,
+                }}
+              >
+                {pct}%
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
@@ -2465,6 +2587,7 @@ function CardFooter({
   italic = false,
   microsPadTop,
   microsPadBottom,
+  hideMicros = false,
 }: {
   brand: Brand;
   pack: Pack;
@@ -2473,15 +2596,20 @@ function CardFooter({
   italic?: boolean;
   microsPadTop?: number;
   microsPadBottom?: number;
+  // Pack 5 (Editorial) renders the micros banner up top instead of in
+  // the footer — set this to skip the default MicrosStrip rendering.
+  hideMicros?: boolean;
 }) {
   return (
     <>
-      <MicrosStrip
-        recipe={recipe}
-        theme={theme}
-        padTop={microsPadTop}
-        padBottom={microsPadBottom}
-      />
+      {hideMicros ? null : (
+        <MicrosStrip
+          recipe={recipe}
+          theme={theme}
+          padTop={microsPadTop}
+          padBottom={microsPadBottom}
+        />
+      )}
       <View
         style={{
           flexDirection: "row",
