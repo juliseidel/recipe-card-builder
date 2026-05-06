@@ -255,6 +255,7 @@ function PatisseriePage({
   const stueck = recipe.servings === 1 ? "Stück" : "Stücke";
   const density = getDensity(recipe);
   const d = PATISSERIE_DENSITY[density];
+  const isSparse = density === "spacious";
 
   return (
     <Page
@@ -355,6 +356,50 @@ function PatisseriePage({
           ) : null}
         </View>
       </View>
+
+      {/* BIENES STORY — only when the recipe is sparse (low score). Renders
+          recipe.description as an editorial pull-quote in italic Fraunces,
+          tinted with the pack's lavender. Fills the bottom whitespace short
+          recipes (e.g. KI-Süßkartoffel-Muffins, 8 ings + 4 steps) would
+          otherwise leave below the body — direct fix for "darf nicht
+          halbleer aussehen". */}
+      {isSparse && recipe.description ? (
+        <View
+          style={{
+            paddingHorizontal: 36,
+            paddingTop: 12,
+            paddingBottom: 14,
+            backgroundColor: blendWithWhite(t.bg, 0.4),
+            borderTopWidth: 1,
+            borderTopColor: t.divider,
+          }}
+          wrap={false}
+        >
+          <Text
+            style={{
+              fontSize: 7,
+              fontWeight: 700,
+              letterSpacing: 1.6,
+              color: t.accent,
+              textTransform: "uppercase",
+              marginBottom: 5,
+            }}
+          >
+            Bienes Story
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontStyle: "italic",
+              fontSize: 12,
+              lineHeight: 1.5,
+              color: t.ink,
+            }}
+          >
+            {recipe.description}
+          </Text>
+        </View>
+      ) : null}
 
       {/* MACRO STRIP — single line, compact */}
       <View
@@ -634,9 +679,15 @@ function MinimalPage({
 // based on ingredient count — no manual configuration needed.
 export type Density = "compact" | "balanced" | "spacious";
 
+// Score weighs steps slightly higher than ingredients because each step is
+// usually 2–3 lines of body copy, while an ingredient is 1–2 short lines.
+// A recipe with 8 ingredients but only 4 steps (e.g. KI-Süßkartoffel-Muffins)
+// ends up sparse-feeling on A4 — the steps column runs out fast and leaves
+// half the page white. Score-based classification catches that.
 export function getDensity(recipe: Recipe): Density {
-  if (recipe.ingredients.length >= 13) return "compact";
-  if (recipe.ingredients.length <= 6) return "spacious";
+  const score = recipe.ingredients.length + recipe.steps.length * 1.5;
+  if (score >= 22) return "compact";
+  if (score <= 14) return "spacious";
   return "balanced";
 }
 
