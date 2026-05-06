@@ -155,6 +155,31 @@ async function main() {
     console.log(`  (kept temp RGB files in ${TMP_DIR} for debugging)`);
   }
 
+  // Auto-publish to public/submission/ so the live download page (/submission)
+  // and the manual e-mail send have one source of truth. Skipped if any pack
+  // failed verification — never overwrite the published set with broken PDFs.
+  if (allOk) {
+    const SUBMISSION_DIR = path.join(
+      process.cwd(),
+      "public",
+      "submission"
+    );
+    await fs.mkdir(SUBMISSION_DIR, { recursive: true });
+    const files = await fs.readdir(OUT_DIR);
+    let copied = 0;
+    for (const f of files) {
+      if (!f.toLowerCase().endsWith(".pdf")) continue;
+      await fs.copyFile(
+        path.join(OUT_DIR, f),
+        path.join(SUBMISSION_DIR, f)
+      );
+      copied++;
+    }
+    console.log(
+      `  → published ${copied} PDF${copied === 1 ? "" : "s"} to public/submission/`
+    );
+  }
+
   console.log(
     allOk
       ? `\n✓ All ${packs.length} packs ready in ${OUT_DIR}\n`
