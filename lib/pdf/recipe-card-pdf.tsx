@@ -601,7 +601,90 @@ function MinimalPage({
 // (Inter/Fraunces) don't carry an emoji table — they'd render as tofu. So
 // the PDF version replaces emojis with a tinted accent dot beside each row,
 // keeping the same hierarchy and visual rhythm.
+//
+// SPORT_DENSITY adapts paddings + font sizes to ingredient count so a
+// 16-ingredient Mexican Bowl fits one A4 page just like a 3-ingredient Eis-
+// Bowl does — direct fix for the brief's "Beide Extreme müssen gut funktio-
+// nieren" requirement. Subtle adjustments only — the layout structure is
+// identical across modes, just slightly tighter or looser typography.
 // ═════════════════════════════════════════════════════════════════════════════
+type SportDensity = "compact" | "balanced" | "spacious";
+
+function getSportDensity(recipe: Recipe): SportDensity {
+  if (recipe.ingredients.length >= 13) return "compact";
+  if (recipe.ingredients.length <= 6) return "spacious";
+  return "balanced";
+}
+
+const SPORT_DENSITY: Record<
+  SportDensity,
+  {
+    heroPadTop: number;
+    heroPadBottom: number;
+    statsPadV: number;
+    macrosPadTop: number;
+    macrosPadBottom: number;
+    macrosBarMargin: number;
+    bodyPadTop: number;
+    bodyPadBottom: number;
+    ingRowPadV: number;
+    ingFontSize: number;
+    ingNoteFontSize: number;
+    stepMarginBottom: number;
+    stepFontSize: number;
+    titleFontSize: number;
+  }
+> = {
+  compact: {
+    heroPadTop: 20,
+    heroPadBottom: 12,
+    statsPadV: 11,
+    macrosPadTop: 9,
+    macrosPadBottom: 10,
+    macrosBarMargin: 3,
+    bodyPadTop: 10,
+    bodyPadBottom: 9,
+    ingRowPadV: 2.5,
+    ingFontSize: 9,
+    ingNoteFontSize: 6.5,
+    stepMarginBottom: 4,
+    stepFontSize: 9,
+    titleFontSize: 26,
+  },
+  balanced: {
+    heroPadTop: 24,
+    heroPadBottom: 16,
+    statsPadV: 14,
+    macrosPadTop: 11,
+    macrosPadBottom: 13,
+    macrosBarMargin: 4,
+    bodyPadTop: 14,
+    bodyPadBottom: 12,
+    ingRowPadV: 3.5,
+    ingFontSize: 9.5,
+    ingNoteFontSize: 7,
+    stepMarginBottom: 5,
+    stepFontSize: 9.5,
+    titleFontSize: 30,
+  },
+  spacious: {
+    heroPadTop: 28,
+    heroPadBottom: 18,
+    statsPadV: 16,
+    macrosPadTop: 12,
+    macrosPadBottom: 14,
+    macrosBarMargin: 5,
+    bodyPadTop: 16,
+    bodyPadBottom: 14,
+    ingRowPadV: 5.5,
+    ingFontSize: 10,
+    ingNoteFontSize: 7.5,
+    stepMarginBottom: 7,
+    stepFontSize: 10,
+    titleFontSize: 32,
+  },
+};
+
 function SportPage({
   brand,
   pack,
@@ -612,7 +695,9 @@ function SportPage({
   const t = packTheme(pack);
   const time = totalTime(recipe);
   const portionsLabel = recipe.servings === 1 ? "Portion" : "Portionen";
-  const isSparse = recipe.ingredients.length <= 6;
+  const density = getSportDensity(recipe);
+  const d = SPORT_DENSITY[density];
+  const isSparse = density === "spacious";
 
   const macroBars = [
     { label: "Eiweiß", value: recipe.nutrition.protein, max: 50, unit: "g" },
@@ -630,8 +715,8 @@ function SportPage({
         style={{
           flexDirection: "row",
           paddingHorizontal: 32,
-          paddingTop: 24,
-          paddingBottom: 16,
+          paddingTop: d.heroPadTop,
+          paddingBottom: d.heroPadBottom,
           gap: 18,
           backgroundColor: blendWithWhite(t.bg, 0.7),
           borderBottomWidth: 1,
@@ -655,7 +740,7 @@ function SportPage({
             style={{
               fontFamily: "Fraunces",
               fontStyle: "italic",
-              fontSize: 30,
+              fontSize: d.titleFontSize,
               lineHeight: 1.02,
               letterSpacing: -0.3,
               color: t.ink,
@@ -769,6 +854,7 @@ function SportPage({
           label={portionsLabel}
           theme={t}
           borderRight
+          padV={d.statsPadV}
         />
         <VolumenStatTile
           dotColor={t.accent}
@@ -777,12 +863,14 @@ function SportPage({
           theme={t}
           borderRight
           highlight
+          padV={d.statsPadV}
         />
         <VolumenStatTile
           dotColor={t.accent}
           value={`${recipe.nutrition.protein}g`}
           label="Eiweiß pro Portion"
           theme={t}
+          padV={d.statsPadV}
         />
       </View>
 
@@ -790,8 +878,8 @@ function SportPage({
       <View
         style={{
           paddingHorizontal: 32,
-          paddingTop: 11,
-          paddingBottom: 13,
+          paddingTop: d.macrosPadTop,
+          paddingBottom: d.macrosPadBottom,
           borderBottomWidth: 1,
           borderBottomColor: t.divider,
         }}
@@ -834,7 +922,7 @@ function SportPage({
               flexDirection: "row",
               alignItems: "center",
               gap: 8,
-              marginTop: 4,
+              marginTop: d.macrosBarMargin,
             }}
           >
             <Text
@@ -890,8 +978,8 @@ function SportPage({
           flexDirection: "row",
           gap: 22,
           paddingHorizontal: 32,
-          paddingTop: 14,
-          paddingBottom: 12,
+          paddingTop: d.bodyPadTop,
+          paddingBottom: d.bodyPadBottom,
         }}
       >
         {/* Zutaten-Cart with checkboxes */}
@@ -937,7 +1025,7 @@ function SportPage({
                   flexDirection: "row",
                   borderBottomWidth: 0.5,
                   borderBottomColor: withAlpha(t.ink, 0.08),
-                  paddingVertical: isSparse ? 5 : 3.5,
+                  paddingVertical: d.ingRowPadV,
                   gap: 5,
                   alignItems: "flex-start",
                 }}
@@ -964,7 +1052,7 @@ function SportPage({
                 <View style={{ flex: 1 }}>
                   <Text
                     style={{
-                      fontSize: isSparse ? 10 : 9.5,
+                      fontSize: d.ingFontSize,
                       lineHeight: 1.3,
                       color: t.ink,
                     }}
@@ -974,7 +1062,7 @@ function SportPage({
                   {ing.note ? (
                     <Text
                       style={{
-                        fontSize: 7,
+                        fontSize: d.ingNoteFontSize,
                         fontStyle: "italic",
                         color: t.inkSoft,
                         marginTop: 0.5,
@@ -1030,7 +1118,7 @@ function SportPage({
                 key={idx}
                 style={{
                   flexDirection: "row",
-                  marginBottom: 5,
+                  marginBottom: d.stepMarginBottom,
                   gap: 8,
                 }}
               >
@@ -1060,7 +1148,7 @@ function SportPage({
                 <Text
                   style={{
                     flex: 1,
-                    fontSize: 9.5,
+                    fontSize: d.stepFontSize,
                     lineHeight: 1.45,
                     color: t.ink,
                     paddingBottom: 4,
@@ -1086,6 +1174,7 @@ function VolumenStatTile({
   theme,
   highlight = false,
   borderRight = false,
+  padV = 14,
 }: {
   dotColor: string;
   value: string;
@@ -1093,13 +1182,14 @@ function VolumenStatTile({
   theme: ReturnType<typeof packTheme>;
   highlight?: boolean;
   borderRight?: boolean;
+  padV?: number;
 }) {
   return (
     <View
       style={{
         flex: 1,
         alignItems: "center",
-        paddingVertical: 14,
+        paddingVertical: padV,
         paddingHorizontal: 6,
         backgroundColor: highlight
           ? blendWithWhite(theme.bg, 0.65)
