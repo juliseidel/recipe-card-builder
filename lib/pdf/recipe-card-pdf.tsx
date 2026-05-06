@@ -38,6 +38,79 @@ const LAYOUTS: Record<CardLayout, (p: RecipeCardPdfProps) => React.JSX.Element> 
 // ═════════════════════════════════════════════════════════════════════════════
 // LAYOUT 1: EDITORIAL — Pack 1 (Feierabend, Honey)
 // ═════════════════════════════════════════════════════════════════════════════
+// Editorial tuning — Cookbook-Spread look, used by Pack 5 (Feierabend-
+// Klassiker). Compact pulls in the header & body when long savory
+// recipes pile up; spacious gives the cover-spread the editorial breathing
+// room and is paired with the Bienes-Story block on shorter recipes.
+const EDITORIAL_DENSITY: Record<
+  Density,
+  {
+    headerPadTop: number;
+    headerPadBottom: number;
+    titleFontSize: number;
+    subtitleFontSize: number;
+    bodyPadTop: number;
+    bodyPadBottom: number;
+    ingRowPadV: number;
+    ingFontSize: number;
+    ingNoteFontSize: number;
+    stepMarginBottom: number;
+    stepFontSize: number;
+    stepNumFontSize: number;
+    microsPadTop: number;
+    microsPadBottom: number;
+  }
+> = {
+  compact: {
+    headerPadTop: 18,
+    headerPadBottom: 12,
+    titleFontSize: 24,
+    subtitleFontSize: 10.5,
+    bodyPadTop: 12,
+    bodyPadBottom: 9,
+    ingRowPadV: 2.5,
+    ingFontSize: 9,
+    ingNoteFontSize: 6.5,
+    stepMarginBottom: 6,
+    stepFontSize: 9,
+    stepNumFontSize: 16,
+    microsPadTop: 9,
+    microsPadBottom: 10,
+  },
+  balanced: {
+    headerPadTop: 22,
+    headerPadBottom: 16,
+    titleFontSize: 28,
+    subtitleFontSize: 12,
+    bodyPadTop: 16,
+    bodyPadBottom: 12,
+    ingRowPadV: 3.5,
+    ingFontSize: 9.5,
+    ingNoteFontSize: 7,
+    stepMarginBottom: 8,
+    stepFontSize: 9.5,
+    stepNumFontSize: 18,
+    microsPadTop: 8,
+    microsPadBottom: 9,
+  },
+  spacious: {
+    headerPadTop: 28,
+    headerPadBottom: 20,
+    titleFontSize: 32,
+    subtitleFontSize: 13,
+    bodyPadTop: 20,
+    bodyPadBottom: 16,
+    ingRowPadV: 5,
+    ingFontSize: 10,
+    ingNoteFontSize: 7.5,
+    stepMarginBottom: 10,
+    stepFontSize: 10,
+    stepNumFontSize: 20,
+    microsPadTop: 11,
+    microsPadBottom: 12,
+  },
+};
+
 function EditorialPage({
   brand,
   pack,
@@ -49,6 +122,8 @@ function EditorialPage({
   const grouped = groupIngredients(recipe.ingredients);
   const time = totalTime(recipe);
   const pl = portionsLabel(recipe.servings);
+  const density = getDensity(recipe);
+  const d = EDITORIAL_DENSITY[density];
 
   return (
     <Page
@@ -62,8 +137,8 @@ function EditorialPage({
           borderBottomWidth: 1,
           borderBottomColor: t.divider,
           paddingHorizontal: 32,
-          paddingTop: 22,
-          paddingBottom: 16,
+          paddingTop: d.headerPadTop,
+          paddingBottom: d.headerPadBottom,
         }}
         wrap={false}
       >
@@ -86,7 +161,7 @@ function EditorialPage({
         <Text
           style={{
             fontFamily: "Fraunces",
-            fontSize: 28,
+            fontSize: d.titleFontSize,
             lineHeight: 1.04,
             letterSpacing: -0.3,
             color: t.ink,
@@ -100,7 +175,7 @@ function EditorialPage({
           style={{
             fontFamily: "Fraunces",
             fontStyle: "italic",
-            fontSize: 12,
+            fontSize: d.subtitleFontSize,
             color: t.inkSoft,
             lineHeight: 1.3,
             marginTop: 4,
@@ -205,14 +280,55 @@ function EditorialPage({
         />
       </View>
 
+      {/* BIENES STORY — short Feierabend recipes (≤10 ings) get the
+          editorial pull-quote between the portions bar and the body to
+          stop the bottom of the card from running dry. */}
+      {shouldShowStory(recipe) ? (
+        <View
+          style={{
+            paddingHorizontal: 32,
+            paddingTop: 12,
+            paddingBottom: 14,
+            backgroundColor: t.paper,
+            borderBottomWidth: 1,
+            borderBottomColor: t.divider,
+          }}
+          wrap={false}
+        >
+          <Text
+            style={{
+              fontSize: 7,
+              fontWeight: 700,
+              letterSpacing: 1.6,
+              color: t.accent,
+              textTransform: "uppercase",
+              marginBottom: 5,
+            }}
+          >
+            Bienes Story
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontStyle: "italic",
+              fontSize: 12,
+              lineHeight: 1.5,
+              color: t.ink,
+            }}
+          >
+            {recipe.description}
+          </Text>
+        </View>
+      ) : null}
+
       {/* BODY: Ingredients (group-aware) | Steps */}
       <View
         style={{
           flex: 1,
           flexDirection: "row",
           paddingHorizontal: 32,
-          paddingTop: 16,
-          paddingBottom: 12,
+          paddingTop: d.bodyPadTop,
+          paddingBottom: d.bodyPadBottom,
           gap: 22,
         }}
       >
@@ -222,7 +338,13 @@ function EditorialPage({
             right={`für ${recipe.servings} ${pl}`}
             theme={t}
           />
-          <IngredientsList grouped={grouped} theme={t} />
+          <IngredientsList
+            grouped={grouped}
+            theme={t}
+            rowPadV={d.ingRowPadV}
+            nameFontSize={d.ingFontSize}
+            noteFontSize={d.ingNoteFontSize}
+          />
         </View>
 
         <View style={{ flex: 1 }}>
@@ -231,11 +353,24 @@ function EditorialPage({
             right={`${recipe.steps.length} Schritte`}
             theme={t}
           />
-          <StepsList steps={recipe.steps} theme={t} />
+          <StepsList
+            steps={recipe.steps}
+            theme={t}
+            stepMarginBottom={d.stepMarginBottom}
+            stepFontSize={d.stepFontSize}
+            stepNumFontSize={d.stepNumFontSize}
+          />
         </View>
       </View>
 
-      <CardFooter brand={brand} pack={pack} recipe={recipe} theme={t} />
+      <CardFooter
+        brand={brand}
+        pack={pack}
+        recipe={recipe}
+        theme={t}
+        microsPadTop={d.microsPadTop}
+        microsPadBottom={d.microsPadBottom}
+      />
     </Page>
   );
 }
