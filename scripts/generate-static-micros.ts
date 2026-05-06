@@ -8,6 +8,8 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+require("dotenv").config({ path: path.join(process.cwd(), ".env.local") });
 import { recipes } from "../lib/recipes";
 import type { Micronutrient } from "../lib/recipes";
 import { generateMicros } from "../lib/ai/generate-micros";

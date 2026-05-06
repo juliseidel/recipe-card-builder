@@ -79,7 +79,10 @@ export async function generateMicros(recipe: Recipe): Promise<Micronutrient[]> {
     schema: RESPONSE_SCHEMA,
     systemInstruction: SYSTEM_INSTRUCTION,
     temperature: 0.3,
-    // No output-token cap — Gemini picks the budget itself, never truncated.
+    // Sanity cap to prevent the rare "infinite \b" Gemini bug from looping
+    // past the model's internal limit (we observed ~134KB of garbage on one
+    // recipe). 4096 tokens is plenty for a 5–10 micros JSON list.
+    maxOutputTokens: 4096,
     // Thinking off: this is pure structured extraction, not reasoning.
     thinkingBudget: 0,
     retries: 3,
