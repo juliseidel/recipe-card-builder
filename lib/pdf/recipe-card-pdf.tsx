@@ -363,7 +363,7 @@ function PatisseriePage({
           recipes (e.g. KI-Süßkartoffel-Muffins, 8 ings + 4 steps) would
           otherwise leave below the body — direct fix for "darf nicht
           halbleer aussehen". */}
-      {isSparse && recipe.description ? (
+      {shouldShowStory(recipe) ? (
         <View
           style={{
             paddingHorizontal: 36,
@@ -711,7 +711,7 @@ function MinimalPage({
           snacks are short (5–7 ings + 3–5 steps) which leaves the body
           empty; rendering recipe.description as an editorial pull-quote
           fills that space with brand-on content. */}
-      {isSparse && recipe.description ? (
+      {shouldShowStory(recipe) ? (
         <View
           style={{
             paddingHorizontal: 36,
@@ -827,6 +827,18 @@ export function getDensity(recipe: Recipe): Density {
   if (score >= 22) return "compact";
   if (score <= 14) return "spacious";
   return "balanced";
+}
+
+// Whether to render the editorial "Bienes Story" pull-quote. Decoupled from
+// density on purpose: the story block fixes the *ingredient column* looking
+// thin (visually short left side), regardless of whether the steps column
+// happens to fill the page. So it triggers on ingredient count alone, with
+// a generous threshold — anything with 10 or fewer ingredients gets the
+// story treatment so no card ever looks halbleer.
+export function shouldShowStory(recipe: Recipe): boolean {
+  return (
+    recipe.ingredients.length <= 10 && Boolean(recipe.description?.trim())
+  );
 }
 
 const SPORT_DENSITY: Record<
@@ -1093,7 +1105,7 @@ function SportPage({
       </View>
 
       {/* BIENES STORY (sparse only) — fills the gap short recipes leave */}
-      {isSparse && recipe.description ? (
+      {shouldShowStory(recipe) ? (
         <View
           style={{
             paddingHorizontal: 32,
