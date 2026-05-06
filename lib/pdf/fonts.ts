@@ -45,5 +45,13 @@ export function ensureFontsRegistered() {
   // German recipe text — keep words intact, no auto-hyphenation
   Font.registerHyphenationCallback((word) => [word]);
 
+  // Twemoji as emoji glyph source — fixes the "Deine Biene 🐝" signature
+  // (and dashboard icons) which would otherwise render as the .notdef glyph.
+  // jsDelivr-hosted, pinned version. Fetched at render time, cached per emoji.
+  Font.registerEmojiSource({
+    format: "png",
+    url: "https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/72x72/",
+  });
+
   registered = true;
 }

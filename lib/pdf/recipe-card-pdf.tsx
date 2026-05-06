@@ -7,12 +7,13 @@ import {
   totalTime,
   pad2,
   portionsLabel,
+  type IngredientGroup,
 } from "./helpers";
-import { A4, packTheme, withAlpha, blendWithWhite } from "./theme";
+import { packTheme, withAlpha, blendWithWhite } from "./theme";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public entry — returns a single A4 page rendered in the matching layout.
-// Used both for single-recipe PDFs and for the recipe pages inside a pack PDF.
+// EVERY recipe is designed to fit on exactly ONE page (3 to 16+ ingredients).
 // ─────────────────────────────────────────────────────────────────────────────
 export type RecipeCardPdfProps = {
   brand: Brand;
@@ -23,8 +24,7 @@ export type RecipeCardPdfProps = {
 };
 
 export function RecipeCardPdfPage(props: RecipeCardPdfProps) {
-  const layout = props.pack.cardLayout;
-  return LAYOUTS[layout](props);
+  return LAYOUTS[props.pack.cardLayout](props);
 }
 
 const LAYOUTS: Record<CardLayout, (p: RecipeCardPdfProps) => React.JSX.Element> = {
@@ -37,8 +37,6 @@ const LAYOUTS: Record<CardLayout, (p: RecipeCardPdfProps) => React.JSX.Element> 
 
 // ═════════════════════════════════════════════════════════════════════════════
 // LAYOUT 1: EDITORIAL — Pack 1 (Feierabend, Honey)
-// Cookbook-Spread: warm pack-mood band at top, framed hero, 3-tile portion bar,
-// group-aware ingredients on the left, numbered steps on the right, macro bars.
 // ═════════════════════════════════════════════════════════════════════════════
 function EditorialPage({
   brand,
@@ -55,11 +53,7 @@ function EditorialPage({
   return (
     <Page
       size="A4"
-      style={{
-        backgroundColor: "#ffffff",
-        fontFamily: "Inter",
-        color: t.ink,
-      }}
+      style={{ backgroundColor: "#ffffff", fontFamily: "Inter", color: t.ink }}
     >
       {/* HEADER BAND */}
       <View
@@ -67,10 +61,11 @@ function EditorialPage({
           backgroundColor: t.paper,
           borderBottomWidth: 1,
           borderBottomColor: t.divider,
-          paddingHorizontal: 36,
-          paddingTop: 28,
-          paddingBottom: 22,
+          paddingHorizontal: 32,
+          paddingTop: 22,
+          paddingBottom: 16,
         }}
+        wrap={false}
       >
         <View
           style={{
@@ -91,12 +86,12 @@ function EditorialPage({
         <Text
           style={{
             fontFamily: "Fraunces",
-            fontSize: 32,
+            fontSize: 28,
             lineHeight: 1.04,
             letterSpacing: -0.3,
             color: t.ink,
             textTransform: "uppercase",
-            marginTop: 14,
+            marginTop: 10,
           }}
         >
           {recipe.title}
@@ -105,51 +100,36 @@ function EditorialPage({
           style={{
             fontFamily: "Fraunces",
             fontStyle: "italic",
-            fontSize: 13,
+            fontSize: 12,
             color: t.inkSoft,
-            lineHeight: 1.35,
-            marginTop: 6,
+            lineHeight: 1.3,
+            marginTop: 4,
           }}
         >
           {recipe.subtitle}
         </Text>
-
-        {recipe.description ? (
-          <Text
-            style={{
-              fontSize: 9.5,
-              lineHeight: 1.55,
-              color: t.ink,
-              opacity: 0.85,
-              marginTop: 10,
-              maxWidth: 460,
-            }}
-          >
-            {recipe.description}
-          </Text>
-        ) : null}
 
         {recipe.tags?.length ? (
           <View
             style={{
               flexDirection: "row",
               flexWrap: "wrap",
-              marginTop: 12,
+              marginTop: 8,
               gap: 4,
             }}
           >
-            {recipe.tags.slice(0, 5).map((tag) => (
+            {recipe.tags.slice(0, 4).map((tag) => (
               <Text
                 key={tag}
                 style={{
-                  fontSize: 7,
+                  fontSize: 6.5,
                   fontWeight: 600,
                   letterSpacing: 0.8,
                   textTransform: "uppercase",
                   color: t.ink,
                   backgroundColor: t.bg,
                   paddingHorizontal: 6,
-                  paddingVertical: 2.5,
+                  paddingVertical: 2,
                   borderRadius: 999,
                 }}
               >
@@ -160,31 +140,35 @@ function EditorialPage({
         ) : null}
       </View>
 
-      {/* HERO IMAGE */}
+      {/* HERO IMAGE — compact */}
       {heroDataUri ? (
         <View
           style={{
-            paddingHorizontal: 36,
-            paddingTop: 18,
+            paddingHorizontal: 32,
+            paddingTop: 12,
             paddingBottom: 4,
             backgroundColor: t.paper,
           }}
+          wrap={false}
         >
           <View
             style={{
-              borderRadius: 12,
+              borderRadius: 10,
               overflow: "hidden",
               alignSelf: "center",
-              width: 460,
-              height: 200,
+              width: 380,
+              height: 130,
             }}
           >
-            <Image src={heroDataUri} style={{ width: 460, height: 200, objectFit: "cover" }} />
+            <Image
+              src={heroDataUri}
+              style={{ width: 380, height: 130, objectFit: "cover" }}
+            />
           </View>
         </View>
       ) : null}
 
-      {/* PORTIONS HERO BAR — 3 tiles */}
+      {/* PORTIONS HERO BAR — 3 tiles, compact */}
       <View
         style={{
           flexDirection: "row",
@@ -192,6 +176,7 @@ function EditorialPage({
           borderBottomWidth: 1,
           borderColor: t.divider,
         }}
+        wrap={false}
       >
         <PortionTile
           label="REZEPT ERGIBT"
@@ -199,150 +184,56 @@ function EditorialPage({
           sub={pl}
           theme={t}
           borderRight
+          compact
         />
         <PortionTile
           label="PRO PORTION"
           value={String(recipe.nutrition.kcal)}
-          sub={`kcal · ${recipe.nutrition.protein}g Eiweiß`}
+          sub={`kcal · ${recipe.nutrition.protein}g Eiweiß · ${recipe.nutrition.carbs}g KH · ${recipe.nutrition.fat}g Fett`}
           theme={t}
           highlight
           borderRight
           accentLabel
+          compact
         />
         <PortionTile
           label="GESAMTZEIT"
           value={String(time)}
           sub={`Min · ${recipe.difficulty}`}
           theme={t}
+          compact
         />
       </View>
 
       {/* BODY: Ingredients (group-aware) | Steps */}
       <View
         style={{
+          flex: 1,
           flexDirection: "row",
-          paddingHorizontal: 36,
-          paddingVertical: 22,
-          gap: 24,
+          paddingHorizontal: 32,
+          paddingTop: 16,
+          paddingBottom: 12,
+          gap: 22,
         }}
       >
-        {/* Ingredients column */}
-        <View style={{ width: 200 }}>
+        <View style={{ width: 220 }}>
           <SectionHeader
             label="MAN NEHME"
             right={`für ${recipe.servings} ${pl}`}
             theme={t}
           />
-          <View style={{ marginTop: 10 }}>
-            {grouped.map((g, gi) => (
-              <View key={g.name ?? `m${gi}`} style={{ marginBottom: 12 }}>
-                {g.name ? (
-                  <Text
-                    style={{
-                      fontSize: 7,
-                      letterSpacing: 1.4,
-                      fontWeight: 600,
-                      color: t.inkSoft,
-                      marginBottom: 5,
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Für {g.name.toLowerCase()}
-                  </Text>
-                ) : null}
-                {g.items.map((ing, ii) => (
-                  <View
-                    key={`${ing.name}-${ii}`}
-                    style={{
-                      flexDirection: "row",
-                      borderBottomWidth: 0.5,
-                      borderBottomColor: withAlpha(t.ink, 0.08),
-                      paddingVertical: 4,
-                      gap: 6,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontFamily: "Inter",
-                        fontSize: 8,
-                        color: t.inkSoft,
-                        width: 56,
-                      }}
-                    >
-                      {ing.amount}
-                    </Text>
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={{ fontSize: 9.5, lineHeight: 1.35, color: t.ink }}
-                      >
-                        {ing.name}
-                      </Text>
-                      {ing.note ? (
-                        <Text
-                          style={{
-                            fontSize: 7.5,
-                            fontStyle: "italic",
-                            color: t.inkSoft,
-                            marginTop: 1,
-                          }}
-                        >
-                          {ing.note}
-                        </Text>
-                      ) : null}
-                    </View>
-                  </View>
-                ))}
-              </View>
-            ))}
-          </View>
+          <IngredientsList grouped={grouped} theme={t} />
         </View>
 
-        {/* Steps column */}
         <View style={{ flex: 1 }}>
           <SectionHeader
             label="ZUBEREITUNG"
             right={`${recipe.steps.length} Schritte`}
             theme={t}
           />
-          <View style={{ marginTop: 10 }}>
-            {recipe.steps.map((step, idx) => (
-              <View
-                key={idx}
-                style={{
-                  flexDirection: "row",
-                  marginBottom: 10,
-                  gap: 8,
-                }}
-              >
-                <Text
-                  style={{
-                    fontFamily: "Fraunces",
-                    fontSize: 22,
-                    color: t.accent,
-                    width: 22,
-                    lineHeight: 1,
-                  }}
-                >
-                  {idx + 1}
-                </Text>
-                <Text
-                  style={{
-                    flex: 1,
-                    fontSize: 10,
-                    lineHeight: 1.5,
-                    color: t.ink,
-                  }}
-                >
-                  {step}
-                </Text>
-              </View>
-            ))}
-          </View>
+          <StepsList steps={recipe.steps} theme={t} />
         </View>
       </View>
-
-      {/* MACROS — bar chart */}
-      <MacrosHero recipe={recipe} theme={t} />
 
       <CardFooter brand={brand} pack={pack} recipe={recipe} theme={t} />
     </Page>
@@ -351,8 +242,6 @@ function EditorialPage({
 
 // ═════════════════════════════════════════════════════════════════════════════
 // LAYOUT 2: PATISSERIE — Pack 2 (Backwelt, Lavender)
-// Boutique-Editorial: tinted page background, italic display, polaroid hero,
-// macro pills, two-column body on white surface.
 // ═════════════════════════════════════════════════════════════════════════════
 function PatisseriePage({
   brand,
@@ -370,36 +259,38 @@ function PatisseriePage({
       size="A4"
       style={{ backgroundColor: t.bg, fontFamily: "Inter", color: t.ink }}
     >
-      {/* HEAD */}
+      {/* HEAD — title left, polaroid right */}
       <View
         style={{
           flexDirection: "row",
-          paddingHorizontal: 40,
-          paddingTop: 36,
-          paddingBottom: 22,
-          gap: 24,
+          paddingHorizontal: 36,
+          paddingTop: 28,
+          paddingBottom: 16,
+          gap: 20,
         }}
+        wrap={false}
       >
         <View style={{ flex: 1.4 }}>
           <Text
             style={{
-              fontSize: 8,
+              fontSize: 7.5,
               letterSpacing: 1.6,
               fontWeight: 600,
               color: t.inkSoft,
             }}
           >
-            № {pad2(recipe.number)} / {pad2(totalRecipes)} · {pack.title.toUpperCase()}
+            № {pad2(recipe.number)} / {pad2(totalRecipes)} ·{" "}
+            {pack.title.toUpperCase()}
           </Text>
           <Text
             style={{
               fontFamily: "Fraunces",
               fontStyle: "italic",
-              fontSize: 44,
+              fontSize: 36,
               lineHeight: 1,
               letterSpacing: -0.4,
               color: t.ink,
-              marginTop: 14,
+              marginTop: 10,
             }}
           >
             {recipe.title}
@@ -408,10 +299,10 @@ function PatisseriePage({
             style={{
               fontFamily: "Fraunces",
               fontStyle: "italic",
-              fontSize: 16,
+              fontSize: 14,
               lineHeight: 1.3,
               color: t.inkSoft,
-              marginTop: 8,
+              marginTop: 6,
             }}
           >
             «&nbsp;{recipe.subtitle}&nbsp;»
@@ -419,75 +310,66 @@ function PatisseriePage({
           <View
             style={{
               flexDirection: "row",
-              gap: 10,
-              marginTop: 14,
+              gap: 8,
+              marginTop: 10,
               flexWrap: "wrap",
             }}
           >
             <Text style={{ fontSize: 9, color: t.inkSoft }}>{time} Minuten</Text>
             <Text style={{ fontSize: 9, color: t.inkSoft }}>·</Text>
             <Text style={{ fontSize: 9, color: t.inkSoft }}>
-              ergibt {recipe.servings} {stueck}
+              {recipe.servings} {stueck}
             </Text>
             <Text style={{ fontSize: 9, color: t.inkSoft }}>·</Text>
-            <Text style={{ fontSize: 9, color: t.inkSoft }}>{recipe.difficulty}</Text>
+            <Text style={{ fontSize: 9, color: t.inkSoft }}>
+              {recipe.difficulty}
+            </Text>
+            <Text style={{ fontSize: 9, color: t.inkSoft }}>·</Text>
+            <Text style={{ fontSize: 9, color: t.ink, fontWeight: 600 }}>
+              {recipe.nutrition.kcal} kcal pro {stueck === "Stücke" ? "Stück" : "Stück"}
+            </Text>
           </View>
         </View>
 
-        {/* Polaroid */}
-        <View style={{ flex: 1 }}>
+        {/* Polaroid — compact */}
+        <View style={{ width: 130 }}>
           {heroDataUri ? (
             <View
               style={{
-                borderWidth: 6,
+                borderWidth: 5,
                 borderColor: "#ffffff",
-                borderRadius: 14,
+                borderRadius: 10,
                 overflow: "hidden",
-                width: 170,
-                height: 170,
-                alignSelf: "flex-end",
+                width: 130,
+                height: 130,
                 backgroundColor: "#ffffff",
               }}
             >
               <Image
                 src={heroDataUri}
-                style={{ width: 158, height: 158, objectFit: "cover" }}
+                style={{ width: 120, height: 120, objectFit: "cover" }}
               />
             </View>
           ) : null}
         </View>
       </View>
 
-      {/* MACRO PILLS */}
+      {/* MACRO STRIP — single line, compact */}
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "center",
-          gap: 12,
-          paddingHorizontal: 40,
-          paddingVertical: 14,
+          gap: 16,
+          paddingHorizontal: 36,
+          paddingVertical: 8,
           borderTopWidth: 1,
           borderBottomWidth: 1,
           borderColor: t.divider,
           flexWrap: "wrap",
         }}
+        wrap={false}
       >
-        <View
-          style={{
-            backgroundColor: t.ink,
-            borderRadius: 999,
-            paddingHorizontal: 12,
-            paddingVertical: 5,
-          }}
-        >
-          <Text style={{ color: t.bg, fontSize: 10, fontWeight: 600 }}>
-            {recipe.nutrition.kcal} kcal{" "}
-            <Text style={{ fontSize: 7.5, fontStyle: "italic", opacity: 0.85 }}>
-              pro {stueck === "Stücke" ? "Stück" : "Stück"}
-            </Text>
-          </Text>
-        </View>
         {[
           { label: "Eiweiß", value: `${recipe.nutrition.protein}g` },
           { label: "Kohlenhydrate", value: `${recipe.nutrition.carbs}g` },
@@ -500,6 +382,7 @@ function PatisseriePage({
             <Text
               style={{
                 fontFamily: "Fraunces",
+                fontStyle: "italic",
                 fontSize: 13,
                 color: t.ink,
               }}
@@ -517,98 +400,22 @@ function PatisseriePage({
           flex: 1,
           backgroundColor: "#ffffff",
           flexDirection: "row",
-          gap: 28,
-          paddingHorizontal: 40,
-          paddingTop: 28,
-          paddingBottom: 28,
+          gap: 22,
+          paddingHorizontal: 36,
+          paddingTop: 18,
+          paddingBottom: 16,
         }}
       >
-        <View style={{ width: 200 }}>
-          <Text
-            style={{
-              fontSize: 9,
-              letterSpacing: 1.8,
-              fontWeight: 600,
-              fontStyle: "italic",
-              color: t.accent,
-              fontFamily: "Fraunces",
-            }}
-          >
-            MAN NEHME
-          </Text>
-          <View style={{ marginTop: 12 }}>
-            {recipe.ingredients.map((ing, i) => (
-              <View
-                key={`${ing.name}-${i}`}
-                style={{
-                  flexDirection: "row",
-                  borderBottomWidth: 0.5,
-                  borderBottomColor: withAlpha(t.ink, 0.1),
-                  paddingVertical: 4.5,
-                  gap: 6,
-                }}
-              >
-                <Text style={{ fontSize: 8, color: t.inkSoft, width: 52 }}>
-                  {ing.amount}
-                </Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 9.5, color: t.ink }}>{ing.name}</Text>
-                  {ing.note ? (
-                    <Text
-                      style={{
-                        fontSize: 7.5,
-                        fontStyle: "italic",
-                        color: t.inkSoft,
-                        marginTop: 1,
-                      }}
-                    >
-                      {ing.note}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-            ))}
-          </View>
+        <View style={{ width: 220 }}>
+          <SectionHeader label="MAN NEHME" theme={t} italic />
+          <IngredientsList
+            grouped={[{ name: null, items: recipe.ingredients }]}
+            theme={t}
+          />
         </View>
-
         <View style={{ flex: 1 }}>
-          <Text
-            style={{
-              fontSize: 9,
-              letterSpacing: 1.8,
-              fontWeight: 600,
-              fontStyle: "italic",
-              color: t.accent,
-              fontFamily: "Fraunces",
-            }}
-          >
-            ZUBEREITUNG
-          </Text>
-          <View style={{ marginTop: 12 }}>
-            {recipe.steps.map((s, idx) => (
-              <View
-                key={idx}
-                style={{ flexDirection: "row", marginBottom: 10, gap: 8 }}
-              >
-                <Text
-                  style={{
-                    fontFamily: "Fraunces",
-                    fontSize: 22,
-                    color: t.accent,
-                    width: 22,
-                    lineHeight: 1,
-                  }}
-                >
-                  {idx + 1}
-                </Text>
-                <Text
-                  style={{ flex: 1, fontSize: 10, lineHeight: 1.55, color: t.ink }}
-                >
-                  {s}
-                </Text>
-              </View>
-            ))}
-          </View>
+          <SectionHeader label="ZUBEREITUNG" theme={t} italic />
+          <StepsList steps={recipe.steps} theme={t} />
         </View>
       </View>
 
@@ -619,7 +426,6 @@ function PatisseriePage({
 
 // ═════════════════════════════════════════════════════════════════════════════
 // LAYOUT 3: MINIMAL — Pack 3 (Snacks, Pistachio)
-// Apple-vibe: massive number, bold sans title, square image, compact stats.
 // ═════════════════════════════════════════════════════════════════════════════
 function MinimalPage({
   brand,
@@ -633,68 +439,78 @@ function MinimalPage({
   const pl = recipe.servings === 1 ? "Portion" : "Stücke";
 
   return (
-    <Page size="A4" style={{ backgroundColor: "#ffffff", fontFamily: "Inter", color: t.ink }}>
+    <Page
+      size="A4"
+      style={{ backgroundColor: "#ffffff", fontFamily: "Inter", color: t.ink }}
+    >
       <View
         style={{
           flexDirection: "row",
-          paddingHorizontal: 40,
-          paddingTop: 40,
-          paddingBottom: 20,
-          gap: 24,
+          paddingHorizontal: 36,
+          paddingTop: 32,
+          paddingBottom: 16,
+          gap: 20,
         }}
+        wrap={false}
       >
         <View style={{ flex: 1.5 }}>
           <Text
             style={{
-              fontSize: 8,
-              letterSpacing: 1.8,
+              fontSize: 7.5,
+              letterSpacing: 1.6,
               fontWeight: 600,
               color: t.inkSoft,
             }}
           >
-            {pack.title.toUpperCase()} · {pad2(recipe.number)} / {pad2(totalRecipes)}
+            {pack.title.toUpperCase()} · {pad2(recipe.number)} /{" "}
+            {pad2(totalRecipes)}
           </Text>
           <Text
             style={{
               fontFamily: "Fraunces",
-              fontSize: 96,
+              fontSize: 76,
               color: t.accent,
               lineHeight: 0.86,
-              marginTop: 14,
-              letterSpacing: -2,
+              marginTop: 10,
+              letterSpacing: -1.5,
             }}
           >
             {pad2(recipe.number)}
           </Text>
           <Text
             style={{
-              fontSize: 28,
+              fontSize: 24,
               fontWeight: 700,
               textTransform: "uppercase",
               letterSpacing: -0.4,
               color: t.ink,
-              marginTop: 16,
+              marginTop: 12,
               lineHeight: 1.02,
             }}
           >
             {recipe.title}
           </Text>
           <Text
-            style={{ fontSize: 11, color: t.inkSoft, marginTop: 6, lineHeight: 1.35 }}
+            style={{
+              fontSize: 11,
+              color: t.inkSoft,
+              marginTop: 4,
+              lineHeight: 1.35,
+            }}
           >
             {recipe.subtitle}
           </Text>
           <Text
             style={{
-              fontSize: 9,
+              fontSize: 8.5,
               fontWeight: 600,
               letterSpacing: 1.2,
               color: t.accent,
-              marginTop: 10,
+              marginTop: 8,
               textTransform: "uppercase",
             }}
           >
-            ergibt {recipe.servings} {pl}
+            ergibt {recipe.servings} {pl} · {time} Min
           </Text>
         </View>
 
@@ -702,36 +518,47 @@ function MinimalPage({
           {heroDataUri ? (
             <View
               style={{
-                borderRadius: 12,
+                borderRadius: 10,
                 overflow: "hidden",
-                width: 200,
-                height: 200,
+                width: 150,
+                height: 150,
                 alignSelf: "flex-end",
               }}
             >
-              <Image src={heroDataUri} style={{ width: 200, height: 200, objectFit: "cover" }} />
+              <Image
+                src={heroDataUri}
+                style={{ width: 150, height: 150, objectFit: "cover" }}
+              />
             </View>
           ) : null}
           <View
             style={{
               flexDirection: "row",
-              marginTop: 10,
-              borderRadius: 12,
+              marginTop: 8,
+              borderRadius: 10,
               borderWidth: 0.5,
               borderColor: withAlpha(t.ink, 0.1),
               backgroundColor: blendWithWhite(t.bg, 0.5),
               paddingVertical: 10,
               alignSelf: "flex-end",
-              width: 200,
+              width: 150,
             }}
           >
-            <MinStat value={String(recipe.nutrition.kcal)} label="kcal" theme={t} />
+            <MinStat
+              value={String(recipe.nutrition.kcal)}
+              label="kcal"
+              theme={t}
+            />
             <MinStat
               value={`${recipe.nutrition.protein}g`}
               label="Eiweiß"
               theme={t}
             />
-            <MinStat value={`${time}'`} label="Min" theme={t} />
+            <MinStat
+              value={`${recipe.nutrition.fat}g`}
+              label="Fett"
+              theme={t}
+            />
           </View>
         </View>
       </View>
@@ -740,91 +567,24 @@ function MinimalPage({
         style={{
           flex: 1,
           flexDirection: "row",
-          gap: 32,
-          paddingHorizontal: 40,
-          paddingTop: 24,
-          paddingBottom: 24,
+          gap: 24,
+          paddingHorizontal: 36,
+          paddingTop: 18,
+          paddingBottom: 16,
           borderTopWidth: 1,
           borderTopColor: t.divider,
         }}
       >
-        <View style={{ width: 200 }}>
-          <Text
-            style={{
-              fontSize: 9,
-              letterSpacing: 1.8,
-              fontWeight: 700,
-              color: t.accent,
-              textTransform: "uppercase",
-            }}
-          >
-            Man nehme
-          </Text>
-          <View style={{ marginTop: 12 }}>
-            {recipe.ingredients.map((ing, i) => (
-              <View
-                key={`${ing.name}-${i}`}
-                style={{ flexDirection: "row", paddingVertical: 4, gap: 6 }}
-              >
-                <Text style={{ fontSize: 8, color: t.inkSoft, width: 52 }}>
-                  {ing.amount}
-                </Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 9.5, color: t.ink }}>{ing.name}</Text>
-                  {ing.note ? (
-                    <Text
-                      style={{
-                        fontSize: 7.5,
-                        fontStyle: "italic",
-                        color: t.inkSoft,
-                      }}
-                    >
-                      {ing.note}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-            ))}
-          </View>
+        <View style={{ width: 220 }}>
+          <SectionHeader label="MAN NEHME" theme={t} bold />
+          <IngredientsList
+            grouped={[{ name: null, items: recipe.ingredients }]}
+            theme={t}
+          />
         </View>
-
         <View style={{ flex: 1 }}>
-          <Text
-            style={{
-              fontSize: 9,
-              letterSpacing: 1.8,
-              fontWeight: 700,
-              color: t.accent,
-              textTransform: "uppercase",
-            }}
-          >
-            Zubereitung
-          </Text>
-          <View style={{ marginTop: 12 }}>
-            {recipe.steps.map((s, idx) => (
-              <View
-                key={idx}
-                style={{ flexDirection: "row", marginBottom: 10, gap: 8 }}
-              >
-                <Text
-                  style={{
-                    fontFamily: "Fraunces",
-                    fontSize: 22,
-                    color: t.accent,
-                    width: 22,
-                    lineHeight: 1,
-                  }}
-                >
-                  {idx + 1}
-                </Text>
-                <Text
-                  style={{ flex: 1, fontSize: 10, lineHeight: 1.55, color: t.ink }}
-                >
-                  {s}
-                </Text>
-              </View>
-            ))}
-          </View>
+          <SectionHeader label="ZUBEREITUNG" theme={t} bold />
+          <StepsList steps={recipe.steps} theme={t} />
         </View>
       </View>
 
@@ -835,7 +595,6 @@ function MinimalPage({
 
 // ═════════════════════════════════════════════════════════════════════════════
 // LAYOUT 4: SPORT — Pack 4 (Volumen, Sage Green)
-// Athletic: dark hero overlay with kcal-trophy + bold uppercase title.
 // ═════════════════════════════════════════════════════════════════════════════
 function SportPage({
   brand,
@@ -852,13 +611,14 @@ function SportPage({
       size="A4"
       style={{ backgroundColor: "#ffffff", fontFamily: "Inter", color: t.ink }}
     >
-      {/* HERO */}
+      {/* HERO — compact dark overlay */}
       <View
         style={{
-          height: 280,
+          height: 200,
           position: "relative",
           backgroundColor: t.ink,
         }}
+        wrap={false}
       >
         {heroDataUri ? (
           <Image
@@ -874,7 +634,6 @@ function SportPage({
             }}
           />
         ) : null}
-        {/* Gradient overlay simulated as solid tinted block */}
         <View
           style={{
             position: "absolute",
@@ -892,7 +651,7 @@ function SportPage({
             left: 0,
             right: 0,
             bottom: 0,
-            padding: 30,
+            padding: 24,
             justifyContent: "space-between",
           }}
         >
@@ -905,13 +664,14 @@ function SportPage({
           >
             <Text
               style={{
-                fontSize: 8,
+                fontSize: 7.5,
                 letterSpacing: 1.8,
                 color: "#ffffff",
                 fontWeight: 600,
               }}
             >
-              PACK {pad2(pack.number)} · KARTE {pad2(recipe.number)} / {pad2(totalRecipes)}
+              PACK {pad2(pack.number)} · KARTE {pad2(recipe.number)} /{" "}
+              {pad2(totalRecipes)}
             </Text>
             <View
               style={{
@@ -923,7 +683,7 @@ function SportPage({
             >
               <Text
                 style={{
-                  fontSize: 8,
+                  fontSize: 7.5,
                   fontWeight: 700,
                   letterSpacing: 1.2,
                   color: t.ink,
@@ -944,10 +704,10 @@ function SportPage({
             >
               <Text
                 style={{
-                  fontSize: 60,
+                  fontSize: 50,
                   fontWeight: 700,
                   color: "#ffffff",
-                  letterSpacing: -1.5,
+                  letterSpacing: -1.2,
                   lineHeight: 1,
                 }}
               >
@@ -956,7 +716,7 @@ function SportPage({
               <View>
                 <Text
                   style={{
-                    fontSize: 10,
+                    fontSize: 9,
                     fontWeight: 600,
                     letterSpacing: 1.4,
                     color: "rgba(255,255,255,0.85)",
@@ -965,19 +725,23 @@ function SportPage({
                 >
                   kcal pro Portion
                 </Text>
-                <Text style={{ fontSize: 8, color: "rgba(255,255,255,0.65)" }}>
-                  {recipe.servings === 1 ? "1 Portion" : `Rezept ergibt ${recipe.servings} Portionen`}
+                <Text
+                  style={{ fontSize: 8, color: "rgba(255,255,255,0.65)" }}
+                >
+                  {recipe.servings === 1
+                    ? "1 Portion"
+                    : `Rezept ergibt ${recipe.servings} Portionen`}
                 </Text>
               </View>
             </View>
             <Text
               style={{
-                fontSize: 32,
+                fontSize: 26,
                 fontWeight: 700,
                 textTransform: "uppercase",
-                letterSpacing: -0.5,
+                letterSpacing: -0.4,
                 color: "#ffffff",
-                marginTop: 10,
+                marginTop: 6,
                 lineHeight: 1,
               }}
             >
@@ -985,10 +749,10 @@ function SportPage({
             </Text>
             <Text
               style={{
-                fontSize: 10,
-                letterSpacing: 1.4,
+                fontSize: 9,
+                letterSpacing: 1.2,
                 color: "rgba(255,255,255,0.85)",
-                marginTop: 6,
+                marginTop: 4,
                 textTransform: "uppercase",
               }}
             >
@@ -1006,6 +770,7 @@ function SportPage({
           borderBottomWidth: 1,
           borderBottomColor: t.divider,
         }}
+        wrap={false}
       >
         {[
           { label: "Eiweiß", value: `${recipe.nutrition.protein}g` },
@@ -1020,19 +785,17 @@ function SportPage({
               justifyContent: "center",
               alignItems: "baseline",
               gap: 6,
-              paddingVertical: 14,
+              paddingVertical: 10,
               borderRightWidth: i === arr.length - 1 ? 0 : 1,
               borderRightColor: t.divider,
             }}
           >
-            <Text
-              style={{ fontSize: 18, fontWeight: 700, color: t.ink }}
-            >
+            <Text style={{ fontSize: 16, fontWeight: 700, color: t.ink }}>
               {m.value}
             </Text>
             <Text
               style={{
-                fontSize: 8,
+                fontSize: 7.5,
                 fontWeight: 600,
                 letterSpacing: 1.2,
                 color: t.inkSoft,
@@ -1050,98 +813,23 @@ function SportPage({
         style={{
           flex: 1,
           flexDirection: "row",
-          gap: 28,
-          paddingHorizontal: 36,
-          paddingTop: 26,
-          paddingBottom: 26,
+          gap: 22,
+          paddingHorizontal: 32,
+          paddingTop: 18,
+          paddingBottom: 14,
         }}
       >
-        <View style={{ width: 200 }}>
-          <Text
-            style={{
-              fontSize: 9,
-              fontWeight: 700,
-              letterSpacing: 1.8,
-              color: t.accent,
-              textTransform: "uppercase",
-            }}
-          >
-            Man nehme
-          </Text>
-          <View style={{ marginTop: 12 }}>
-            {recipe.ingredients.map((ing, i) => (
-              <View
-                key={`${ing.name}-${i}`}
-                style={{
-                  flexDirection: "row",
-                  borderBottomWidth: 0.5,
-                  borderBottomColor: withAlpha(t.ink, 0.1),
-                  paddingVertical: 4.5,
-                  gap: 6,
-                }}
-              >
-                <Text style={{ fontSize: 8, color: t.inkSoft, width: 52, fontWeight: 600 }}>
-                  {ing.amount}
-                </Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 9.5, fontWeight: 600, color: t.ink }}>
-                    {ing.name}
-                  </Text>
-                  {ing.note ? (
-                    <Text
-                      style={{
-                        fontSize: 7.5,
-                        fontStyle: "italic",
-                        color: t.inkSoft,
-                      }}
-                    >
-                      {ing.note}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-            ))}
-          </View>
+        <View style={{ width: 220 }}>
+          <SectionHeader label="MAN NEHME" theme={t} bold />
+          <IngredientsList
+            grouped={[{ name: null, items: recipe.ingredients }]}
+            theme={t}
+            bold
+          />
         </View>
-
         <View style={{ flex: 1 }}>
-          <Text
-            style={{
-              fontSize: 9,
-              fontWeight: 700,
-              letterSpacing: 1.8,
-              color: t.accent,
-              textTransform: "uppercase",
-            }}
-          >
-            Zubereitung
-          </Text>
-          <View style={{ marginTop: 12 }}>
-            {recipe.steps.map((s, idx) => (
-              <View
-                key={idx}
-                style={{ flexDirection: "row", marginBottom: 10, gap: 8 }}
-              >
-                <Text
-                  style={{
-                    fontFamily: "Fraunces",
-                    fontSize: 22,
-                    fontWeight: 700,
-                    color: t.accent,
-                    width: 22,
-                    lineHeight: 1,
-                  }}
-                >
-                  {idx + 1}
-                </Text>
-                <Text
-                  style={{ flex: 1, fontSize: 10, lineHeight: 1.55, color: t.ink }}
-                >
-                  {s}
-                </Text>
-              </View>
-            ))}
-          </View>
+          <SectionHeader label="ZUBEREITUNG" theme={t} bold />
+          <StepsList steps={recipe.steps} theme={t} bold />
         </View>
       </View>
 
@@ -1152,7 +840,6 @@ function SportPage({
 
 // ═════════════════════════════════════════════════════════════════════════════
 // LAYOUT 5: DASHBOARD — Pack 5 (Meal-Prep, Sky Blue)
-// Notion-style: weekday tag, structured data rows, image strip, checklist body.
 // ═════════════════════════════════════════════════════════════════════════════
 function DashboardPage({
   brand,
@@ -1186,12 +873,13 @@ function DashboardPage({
           flexDirection: "row",
           alignItems: "center",
           gap: 10,
-          paddingHorizontal: 36,
-          paddingVertical: 12,
+          paddingHorizontal: 32,
+          paddingVertical: 10,
           backgroundColor: blendWithWhite(t.bg, 0.6),
           borderBottomWidth: 1,
           borderBottomColor: t.divider,
         }}
+        wrap={false}
       >
         <View
           style={{
@@ -1203,9 +891,9 @@ function DashboardPage({
         >
           <Text
             style={{
-              fontSize: 8,
+              fontSize: 7.5,
               fontWeight: 600,
-              letterSpacing: 1.4,
+              letterSpacing: 1.2,
               color: t.ink,
               textTransform: "uppercase",
             }}
@@ -1213,30 +901,30 @@ function DashboardPage({
             {weekDay}
           </Text>
         </View>
-        <Text style={{ fontSize: 9, color: t.inkSoft }}>
+        <Text style={{ fontSize: 8.5, color: t.inkSoft }}>
           Pack {pad2(pack.number)} · {pack.title} · Karte {pad2(recipe.number)} /{" "}
           {pad2(totalRecipes)}
         </Text>
         <View style={{ flex: 1 }} />
-        <Text style={{ fontSize: 9, color: t.accent, fontWeight: 600 }}>
-          ✓ Mealprep-Ready
+        <Text style={{ fontSize: 8.5, color: t.accent, fontWeight: 600 }}>
+          MEALPREP-READY
         </Text>
       </View>
 
       {/* TITLE + IMAGE STRIP */}
-      <View style={{ flexDirection: "row" }}>
+      <View style={{ flexDirection: "row" }} wrap={false}>
         <View
           style={{
             flex: 1.4,
-            paddingHorizontal: 36,
-            paddingTop: 28,
-            paddingBottom: 24,
+            paddingHorizontal: 32,
+            paddingTop: 22,
+            paddingBottom: 16,
           }}
         >
           <Text
             style={{
               fontFamily: "Fraunces",
-              fontSize: 30,
+              fontSize: 26,
               lineHeight: 1.04,
               letterSpacing: -0.3,
               color: t.ink,
@@ -1245,38 +933,43 @@ function DashboardPage({
             {recipe.title}
           </Text>
           <Text
-            style={{ fontSize: 11, color: t.inkSoft, lineHeight: 1.35, marginTop: 6 }}
+            style={{
+              fontSize: 10.5,
+              color: t.inkSoft,
+              lineHeight: 1.35,
+              marginTop: 4,
+            }}
           >
             {recipe.subtitle}
           </Text>
 
-          {/* DATA ROWS */}
           <View
             style={{
-              marginTop: 14,
+              marginTop: 10,
               borderRadius: 8,
               borderWidth: 0.5,
               borderColor: t.divider,
               overflow: "hidden",
             }}
           >
-            <DashRow icon="🍴" label="Ergibt" value={`${recipe.servings} ${pl}`} theme={t} />
+            <DashRow label="Ergibt" value={`${recipe.servings} ${pl}`} theme={t} />
             <DashRow
-              icon="🔥"
               label="Pro Portion"
               value={`${recipe.nutrition.kcal} kcal`}
               theme={t}
               highlight
             />
             <DashRow
-              icon="💪"
               label="Eiweiß / Portion"
               value={`${recipe.nutrition.protein} g`}
               theme={t}
             />
-            <DashRow icon="⏱" label="Zubereitung" value={`${time} Min`} theme={t} />
             <DashRow
-              icon="📊"
+              label="Zubereitung"
+              value={`${time} Min`}
+              theme={t}
+            />
+            <DashRow
               label="Schwierigkeit"
               value={recipe.difficulty}
               theme={t}
@@ -1289,7 +982,7 @@ function DashboardPage({
           style={{
             flex: 1,
             backgroundColor: t.bg,
-            minHeight: 220,
+            minHeight: 180,
             position: "relative",
           }}
         >
@@ -1307,92 +1000,24 @@ function DashboardPage({
         style={{
           flex: 1,
           flexDirection: "row",
-          gap: 28,
-          paddingHorizontal: 36,
-          paddingVertical: 22,
+          gap: 22,
+          paddingHorizontal: 32,
+          paddingVertical: 16,
           borderTopWidth: 1,
           borderTopColor: t.divider,
         }}
       >
-        <View style={{ width: 200 }}>
-          <Text
-            style={{
-              fontSize: 9,
-              fontWeight: 700,
-              letterSpacing: 1.6,
-              color: t.accent,
-              textTransform: "uppercase",
-            }}
-          >
-            Man nehme
-          </Text>
-          <View style={{ marginTop: 12 }}>
-            {recipe.ingredients.map((ing, i) => (
-              <View
-                key={`${ing.name}-${i}`}
-                style={{ flexDirection: "row", paddingVertical: 4, gap: 6 }}
-              >
-                <Text style={{ fontSize: 8, color: t.inkSoft, width: 50 }}>
-                  {ing.amount}
-                </Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 9.5, color: t.ink }}>
-                    <Text style={{ color: t.inkSubtle }}>☐ </Text>
-                    {ing.name}
-                  </Text>
-                  {ing.note ? (
-                    <Text
-                      style={{
-                        fontSize: 7.5,
-                        fontStyle: "italic",
-                        color: t.inkSoft,
-                      }}
-                    >
-                      {ing.note}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-            ))}
-          </View>
+        <View style={{ width: 220 }}>
+          <SectionHeader label="MAN NEHME" theme={t} bold />
+          <IngredientsList
+            grouped={[{ name: null, items: recipe.ingredients }]}
+            theme={t}
+            checklist
+          />
         </View>
-
         <View style={{ flex: 1 }}>
-          <Text
-            style={{
-              fontSize: 9,
-              fontWeight: 700,
-              letterSpacing: 1.6,
-              color: t.accent,
-              textTransform: "uppercase",
-            }}
-          >
-            Zubereitung
-          </Text>
-          <View style={{ marginTop: 12 }}>
-            {recipe.steps.map((s, idx) => (
-              <View
-                key={idx}
-                style={{ flexDirection: "row", marginBottom: 10, gap: 8 }}
-              >
-                <Text
-                  style={{
-                    fontFamily: "Fraunces",
-                    fontSize: 20,
-                    color: t.accent,
-                    width: 20,
-                    lineHeight: 1,
-                  }}
-                >
-                  {idx + 1}
-                </Text>
-                <Text style={{ flex: 1, fontSize: 10, lineHeight: 1.55, color: t.ink }}>
-                  <Text style={{ color: t.inkSubtle }}>☐ </Text>
-                  {s}
-                </Text>
-              </View>
-            ))}
-          </View>
+          <SectionHeader label="ZUBEREITUNG" theme={t} bold />
+          <StepsList steps={recipe.steps} theme={t} checklist />
         </View>
       </View>
 
@@ -1401,7 +1026,215 @@ function DashboardPage({
   );
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
+// ─── Shared building blocks ──────────────────────────────────────────────────
+
+// Renders the ingredients list. When a single (ungrouped) list has more than
+// 8 items, automatically switches to a 2-column layout to avoid overflow on
+// long recipes (16+ ingredients still fit on one A4 page). Subgroups stack
+// vertically and each can independently flip to 2-col when long.
+function IngredientsList({
+  grouped,
+  theme,
+  bold = false,
+  checklist = false,
+}: {
+  grouped: IngredientGroup[];
+  theme: ReturnType<typeof packTheme>;
+  bold?: boolean;
+  checklist?: boolean;
+}) {
+  return (
+    <View style={{ marginTop: 8 }}>
+      {grouped.map((g, gi) => (
+        <View key={g.name ?? `m${gi}`} style={{ marginBottom: 8 }}>
+          {g.name ? (
+            <Text
+              style={{
+                fontSize: 7,
+                letterSpacing: 1.4,
+                fontWeight: 600,
+                color: theme.inkSoft,
+                marginBottom: 4,
+                textTransform: "uppercase",
+              }}
+            >
+              Für {g.name.toLowerCase()}
+            </Text>
+          ) : null}
+          <IngredientGroupBody
+            items={g.items}
+            theme={theme}
+            bold={bold}
+            checklist={checklist}
+          />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function IngredientGroupBody({
+  items,
+  theme,
+  bold,
+  checklist,
+}: {
+  items: IngredientGroup["items"];
+  theme: ReturnType<typeof packTheme>;
+  bold: boolean;
+  checklist: boolean;
+}) {
+  // Auto 2-col when 9+ items — keeps long recipes on one page.
+  const useTwoCol = items.length >= 9;
+  if (!useTwoCol) {
+    return (
+      <View>
+        {items.map((ing, i) => (
+          <IngredientRow
+            key={`${ing.name}-${i}`}
+            ing={ing}
+            theme={theme}
+            bold={bold}
+            checklist={checklist}
+          />
+        ))}
+      </View>
+    );
+  }
+  const half = Math.ceil(items.length / 2);
+  const left = items.slice(0, half);
+  const right = items.slice(half);
+  return (
+    <View style={{ flexDirection: "row", gap: 10 }}>
+      <View style={{ flex: 1 }}>
+        {left.map((ing, i) => (
+          <IngredientRow
+            key={`L-${ing.name}-${i}`}
+            ing={ing}
+            theme={theme}
+            bold={bold}
+            checklist={checklist}
+            compact
+          />
+        ))}
+      </View>
+      <View style={{ flex: 1 }}>
+        {right.map((ing, i) => (
+          <IngredientRow
+            key={`R-${ing.name}-${i}`}
+            ing={ing}
+            theme={theme}
+            bold={bold}
+            checklist={checklist}
+            compact
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function IngredientRow({
+  ing,
+  theme,
+  bold,
+  checklist,
+  compact = false,
+}: {
+  ing: IngredientGroup["items"][number];
+  theme: ReturnType<typeof packTheme>;
+  bold: boolean;
+  checklist: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        borderBottomWidth: 0.5,
+        borderBottomColor: withAlpha(theme.ink, 0.08),
+        paddingVertical: compact ? 2.5 : 3.5,
+        gap: 5,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: compact ? 7 : 7.5,
+          color: theme.inkSoft,
+          width: compact ? 38 : 50,
+          fontWeight: bold ? 600 : 400,
+        }}
+      >
+        {ing.amount}
+      </Text>
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{
+            fontSize: compact ? 8.5 : 9.5,
+            lineHeight: 1.3,
+            color: theme.ink,
+            fontWeight: bold ? 600 : 400,
+          }}
+        >
+          {checklist ? <Text style={{ color: theme.inkSubtle }}>☐ </Text> : null}
+          {ing.name}
+        </Text>
+        {ing.note ? (
+          <Text
+            style={{
+              fontSize: compact ? 6.5 : 7,
+              fontStyle: "italic",
+              color: theme.inkSoft,
+              marginTop: 0.5,
+            }}
+          >
+            {ing.note}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function StepsList({
+  steps,
+  theme,
+  bold = false,
+  checklist = false,
+}: {
+  steps: string[];
+  theme: ReturnType<typeof packTheme>;
+  bold?: boolean;
+  checklist?: boolean;
+}) {
+  return (
+    <View style={{ marginTop: 8 }}>
+      {steps.map((step, idx) => (
+        <View
+          key={idx}
+          style={{ flexDirection: "row", marginBottom: 8, gap: 6 }}
+        >
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: 18,
+              fontWeight: bold ? 700 : 400,
+              color: theme.accent,
+              width: 18,
+              lineHeight: 1,
+            }}
+          >
+            {idx + 1}
+          </Text>
+          <Text style={{ flex: 1, fontSize: 9.5, lineHeight: 1.45, color: theme.ink }}>
+            {checklist ? <Text style={{ color: theme.inkSubtle }}>☐ </Text> : null}
+            {step}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 function PortionTile({
   label,
@@ -1411,6 +1244,7 @@ function PortionTile({
   highlight = false,
   borderRight = false,
   accentLabel = false,
+  compact = false,
 }: {
   label: string;
   value: string;
@@ -1419,13 +1253,14 @@ function PortionTile({
   highlight?: boolean;
   borderRight?: boolean;
   accentLabel?: boolean;
+  compact?: boolean;
 }) {
   return (
     <View
       style={{
         flex: 1,
         alignItems: "center",
-        paddingVertical: 16,
+        paddingVertical: compact ? 12 : 16,
         paddingHorizontal: 6,
         backgroundColor: highlight ? blendWithWhite(theme.bg, 0.65) : "transparent",
         borderRightWidth: borderRight ? 1 : 0,
@@ -1434,7 +1269,7 @@ function PortionTile({
     >
       <Text
         style={{
-          fontSize: 7,
+          fontSize: 6.5,
           fontWeight: 600,
           letterSpacing: 1.6,
           color: accentLabel ? theme.accent : theme.inkSoft,
@@ -1445,15 +1280,22 @@ function PortionTile({
       <Text
         style={{
           fontFamily: "Fraunces",
-          fontSize: 26,
+          fontSize: 22,
           color: theme.ink,
-          marginTop: 4,
+          marginTop: 2,
           lineHeight: 1,
         }}
       >
         {value}
       </Text>
-      <Text style={{ fontSize: 8, color: theme.inkSoft, marginTop: 3 }}>
+      <Text
+        style={{
+          fontSize: 7.5,
+          color: theme.inkSoft,
+          marginTop: 2,
+          textAlign: "center",
+        }}
+      >
         {sub}
       </Text>
     </View>
@@ -1464,10 +1306,14 @@ function SectionHeader({
   label,
   right,
   theme,
+  bold = false,
+  italic = false,
 }: {
   label: string;
   right?: string;
   theme: ReturnType<typeof packTheme>;
+  bold?: boolean;
+  italic?: boolean;
 }) {
   return (
     <View
@@ -1477,16 +1323,18 @@ function SectionHeader({
         justifyContent: "space-between",
         borderBottomWidth: 1,
         borderBottomColor: withAlpha(theme.ink, 0.15),
-        paddingBottom: 4,
+        paddingBottom: 3,
       }}
     >
       <Text
         style={{
-          fontSize: 9,
-          fontWeight: 700,
+          fontSize: 8.5,
+          fontWeight: bold ? 700 : 600,
           letterSpacing: 1.8,
           color: theme.accent,
           textTransform: "uppercase",
+          fontFamily: italic ? "Fraunces" : "Inter",
+          fontStyle: italic ? "italic" : "normal",
         }}
       >
         {label}
@@ -1494,7 +1342,7 @@ function SectionHeader({
       {right ? (
         <Text
           style={{
-            fontSize: 7.5,
+            fontSize: 7,
             fontWeight: 500,
             letterSpacing: 1,
             color: theme.inkSoft,
@@ -1504,124 +1352,6 @@ function SectionHeader({
           {right}
         </Text>
       ) : null}
-    </View>
-  );
-}
-
-function MacrosHero({
-  recipe,
-  theme,
-}: {
-  recipe: Recipe;
-  theme: ReturnType<typeof packTheme>;
-}) {
-  const bars = [
-    { label: "Eiweiß", value: recipe.nutrition.protein, max: 60, unit: "g" },
-    { label: "Kohlenhydrate", value: recipe.nutrition.carbs, max: 100, unit: "g" },
-    { label: "Fett", value: recipe.nutrition.fat, max: 40, unit: "g" },
-  ];
-  if (recipe.nutrition.fiber !== undefined) {
-    bars.push({
-      label: "Ballaststoffe",
-      value: recipe.nutrition.fiber,
-      max: 15,
-      unit: "g",
-    });
-  }
-  return (
-    <View
-      style={{
-        borderTopWidth: 1,
-        borderBottomWidth: 1,
-        borderColor: withAlpha(theme.ink, 0.15),
-        paddingHorizontal: 36,
-        paddingVertical: 16,
-        backgroundColor: blendWithWhite(theme.bg, 0.85),
-      }}
-    >
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "baseline",
-          marginBottom: 8,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 9,
-            fontWeight: 700,
-            letterSpacing: 1.8,
-            color: theme.accent,
-            textTransform: "uppercase",
-          }}
-        >
-          Makronährstoffe
-        </Text>
-        <Text
-          style={{
-            fontSize: 7.5,
-            letterSpacing: 1,
-            color: theme.inkSoft,
-            textTransform: "uppercase",
-          }}
-        >
-          pro Portion ({recipe.nutrition.kcal} kcal)
-        </Text>
-      </View>
-      {bars.map((b) => (
-        <View
-          key={b.label}
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 10,
-            marginBottom: 4,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 8,
-              fontWeight: 600,
-              letterSpacing: 1.2,
-              color: theme.inkSoft,
-              width: 80,
-              textTransform: "uppercase",
-            }}
-          >
-            {b.label}
-          </Text>
-          <View
-            style={{
-              flex: 1,
-              height: 5,
-              borderRadius: 3,
-              backgroundColor: withAlpha(theme.ink, 0.08),
-              overflow: "hidden",
-            }}
-          >
-            <View
-              style={{
-                width: `${Math.min((b.value / b.max) * 100, 100)}%`,
-                height: 5,
-                backgroundColor: theme.accent,
-              }}
-            />
-          </View>
-          <Text
-            style={{
-              fontFamily: "Fraunces",
-              fontSize: 12,
-              color: theme.ink,
-              width: 28,
-              textAlign: "right",
-            }}
-          >
-            {b.value}
-            {b.unit}
-          </Text>
-        </View>
-      ))}
     </View>
   );
 }
@@ -1637,16 +1367,16 @@ function MinStat({
 }) {
   return (
     <View style={{ flex: 1, alignItems: "center" }}>
-      <Text style={{ fontSize: 14, fontWeight: 700, color: theme.ink }}>
+      <Text style={{ fontSize: 13, fontWeight: 700, color: theme.ink }}>
         {value}
       </Text>
       <Text
         style={{
-          fontSize: 7,
+          fontSize: 6.5,
           fontWeight: 600,
           letterSpacing: 1.2,
           color: theme.inkSoft,
-          marginTop: 2,
+          marginTop: 1,
           textTransform: "uppercase",
         }}
       >
@@ -1657,14 +1387,12 @@ function MinStat({
 }
 
 function DashRow({
-  icon,
   label,
   value,
   theme,
   highlight = false,
   last = false,
 }: {
-  icon: string;
   label: string;
   value: string;
   theme: ReturnType<typeof packTheme>;
@@ -1677,7 +1405,7 @@ function DashRow({
         flexDirection: "row",
         alignItems: "center",
         paddingHorizontal: 10,
-        paddingVertical: 7,
+        paddingVertical: 6,
         gap: 8,
         backgroundColor: highlight
           ? blendWithWhite(theme.bg, 0.6)
@@ -1686,11 +1414,10 @@ function DashRow({
         borderBottomColor: theme.divider,
       }}
     >
-      <Text style={{ fontSize: 11, width: 18 }}>{icon}</Text>
       <Text
         style={{
           flex: 1,
-          fontSize: highlight ? 10 : 9.5,
+          fontSize: highlight ? 9.5 : 9,
           color: highlight ? theme.ink : theme.inkSoft,
           fontWeight: highlight ? 600 : 400,
         }}
@@ -1699,7 +1426,7 @@ function DashRow({
       </Text>
       <Text
         style={{
-          fontSize: highlight ? 10 : 9,
+          fontSize: highlight ? 9.5 : 9,
           fontWeight: highlight ? 700 : 600,
           color: theme.ink,
         }}
@@ -1732,8 +1459,8 @@ function CardFooter({
         borderTopWidth: 1,
         borderTopColor: theme.divider,
         backgroundColor: "#ffffff",
-        paddingHorizontal: 36,
-        paddingVertical: 12,
+        paddingHorizontal: 32,
+        paddingVertical: 10,
         marginTop: "auto",
       }}
       fixed
@@ -1741,7 +1468,7 @@ function CardFooter({
       <Text
         style={{
           fontFamily: "Fraunces",
-          fontSize: 14,
+          fontSize: 13,
           fontStyle: italic ? "italic" : "normal",
           color: brand.tokens.ink,
         }}
@@ -1750,7 +1477,7 @@ function CardFooter({
       </Text>
       <Text
         style={{
-          fontSize: 7.5,
+          fontSize: 7,
           fontWeight: 500,
           letterSpacing: 1.4,
           color: brand.tokens.inkMuted,

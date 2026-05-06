@@ -121,7 +121,10 @@ export async function processJob(jobId: string): Promise<void> {
     };
 
     let buffer: Buffer;
-    let filename: string;
+    // storagePath stays slug-based so URLs remain ASCII-safe.
+    // downloadName is the human-readable filename the browser saves.
+    let storagePath: string;
+    let downloadName: string;
 
     if (job.type === "recipe") {
       const recipe = await loadRecipe(
@@ -143,7 +146,8 @@ export async function processJob(jobId: string): Promise<void> {
         totalRecipes,
         onProgress,
       });
-      filename = `${pack.slug}__${recipe.slug}.pdf`;
+      storagePath = `${pack.slug}__${recipe.slug}.pdf`;
+      downloadName = `${safeFilename(recipe.title)}.pdf`;
     } else {
       const recipes = getRecipesForPack(job.pack_slug);
       if (recipes.length === 0) {
@@ -156,7 +160,8 @@ export async function processJob(jobId: string): Promise<void> {
         recipes,
         onProgress,
       });
-      filename = `${pack.slug}__pack.pdf`;
+      storagePath = `${pack.slug}__pack.pdf`;
+      downloadName = `${safeFilename(pack.title)} – ${recipes.length} Rezepte von ${safeFilename(brand.name)}.pdf`;
     }
 
     await supabase
@@ -164,7 +169,7 @@ export async function processJob(jobId: string): Promise<void> {
       .update({ stage: "uploading", progress: 90 })
       .eq("id", jobId);
 
-    const filePath = `${jobId}/${filename}`;
+    const filePath = `${jobId}/${storagePath}`;
     const upload = await supabase.storage
       .from(BUCKET)
       .upload(filePath, buffer, {
@@ -180,7 +185,7 @@ export async function processJob(jobId: string): Promise<void> {
     const { data: publicData } = supabase.storage
       .from(BUCKET)
       .getPublicUrl(filePath, {
-        download: filename,
+        download: downloadName,
       });
 
     await supabase
@@ -200,6 +205,16 @@ export async function processJob(jobId: string): Promise<void> {
     console.error("[pdf-jobs] processJob failed", jobId, err);
     await markFailed(supabase, jobId, msg);
   }
+}
+
+// Strip filesystem-unsafe characters but keep umlauts and spaces — browsers
+// handle UTF-8 download names fine via Content-Disposition filename*= encoding.
+function safeFilename(input: string): string {
+  return input
+    .replace(/[\/\\:*?"<>|]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
 }
 
 async function loadRecipe(

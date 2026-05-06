@@ -239,33 +239,30 @@ export function PdfExportButton(props: Props) {
         </span>
       </button>
 
-      {/* Detail line under button — keeps it compact but transparent */}
-      {(isBusy || isFailed || (isReady && snap.fileUrl)) ? (
+      {/* Compact secondary line: only shown when ready (link) or failed (error).
+       * No noise during queueing/rendering — the button itself shows progress. */}
+      {isReady && snap.fileUrl ? (
         <div
           className="mt-1.5 flex items-center justify-end gap-2 text-[11px]"
           style={{ color: tint.ink, opacity: 0.7 }}
         >
-          {isBusy ? (
-            <span>
-              {snap.status === "queued"
-                ? "Job angelegt — startet, sobald ein Render-Slot frei ist"
-                : "Du kannst die Seite verlassen — der Job läuft im Hintergrund weiter"}
-            </span>
-          ) : null}
-          {isReady && snap.fileUrl ? (
-            <a
-              href={snap.fileUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2"
-              style={{ color: tint.ink }}
-            >
-              Direkt-Link zum PDF
-            </a>
-          ) : null}
-          {isFailed ? (
-            <span style={{ color: "#b91c1c" }}>{snap.error ?? "Fehler"}</span>
-          ) : null}
+          <a
+            href={snap.fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2"
+            style={{ color: tint.ink }}
+          >
+            Direkt-Link zum PDF
+          </a>
+        </div>
+      ) : null}
+      {isFailed ? (
+        <div
+          className="mt-1.5 flex items-center justify-end gap-2 text-[11px]"
+          style={{ color: "#b91c1c" }}
+        >
+          {snap.error ?? "Fehler beim Rendern"}
         </div>
       ) : null}
     </div>
