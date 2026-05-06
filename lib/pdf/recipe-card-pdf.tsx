@@ -1543,6 +1543,74 @@ function VolumenStatTile({
 // ═════════════════════════════════════════════════════════════════════════════
 // LAYOUT 5: DASHBOARD — Pack 5 (Meal-Prep, Sky Blue)
 // ═════════════════════════════════════════════════════════════════════════════
+// Dashboard tuning — Notion-template look. Most Pack 5 (Meal-Prep)
+// recipes are mid-density (3–6 steps + 7–13 ings), so spacious carries the
+// brunt of the work: when ingredients ≤ 10 we surface the story block too.
+const DASHBOARD_DENSITY: Record<
+  Density,
+  {
+    titleStripPadTop: number;
+    titleStripPadBottom: number;
+    titleFontSize: number;
+    subtitleFontSize: number;
+    bodyPadV: number;
+    ingRowPadV: number;
+    ingFontSize: number;
+    ingNoteFontSize: number;
+    stepMarginBottom: number;
+    stepFontSize: number;
+    stepNumFontSize: number;
+    microsPadTop: number;
+    microsPadBottom: number;
+  }
+> = {
+  compact: {
+    titleStripPadTop: 18,
+    titleStripPadBottom: 12,
+    titleFontSize: 22,
+    subtitleFontSize: 9.5,
+    bodyPadV: 12,
+    ingRowPadV: 2.5,
+    ingFontSize: 9,
+    ingNoteFontSize: 6.5,
+    stepMarginBottom: 6,
+    stepFontSize: 9,
+    stepNumFontSize: 16,
+    microsPadTop: 9,
+    microsPadBottom: 10,
+  },
+  balanced: {
+    titleStripPadTop: 22,
+    titleStripPadBottom: 16,
+    titleFontSize: 26,
+    subtitleFontSize: 10.5,
+    bodyPadV: 16,
+    ingRowPadV: 3.5,
+    ingFontSize: 9.5,
+    ingNoteFontSize: 7,
+    stepMarginBottom: 8,
+    stepFontSize: 9.5,
+    stepNumFontSize: 18,
+    microsPadTop: 8,
+    microsPadBottom: 9,
+  },
+  spacious: {
+    titleStripPadTop: 28,
+    titleStripPadBottom: 20,
+    titleFontSize: 30,
+    subtitleFontSize: 11.5,
+    bodyPadV: 20,
+    ingRowPadV: 5,
+    ingFontSize: 10,
+    ingNoteFontSize: 7.5,
+    stepMarginBottom: 10,
+    stepFontSize: 10,
+    stepNumFontSize: 20,
+    microsPadTop: 11,
+    microsPadBottom: 12,
+  },
+};
+
 function DashboardPage({
   brand,
   pack,
@@ -1553,6 +1621,8 @@ function DashboardPage({
   const t = packTheme(pack);
   const time = totalTime(recipe);
   const pl = portionsLabel(recipe.servings);
+  const density = getDensity(recipe);
+  const d = DASHBOARD_DENSITY[density];
   const weekDays = [
     "Montag",
     "Dienstag",
@@ -1619,14 +1689,14 @@ function DashboardPage({
           style={{
             flex: 1.4,
             paddingHorizontal: 32,
-            paddingTop: 22,
-            paddingBottom: 16,
+            paddingTop: d.titleStripPadTop,
+            paddingBottom: d.titleStripPadBottom,
           }}
         >
           <Text
             style={{
               fontFamily: "Fraunces",
-              fontSize: 26,
+              fontSize: d.titleFontSize,
               lineHeight: 1.04,
               letterSpacing: -0.3,
               color: t.ink,
@@ -1636,7 +1706,7 @@ function DashboardPage({
           </Text>
           <Text
             style={{
-              fontSize: 10.5,
+              fontSize: d.subtitleFontSize,
               color: t.inkSoft,
               lineHeight: 1.35,
               marginTop: 4,
@@ -1697,6 +1767,48 @@ function DashboardPage({
         </View>
       </View>
 
+      {/* BIENES STORY (≤10 Zutaten) — sits between header strip and the
+          checklist body. Sage-blue tinted to match the dashboard mood, italic
+          Fraunces pull-quote of recipe.description. Stops short Meal-Prep
+          cards from looking halbleer below the data table. */}
+      {shouldShowStory(recipe) ? (
+        <View
+          style={{
+            paddingHorizontal: 32,
+            paddingTop: 12,
+            paddingBottom: 14,
+            backgroundColor: blendWithWhite(t.bg, 0.55),
+            borderTopWidth: 1,
+            borderTopColor: t.divider,
+          }}
+          wrap={false}
+        >
+          <Text
+            style={{
+              fontSize: 7,
+              fontWeight: 700,
+              letterSpacing: 1.6,
+              color: t.accent,
+              textTransform: "uppercase",
+              marginBottom: 5,
+            }}
+          >
+            Bienes Story
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontStyle: "italic",
+              fontSize: 12,
+              lineHeight: 1.5,
+              color: t.ink,
+            }}
+          >
+            {recipe.description}
+          </Text>
+        </View>
+      ) : null}
+
       {/* CHECKLIST BODY */}
       <View
         style={{
@@ -1704,7 +1816,7 @@ function DashboardPage({
           flexDirection: "row",
           gap: 22,
           paddingHorizontal: 32,
-          paddingVertical: 16,
+          paddingVertical: d.bodyPadV,
           borderTopWidth: 1,
           borderTopColor: t.divider,
         }}
@@ -1715,15 +1827,32 @@ function DashboardPage({
             grouped={[{ name: null, items: recipe.ingredients }]}
             theme={t}
             checklist
+            rowPadV={d.ingRowPadV}
+            nameFontSize={d.ingFontSize}
+            noteFontSize={d.ingNoteFontSize}
           />
         </View>
         <View style={{ flex: 1 }}>
           <SectionHeader label="ZUBEREITUNG" theme={t} bold />
-          <StepsList steps={recipe.steps} theme={t} checklist />
+          <StepsList
+            steps={recipe.steps}
+            theme={t}
+            checklist
+            stepMarginBottom={d.stepMarginBottom}
+            stepFontSize={d.stepFontSize}
+            stepNumFontSize={d.stepNumFontSize}
+          />
         </View>
       </View>
 
-      <CardFooter brand={brand} pack={pack} recipe={recipe} theme={t} />
+      <CardFooter
+        brand={brand}
+        pack={pack}
+        recipe={recipe}
+        theme={t}
+        microsPadTop={d.microsPadTop}
+        microsPadBottom={d.microsPadBottom}
+      />
     </Page>
   );
 }
