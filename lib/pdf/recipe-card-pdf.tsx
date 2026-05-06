@@ -1085,52 +1085,19 @@ function IngredientGroupBody({
   bold: boolean;
   checklist: boolean;
 }) {
-  // Auto 2-col when 9+ items — keeps long recipes on one page.
-  const useTwoCol = items.length >= 9;
-  if (!useTwoCol) {
-    return (
-      <View>
-        {items.map((ing, i) => (
-          <IngredientRow
-            key={`${ing.name}-${i}`}
-            ing={ing}
-            theme={theme}
-            bold={bold}
-            checklist={checklist}
-          />
-        ))}
-      </View>
-    );
-  }
-  const half = Math.ceil(items.length / 2);
-  const left = items.slice(0, half);
-  const right = items.slice(half);
+  // Always single-column to mirror the web layout. Long recipes (16+
+  // ingredients) still fit on one A4 page with the compact row spacing.
   return (
-    <View style={{ flexDirection: "row", gap: 10 }}>
-      <View style={{ flex: 1 }}>
-        {left.map((ing, i) => (
-          <IngredientRow
-            key={`L-${ing.name}-${i}`}
-            ing={ing}
-            theme={theme}
-            bold={bold}
-            checklist={checklist}
-            compact
-          />
-        ))}
-      </View>
-      <View style={{ flex: 1 }}>
-        {right.map((ing, i) => (
-          <IngredientRow
-            key={`R-${ing.name}-${i}`}
-            ing={ing}
-            theme={theme}
-            bold={bold}
-            checklist={checklist}
-            compact
-          />
-        ))}
-      </View>
+    <View>
+      {items.map((ing, i) => (
+        <IngredientRow
+          key={`${ing.name}-${i}`}
+          ing={ing}
+          theme={theme}
+          bold={bold}
+          checklist={checklist}
+        />
+      ))}
     </View>
   );
 }
