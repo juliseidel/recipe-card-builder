@@ -1,10 +1,18 @@
-// Headless Chromium launcher for Vercel serverless. Uses @sparticuz/chromium —
-// the binary is fetched from the package's GitHub-Releases mirror at first
-// invocation and cached in /tmp, so cold starts pay ~5–10 s but warm starts
-// reuse the same instance.
+// Headless Chromium launcher for Vercel serverless.
+//
+// We use @sparticuz/chromium-min instead of @sparticuz/chromium: the -min
+// variant ships zero binaries (~120 KB total) so it fits trivially in the
+// Vercel function bundle. The actual Chromium tar is fetched on first launch
+// from the GitHub release matching the package version, extracted to /tmp,
+// and reused on warm invocations. Cold start cost: 5–10 s; warm: instant.
 
-import chromium from "@sparticuz/chromium";
+import chromium from "@sparticuz/chromium-min";
 import puppeteer, { type Browser } from "puppeteer-core";
+
+// Pinned to the chromium-min major version we install. When you bump the
+// package, bump this URL too — they must match exactly.
+const CHROMIUM_PACK_URL =
+  "https://github.com/Sparticuz/chromium/releases/download/v147.0.0/chromium-v147.0.0-pack.x64.tar";
 
 let cached: Browser | null = null;
 
@@ -20,7 +28,7 @@ export async function getBrowser(): Promise<Browser> {
       "--disable-dev-shm-usage",
     ],
     defaultViewport: { width: 1024, height: 1500, deviceScaleFactor: 1 },
-    executablePath: await chromium.executablePath(),
+    executablePath: await chromium.executablePath(CHROMIUM_PACK_URL),
     headless: true,
   });
 

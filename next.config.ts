@@ -8,10 +8,10 @@ const nextConfig: NextConfig = {
   images: {
     qualities: [75, 90, 95],
   },
-  // Puppeteer + @sparticuz/chromium ship native binaries that webpack must not
-  // try to bundle. Marking them external means they're require()d at runtime
-  // from node_modules instead of being inlined into the function bundle.
-  serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core"],
+  // Puppeteer + @sparticuz/chromium-min ship native binaries / require dynamic
+  // imports that webpack must not try to bundle. Marking them external means
+  // they're require()d at runtime from node_modules.
+  serverExternalPackages: ["@sparticuz/chromium-min", "puppeteer-core"],
   // PDF rendering reads font + brand images at runtime. The font files are
   // still used by the legacy @react-pdf renderer (kept around as fallback);
   // the brand images are read by the print routes via Next/Image. Bundling
