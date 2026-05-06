@@ -654,9 +654,16 @@ function MinStat({
 }
 
 // ════════════════════════════════════════════════
-// LAYOUT 4: SPORT — Pack 4 (Volumen, Spring Green)
-// Athletisches Cookbook: Hero-Bild mit Dark-Overlay,
-// kcal als 80px Trophäe, bold uppercase Sans-Serif
+// LAYOUT 4: SPORT (Volumen-Editorial) — Pack 2 (Volumen-Wunder, Sage Green)
+// XL-Mahlzeit-Showcase: Foto rechts OHNE Overlay (Bild ist der Hero), italic
+// Fraunces title links, 3-Tile Volumen-Stats mit Emojis, visuelle Macro-Bars,
+// ☐-Checklist-Zutaten und Schritt-Timeline mit Verbindungslinien.
+//
+// Adaptiv für Edge-Cases: bei sparse content (≤6 Zutaten — 3-Zutaten-Eisbowl
+// als Härtefall) blendet sich automatisch ein "Bienes Story"-Block aus
+// `recipe.description` ein und Zutaten-Rows werden größer + luftiger, damit
+// kurze Karten nicht halbleer wirken. Lange Karten (16-Zutaten-Mexican-Bowl)
+// bleiben dicht und funktional.
 // ════════════════════════════════════════════════
 function SportLayout({
   brand,
@@ -665,80 +672,392 @@ function SportLayout({
   totalRecipes,
 }: RecipeCardFullProps) {
   const totalTime = recipe.prepTime + (recipe.cookTime ?? 0);
+  const portionsLabel = recipe.servings === 1 ? "Portion" : "Portionen";
+  // Sparse-content signal — short recipes get a Story block + larger rows.
+  const isSparse = recipe.ingredients.length <= 6;
+
+  // Macro bars — visualise the "high protein at low kcal" promise of the
+  // Volumen-Wunder pack. Maxes are pack-typical (≤450 kcal, ≥30g protein).
+  const macroBars = [
+    {
+      label: "Eiweiß",
+      value: recipe.nutrition.protein,
+      max: 50,
+      unit: "g",
+      emoji: "💪",
+    },
+    {
+      label: "Kohlenhydrate",
+      value: recipe.nutrition.carbs,
+      max: 80,
+      unit: "g",
+      emoji: "🌾",
+    },
+    {
+      label: "Fett",
+      value: recipe.nutrition.fat,
+      max: 35,
+      unit: "g",
+      emoji: "🥑",
+    },
+  ];
+
   return (
     <article
-      className="mx-auto w-full max-w-[860px] overflow-hidden rounded-[var(--radius-card)] border bg-white"
+      className="mx-auto w-full max-w-[940px] overflow-hidden rounded-[var(--radius-card)] border bg-white"
       style={baseShellStyle(pack, brand)}
     >
-      {/* Hero with athletic overlay */}
-      <div className="relative aspect-[16/9] overflow-hidden text-white">
-        <Image
-          src={recipe.hero ?? pack.coverImage}
-          alt={recipe.title}
-          fill
-          sizes="(min-width: 1024px) 860px, 100vw"
-          className="object-cover"
-          priority
-        />
-        <div
-          className="absolute inset-0"
-          style={{
-            background: `linear-gradient(135deg, ${pack.mood.ink}f0 0%, ${pack.mood.ink}aa 50%, ${pack.mood.accent}90 100%)`,
-          }}
-        />
-
-        <div className="absolute inset-0 flex flex-col justify-between p-8">
-          <div className="flex items-start justify-between">
-            <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.22em]">
-              Pack {String(pack.number).padStart(2, "0")} · Karte{" "}
-              {String(recipe.number).padStart(2, "0")} / {String(totalRecipes).padStart(2, "0")}
-            </span>
-            <span
-              className="rounded-full bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em]"
-              style={{ color: pack.mood.ink }}
-            >
-              {totalTime} Min · {recipe.difficulty}
+      {/* HERO — square photo right (no overlay), editorial title left */}
+      <header
+        className="grid grid-cols-1 gap-8 border-b px-8 pt-10 pb-8 sm:px-12 sm:pt-12 lg:grid-cols-[1.2fr_1fr] lg:gap-10"
+        style={{
+          background: pack.mood.background + "30",
+          borderColor: pack.mood.ink + "1a",
+        }}
+      >
+        <div className="flex flex-col gap-4">
+          <span
+            className="text-[10px] font-semibold uppercase tracking-[0.22em]"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            Pack {String(pack.number).padStart(2, "0")} · {pack.title} · Karte{" "}
+            {String(recipe.number).padStart(2, "0")} /{" "}
+            {String(totalRecipes).padStart(2, "0")}
+          </span>
+          <h1
+            className="font-display text-[44px] italic leading-[0.96] tracking-[-0.01em] sm:text-[56px]"
+            style={{ color: pack.mood.ink }}
+          >
+            {recipe.title}
+          </h1>
+          <p
+            className="font-display text-[18px] italic leading-snug"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            «&nbsp;{recipe.subtitle}&nbsp;»
+          </p>
+          <div
+            className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            <span>{totalTime} Min</span>
+            <span>·</span>
+            <span>{recipe.difficulty}</span>
+            <span>·</span>
+            <span>
+              ergibt {recipe.servings} {portionsLabel}
             </span>
           </div>
+          {recipe.tags?.length ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {recipe.tags.slice(0, 4).map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em]"
+                  style={{
+                    background: pack.mood.background + "80",
+                    color: pack.mood.ink,
+                  }}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
 
-          <div className="flex flex-col gap-3">
-            <div className="flex items-baseline gap-3">
-              <span className="font-sans text-[80px] font-bold leading-none tracking-[-0.03em] tabular-nums">
-                {recipe.nutrition.kcal}
-              </span>
-              <span className="flex flex-col text-[14px] font-semibold uppercase tracking-[0.16em] text-white/85">
-                kcal pro Portion
-                {recipe.servings > 1 ? (
-                  <span className="text-[11px] normal-case tracking-[0.06em] text-white/65">
-                    Rezept ergibt {recipe.servings} Portionen
-                  </span>
-                ) : (
-                  <span className="text-[11px] normal-case tracking-[0.06em] text-white/65">
-                    1 Portion
-                  </span>
-                )}
+        <div className="relative">
+          <div
+            className="relative mx-auto aspect-square w-full max-w-[340px] overflow-hidden rounded-2xl lg:ml-auto"
+            style={{
+              boxShadow:
+                "0 1px 0 rgba(43,31,25,0.05), 0 22px 40px -16px rgba(43,31,25,0.22)",
+            }}
+          >
+            <Image
+              src={recipe.hero ?? pack.coverImage}
+              alt={recipe.title}
+              fill
+              sizes="(min-width: 1024px) 340px, 100vw"
+              className="object-cover"
+              priority
+            />
+          </div>
+        </div>
+      </header>
+
+      {/* BIENES STORY — only shown when ingredients are sparse, fills the
+          empty space short recipes would otherwise leave below. */}
+      {isSparse && recipe.description ? (
+        <div
+          className="border-b px-8 py-6 sm:px-12"
+          style={{
+            borderColor: pack.mood.ink + "1a",
+            background: pack.mood.background + "20",
+          }}
+        >
+          <div
+            className="mb-2 text-[10px] font-semibold uppercase tracking-[0.22em]"
+            style={{ color: pack.mood.accent }}
+          >
+            Bienes Story
+          </div>
+          <p
+            className="max-w-[60ch] font-display text-[17px] italic leading-relaxed"
+            style={{ color: pack.mood.ink }}
+          >
+            {recipe.description}
+          </p>
+        </div>
+      ) : null}
+
+      {/* VOLUMEN-STATS — 3 prominent tiles with emojis */}
+      <div
+        className="grid grid-cols-3 border-b"
+        style={{ borderColor: pack.mood.ink + "1f" }}
+      >
+        <VolumenStat
+          emoji="🥄"
+          value={`${recipe.servings}×`}
+          label={portionsLabel}
+          pack={pack}
+        />
+        <VolumenStat
+          emoji="🔥"
+          value={String(recipe.nutrition.kcal)}
+          label="kcal pro Portion"
+          pack={pack}
+          highlight
+        />
+        <VolumenStat
+          emoji="💪"
+          value={`${recipe.nutrition.protein}g`}
+          label="Eiweiß pro Portion"
+          pack={pack}
+        />
+      </div>
+
+      {/* MACRO BARS — visualise the protein-density story */}
+      <div
+        className="border-b px-8 py-6 sm:px-12"
+        style={{ borderColor: pack.mood.ink + "1f" }}
+      >
+        <div className="mb-4 flex items-baseline justify-between gap-3">
+          <h2
+            className="text-[12px] font-semibold uppercase tracking-[0.22em]"
+            style={{ color: pack.mood.accent }}
+          >
+            Makros
+          </h2>
+          <span
+            className="text-[10px] font-medium uppercase tracking-[0.14em]"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            pro Portion · von 50 / 80 / 35 g Skala
+          </span>
+        </div>
+        <div className="flex flex-col gap-3">
+          {macroBars.map((m) => (
+            <div
+              key={m.label}
+              className="grid grid-cols-[8.5rem_1fr_3rem] items-center gap-4"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-[14px]" aria-hidden>
+                  {m.emoji}
+                </span>
+                <span
+                  className="text-[12px] font-semibold uppercase tracking-[0.14em]"
+                  style={{ color: pack.mood.inkSoft }}
+                >
+                  {m.label}
+                </span>
+              </div>
+              <div
+                className="h-2.5 overflow-hidden rounded-full"
+                style={{ background: pack.mood.ink + "12" }}
+              >
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${Math.min((m.value / m.max) * 100, 100)}%`,
+                    background: pack.mood.accent,
+                  }}
+                />
+              </div>
+              <span
+                className="text-right font-display text-[18px] tabular-nums"
+                style={{ color: pack.mood.ink }}
+              >
+                {m.value}
+                {m.unit}
               </span>
             </div>
-            <h1 className="max-w-[20ch] font-sans text-[44px] font-bold uppercase leading-[0.95] tracking-[-0.02em]">
-              {recipe.title}
-            </h1>
-            <p className="text-[14px] uppercase tracking-[0.12em] text-white/80">
-              {recipe.subtitle}
-            </p>
-          </div>
+          ))}
         </div>
       </div>
 
-      <MacrosBlock recipe={recipe} pack={pack} variant="bold" />
+      {/* BODY — Zutaten-Cart (☐) + Schritt-Timeline */}
+      <div className="grid grid-cols-1 gap-10 px-8 py-10 sm:px-12 lg:grid-cols-[1fr_1.4fr] lg:gap-14">
+        {/* Zutaten-Cart with checkboxes */}
+        <section>
+          <div
+            className="flex items-baseline justify-between gap-3 border-b pb-3"
+            style={{ borderColor: pack.mood.ink + "20" }}
+          >
+            <h2
+              className="text-[12px] font-semibold uppercase tracking-[0.22em]"
+              style={{ color: pack.mood.accent }}
+            >
+              Zutaten-Cart
+            </h2>
+            <span
+              className="text-[10px] font-medium uppercase tracking-[0.14em]"
+              style={{ color: pack.mood.inkSoft }}
+            >
+              {recipe.ingredients.length} Items · zum Abhaken
+            </span>
+          </div>
+          <ul className="mt-5 flex flex-col">
+            {recipe.ingredients.map((ing, idx) => (
+              <li
+                key={`${ing.name}-${idx}`}
+                className={`grid grid-cols-[1.25rem_4rem_1fr] items-baseline gap-3 border-b ${
+                  isSparse ? "py-3" : "py-2"
+                }`}
+                style={{ borderColor: pack.mood.ink + "10" }}
+              >
+                <span
+                  className="text-[16px] leading-none"
+                  style={{ color: pack.mood.accent + "90" }}
+                  aria-hidden
+                >
+                  ☐
+                </span>
+                <span
+                  className="font-mono text-[12px] tabular-nums"
+                  style={{ color: pack.mood.inkSoft }}
+                >
+                  {ing.amount}
+                </span>
+                <span
+                  className={`leading-snug ${
+                    isSparse ? "text-[15px]" : "text-[14px]"
+                  }`}
+                  style={{ color: pack.mood.ink }}
+                >
+                  {ing.name}
+                  {ing.note ? (
+                    <span
+                      className="block text-[11px] italic"
+                      style={{ color: pack.mood.inkSoft }}
+                    >
+                      {ing.note}
+                    </span>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
 
-      {/* Body */}
-      <div className="grid grid-cols-1 gap-12 px-10 pt-12 pb-10 lg:grid-cols-[1fr_1.4fr] lg:gap-14">
-        <SectionList recipe={recipe} pack={pack} kind="ingredients" bold />
-        <SectionList recipe={recipe} pack={pack} kind="steps" bold />
+        {/* Schritt-Timeline with connecting lines */}
+        <section>
+          <div
+            className="flex items-baseline justify-between gap-3 border-b pb-3"
+            style={{ borderColor: pack.mood.ink + "20" }}
+          >
+            <h2
+              className="text-[12px] font-semibold uppercase tracking-[0.22em]"
+              style={{ color: pack.mood.accent }}
+            >
+              Timeline
+            </h2>
+            <span
+              className="text-[10px] font-medium uppercase tracking-[0.14em]"
+              style={{ color: pack.mood.inkSoft }}
+            >
+              {recipe.steps.length} Schritte · {totalTime} Min total
+            </span>
+          </div>
+          <ol className="mt-5 flex flex-col">
+            {recipe.steps.map((step, idx) => (
+              <li
+                key={idx}
+                className="grid grid-cols-[2.4rem_1fr] gap-3 pb-5 last:pb-0"
+              >
+                <div className="flex flex-col items-center">
+                  <span
+                    className="font-display text-[28px] leading-none tabular-nums"
+                    style={{ color: pack.mood.accent }}
+                  >
+                    {idx + 1}
+                  </span>
+                  {idx < recipe.steps.length - 1 ? (
+                    <span
+                      className="mt-2 block w-0.5 flex-1"
+                      style={{
+                        background: pack.mood.accent + "30",
+                        minHeight: 32,
+                      }}
+                      aria-hidden
+                    />
+                  ) : null}
+                </div>
+                <span
+                  className="text-[15px] leading-[1.55]"
+                  style={{ color: pack.mood.ink }}
+                >
+                  {step}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
       </div>
 
       <CardFooter brand={brand} pack={pack} recipe={recipe} />
     </article>
+  );
+}
+
+function VolumenStat({
+  emoji,
+  value,
+  label,
+  pack,
+  highlight = false,
+}: {
+  emoji: string;
+  value: string;
+  label: string;
+  pack: Pack;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      className="flex flex-col items-center gap-1.5 border-r px-3 py-7 text-center last:border-r-0"
+      style={{
+        borderColor: pack.mood.ink + "1f",
+        background: highlight ? pack.mood.background + "55" : "transparent",
+      }}
+    >
+      <span className="text-[24px] leading-none" aria-hidden>
+        {emoji}
+      </span>
+      <span
+        className="font-display text-[36px] leading-none tabular-nums"
+        style={{ color: pack.mood.ink }}
+      >
+        {value}
+      </span>
+      <span
+        className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+        style={{ color: highlight ? pack.mood.accent : pack.mood.inkSoft }}
+      >
+        {label}
+      </span>
+    </div>
   );
 }
 
