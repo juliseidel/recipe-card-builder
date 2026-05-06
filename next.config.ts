@@ -8,9 +8,15 @@ const nextConfig: NextConfig = {
   images: {
     qualities: [75, 90, 95],
   },
-  // PDF rendering reads font + brand images at runtime via fs. The dynamic
-  // path.join(...) calls don't get traced automatically, so include them
-  // explicitly in the API-route function bundles deployed to Vercel.
+  // Puppeteer + @sparticuz/chromium ship native binaries that webpack must not
+  // try to bundle. Marking them external means they're require()d at runtime
+  // from node_modules instead of being inlined into the function bundle.
+  serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core"],
+  // PDF rendering reads font + brand images at runtime. The font files are
+  // still used by the legacy @react-pdf renderer (kept around as fallback);
+  // the brand images are read by the print routes via Next/Image. Bundling
+  // them into the API-route function ensures everything is available even
+  // when serverless functions can't reach the public/ statically.
   outputFileTracingIncludes: {
     "/api/pdf/jobs": [
       "./public/fonts/**/*",

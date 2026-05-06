@@ -3,7 +3,7 @@ import { getBrand } from "@/lib/brands";
 import { getPack } from "@/lib/packs";
 import { getRecipe, getRecipesForPack, type Recipe } from "@/lib/recipes";
 import { getServerSupabase } from "@/lib/supabase-server";
-import { renderPackPdf, renderRecipePdf } from "./render";
+import { renderPackPdf, renderRecipePdf } from "./render-puppeteer";
 
 export type PdfJobType = "recipe" | "pack";
 
