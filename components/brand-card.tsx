@@ -10,7 +10,7 @@ export function BrandCard({ brand }: BrandCardProps) {
   return (
     <Link
       href={`/${brand.slug}`}
-      className="group relative flex flex-col overflow-hidden rounded-[var(--radius-card)] bg-surface ring-1 ring-line shadow-[var(--shadow-card)] transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[var(--shadow-card-hover)] hover:ring-line-strong"
+      className="group relative flex flex-col overflow-hidden rounded-[var(--radius-card)] bg-surface ring-1 ring-line shadow-[var(--shadow-card)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[var(--shadow-card-hover)] hover:ring-line-strong"
       style={{ background: brand.tokens.surface }}
     >
       <div
@@ -22,7 +22,7 @@ export function BrandCard({ brand }: BrandCardProps) {
           alt={`${brand.name} – ${brand.fullName}`}
           fill
           sizes="(min-width: 1280px) 480px, (min-width: 768px) 50vw, 100vw"
-          className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+          className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
           priority
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/15 to-transparent" />

@@ -127,7 +127,7 @@ export default function SubmissionPage() {
                   <a
                     href={href}
                     download
-                    className="group relative flex flex-col overflow-hidden rounded-[var(--radius-card)] transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[var(--shadow-card-hover)]"
+                    className="group relative flex flex-col overflow-hidden rounded-[var(--radius-card)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[var(--shadow-card-hover)]"
                     style={{
                       background: pack.mood.background,
                       color: pack.mood.ink,
@@ -155,7 +155,7 @@ export default function SubmissionPage() {
                         alt={`${pack.title} – Cover`}
                         fill
                         sizes="(min-width: 1024px) 360px, 50vw"
-                        className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]"
+                        className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.05]"
                       />
                     </div>
 

@@ -1,10 +1,22 @@
 import { notFound } from "next/navigation";
-import { getBrand } from "@/lib/brands";
+import { brands, getBrand } from "@/lib/brands";
 import { getPacksForBrand } from "@/lib/packs";
 import { SiteHeader } from "@/components/site-header";
 import { BrandHero } from "@/components/brand-hero";
 import { PackCard } from "@/components/pack-card";
 import { NewPackCard } from "@/components/new-pack-card";
+
+// Pre-render every brand at build time. The brand+pack catalogue is fully
+// static (lib/brands.ts, lib/packs.ts) so we can hand Vercel a finished HTML
+// page instead of running the renderer on every request.
+export async function generateStaticParams() {
+  return brands.map((b) => ({ brand: b.slug }));
+}
+
+// Re-render in the background every 5 minutes so any future data changes
+// land without a redeploy. Custom recipes are loaded client-side and stay
+// fresh independent of this cadence.
+export const revalidate = 300;
 
 type BrandPageProps = {
   params: Promise<{ brand: string }>;

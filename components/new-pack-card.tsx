@@ -9,7 +9,7 @@ export function NewPackCard({ brand }: NewPackCardProps) {
   return (
     <Link
       href={`/${brand.slug}/new`}
-      className="group relative flex flex-col overflow-hidden rounded-[var(--radius-card)] border-2 border-dashed transition-all duration-500 hover:-translate-y-2 hover:shadow-[var(--shadow-card-hover)]"
+      className="group relative flex flex-col overflow-hidden rounded-[var(--radius-card)] border-2 border-dashed transition-all duration-300 hover:-translate-y-2 hover:shadow-[var(--shadow-card-hover)]"
       style={{
         borderColor: brand.tokens.line,
         background: brand.tokens.surface,
@@ -42,7 +42,7 @@ export function NewPackCard({ brand }: NewPackCardProps) {
         }}
       >
         <div
-          className="grid size-16 place-items-center rounded-2xl transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3"
+          className="grid size-16 place-items-center rounded-2xl transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
           style={{
             background: brand.tokens.ink,
             color: brand.tokens.signature,

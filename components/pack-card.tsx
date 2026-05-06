@@ -21,7 +21,7 @@ export function PackCard({ pack, brand }: PackCardProps) {
   return (
     <Link
       href={`/${brand.slug}/${pack.slug}`}
-      className="group relative flex flex-col overflow-hidden rounded-[var(--radius-card)] transition-all duration-500 hover:-translate-y-2 hover:shadow-[var(--shadow-card-hover)]"
+      className="group relative flex flex-col overflow-hidden rounded-[var(--radius-card)] transition-all duration-300 hover:-translate-y-2 hover:shadow-[var(--shadow-card-hover)]"
       style={{
         background: pack.mood.background,
         color: pack.mood.ink,
@@ -58,7 +58,8 @@ export function PackCard({ pack, brand }: PackCardProps) {
           alt={`${pack.title} – ${pack.tagline}`}
           fill
           sizes="(min-width: 1280px) 420px, (min-width: 768px) 50vw, 100vw"
-          className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.06]"
+          className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.06]"
+          priority
         />
       </div>
 

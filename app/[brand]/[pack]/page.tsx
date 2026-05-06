@@ -1,12 +1,22 @@
 import { notFound } from "next/navigation";
 import { getBrand } from "@/lib/brands";
-import { getPack } from "@/lib/packs";
+import { getPack, packs } from "@/lib/packs";
 import { getRecipesForPack } from "@/lib/recipes";
 import { SiteHeader } from "@/components/site-header";
 import { PackCover } from "@/components/pack-cover";
 import { PackActions } from "@/components/pack-actions";
 import { RecipeGrid } from "@/components/recipe-grid";
 import { NutritionOverview } from "@/components/nutrition-overview";
+
+// Static generation per pack — the recipe catalogue rarely changes, so caching
+// the rendered page for five minutes turns a Supabase round-trip into a CDN
+// hit. Custom and hidden recipes are loaded client-side, so they stay fresh
+// independent of this revalidation window.
+export async function generateStaticParams() {
+  return packs.map((p) => ({ brand: p.brandSlug, pack: p.slug }));
+}
+
+export const revalidate = 300;
 
 type PackPageProps = {
   params: Promise<{ brand: string; pack: string }>;

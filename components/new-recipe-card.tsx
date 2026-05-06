@@ -11,7 +11,7 @@ export function NewRecipeCard({ brand, pack }: NewRecipeCardProps) {
   return (
     <Link
       href={`/${brand.slug}/${pack.slug}/new`}
-      className="group relative flex aspect-[3/4] flex-col items-center justify-center overflow-hidden rounded-[var(--radius-card)] border-2 border-dashed transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[var(--shadow-card-hover)]"
+      className="group relative flex aspect-[3/4] flex-col items-center justify-center overflow-hidden rounded-[var(--radius-card)] border-2 border-dashed transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[var(--shadow-card-hover)]"
       style={{
         borderColor: pack.mood.ink + "30",
         background: pack.mood.background + "30",
@@ -29,7 +29,7 @@ export function NewRecipeCard({ brand, pack }: NewRecipeCardProps) {
       {/* Center stack */}
       <div className="relative z-10 flex flex-col items-center gap-7 px-8 text-center">
         <div
-          className="grid size-[72px] place-items-center rounded-[20px] shadow-soft transition-transform duration-500 group-hover:scale-[1.08] group-hover:rotate-[4deg]"
+          className="grid size-[72px] place-items-center rounded-[20px] shadow-soft transition-transform duration-300 group-hover:scale-[1.08] group-hover:rotate-[4deg]"
           style={{
             background: pack.mood.ink,
             color: pack.mood.background,

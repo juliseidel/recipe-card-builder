@@ -4,10 +4,10 @@ export function NewBrandCard() {
   return (
     <Link
       href="/new-brand"
-      className="group relative flex flex-col overflow-hidden rounded-[var(--radius-card)] border-2 border-dashed border-line-strong bg-canvas-alt/40 transition-all duration-500 hover:-translate-y-1.5 hover:border-ink hover:bg-surface hover:shadow-[var(--shadow-card-hover)]"
+      className="group relative flex flex-col overflow-hidden rounded-[var(--radius-card)] border-2 border-dashed border-line-strong bg-canvas-alt/40 transition-all duration-300 hover:-translate-y-1.5 hover:border-ink hover:bg-surface hover:shadow-[var(--shadow-card-hover)]"
     >
       <div className="relative flex aspect-[4/5] flex-col items-center justify-center gap-5 px-8 text-center">
-        <div className="grid size-16 place-items-center rounded-2xl bg-ink text-canvas transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3">
+        <div className="grid size-16 place-items-center rounded-2xl bg-ink text-canvas transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3">
           <svg
             width="22"
             height="22"
