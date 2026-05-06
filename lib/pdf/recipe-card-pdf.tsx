@@ -166,120 +166,118 @@ function EditorialPage({
         </Text>
       </View>
 
-      {/* HERO PHOTO — full-width landscape, dominates the top of the
-          spread. Pack 5 is the only layout that puts the photo above the
-          title rather than beside it (Patisserie/Sport square right,
-          Minimal/Dashboard data-row beside). 5:2 aspect keeps food
-          recognisable while reading as cinematic. */}
+      {/* TITLE SECTION — square photo LEFT, title content RIGHT. Mirrors
+          Patisserie/Sport but reversed (photo is on the left side instead
+          of the right). Compact 130×130 photo so source quality always
+          looks crisp — no aggressive crops or up-scaling. */}
       <View
         style={{
-          paddingHorizontal: 32,
-          paddingTop: 14,
-          paddingBottom: 14,
-          backgroundColor: t.paper,
-        }}
-        wrap={false}
-      >
-        <View
-          style={{
-            width: "100%",
-            height: 212,
-            borderRadius: 10,
-            overflow: "hidden",
-          }}
-        >
-          {heroDataUri ? (
-            <Image
-              src={heroDataUri}
-              style={{ width: "100%", height: 212, objectFit: "cover" }}
-            />
-          ) : null}
-        </View>
-      </View>
-
-      {/* TITLE BAND — beneath the photo, full-width */}
-      <View
-        style={{
+          flexDirection: "row",
           paddingHorizontal: 32,
           paddingTop: d.headerPadTop,
           paddingBottom: d.headerPadBottom,
+          gap: 18,
           backgroundColor: t.paper,
           borderBottomWidth: 1,
           borderBottomColor: t.divider,
         }}
         wrap={false}
       >
-        <Text
-          style={{
-            fontFamily: "Fraunces",
-            fontSize: d.titleFontSize,
-            lineHeight: 1.02,
-            letterSpacing: -0.3,
-            color: t.ink,
-            textTransform: "uppercase",
-          }}
-        >
-          {recipe.title}
-        </Text>
-        <Text
-          style={{
-            fontFamily: "Fraunces",
-            fontStyle: "italic",
-            fontSize: d.subtitleFontSize,
-            color: t.inkSoft,
-            lineHeight: 1.3,
-            marginTop: 6,
-          }}
-        >
-          {recipe.subtitle}
-        </Text>
-        <View
-          style={{
-            flexDirection: "row",
-            gap: 8,
-            marginTop: 6,
-            flexWrap: "wrap",
-          }}
-        >
-          <Text style={{ fontSize: 8.5, color: t.inkSoft }}>{time} Min</Text>
-          <Text style={{ fontSize: 8.5, color: t.inkSoft }}>·</Text>
-          <Text style={{ fontSize: 8.5, color: t.inkSoft }}>
-            ergibt {recipe.servings} {pl}
-          </Text>
-          <Text style={{ fontSize: 8.5, color: t.inkSoft }}>·</Text>
-          <Text style={{ fontSize: 8.5, color: t.inkSoft }}>
-            {recipe.difficulty}
-          </Text>
+        <View style={{ width: 130 }}>
+          {heroDataUri ? (
+            <View
+              style={{
+                borderRadius: 10,
+                overflow: "hidden",
+                width: 130,
+                height: 130,
+              }}
+            >
+              <Image
+                src={heroDataUri}
+                style={{ width: 130, height: 130, objectFit: "cover" }}
+              />
+            </View>
+          ) : null}
         </View>
-        {recipe.tags?.length ? (
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              marginTop: 8,
-              gap: 4,
-            }}
-          >
-            {recipe.tags.slice(0, 5).map((tag) => (
-              <Text
-                key={tag}
-                style={{
-                  fontSize: 6.5,
-                  fontWeight: 600,
-                  letterSpacing: 0.8,
-                  textTransform: "uppercase",
-                  color: t.ink,
-                  backgroundColor: t.bg,
-                  paddingHorizontal: 6,
-                  paddingVertical: 2,
-                  borderRadius: 999,
-                }}
-              >
-                {tag}
+
+        <View style={{ flex: 1.4, justifyContent: "space-between" }}>
+          <View>
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: d.titleFontSize,
+                lineHeight: 1.02,
+                letterSpacing: -0.3,
+                color: t.ink,
+                textTransform: "uppercase",
+              }}
+            >
+              {recipe.title}
+            </Text>
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontStyle: "italic",
+                fontSize: d.subtitleFontSize,
+                color: t.inkSoft,
+                lineHeight: 1.3,
+                marginTop: 6,
+              }}
+            >
+              {recipe.subtitle}
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 8,
+                marginTop: 6,
+                flexWrap: "wrap",
+              }}
+            >
+              <Text style={{ fontSize: 8.5, color: t.inkSoft }}>
+                {time} Min
               </Text>
-            ))}
+              <Text style={{ fontSize: 8.5, color: t.inkSoft }}>·</Text>
+              <Text style={{ fontSize: 8.5, color: t.inkSoft }}>
+                ergibt {recipe.servings} {pl}
+              </Text>
+              <Text style={{ fontSize: 8.5, color: t.inkSoft }}>·</Text>
+              <Text style={{ fontSize: 8.5, color: t.inkSoft }}>
+                {recipe.difficulty}
+              </Text>
+            </View>
           </View>
-        ) : null}
+          {recipe.tags?.length ? (
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                marginTop: 8,
+                gap: 4,
+              }}
+            >
+              {recipe.tags.slice(0, 5).map((tag) => (
+                <Text
+                  key={tag}
+                  style={{
+                    fontSize: 6.5,
+                    fontWeight: 600,
+                    letterSpacing: 0.8,
+                    textTransform: "uppercase",
+                    color: t.ink,
+                    backgroundColor: t.bg,
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    borderRadius: 999,
+                  }}
+                >
+                  {tag}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+        </View>
       </View>
 
       {/* NUTRIENT BANNER — pack-5 signature: Mikros surfaced HERE, right

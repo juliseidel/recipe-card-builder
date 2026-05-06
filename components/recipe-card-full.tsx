@@ -134,76 +134,78 @@ function EditorialLayout({
         </span>
       </header>
 
-      {/* HERO PHOTO — full-width 3:2 cinematic. The other 4 packs put the
-          photo to the side or as a small polaroid; here it dominates the
-          top half of the spread like a cookbook chapter opener. */}
+      {/* TITLE SECTION — photo LEFT, title content RIGHT. The other side-
+          by-side packs (Patisserie, Sport) all put the photo right; Pack 5
+          mirrors that to a left-aligned hero so the visual weight reads
+          differently while staying compact (no full-bleed photo so source
+          quality always looks tight). */}
       <div
-        className="relative aspect-[16/9] w-full overflow-hidden"
-        style={{ background: pack.mood.background }}
-      >
-        <Image
-          src={recipe.hero ?? pack.coverImage}
-          alt={recipe.title}
-          fill
-          sizes="(min-width: 1024px) 960px, 100vw"
-          className="object-cover"
-          priority
-        />
-        {/* subtle bottom gradient so the title-band edge feels like one
-            continuous editorial spread, not two stacked panels */}
-        <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-16"
-          style={{
-            background: `linear-gradient(180deg, transparent 0%, ${pack.mood.background}40 100%)`,
-          }}
-        />
-      </div>
-
-      {/* TITLE BAND — beneath photo (not beside) */}
-      <div
-        className="px-8 pt-9 pb-7 sm:px-12 sm:pt-10"
+        className="grid grid-cols-1 gap-8 px-8 pt-10 pb-10 sm:px-12 sm:pt-12 lg:grid-cols-[1fr_1.3fr] lg:gap-12"
         style={{ background: pack.mood.background + "20" }}
       >
-        <h1
-          className="font-display text-[40px] uppercase leading-[0.96] tracking-[-0.01em] sm:text-[56px]"
-          style={{ color: pack.mood.ink }}
-        >
-          {recipe.title}
-        </h1>
-        <p
-          className="mt-3 max-w-[60ch] font-display text-[18px] italic leading-snug"
-          style={{ color: pack.mood.inkSoft }}
-        >
-          {recipe.subtitle}
-        </p>
-        <div
-          className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]"
-          style={{ color: pack.mood.inkSoft }}
-        >
-          <span>{totalTime} Minuten</span>
-          <span>·</span>
-          <span>
-            ergibt {recipe.servings} {portionsLabel}
-          </span>
-          <span>·</span>
-          <span>{recipe.difficulty}</span>
-        </div>
-        {recipe.tags?.length ? (
-          <div className="mt-4 flex flex-wrap gap-1.5">
-            {recipe.tags.slice(0, 5).map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em]"
-                style={{
-                  background: pack.mood.background,
-                  color: pack.mood.ink,
-                }}
-              >
-                {tag}
-              </span>
-            ))}
+        <div className="relative">
+          <div
+            className="relative mx-auto aspect-square w-full max-w-[320px] overflow-hidden rounded-2xl lg:mr-auto"
+            style={{
+              boxShadow:
+                "0 1px 0 rgba(43,31,25,0.05), 0 28px 50px -22px rgba(43,31,25,0.28)",
+            }}
+          >
+            <Image
+              src={recipe.hero ?? pack.coverImage}
+              alt={recipe.title}
+              fill
+              sizes="(min-width: 1024px) 320px, 100vw"
+              className="object-cover"
+              priority
+            />
           </div>
-        ) : null}
+        </div>
+
+        <div className="flex flex-col justify-between gap-5">
+          <div className="flex flex-col gap-3">
+            <h1
+              className="font-display text-[40px] uppercase leading-[0.96] tracking-[-0.01em] sm:text-[52px]"
+              style={{ color: pack.mood.ink }}
+            >
+              {recipe.title}
+            </h1>
+            <p
+              className="font-display text-[18px] italic leading-snug"
+              style={{ color: pack.mood.inkSoft }}
+            >
+              {recipe.subtitle}
+            </p>
+            <div
+              className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]"
+              style={{ color: pack.mood.inkSoft }}
+            >
+              <span>{totalTime} Minuten</span>
+              <span>·</span>
+              <span>
+                ergibt {recipe.servings} {portionsLabel}
+              </span>
+              <span>·</span>
+              <span>{recipe.difficulty}</span>
+            </div>
+          </div>
+          {recipe.tags?.length ? (
+            <div className="flex flex-wrap gap-1.5">
+              {recipe.tags.slice(0, 5).map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em]"
+                  style={{
+                    background: pack.mood.background,
+                    color: pack.mood.ink,
+                  }}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {/* NUTRIENT BANNER — pack-5 signature move: Mikros are surfaced HERE,
