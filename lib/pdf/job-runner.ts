@@ -136,8 +136,9 @@ export async function processJob(jobId: string): Promise<void> {
         await markFailed(supabase, jobId, "Recipe not found");
         return;
       }
+      const staticRecipes = await getRecipesForPack(job.pack_slug);
       const totalRecipes =
-        getRecipesForPack(job.pack_slug).length +
+        staticRecipes.length +
         (await countCustomRecipes(supabase, job.pack_slug));
       buffer = await renderRecipePdf({
         brand,
@@ -149,7 +150,7 @@ export async function processJob(jobId: string): Promise<void> {
       storagePath = `${pack.slug}__${recipe.slug}.pdf`;
       downloadName = `${safeFilename(recipe.title)}.pdf`;
     } else {
-      const recipes = getRecipesForPack(job.pack_slug);
+      const recipes = await getRecipesForPack(job.pack_slug);
       if (recipes.length === 0) {
         await markFailed(supabase, jobId, "Pack has no recipes");
         return;
@@ -222,8 +223,8 @@ async function loadRecipe(
   packSlug: string,
   recipeSlug: string
 ): Promise<Recipe | null> {
-  // Try static first
-  const stat = getRecipe(packSlug, recipeSlug);
+  // Try the curated set first (static or already-seeded DB row)
+  const stat = await getRecipe(packSlug, recipeSlug);
   if (stat) return stat;
   // Fall back to custom (Supabase-stored)
   const { data, error } = await supabase

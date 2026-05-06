@@ -1252,19 +1252,21 @@ function CardFooter({
   italic?: boolean;
 }) {
   return (
-    <div
-      className="flex flex-wrap items-center justify-between gap-3 border-t px-8 py-4 sm:px-10"
-      style={{
-        borderColor: brand.tokens.line,
-        background: brand.tokens.surface,
-      }}
-    >
-      <span
-        className={`font-display text-[20px] ${italic ? "italic" : ""}`}
-        style={{ color: brand.tokens.ink }}
+    <>
+      <MicrosPanel recipe={recipe} pack={pack} />
+      <div
+        className="flex flex-wrap items-center justify-between gap-3 border-t px-8 py-4 sm:px-10"
+        style={{
+          borderColor: brand.tokens.line,
+          background: brand.tokens.surface,
+        }}
       >
-        {brand.signature}
-      </span>
+        <span
+          className={`font-display text-[20px] ${italic ? "italic" : ""}`}
+          style={{ color: brand.tokens.ink }}
+        >
+          {brand.signature}
+        </span>
 
       <div className="flex flex-wrap items-center gap-3">
         {recipe?.sourceUrl ? (
@@ -1299,6 +1301,90 @@ function CardFooter({
         >
           {brand.handle} · {pack.title}
         </span>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ════════════════════════════════════════════════
+// MICROS — same compact strip across all 5 layouts.
+// "REICH AN" header + top micros as inline pills sorted by % EU-NRV.
+// Pack-themed accent. Hides itself if the recipe has no micros yet.
+// ════════════════════════════════════════════════
+function MicrosPanel({
+  recipe,
+  pack,
+}: {
+  recipe?: Recipe;
+  pack: Pack;
+}) {
+  const micros = recipe?.nutrition?.micros;
+  if (!micros || micros.length === 0) return null;
+
+  // Show all that AI returned (already capped at ~10), sorted desc by %TBD
+  const sorted = [...micros].sort(
+    (a, b) => (b.pctDaily ?? 0) - (a.pctDaily ?? 0)
+  );
+
+  return (
+    <div
+      className="border-t px-8 py-5 sm:px-10"
+      style={{
+        borderColor: pack.mood.ink + "20",
+        background: pack.mood.background + "26",
+      }}
+    >
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <h3
+          className="text-[12px] font-semibold uppercase tracking-[0.22em]"
+          style={{ color: pack.mood.accent }}
+        >
+          Reich an
+        </h3>
+        <span
+          className="text-[10px] font-medium uppercase tracking-[0.14em]"
+          style={{ color: pack.mood.inkSoft }}
+        >
+          Mikronährstoffe pro Portion · % Tagesbedarf
+        </span>
+      </div>
+
+      <div className="flex flex-wrap gap-x-4 gap-y-2">
+        {sorted.map((m) => (
+          <div
+            key={m.name}
+            className="inline-flex items-baseline gap-2 rounded-full border px-3 py-1.5"
+            style={{
+              borderColor: pack.mood.ink + "1f",
+              background: "rgba(255,255,255,0.55)",
+            }}
+          >
+            <span
+              className="text-[12px] font-medium"
+              style={{ color: pack.mood.ink }}
+            >
+              {m.name}
+            </span>
+            <span
+              className="text-[10px] tabular-nums"
+              style={{ color: pack.mood.inkSoft }}
+            >
+              {m.amount}
+            </span>
+            {m.pctDaily ? (
+              <span
+                className="rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular-nums"
+                style={{
+                  background: pack.mood.accent,
+                  color: pack.mood.background,
+                }}
+              >
+                {m.pctDaily}%
+              </span>
+            ) : null}
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -25,7 +25,7 @@ async function main() {
 
   console.log("\n→ Single-recipe PDFs (every recipe in every pack)");
   for (const pack of packs) {
-    const recipes = getRecipesForPack(pack.slug);
+    const recipes = await getRecipesForPack(pack.slug);
     console.log(`\n  ${pack.title} · ${pack.cardLayout} layout`);
     for (const recipe of recipes) {
       const buf = await renderRecipePdf({
@@ -48,7 +48,7 @@ async function main() {
 
   console.log("\n→ Pack PDFs");
   for (const pack of packs as Pack[]) {
-    const recipes = getRecipesForPack(pack.slug);
+    const recipes = await getRecipesForPack(pack.slug);
     const buf = await renderPackPdf({ brand, pack, recipes });
     const out = `${OUT}/PACK__${pack.slug}.pdf`;
     await fs.writeFile(out, buf);

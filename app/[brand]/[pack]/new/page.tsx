@@ -157,6 +157,15 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
       setError("Konnte die Karte nicht speichern. Bitte erneut versuchen.");
       return;
     }
+    // Fire-and-forget: kick off Gemini micro-enrichment in the background.
+    // The detail page will poll and reveal micros when ready.
+    void fetch("/api/recipes/enrich", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipeId: saved.id }),
+    }).catch(() => {
+      /* swallow — enrichment is best-effort */
+    });
     setSavedSuccess(true);
     setTimeout(() => {
       router.push(`/${brand.slug}/${pack.slug}/${saved.slug}`);

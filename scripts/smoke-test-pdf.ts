@@ -37,9 +37,16 @@ async function main() {
   const brand = getBrand("biene");
   if (!brand) throw new Error("Brand 'biene' not found");
 
+  // Pre-load every pack's recipes once — async loaders, no per-call awaits.
+  const byPack: Map<string, Awaited<ReturnType<typeof getRecipesForPack>>> =
+    new Map();
+  for (const p of packs) {
+    byPack.set(p.slug, await getRecipesForPack(p.slug));
+  }
+
   console.log(`\n→ Single recipe per layout (one card per pack)`);
   for (const pack of packs) {
-    const recipes = getRecipesForPack(pack.slug);
+    const recipes = byPack.get(pack.slug)!;
     const recipe = recipes[0];
     if (!recipe) {
       console.warn(`  ! Pack ${pack.slug} has no recipes, skipping`);
@@ -56,7 +63,7 @@ async function main() {
 
   console.log(`\n→ Edge case — long recipe (find one with most ingredients)`);
   const allRecipes = packs.flatMap((p) =>
-    getRecipesForPack(p.slug).map((r) => ({ pack: p, r }))
+    byPack.get(p.slug)!.map((r) => ({ pack: p, r }))
   );
   const longest = allRecipes.reduce((acc, cur) =>
     cur.r.ingredients.length > acc.r.ingredients.length ? cur : acc
@@ -68,7 +75,7 @@ async function main() {
     brand,
     pack: longest.pack,
     recipe: longest.r,
-    totalRecipes: getRecipesForPack(longest.pack.slug).length,
+    totalRecipes: byPack.get(longest.pack.slug)!.length,
   });
   await writePdf(`edge_long__${longest.pack.slug}__${longest.r.slug}.pdf`, longBuf);
 
@@ -83,7 +90,7 @@ async function main() {
     brand,
     pack: shortest.pack,
     recipe: shortest.r,
-    totalRecipes: getRecipesForPack(shortest.pack.slug).length,
+    totalRecipes: byPack.get(shortest.pack.slug)!.length,
   });
   await writePdf(
     `edge_short__${shortest.pack.slug}__${shortest.r.slug}.pdf`,
@@ -92,9 +99,9 @@ async function main() {
 
   console.log(`\n→ Full pack (largest pack)`);
   const biggestPack = packs.reduce((a, b) =>
-    getRecipesForPack(b.slug).length > getRecipesForPack(a.slug).length ? b : a
+    byPack.get(b.slug)!.length > byPack.get(a.slug)!.length ? b : a
   );
-  const packRecipes = getRecipesForPack(biggestPack.slug);
+  const packRecipes = byPack.get(biggestPack.slug)!;
   console.log(
     `  Pack: ${biggestPack.title} — ${packRecipes.length} recipes (~${
       packRecipes.length + 4

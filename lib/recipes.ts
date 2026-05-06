@@ -1511,14 +1511,103 @@ export const recipes: Recipe[] = [
   },
 ];
 
-export function getRecipesForPack(packSlug: string): Recipe[] {
-  return recipes
-    .filter((recipe) => recipe.packSlug === packSlug)
-    .sort((a, b) => a.number - b.number);
+// Lazy-imported to avoid a circular dep (recipe-micros.ts imports Micronutrient
+// from this file). The import happens at first call, not at module-load time.
+let _microsCache: Record<string, Micronutrient[]> | null = null;
+function getMicros(): Record<string, Micronutrient[]> {
+  if (_microsCache) return _microsCache;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require("./recipe-micros") as {
+      recipeMicros: Record<string, Micronutrient[]>;
+    };
+    _microsCache = mod.recipeMicros;
+  } catch {
+    _microsCache = {};
+  }
+  return _microsCache;
 }
 
-export function getRecipe(packSlug: string, recipeSlug: string): Recipe | undefined {
-  return recipes.find(
+function withMicros(recipe: Recipe): Recipe {
+  if (recipe.nutrition.micros && recipe.nutrition.micros.length > 0) {
+    return recipe;
+  }
+  const fromAi = getMicros()[recipe.slug];
+  if (!fromAi || fromAi.length === 0) return recipe;
+  return {
+    ...recipe,
+    nutrition: { ...recipe.nutrition, micros: fromAi },
+  };
+}
+
+// Static fallback (used when Supabase is unavailable or row not in DB).
+function staticRecipesForPack(packSlug: string): Recipe[] {
+  return recipes
+    .filter((recipe) => recipe.packSlug === packSlug)
+    .sort((a, b) => a.number - b.number)
+    .map(withMicros);
+}
+
+function staticRecipe(
+  packSlug: string,
+  recipeSlug: string
+): Recipe | undefined {
+  const r = recipes.find(
     (recipe) => recipe.packSlug === packSlug && recipe.slug === recipeSlug
   );
+  return r ? withMicros(r) : undefined;
+}
+
+// DB-backed loader. Server-only — callers MUST await.
+// Falls back to the static array (with micros file merged) if Supabase is
+// unreachable or the row isn't seeded yet, so /[brand]/[pack] never breaks.
+export async function getRecipesForPack(
+  packSlug: string
+): Promise<Recipe[]> {
+  try {
+    const { getServerSupabase, hasServerSupabase } = await import(
+      "./supabase-server"
+    );
+    if (!hasServerSupabase()) return staticRecipesForPack(packSlug);
+    const supabase = getServerSupabase();
+    const { data, error } = await supabase
+      .from("recipes")
+      .select("data")
+      .eq("pack_slug", packSlug)
+      .eq("is_custom", false);
+    if (error || !data || data.length === 0) {
+      return staticRecipesForPack(packSlug);
+    }
+    return (data as Array<{ data: Recipe }>)
+      .map((row) => row.data)
+      .sort((a, b) => a.number - b.number);
+  } catch (err) {
+    console.warn("[recipes] DB load failed, using static fallback", err);
+    return staticRecipesForPack(packSlug);
+  }
+}
+
+export async function getRecipe(
+  packSlug: string,
+  recipeSlug: string
+): Promise<Recipe | undefined> {
+  try {
+    const { getServerSupabase, hasServerSupabase } = await import(
+      "./supabase-server"
+    );
+    if (!hasServerSupabase()) return staticRecipe(packSlug, recipeSlug);
+    const supabase = getServerSupabase();
+    const { data, error } = await supabase
+      .from("recipes")
+      .select("data")
+      .eq("pack_slug", packSlug)
+      .eq("recipe_slug", recipeSlug)
+      .eq("is_custom", false)
+      .maybeSingle();
+    if (error || !data) return staticRecipe(packSlug, recipeSlug);
+    return (data as { data: Recipe }).data;
+  } catch (err) {
+    console.warn("[recipes] DB load failed, using static fallback", err);
+    return staticRecipe(packSlug, recipeSlug);
+  }
 }

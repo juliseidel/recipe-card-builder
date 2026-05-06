@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: RecipePageProps) {
   const { brand: brandSlug, pack: packSlug, recipe: recipeSlug } = await params;
   const brand = getBrand(brandSlug);
   const pack = getPack(brandSlug, packSlug);
-  const recipe = getRecipe(packSlug, recipeSlug);
+  const recipe = await getRecipe(packSlug, recipeSlug);
 
   if (!brand || !pack) {
     return { title: "Workspace nicht gefunden · Recipe Card Builder" };
@@ -42,8 +42,8 @@ export default async function RecipePage({ params }: RecipePageProps) {
     notFound();
   }
 
-  const staticRecipes = getRecipesForPack(pack.slug);
-  const recipe = getRecipe(packSlug, recipeSlug);
+  const staticRecipes = await getRecipesForPack(pack.slug);
+  const recipe = await getRecipe(packSlug, recipeSlug);
 
   // Static recipe → render directly with shared layout
   if (recipe) {

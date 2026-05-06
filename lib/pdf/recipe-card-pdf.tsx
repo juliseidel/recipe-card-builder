@@ -1451,20 +1451,21 @@ function CardFooter({
   italic?: boolean;
 }) {
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        borderTopWidth: 1,
-        borderTopColor: theme.divider,
-        backgroundColor: "#ffffff",
-        paddingHorizontal: 32,
-        paddingVertical: 10,
-        marginTop: "auto",
-      }}
-      fixed
-    >
+    <>
+      <MicrosStrip recipe={recipe} theme={theme} />
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderTopWidth: 1,
+          borderTopColor: theme.divider,
+          backgroundColor: "#ffffff",
+          paddingHorizontal: 32,
+          paddingVertical: 10,
+        }}
+        fixed
+      >
       <Text
         style={{
           fontFamily: "Fraunces",
@@ -1487,6 +1488,109 @@ function CardFooter({
         {brand.handle} · {pack.title}
         {recipe?.sourceUrl ? `  ·  ${recipe.sourceLabel ?? "Original-Reel"}` : ""}
       </Text>
+      </View>
+    </>
+  );
+}
+
+// Compact micros band for the PDF — same place across all 5 layouts. Sits
+// above the footer in normal flow. Hides if no micros yet.
+function MicrosStrip({
+  recipe,
+  theme,
+}: {
+  recipe?: Recipe;
+  theme: ReturnType<typeof packTheme>;
+}) {
+  const micros = recipe?.nutrition?.micros;
+  if (!micros || micros.length === 0) return null;
+  // Top 8 micros — keeps the strip to one wrapping row even on long recipes
+  const top = [...micros]
+    .sort((a, b) => (b.pctDaily ?? 0) - (a.pctDaily ?? 0))
+    .slice(0, 8);
+
+  return (
+    <View
+      style={{
+        borderTopWidth: 1,
+        borderTopColor: withAlpha(theme.ink, 0.18),
+        backgroundColor: blendWithWhite(theme.bg, 0.78),
+        paddingHorizontal: 32,
+        paddingTop: 8,
+        paddingBottom: 9,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          marginBottom: 4,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 8,
+            fontWeight: 700,
+            letterSpacing: 1.6,
+            color: theme.accent,
+            textTransform: "uppercase",
+          }}
+        >
+          Reich an
+        </Text>
+        <Text
+          style={{
+            fontSize: 6.5,
+            letterSpacing: 1,
+            color: theme.inkSoft,
+            textTransform: "uppercase",
+          }}
+        >
+          Mikronährstoffe pro Portion · % Tagesbedarf
+        </Text>
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: 6,
+        }}
+      >
+        {top.map((m) => (
+          <View
+            key={m.name}
+            style={{
+              flexDirection: "row",
+              alignItems: "baseline",
+              borderWidth: 0.5,
+              borderColor: withAlpha(theme.ink, 0.18),
+              borderRadius: 999,
+              paddingHorizontal: 7,
+              paddingVertical: 2,
+              backgroundColor: "rgba(255,255,255,0.55)",
+              gap: 4,
+            }}
+          >
+            <Text style={{ fontSize: 8, color: theme.ink, fontWeight: 600 }}>
+              {m.name}
+            </Text>
+            <Text style={{ fontSize: 7, color: theme.inkSoft }}>{m.amount}</Text>
+            {m.pctDaily ? (
+              <Text
+                style={{
+                  fontSize: 7,
+                  fontWeight: 700,
+                  color: theme.accent,
+                  marginLeft: 2,
+                }}
+              >
+                {m.pctDaily}%
+              </Text>
+            ) : null}
+          </View>
+        ))}
+      </View>
     </View>
   );
 }

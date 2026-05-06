@@ -36,7 +36,7 @@ export default async function PackPage({ params }: PackPageProps) {
     notFound();
   }
 
-  const recipes = getRecipesForPack(pack.slug);
+  const recipes = await getRecipesForPack(pack.slug);
 
   return (
     <div
