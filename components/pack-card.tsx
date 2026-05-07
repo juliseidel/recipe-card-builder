@@ -28,14 +28,18 @@ export function PackCard({ pack, brand, customPackId }: PackCardProps) {
   const router = useRouter();
 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  // Optimistic state: when set, the card renders nothing immediately —
+  // the user sees instant feedback while the DB delete + workspace
+  // revalidation happen in the background. If the DB call fails the
+  // card pops back into view.
+  const [optimisticallyRemoved, setOptimisticallyRemoved] = useState(false);
   const confirmTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Two-stage delete (matches the recipe-card pattern): first click arms
   // the button (red, "Wirklich löschen?") for 3s, second click commits.
   // Stops Link navigation via stopPropagation since the whole card is a
   // big <Link>.
-  const handleDeleteClick = async (e: React.MouseEvent) => {
+  const handleDeleteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (!customPackId) return;
@@ -48,25 +52,30 @@ export function PackCard({ pack, brand, customPackId }: PackCardProps) {
       );
       return;
     }
-    setDeleting(true);
-    const ok = await removeCustomPack(customPackId);
-    if (!ok) {
-      // Roll the UI back so the user can try again instead of being
-      // stuck in a "lösche…" spinner forever.
-      setDeleting(false);
-      setConfirmingDelete(false);
-      console.error("[pack-card] delete failed for", customPackId);
-      return;
-    }
-    // Drop the workspace's cached server render — without this, the
-    // 30-second revalidate window keeps the deleted pack visible.
-    await fetch("/api/packs/revalidate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brandSlug: brand.slug }),
-    }).catch(() => {});
-    router.refresh();
+    // Optimistic removal — card disappears now, DB call runs in the
+    // background. Feels instant; if Supabase rejects we put the card back.
+    setOptimisticallyRemoved(true);
+    void (async () => {
+      const ok = await removeCustomPack(customPackId);
+      if (!ok) {
+        setOptimisticallyRemoved(false);
+        setConfirmingDelete(false);
+        console.error("[pack-card] delete failed for", customPackId);
+        return;
+      }
+      // Drop the workspace's cached server render — keeps a hard reload
+      // from showing the deleted pack again. router.refresh() pulls the
+      // fresh version into the client.
+      await fetch("/api/packs/revalidate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brandSlug: brand.slug }),
+      }).catch(() => {});
+      router.refresh();
+    })();
   };
+
+  if (optimisticallyRemoved) return null;
 
   return (
     <Link
@@ -104,10 +113,7 @@ export function PackCard({ pack, brand, customPackId }: PackCardProps) {
             <button
               type="button"
               onClick={handleDeleteClick}
-              onMouseLeave={() => {
-                if (!deleting) setConfirmingDelete(false);
-              }}
-              disabled={deleting}
+              onMouseLeave={() => setConfirmingDelete(false)}
               aria-label={
                 confirmingDelete
                   ? "Pack wirklich löschen — nochmal klicken"
@@ -128,24 +134,16 @@ export function PackCard({ pack, brand, customPackId }: PackCardProps) {
                     }
               }
             >
-              {deleting ? (
-                <span className="size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              ) : (
-                <svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden>
-                  <path
-                    d="M3 4h8m-7 0v7a1 1 0 001 1h4a1 1 0 001-1V4M5.5 4V2.5h3V4M6 6.5v3M8 6.5v3"
-                    stroke="currentColor"
-                    strokeWidth="1.4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              )}
-              {deleting
-                ? "Lösche…"
-                : confirmingDelete
-                ? "Wirklich?"
-                : "Löschen"}
+              <svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden>
+                <path
+                  d="M3 4h8m-7 0v7a1 1 0 001 1h4a1 1 0 001-1V4M5.5 4V2.5h3V4M6 6.5v3M8 6.5v3"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              {confirmingDelete ? "Wirklich?" : "Löschen"}
             </button>
           ) : null}
         </div>
