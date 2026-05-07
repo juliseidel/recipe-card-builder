@@ -16,7 +16,6 @@ const fontClassMap: Record<Pack["displayFont"], string> = {
 
 export function PackCard({ pack, brand }: PackCardProps) {
   const fontClass = fontClassMap[pack.displayFont];
-  const orderLabel = String(pack.number).padStart(2, "0");
 
   return (
     <Link
@@ -28,14 +27,9 @@ export function PackCard({ pack, brand }: PackCardProps) {
         boxShadow: "var(--shadow-card)",
       }}
     >
-      {/* Top row: Pack number + edge case badge */}
-      <div className="flex items-start justify-between gap-3 px-6 pt-5">
-        <span
-          className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em]"
-          style={{ color: pack.mood.inkSoft }}
-        >
-          Pack {orderLabel}
-        </span>
+      {/* Top row: recipe-count badge only — pack-number prefix removed
+          per the editor cleanup, recipe-count carries the same context. */}
+      <div className="flex items-start justify-end gap-3 px-6 pt-5">
         <span
           className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em]"
           style={{

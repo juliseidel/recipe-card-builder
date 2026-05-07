@@ -17,7 +17,6 @@ const fontClassMap: Record<Pack["displayFont"], string> = {
 
 export function PackCover({ brand, pack, totalRecipes }: PackCoverProps) {
   const fontClass = fontClassMap[pack.displayFont];
-  const orderLabel = String(pack.number).padStart(2, "0");
 
   return (
     <section
@@ -58,7 +57,7 @@ export function PackCover({ brand, pack, totalRecipes }: PackCoverProps) {
                 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em]"
                 style={{ color: pack.mood.inkSoft }}
               >
-                Pack {orderLabel} · {pack.category}
+                {pack.category}
               </span>
             </div>
 

@@ -1,99 +1,81 @@
 import type { Pack } from "@/lib/packs";
-import type { Brand } from "@/lib/brands";
 import { generateImage, downloadImage } from "./bfl-flux";
 
-// Pack-cover prompts are simpler than per-recipe heroes: we don't have a
-// dish to photograph, just a "mood image" that captures the pack's category.
-// Editorial cookbook aesthetic, soft natural light, props that hint at the
-// pack's category without spelling it out.
-//
-// We pass the pack title + tagline + category to Flux through the prompt and
-// rely on its text-grounded model to compose a still life that reads like a
-// magazine cover. Mood colour + biene-style backdrop come from the pack
-// metadata so each generated cover sits inside the pack's own palette.
+// Pack covers are styled exactly like the curated pack-1..pack-5 images:
+// a single dish on a flat coloured backdrop matching the pack's mood,
+// shot from above. We deliberately don't dictate the dish — we feed Flux
+// the pack title + tagline and let it pick something thematically right
+// (so "7 Tage Frühstück" gets a breakfast scene, "Bienes Backwelt" gets a
+// cake, etc.) instead of hardcoding category mappings that always drift
+// in edge cases.
 
 type PackCoverInput = {
   pack: Pack;
-  brand: Brand;
 };
 
-function paletteHint(pack: Pack): string {
-  // Flux responds well to literal hex codes plus a colloquial colour word.
-  // The more specific the hint, the closer the result lands to the rest of
-  // the pack — a generic "warm tones" prompt drifts a lot.
-  const hex = pack.mood.background;
-  const word = colourWord(hex);
-  return `dominant palette: ${hex} (${word}), soft cream highlights, muted natural tones`;
-}
-
+// Hex → English colour word so Flux's text encoder anchors the backdrop
+// colour properly. Without the word the model treats the hex as noise.
 function colourWord(hex: string): string {
-  // Tiny lookup keyed off Biene's preset palette. Falls back to "warm" so we
-  // never leave the prompt empty for custom-mood packs with arbitrary hex.
   const map: Record<string, string> = {
-    "#ddc9e8": "lavender",
+    "#ddc9e8": "lavender purple",
     "#c8e2a8": "sage green",
-    "#b8dcc9": "mint",
+    "#b8dcc9": "mint green",
     "#b4cde4": "sky blue",
-    "#f4d88d": "honey",
-    "#f3cdd3": "soft rose",
+    "#f4d88d": "honey yellow",
+    "#f3cdd3": "soft rose pink",
     "#f7d4b8": "apricot",
-    "#e0cdb6": "cocoa cream",
+    "#e0cdb6": "cocoa cream beige",
   };
-  return map[hex.toLowerCase()] ?? "warm pastel";
-}
-
-function categoryProps(pack: Pack): string {
-  // Pack category → still-life prop hint. Generic enough to not constrain
-  // composition, specific enough to read on the cover.
-  const cat = pack.category.toLowerCase();
-  if (cat.includes("back") || cat.includes("dessert"))
-    return "a wooden cake stand with one elegant slice, fresh berries, dusted icing sugar, vintage pastry fork";
-  if (cat.includes("snack"))
-    return "small ceramic bowls with bite-sized treats, cocoa nibs scattered, linen napkin";
-  if (cat.includes("haupt") || cat.includes("klassik"))
-    return "a generous plated main on a stoneware plate, fresh herbs scattered, a worn linen napkin";
-  if (cat.includes("meal") || cat.includes("woche") || cat.includes("prep"))
-    return "neat glass meal-prep containers in a row, mixed proteins and vegetables, planner notebook in soft focus";
-  if (cat.includes("diät") || cat.includes("volumen") || cat.includes("fitness"))
-    return "a generous bowl of vibrant salad with grilled chicken and avocado, lemon halves, kitchen towel";
-  if (cat.includes("frühstück"))
-    return "an overnight-oats glass with berries, a wooden spoon, sliced banana, soft morning light";
-  return "a styled flat-lay of ingredients suggesting the dish, herbs and a linen napkin";
+  return map[hex.toLowerCase()] ?? "soft pastel";
 }
 
 export async function generatePackCover(input: PackCoverInput): Promise<{
   buffer: Buffer;
   contentType: "image/jpeg";
 }> {
-  const { pack, brand } = input;
-  const prompt = [
-    `Editorial cookbook cover photography, magazine still life style.`,
-    `Subject: ${categoryProps(pack)}.`,
-    `Mood: ${pack.tagline || pack.title}, captures the spirit of "${pack.title}" by ${brand.name}.`,
-    `${paletteHint(pack)}.`,
-    `Soft diffused natural daylight from upper left, gentle shadows, no harsh highlights.`,
-    `Composition: vertical 4:5 frame, generous negative space at the top for a future title overlay, dish slightly off-center for editorial feel.`,
-    `Texture: real food, real props, slight imperfection, no plastic look. Shot on a 50mm, shallow depth of field, slight grain.`,
-    `Style: Bon Appétit + Kinfolk cookbook aesthetic, warm and inviting, NOT clinical, NOT studio harsh.`,
-  ].join(" ");
+  const { pack } = input;
+  const bgHex = pack.mood.background;
+  const bgWord = colourWord(bgHex);
 
+  // Minimal prompt. The dish is implied from the pack name — Flux is good
+  // enough at "what dish fits this title" that we don't need to micromanage.
+  // Hard rules: solid coloured backdrop in the pack mood, no text anywhere,
+  // top-down, single dish, real food.
+  const prompt = [
+    `Top-down food photography on a completely solid ${bgWord} (${bgHex}) painted backdrop.`,
+    `One single beautiful dish that fits the theme "${pack.title}".`,
+    pack.tagline ? `Vibe: ${pack.tagline}.` : "",
+    `The entire background is the ${bgWord} colour, edge to edge — no other surfaces, no table texture, no objects bleeding in.`,
+    `Soft diffused natural daylight, gentle shadow underneath the dish.`,
+    `Composition: dish centred, square 1:1 frame.`,
+    `Real food, modern cookbook plating, slight imperfection, NO TEXT anywhere in the image.`,
+    `Style: Bon Appétit cookbook aesthetic, clean and inviting.`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  // Negatives are blunt — Flux Pro respects them well when the positive
+  // prompt is short. Text is at the front because that's the failure we
+  // see most: Flux loves to hallucinate cookbook titles.
   const negative = [
-    `text, watermark, logo, signage, written words, captions`,
-    `cartoon, illustration, 3D render, CGI, AI artifacts`,
-    `harsh studio lighting, overexposed highlights, clipped shadows`,
-    `plastic-looking food, fake gloss, oversaturated colours`,
-    `multiple plates fighting for attention, cluttered composition`,
-    `dirty surfaces, untidy props, messy backgrounds`,
-    `human hands, faces, body parts`,
+    `text, words, letters, captions, titles, written language, signage, watermark, logo`,
+    `wooden table, marble surface, tablecloth, bleeding background, complex texture`,
+    `multiple plates, multiple bowls, cluttered scene`,
+    `human hands, fingers, faces, body parts`,
+    `plastic food, glossy fake food, oversaturated, garish`,
+    `illustration, painting, drawing, 3D render, CGI, cartoon, AI artifacts`,
+    `harsh studio lighting, blown highlights, deep clipped shadows`,
+    `dirty plates, messy crumbs, stained surface`,
   ].join(", ");
 
   const result = await generateImage({
     prompt,
     negativePrompt: negative,
     model: "flux-2-pro",
-    // 4:5 portrait — matches the pack-cover aspect on the workspace + cover
-    // page. Falls back to 3:4 if BFL doesn't accept 4:5 in this revision.
-    aspectRatio: "3:4",
+    // 1:1 — same shape as the curated pack-1..pack-5 images. Display layouts
+    // (3/4 cover, 4/3.4 card) crop into it via object-cover. Square also
+    // gives Flux room to centre the dish without weird vertical cropping.
+    aspectRatio: "1:1",
     outputFormat: "jpeg",
     safetyTolerance: 2,
   });

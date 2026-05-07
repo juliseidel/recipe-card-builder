@@ -2,7 +2,6 @@ import { NextResponse, after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { generatePackCover } from "@/lib/ai/generate-pack-cover";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
-import { getBrand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
 
 // Async pack-cover generation — analogous to /api/recipes/enrich but for
@@ -62,12 +61,6 @@ export async function POST(req: Request) {
   }
 
   const pack = row.data as Pack;
-  const brandSlug = (row.brand_slug as string) || "biene";
-  const brand = getBrand(brandSlug);
-
-  if (!brand) {
-    return NextResponse.json({ error: "Brand not found" }, { status: 404 });
-  }
 
   // Skip if cover already looks AI-generated (URL points at our bucket) — the
   // user might re-trigger by editing, we don't want to burn another Flux
@@ -84,7 +77,7 @@ export async function POST(req: Request) {
 
   after(async () => {
     try {
-      const { buffer } = await generatePackCover({ pack, brand });
+      const { buffer } = await generatePackCover({ pack });
       await ensureCoverBucket(supabase);
       const filePath = `${row.id}.jpg`;
       const upload = await supabase.storage
