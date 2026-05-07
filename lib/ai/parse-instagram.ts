@@ -7,7 +7,7 @@ import type {
 
 // Was wir aus einer Instagram-Caption extrahieren wollen. Spiegelt die Felder
 // des Editor-Forms (app/[brand]/[pack]/new/page.tsx) — alles, was der User
-// eintippen wuerde, soll Gemini fuellen koennen, plus ein Confidence-Signal,
+// eintippen würde, soll Gemini füllen können, plus ein Confidence-Signal,
 // damit die UI dem Nutzer zeigen kann, wie sicher die KI war.
 export type ParsedInstagramRecipe = {
   title: string;
@@ -29,7 +29,7 @@ export type ParsedInstagramRecipe = {
   nutritionBasis: NutritionBasis;
   /** Wie sicher Gemini sich beim Parsen war. low = kaum erkennbar. */
   confidence: "high" | "medium" | "low";
-  /** Eine kurze Erklaerung fuer den User, was nicht oder unklar erkannt wurde. */
+  /** Eine kurze Erklärung für den User, was nicht oder unklar erkannt wurde. */
   notes: string | null;
 };
 
@@ -70,7 +70,7 @@ const RESPONSE_SCHEMA = {
     servings: {
       type: "integer",
       description:
-        "Anzahl Portionen / Stueck. Wenn 'fuer 12 Cookies' → 12. Wenn 'fuer 2 Personen' → 2. Default 2.",
+        "Anzahl Portionen / Stück. Wenn 'für 12 Cookies' → 12. Wenn 'für 2 Personen' → 2. Default 2.",
     },
     tags: {
       type: "array",
@@ -88,7 +88,7 @@ const RESPONSE_SCHEMA = {
           amount: {
             type: "string",
             description:
-              "Menge mit Einheit, z. B. '200 g', '1 EL', '2 Stueck'. Bei unklarer Menge 'n. A.'",
+              "Menge mit Einheit, z. B. '200 g', '1 EL', '2 Stück'. Bei unklarer Menge 'n. A.'",
           },
           name: {
             type: "string",
@@ -143,18 +143,18 @@ const RESPONSE_SCHEMA = {
       type: "string",
       enum: ["portion", "piece", "per100g", "total"],
       description:
-        "Worauf beziehen sich die Naehrwerte. 'portion' = pro Portion, 'piece' = pro Stueck (z. B. Cookie/Muffin), 'per100g' = pro 100 g, 'total' = gesamtes Rezept.",
+        "Worauf beziehen sich die Nährwerte. 'portion' = pro Portion, 'piece' = pro Stück (z. B. Cookie/Muffin), 'per100g' = pro 100 g, 'total' = gesamtes Rezept.",
     },
     confidence: {
       type: "string",
       enum: ["high", "medium", "low"],
       description:
-        "Wie sicher du dir beim Parsen bist. 'high' = klare Liste mit Mengen + Schritten. 'medium' = Rezept erkennbar aber Luecken. 'low' = kein eindeutiges Rezept in der Caption.",
+        "Wie sicher du dir beim Parsen bist. 'high' = klare Liste mit Mengen + Schritten. 'medium' = Rezept erkennbar aber Lücken. 'low' = kein eindeutiges Rezept in der Caption.",
     },
     notes: {
       type: "string",
       description:
-        "1 Satz fuer den User, was nicht / unklar erkennbar war. Z. B. 'Naehrwerte fehlen in der Caption — bitte ergaenzen.'. Leerer String wenn alles klar.",
+        "1 Satz für den User, was nicht / unklar erkennbar war. Z. B. 'Nährwerte fehlen in der Caption — bitte ergänzen.'. Leerer String wenn alles klar.",
     },
   },
   required: [
@@ -178,26 +178,26 @@ const RESPONSE_SCHEMA = {
   ],
 };
 
-const SYSTEM_INSTRUCTION = `Du bist ein praeziser Rezept-Parser fuer Instagram-Captions deutscher Food-Creator (Schwerpunkt: Bienesfitlife, Fitness-Backwerk, MORE Nutrition).
+const SYSTEM_INSTRUCTION = `Du bist ein präziser Rezept-Parser für Instagram-Captions deutscher Food-Creator (Schwerpunkt: Bienesfitlife, Fitness-Backwerk, MORE Nutrition).
 
 Deine Aufgabe: Aus der Caption ein vollstaendiges, druckfertiges Rezept extrahieren — strukturiert nach dem JSON-Schema.
 
 Regeln:
 • ALLES auf Deutsch — Zutaten, Schritte, Tags, Beschreibung. Auch wenn Caption Englisch sprenkelt.
-• MENGEN exakt aus der Caption uebernehmen ('200 g', '1 EL', '2 Eier'). Wenn unklar: 'n. A.'
+• MENGEN exakt aus der Caption übernehmen ('200 g', '1 EL', '2 Eier'). Wenn unklar: 'n. A.'
 • Schritte als kurze, klare Saetze (du-Form, gerne imperativ: 'Vermische die Zutaten').
 • Hashtags und Affiliate-Codes ('Code BIENE') NICHT in description — die gehoeren weg.
-• Naehrwerte aus Caption uebernehmen ('✅ 394 kcal · 31g Protein'). Wenn nicht da: alle 0 + notes-Hinweis.
-• nutritionBasis: 'piece' bei Backwerk wo pro Stueck angegeben (Cookie, Muffin, Pancake). 'portion' default. 'per100g' wenn explizit '/100 g'.
+• Nährwerte aus Caption übernehmen ('✅ 394 kcal · 31g Protein'). Wenn nicht da: alle 0 + notes-Hinweis.
+• nutritionBasis: 'piece' bei Backwerk wo pro Stück angegeben (Cookie, Muffin, Pancake). 'portion' default. 'per100g' wenn explizit '/100 g'.
 • Tags: 3-6 thematische Schlagworte ('High Protein', 'Mealprep', 'Ohne Backen'). NIE mit '#'-Prefix. Marken nur wenn relevant ('MORE Nutrition' nicht als Tag).
 • subtitle: nur wenn die Caption einen offensichtlichen Untertitel hat (z. B. nach dem Titel ein Stichpunkt-Satz). Sonst leer.
 • description: 1-3 Saetze, Bienes warmer Ton, du-Form, ohne Hashtag-Salat.
 • Sub-Gruppen ('Fuer den Teig:', 'Fuer die Glasur:'): explizit als group-Feld bei Zutaten UND Schritten markieren.
 • confidence:
-  - 'high' wenn klare Zutatenliste + nummerierte Schritte + Naehrwerte
-  - 'medium' wenn Rezept erkennbar aber Luecken (z. B. keine Naehrwerte)
-  - 'low' wenn die Caption ueberwiegend Story / Werbung ist und kaum Rezept-Info
-• Antworte AUSSCHLIESSLICH im JSON-Schema — keine Erklaerungen davor oder dahinter.`;
+  - 'high' wenn klare Zutatenliste + nummerierte Schritte + Nährwerte
+  - 'medium' wenn Rezept erkennbar aber Lücken (z. B. keine Nährwerte)
+  - 'low' wenn die Caption überwiegend Story / Werbung ist und kaum Rezept-Info
+• Antworte AUSSCHLIESSLICH im JSON-Schema — keine Erklärungen davor oder dahinter.`;
 
 const URL_REGEX = /https?:\/\/[^\s)]+/g;
 const HASHTAG_LINE_REGEX = /(^|\n)\s*(?:#\w+\s*)+(?:\n|$)/g;
@@ -228,7 +228,7 @@ export async function parseRecipeFromCaption(
     return {
       ok: false,
       error:
-        "Caption zu kurz fuer ein Rezept. Wahrscheinlich nur Story / Bildunterschrift.",
+        "Caption zu kurz für ein Rezept. Wahrscheinlich nur Story / Bildunterschrift.",
     };
   }
 
@@ -286,7 +286,7 @@ function normalizeParsed(raw: RawGeminiResponse): ParsedInstagramRecipe {
   const cookTime =
     raw.cookTime && raw.cookTime > 0 ? Math.floor(raw.cookTime) : null;
 
-  // Difficulty: Gemini kann manchmal Varianten zurueckgeben, defensiv eingrenzen
+  // Difficulty: Gemini kann manchmal Varianten zurückgeben, defensiv eingrenzen
   const difficulty: "Einfach" | "Mittel" | "Aufwendig" = (
     ["Einfach", "Mittel", "Aufwendig"] as const
   ).includes(raw.difficulty as never)

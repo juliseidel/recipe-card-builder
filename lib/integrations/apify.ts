@@ -1,12 +1,12 @@
-// Apify-Client fuer Instagram-Post-Scraping. Wir nutzen den "instagram-post-
+// Apify-Client für Instagram-Post-Scraping. Wir nutzen den "instagram-post-
 // scraper" Actor und den synchronen "run-sync-get-dataset-items"-Endpoint:
 // schickt einen Run los, wartet bis Apify fertig ist, gibt das Dataset direkt
-// zurueck. Kein Polling-Loop noetig, kein eigener Job-State.
+// zurück. Kein Polling-Loop noetig, kein eigener Job-State.
 //
 // Docs: https://apify.com/apify/instagram-post-scraper
 
 const APIFY_BASE = "https://api.apify.com/v2";
-// Apify-Actor-ID fuer den Instagram-Scraper. "~"-Form (statt "/") weil
+// Apify-Actor-ID für den Instagram-Scraper. "~"-Form (statt "/") weil
 // die Apify-API in URL-Pfaden Tilden statt Slashes erwartet.
 //
 // Wir nutzen "instagram-scraper" (den universellen, nicht
@@ -20,7 +20,7 @@ export type InstagramPost = {
   caption: string;
   /** Hauptbild-URL (CDN, public). Bei Reels: Cover-Frame. */
   displayUrl: string | null;
-  /** URL des Posts selbst — fuer Source-Attribution. */
+  /** URL des Posts selbst — für Source-Attribution. */
   postUrl: string;
   /** @username des Erstellers (z. B. "bienesfitlife"). */
   ownerUsername: string | null;
@@ -54,7 +54,7 @@ export function normalizeInstagramUrl(raw: string): string | null {
   let url = raw.trim();
   if (!url) return null;
 
-  // Schema haendisch ergaenzen wenn der User nur "instagram.com/p/..." kopiert.
+  // Schema händisch ergänzen wenn der User nur "instagram.com/p/..." kopiert.
   if (!/^https?:\/\//i.test(url)) {
     url = `https://${url}`;
   }
@@ -79,7 +79,7 @@ export function normalizeInstagramUrl(raw: string): string | null {
   if (!/^[A-Za-z0-9_-]+$/.test(code ?? "")) return null;
   if (!["p", "reel", "reels", "tv"].includes(type)) return null;
 
-  // Wir kanonisieren auf /p/<code>/ — Apify akzeptiert das fuer Reels und
+  // Wir kanonisieren auf /p/<code>/ — Apify akzeptiert das für Reels und
   // Posts gleichermassen, und es haelt den Cache-Key konsistent.
   return `https://www.instagram.com/${type}/${code}/`;
 }
@@ -95,7 +95,7 @@ export async function scrapeInstagramPost(
   const normalized = normalizeInstagramUrl(url);
   if (!normalized) {
     throw new ApifyError(
-      "Das ist keine gueltige Instagram-URL. Erwartet: instagram.com/p/... oder /reel/..."
+      "Das ist keine gültige Instagram-URL. Erwartet: instagram.com/p/... oder /reel/..."
     );
   }
 
@@ -115,8 +115,8 @@ export async function scrapeInstagramPost(
   };
 
   // Timeout: 55 s. Apify-Actors haben Cold-Starts, die bis zu ~45 s dauern
-  // koennen. Vercel-Lambda-Limit liegt bei 60 s, also lassen wir uns 55 s
-  // geben und 5 s Puffer fuer Gemini-Parsing + Response-Marshalling.
+  // können. Vercel-Lambda-Limit liegt bei 60 s, also lassen wir uns 55 s
+  // geben und 5 s Puffer für Gemini-Parsing + Response-Marshalling.
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 55_000);
 
@@ -133,7 +133,7 @@ export async function scrapeInstagramPost(
     const isAbort = (err as Error).name === "AbortError";
     throw new ApifyError(
       isAbort
-        ? "Apify-Cold-Start dauert gerade laenger als ueblich. Klick einfach nochmal auf 'Rezept importieren' — der zweite Versuch geht meist in 5-10 Sekunden durch."
+        ? "Apify-Cold-Start dauert gerade länger als üblich. Klick einfach nochmal auf 'Rezept importieren' — der zweite Versuch geht meist in 5-10 Sekunden durch."
         : `Netzwerk-Fehler: ${(err as Error).message}`
     );
   }
@@ -152,7 +152,7 @@ export async function scrapeInstagramPost(
     }
     if (res.status === 402) {
       throw new ApifyError(
-        "Apify-Limit erreicht. Bitte spaeter erneut versuchen oder Free-Tier upgraden.",
+        "Apify-Limit erreicht. Bitte später erneut versuchen oder Free-Tier upgraden.",
         402,
         errText
       );
@@ -177,14 +177,14 @@ export async function scrapeInstagramPost(
 
   if (!Array.isArray(items) || items.length === 0) {
     throw new ApifyError(
-      "Apify hat keinen Post zurueckgeliefert. Eventuell ist der Post privat oder geloescht."
+      "Apify hat keinen Post zurückgeliefert. Eventuell ist der Post privat oder gelöscht."
     );
   }
 
   const item = items[0];
 
-  // Apify gibt bei privaten / geloeschten Posts oft ein Item mit error-Feld
-  // zurueck statt eines HTTP-Errors.
+  // Apify gibt bei privaten / gelöschten Posts oft ein Item mit error-Feld
+  // zurück statt eines HTTP-Errors.
   if (item.error || item.errorDescription) {
     throw new ApifyError(
       item.errorDescription ?? item.error ?? "Post nicht erreichbar."
