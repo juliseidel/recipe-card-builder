@@ -96,8 +96,12 @@ export function BrandHero({ brand }: BrandHeroProps) {
             </div>
           </div>
 
+          {/* Stats-Block: auf Mobile als 2-Spalten-Grid (vier Stats in 2x2),
+              ab sm wieder als Flex-Row mit vertikalen Dividern. So passt
+              der Block auch in einen 375-px-iPhone-Viewport, ohne dass
+              "Live" rechts abgeschnitten wird. Desktop-Layout unverändert. */}
           <div
-            className="flex items-stretch gap-6 rounded-2xl border px-5 py-4"
+            className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-2xl border px-5 py-4 sm:flex sm:items-stretch sm:gap-6"
             style={{
               borderColor: brand.tokens.line,
               background: brand.tokens.surface,
@@ -162,7 +166,9 @@ function Stat({
 function Divider({ brand }: { brand: Brand }) {
   return (
     <span
-      className="h-9 w-px self-center"
+      // Versteckt auf Mobile (Grid-Layout braucht keine Trennstriche),
+      // ab sm wieder sichtbar als vertikale Trennlinie zwischen den Stats.
+      className="hidden h-9 w-px self-center sm:block"
       style={{ background: brand.tokens.line }}
     />
   );
