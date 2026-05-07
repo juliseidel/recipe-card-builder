@@ -1947,12 +1947,15 @@ function FullCardPreview({
       }}
     >
       <div
-        // Force a Desktop-class viewport for the inner card so its lg:
-        // breakpoints fire (split title/photo, multi-column body, etc.)
-        // even though the sidebar is narrow. The outer `zoom` then
-        // shrinks the rendered pixels to fit.
+        // Erzwingt einen Desktop-Viewport für die innere Karte (1100 px
+        // breit), damit ihre lg:-Breakpoints feuern (Split-Titel/Foto,
+        // 2-Spalten-Body etc.). Der Outer-Zoom skaliert die gerenderten
+        // Pixel auf das Sidebar-Maß runter:
+        //   - Mobile: 0.32 (1100 × 0.32 = 352 px) — passt in Mobile-Viewport
+        //   - sm+: 0.5 (1100 × 0.5 = 550 px) — wie bisher in der Editor-
+        //     Sidebar.
+        className="[zoom:0.32] sm:[zoom:0.5]"
         style={{
-          zoom: 0.5,
           width: "1100px",
         }}
       >
