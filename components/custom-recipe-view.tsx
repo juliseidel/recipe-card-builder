@@ -31,6 +31,13 @@ export function CustomRecipeView({
   const [recipe, setRecipe] = useState<CustomRecipe | null>(null);
   const [allRecipes, setAllRecipes] = useState<(Recipe | CustomRecipe)[]>([]);
   const [loaded, setLoaded] = useState(false);
+  // What's still being generated in the background. We track each piece
+  // independently so the UI can show "Mikros ✓ · Bild noch …" once the
+  // faster Gemini call returns and the slow Flux call is still running.
+  const [pending, setPending] = useState<{ micros: boolean; hero: boolean }>({
+    micros: false,
+    hero: false,
+  });
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const confirmTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -54,6 +61,7 @@ export function CustomRecipeView({
       // load), so we wait for both before stopping.
       const hasMicros = (found?.nutrition?.micros?.length ?? 0) > 0;
       const hasHero = Boolean(found?.hero);
+      setPending({ micros: !hasMicros, hero: !hasHero });
       return hasMicros && hasHero;
     };
 
@@ -64,6 +72,10 @@ export function CustomRecipeView({
       // 50 attempts × 2.5 s ≈ 125 s — covers a slow Flux render.
       if (attempts++ < 50) {
         pollTimer = setTimeout(tick, 2500);
+      } else {
+        // Timeout: stop showing "is generating" to avoid lying to the user.
+        // The hero / micros may still arrive on a later refresh.
+        setPending({ micros: false, hero: false });
       }
     };
 
@@ -202,16 +214,80 @@ export function CustomRecipeView({
     </button>
   );
 
+  // Background-enrichment toast. Only visible while Gemini micros or the
+  // Flux hero are still in flight after a save. Shows the user what's
+  // actually happening so they know a half-rendered card is mid-process,
+  // not broken.
+  const enrichingToast =
+    pending.micros || pending.hero ? (
+      <div
+        className="fixed left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full border bg-white/95 px-5 py-2.5 shadow-[0_8px_30px_rgba(0,0,0,0.15)] backdrop-blur-md"
+        style={{
+          bottom: 24,
+          borderColor: pack.mood.ink + "1f",
+        }}
+        role="status"
+        aria-live="polite"
+      >
+        <span
+          className="size-3.5 animate-spin rounded-full border-[2px] border-t-transparent"
+          style={{
+            borderColor: pack.mood.accent + "30",
+            borderTopColor: pack.mood.accent,
+          }}
+          aria-hidden
+        />
+        <span
+          className="text-[12.5px] font-medium leading-none"
+          style={{ color: pack.mood.ink }}
+        >
+          {pending.micros && pending.hero ? (
+            <>
+              Mikronährstoffe + Bild werden generiert
+              <span
+                className="ml-1.5 font-mono"
+                style={{ color: pack.mood.inkSoft }}
+              >
+                · ca. 30–60 Sek
+              </span>
+            </>
+          ) : pending.hero ? (
+            <>
+              <span style={{ color: pack.mood.accent }}>✓</span>{" "}
+              Mikronährstoffe ·{" "}
+              <span style={{ color: pack.mood.ink }}>Bild wird generiert</span>
+              <span
+                className="ml-1.5 font-mono"
+                style={{ color: pack.mood.inkSoft }}
+              >
+                · gleich fertig
+              </span>
+            </>
+          ) : (
+            <>
+              <span style={{ color: pack.mood.accent }}>✓</span> Bild ·{" "}
+              <span style={{ color: pack.mood.ink }}>
+                Mikronährstoffe werden berechnet
+              </span>
+            </>
+          )}
+        </span>
+      </div>
+    ) : null;
+
   return (
-    <RecipeDetailLayout
-      brand={brand}
-      pack={pack}
-      recipe={recipe}
-      totalRecipes={allRecipes.length}
-      previous={previous}
-      next={next}
-      isCustom
-      deleteAction={deleteAction}
-    />
+    <>
+      <RecipeDetailLayout
+        brand={brand}
+        pack={pack}
+        recipe={recipe}
+        totalRecipes={allRecipes.length}
+        previous={previous}
+        next={next}
+        isCustom
+        deleteAction={deleteAction}
+      />
+      {enrichingToast}
+    </>
   );
 }
