@@ -114,8 +114,11 @@ export async function scrapeInstagramPost(
     resultsLimit: 1,
   };
 
+  // Timeout: 55 s. Apify-Actors haben Cold-Starts, die bis zu ~45 s dauern
+  // koennen. Vercel-Lambda-Limit liegt bei 60 s, also lassen wir uns 55 s
+  // geben und 5 s Puffer fuer Gemini-Parsing + Response-Marshalling.
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 45_000);
+  const timeout = setTimeout(() => controller.abort(), 55_000);
 
   let res: Response;
   try {
@@ -130,7 +133,7 @@ export async function scrapeInstagramPost(
     const isAbort = (err as Error).name === "AbortError";
     throw new ApifyError(
       isAbort
-        ? "Apify-Anfrage hat zu lange gedauert (>45 s). Bitte erneut versuchen."
+        ? "Apify-Cold-Start dauert gerade laenger als ueblich. Klick einfach nochmal auf 'Rezept importieren' — der zweite Versuch geht meist in 5-10 Sekunden durch."
         : `Netzwerk-Fehler: ${(err as Error).message}`
     );
   }
