@@ -29,10 +29,12 @@ import { IngredientCombobox } from "@/components/ingredient-combobox";
 // nested drag-drop UX.
 type IngredientRow =
   | { kind: "header"; name: string }
+  | { kind: "reset" } // explicit "back to main group" marker
   | { kind: "item"; amount: string; name: string };
 
 type StepRow =
   | { kind: "header"; name: string }
+  | { kind: "reset" }
   | { kind: "step"; text: string };
 
 type NewRecipePageProps = {
@@ -79,13 +81,16 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   );
 
   // Walk the ingredient rows once: track the current group header and
-  // attach it as `group` to every subsequent item until the next header.
+  // attach it as `group` to every subsequent item until the next header
+  // or reset marker.
   const builtIngredients: Ingredient[] = useMemo(() => {
     let currentGroup: string | null = null;
     const out: Ingredient[] = [];
     for (const row of ingredientRows) {
       if (row.kind === "header") {
         currentGroup = row.name.trim() || null;
+      } else if (row.kind === "reset") {
+        currentGroup = null;
       } else if (row.amount.trim() || row.name.trim()) {
         out.push({
           amount: row.amount.trim(),
@@ -103,6 +108,8 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     for (const row of stepRows) {
       if (row.kind === "header") {
         currentGroup = row.name.trim() || null;
+      } else if (row.kind === "reset") {
+        currentGroup = null;
       } else if (row.text.trim()) {
         out.push({
           text: row.text.trim(),
@@ -297,14 +304,15 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     ]);
     setFocusedIngredientIdx(idx + 1);
   };
-  // "Back to main group" — appends an empty header (which resets the active
-  // group to null at save time) plus a fresh empty item. The empty header
-  // renders as a subtle "Hauptgruppe"-divider so the user sees what
-  // happened.
+  // "Back to main group" — appends an explicit `reset` marker (rendered as
+  // a subtle "Hauptgruppe"-divider) plus a fresh empty item. Distinct from
+  // an empty `header` row, which would render as a blank named-group input
+  // — that confused users who clicked "+ Gruppe" and expected to type a
+  // name immediately.
   const addIngredientItemMainGroup = () => {
     setIngredientRows((prev) => [
       ...prev,
-      { kind: "header", name: "" },
+      { kind: "reset" },
       { kind: "item", amount: "", name: "" },
     ]);
     setFocusedIngredientIdx(ingredientRows.length + 1);
@@ -335,7 +343,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   const addStepItemMainGroup = () => {
     setStepRows((prev) => [
       ...prev,
-      { kind: "header", name: "" },
+      { kind: "reset" },
       { kind: "step", text: "" },
     ]);
   };
@@ -343,15 +351,16 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   // Walk both lists once to find the currently active (last non-empty)
   // group. The "+ Zutat" / "+ Schritt" buttons use this to label
   // themselves accurately ("zur Gruppe Glasur") and to decide whether the
-  // "Hauptgruppe"-escape button is needed.
-  function activeGroup<T extends { kind: "header"; name: string } | { kind: string }>(
-    rows: T[]
-  ): string | null {
+  // "Hauptgruppe"-escape button is needed. Reset rows clear the active
+  // group back to null.
+  function activeGroup<T extends { kind: string }>(rows: T[]): string | null {
     let g: string | null = null;
     for (const row of rows) {
       if (row.kind === "header") {
-        const name = (row as { name: string }).name.trim();
+        const name = ((row as { name?: string }).name ?? "").trim();
         g = name || null;
+      } else if (row.kind === "reset") {
+        g = null;
       }
     }
     return g;
@@ -733,6 +742,15 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                       />
                     );
                   }
+                  if (row.kind === "reset") {
+                    return (
+                      <MainGroupReset
+                        key={idx}
+                        pack={pack}
+                        onRemove={() => removeIngredientRow(idx)}
+                      />
+                    );
+                  }
                   const isFocused = focusedIngredientIdx === idx;
                   return (
                     <div
@@ -894,6 +912,15 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                         onRemove={() => removeStepRow(idx)}
                         pack={pack}
                         kind="step"
+                      />
+                    );
+                  }
+                  if (row.kind === "reset") {
+                    return (
+                      <MainGroupReset
+                        key={idx}
+                        pack={pack}
+                        onRemove={() => removeStepRow(idx)}
                       />
                     );
                   }
@@ -1238,54 +1265,6 @@ function GroupSeparator({
       ? "z. B. Glasur zubereiten, Variante mit Schoko"
       : "z. B. Für den Teig, Glasur, Topping";
 
-  // Reset / "Hauptgruppe" marker: the empty header that gets inserted by
-  // the "+ Zutat (Hauptgruppe)" escape button. Show it as a subtle
-  // dashed divider so the user knows the next items aren't in any group.
-  if (value.trim() === "") {
-    return (
-      <div className="my-1 flex items-center gap-3 py-1">
-        <div
-          className="h-px flex-1"
-          style={{
-            background: `repeating-linear-gradient(to right, ${pack.mood.ink}33 0 4px, transparent 4px 8px)`,
-          }}
-          aria-hidden
-        />
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && onSubmit) {
-              e.preventDefault();
-              onSubmit();
-            }
-          }}
-          placeholder="Hauptgruppe (klick um zu benennen)"
-          className="min-w-0 max-w-[16rem] flex-shrink bg-transparent text-center font-mono text-[10px] font-semibold uppercase tracking-[0.18em] outline-none placeholder:opacity-60"
-          style={{ color: pack.mood.inkSoft }}
-          aria-label="Gruppe benennen"
-        />
-        <div
-          className="h-px flex-1"
-          style={{
-            background: `repeating-linear-gradient(to right, ${pack.mood.ink}33 0 4px, transparent 4px 8px)`,
-          }}
-          aria-hidden
-        />
-        <button
-          type="button"
-          onClick={onRemove}
-          className="grid size-6 flex-shrink-0 place-items-center rounded-full text-[12px] opacity-60 transition-opacity hover:opacity-100"
-          style={{ color: pack.mood.inkSoft }}
-          aria-label="Trenner entfernen"
-        >
-          ×
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="my-1 flex items-center gap-3 py-1">
       <div
@@ -1325,6 +1304,53 @@ function GroupSeparator({
         className="grid size-7 flex-shrink-0 place-items-center rounded-full text-[13px] transition-colors hover:bg-canvas-alt"
         style={{ color: pack.mood.inkSoft }}
         aria-label="Gruppe entfernen"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+// "Back to main group" marker — inserted by the secondary escape button
+// when the user wants to add an item outside the active group. Renders as
+// a dotted divider with a "HAUPTGRUPPE"-label so the user can see where
+// the group ends. Has no input field — to start a new group the user
+// clicks "+ Gruppe" again.
+function MainGroupReset({
+  pack,
+  onRemove,
+}: {
+  pack: NonNullable<ReturnType<typeof getPack>>;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="my-1 flex items-center gap-3 py-1">
+      <div
+        className="h-px flex-1"
+        style={{
+          background: `repeating-linear-gradient(to right, ${pack.mood.ink}33 0 4px, transparent 4px 8px)`,
+        }}
+        aria-hidden
+      />
+      <span
+        className="flex-shrink-0 font-mono text-[10px] font-semibold uppercase tracking-[0.18em]"
+        style={{ color: pack.mood.inkSoft }}
+      >
+        ↑ Hauptgruppe
+      </span>
+      <div
+        className="h-px flex-1"
+        style={{
+          background: `repeating-linear-gradient(to right, ${pack.mood.ink}33 0 4px, transparent 4px 8px)`,
+        }}
+        aria-hidden
+      />
+      <button
+        type="button"
+        onClick={onRemove}
+        className="grid size-6 flex-shrink-0 place-items-center rounded-full text-[12px] opacity-60 transition-opacity hover:opacity-100"
+        style={{ color: pack.mood.inkSoft }}
+        aria-label="Hauptgruppen-Trenner entfernen"
       >
         ×
       </button>
