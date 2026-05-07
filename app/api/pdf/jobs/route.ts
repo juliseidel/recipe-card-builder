@@ -2,6 +2,7 @@ import { NextResponse, after } from "next/server";
 import { createJob, processJob, type CreateJobInput } from "@/lib/pdf/job-runner";
 import { getBrand } from "@/lib/brands";
 import { getPack } from "@/lib/packs";
+import { getCustomPackServer } from "@/lib/custom-packs-server";
 import { hasServerSupabase } from "@/lib/supabase-server";
 
 // PDF rendering needs the Node.js runtime (binary FS reads, Buffer, etc.)
@@ -44,8 +45,13 @@ export async function POST(req: Request) {
   }
 
   // Cheap existence check before queuing — return 404 fast for typos.
+  // Falls through to the user-created custom pack table if the slug
+  // isn't in the curated set, otherwise PDFs for new packs would 404
+  // before they even hit the job runner.
   const brand = getBrand(body.brandSlug);
-  const pack = getPack(body.brandSlug, body.packSlug);
+  const pack =
+    getPack(body.brandSlug, body.packSlug) ??
+    (await getCustomPackServer(body.brandSlug, body.packSlug));
   if (!brand || !pack) {
     return NextResponse.json(
       { error: "Unknown brand or pack" },
