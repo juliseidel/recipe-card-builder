@@ -663,37 +663,16 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                 {ingredientRows.map((row, idx) => {
                   if (row.kind === "header") {
                     return (
-                      <div
+                      <GroupSeparator
                         key={idx}
-                        className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-2xl border-l-2 px-3 py-2"
-                        style={{
-                          borderLeftColor: pack.mood.accent,
-                          background: pack.mood.background + "60",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={row.name}
-                          onChange={(e) =>
-                            updateIngredientRow(idx, { name: e.target.value })
-                          }
-                          placeholder="Gruppen-Name (z. B. Für den Teig, Glasur, Topping)"
-                          className="bg-transparent text-[13px] font-semibold uppercase tracking-[0.14em] outline-none placeholder:text-ink-subtle"
-                          style={{ color: pack.mood.inkSoft }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeIngredientRow(idx)}
-                          className="grid size-[34px] place-items-center rounded-xl border text-[14px] transition-colors hover:bg-canvas-alt"
-                          style={{
-                            borderColor: brand.tokens.line,
-                            color: brand.tokens.inkMuted,
-                          }}
-                          aria-label="Gruppe entfernen"
-                        >
-                          ×
-                        </button>
-                      </div>
+                        value={row.name}
+                        onChange={(v) =>
+                          updateIngredientRow(idx, { name: v })
+                        }
+                        onRemove={() => removeIngredientRow(idx)}
+                        pack={pack}
+                        kind="ingredient"
+                      />
                     );
                   }
                   const isFocused = focusedIngredientIdx === idx;
@@ -827,37 +806,14 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                 {stepRows.map((row, idx) => {
                   if (row.kind === "header") {
                     return (
-                      <div
+                      <GroupSeparator
                         key={idx}
-                        className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-2xl border-l-2 px-3 py-2"
-                        style={{
-                          borderLeftColor: pack.mood.accent,
-                          background: pack.mood.background + "60",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={row.name}
-                          onChange={(e) =>
-                            updateStepRow(idx, { name: e.target.value })
-                          }
-                          placeholder="Gruppen-Name (z. B. Teig zubereiten, Glasur, Variante mit Schoko)"
-                          className="bg-transparent text-[13px] font-semibold uppercase tracking-[0.14em] outline-none placeholder:text-ink-subtle"
-                          style={{ color: pack.mood.inkSoft }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeStepRow(idx)}
-                          className="grid size-[34px] place-items-center rounded-xl border text-[14px] transition-colors hover:bg-canvas-alt"
-                          style={{
-                            borderColor: brand.tokens.line,
-                            color: brand.tokens.inkMuted,
-                          }}
-                          aria-label="Gruppe entfernen"
-                        >
-                          ×
-                        </button>
-                      </div>
+                        value={row.name}
+                        onChange={(v) => updateStepRow(idx, { name: v })}
+                        onRemove={() => removeStepRow(idx)}
+                        pack={pack}
+                        kind="step"
+                      />
                     );
                   }
                   return (
@@ -1145,6 +1101,67 @@ function UnitSuffix({ label }: { label: string }) {
     <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-ink-subtle">
       {label}
     </span>
+  );
+}
+
+// Group divider for ingredient / step lists. Renders as a section separator
+// (left rule · "Gruppe ↓" hint · italic name · right rule · remove button)
+// rather than a chunky filled block. The "↓" is the affordance: everything
+// below the divider belongs to this group until the next divider.
+function GroupSeparator({
+  value,
+  onChange,
+  onRemove,
+  pack,
+  kind,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onRemove: () => void;
+  pack: NonNullable<ReturnType<typeof getPack>>;
+  kind: "ingredient" | "step";
+}) {
+  const placeholder =
+    kind === "step"
+      ? "z. B. Glasur zubereiten, Variante mit Schoko"
+      : "z. B. Für den Teig, Glasur, Topping";
+  return (
+    <div className="my-1 flex items-center gap-3 py-1">
+      <div
+        className="h-[2px] w-7 flex-shrink-0 rounded-full"
+        style={{ background: pack.mood.accent }}
+        aria-hidden
+      />
+      <span
+        className="flex-shrink-0 font-mono text-[10px] font-semibold uppercase tracking-[0.18em]"
+        style={{ color: pack.mood.inkSoft }}
+      >
+        Gruppe ↓
+      </span>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="min-w-0 flex-1 bg-transparent font-display text-[15px] italic outline-none placeholder:opacity-50"
+        style={{ color: pack.mood.ink }}
+        aria-label={`${kind === "step" ? "Schritt" : "Zutaten"}-Gruppe Name`}
+      />
+      <div
+        className="h-px min-w-[1.5rem] flex-shrink"
+        style={{ background: pack.mood.accent + "40", flex: "0 1 4rem" }}
+        aria-hidden
+      />
+      <button
+        type="button"
+        onClick={onRemove}
+        className="grid size-7 flex-shrink-0 place-items-center rounded-full text-[13px] transition-colors hover:bg-canvas-alt"
+        style={{ color: pack.mood.inkSoft }}
+        aria-label="Gruppe entfernen"
+      >
+        ×
+      </button>
+    </div>
   );
 }
 
