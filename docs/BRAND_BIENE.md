@@ -1,6 +1,10 @@
 # Brand-Profil: Biene (@bienesfitlife)
 
-> Recherche-Synthese aus Instagram, YouTube, TikTok, Pinterest, Google Bilder, Linktree, MORE Nutrition Posts. Stand: 2026-05-05.
+> Recherche-Synthese aus Instagram, YouTube, TikTok, Pinterest, Google Bilder, Linktree, MORE Nutrition Posts. Stand: 2026-05-07.
+>
+> **Diese Datei ist die tiefe Brand-DNA-Recherche.** Pro-Pack-Begründungen
+> mit kompakteren 1-Pagern liegen in [`packs/`](packs/) — eine Datei pro
+> Pack, fokussiert auf Mood, Layout-Wahl, Edge-Case-Trick und Brand-Match.
 
 ## Person
 
