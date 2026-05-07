@@ -1,11 +1,19 @@
+"use client";
+
 import Link from "next/link";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
 import { PackCardCoverImage } from "./pack-cover-image";
+import { removeCustomPack } from "@/lib/custom-packs";
 
 type PackCardProps = {
   pack: Pack;
   brand: Brand;
+  /** Custom-pack metadata used for the delete action. Curated packs leave
+   *  this undefined and don't show a delete button. */
+  customPackId?: string;
 };
 
 const fontClassMap: Record<Pack["displayFont"], string> = {
@@ -14,8 +22,38 @@ const fontClassMap: Record<Pack["displayFont"], string> = {
   "inter-tight": "font-sans font-bold tracking-[-0.02em]",
 };
 
-export function PackCard({ pack, brand }: PackCardProps) {
+export function PackCard({ pack, brand, customPackId }: PackCardProps) {
   const fontClass = fontClassMap[pack.displayFont];
+  const orderLabel = String(pack.number).padStart(2, "0");
+  const router = useRouter();
+
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const confirmTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Two-stage delete (matches the recipe-card pattern): first click arms
+  // the button (red, "Wirklich löschen?") for 3s, second click commits.
+  // Stops Link navigation via stopPropagation since the whole card is a
+  // big <Link>.
+  const handleDeleteClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!customPackId) return;
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      if (confirmTimeout.current) clearTimeout(confirmTimeout.current);
+      confirmTimeout.current = setTimeout(
+        () => setConfirmingDelete(false),
+        3000
+      );
+      return;
+    }
+    setDeleting(true);
+    await removeCustomPack(customPackId);
+    // refresh() pulls a fresh server-render of the workspace so the deleted
+    // pack disappears from the grid without a hard reload.
+    router.refresh();
+  };
 
   return (
     <Link
@@ -27,22 +65,77 @@ export function PackCard({ pack, brand }: PackCardProps) {
         boxShadow: "var(--shadow-card)",
       }}
     >
-      {/* Top row: recipe-count badge only — pack-number prefix removed
-          per the editor cleanup, recipe-count carries the same context. */}
-      <div className="flex items-start justify-end gap-3 px-6 pt-5">
+      {/* Top row: pack number + recipe-count badge + optional delete */}
+      <div className="flex items-start justify-between gap-3 px-6 pt-5">
         <span
-          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em]"
-          style={{
-            background: "rgba(255,255,255,0.7)",
-            color: pack.mood.ink,
-          }}
+          className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em]"
+          style={{ color: pack.mood.inkSoft }}
         >
-          <span
-            className="size-1.5 rounded-full"
-            style={{ background: pack.mood.accent }}
-          />
-          {pack.recipeCount} Rezepte
+          Pack {orderLabel}
         </span>
+        <div className="flex items-center gap-2">
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em]"
+            style={{
+              background: "rgba(255,255,255,0.7)",
+              color: pack.mood.ink,
+            }}
+          >
+            <span
+              className="size-1.5 rounded-full"
+              style={{ background: pack.mood.accent }}
+            />
+            {pack.recipeCount} Rezepte
+          </span>
+          {customPackId ? (
+            <button
+              type="button"
+              onClick={handleDeleteClick}
+              onMouseLeave={() => {
+                if (!deleting) setConfirmingDelete(false);
+              }}
+              disabled={deleting}
+              aria-label={
+                confirmingDelete
+                  ? "Pack wirklich löschen — nochmal klicken"
+                  : "Pack löschen"
+              }
+              className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] transition-colors"
+              style={
+                confirmingDelete
+                  ? {
+                      borderColor: "transparent",
+                      background: "#dc2626",
+                      color: "white",
+                    }
+                  : {
+                      borderColor: pack.mood.ink + "20",
+                      color: pack.mood.inkSoft,
+                      background: "rgba(255,255,255,0.7)",
+                    }
+              }
+            >
+              {deleting ? (
+                <span className="size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              ) : (
+                <svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden>
+                  <path
+                    d="M3 4h8m-7 0v7a1 1 0 001 1h4a1 1 0 001-1V4M5.5 4V2.5h3V4M6 6.5v3M8 6.5v3"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+              {deleting
+                ? "Lösche…"
+                : confirmingDelete
+                ? "Wirklich?"
+                : "Löschen"}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* Hero image — falls back to a shimmer skeleton while a custom pack

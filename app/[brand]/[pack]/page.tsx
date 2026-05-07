@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
 import { getBrand } from "@/lib/brands";
 import { getPack, packs } from "@/lib/packs";
-import { getCustomPackServer } from "@/lib/custom-packs-server";
+import {
+  getCustomPackByIdServer,
+  getCustomPackServer,
+} from "@/lib/custom-packs-server";
 import { getRecipesForPack } from "@/lib/recipes";
 import { SiteHeader } from "@/components/site-header";
 import { PackCover } from "@/components/pack-cover";
@@ -47,10 +50,13 @@ export default async function PackPage({ params }: PackPageProps) {
   const { brand: brandSlug, pack: packSlug } = await params;
   const brand = getBrand(brandSlug);
   // Try curated packs first, fall back to user-created custom packs in
-  // Supabase. The rest of the page is layout-agnostic so both work the same.
-  const pack =
-    getPack(brandSlug, packSlug) ??
-    (await getCustomPackServer(brandSlug, packSlug));
+  // Supabase. We track whether the pack came from the custom table so we
+  // can wire up its delete button on the actions bar.
+  const staticPack = getPack(brandSlug, packSlug);
+  const customRow = staticPack
+    ? null
+    : await getCustomPackByIdServer(brandSlug, packSlug);
+  const pack = staticPack ?? customRow?.pack;
 
   if (!brand || !pack) {
     notFound();
@@ -65,7 +71,11 @@ export default async function PackPage({ params }: PackPageProps) {
     >
       <SiteHeader />
       <PackCover brand={brand} pack={pack} totalRecipes={recipes.length} />
-      <PackActions brand={brand} pack={pack} />
+      <PackActions
+        brand={brand}
+        pack={pack}
+        customPackId={customRow?.id}
+      />
 
       <main className="flex-1">
         <section className="mx-auto max-w-[1400px] px-6 pt-12 pb-2 lg:px-10 lg:pt-16">

@@ -47,3 +47,57 @@ export async function getCustomPacksForBrandServer(
     .map((row) => row.data as Pack | undefined)
     .filter((p): p is Pack => Boolean(p));
 }
+
+// Single-row variant — returns the matching custom pack plus its row id
+// so the pack-detail page can wire up its delete button.
+export async function getCustomPackByIdServer(
+  brandSlug: string,
+  packSlug: string
+): Promise<{ pack: Pack; id: string } | null> {
+  if (!hasServerSupabase()) return null;
+  const supabase: SupabaseClient = getServerSupabase();
+  const { data, error } = await supabase
+    .from("packs")
+    .select("id, data")
+    .eq("brand_slug", brandSlug)
+    .eq("pack_slug", packSlug)
+    .eq("is_custom", true)
+    .maybeSingle();
+  if (error) {
+    console.warn("[packs-server] getCustomPackByIdServer", error);
+    return null;
+  }
+  if (!data) return null;
+  const pack = data.data as Pack | undefined;
+  if (!pack) return null;
+  return { pack, id: data.id as string };
+}
+
+// Same as above but also returns the row IDs so the workspace grid can
+// wire up per-pack delete buttons (the `Pack` type doesn't carry an id).
+export async function getCustomPacksWithIdsForBrandServer(
+  brandSlug: string
+): Promise<Array<{ pack: Pack; id: string }>> {
+  if (!hasServerSupabase()) return [];
+  const supabase: SupabaseClient = getServerSupabase();
+  const { data, error } = await supabase
+    .from("packs")
+    .select("id, data, created_at")
+    .eq("brand_slug", brandSlug)
+    .eq("is_custom", true)
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.warn(
+      "[packs-server] getCustomPacksWithIdsForBrandServer",
+      error
+    );
+    return [];
+  }
+  const out: Array<{ pack: Pack; id: string }> = [];
+  for (const row of data ?? []) {
+    const pack = row.data as Pack | undefined;
+    if (!pack) continue;
+    out.push({ pack, id: row.id as string });
+  }
+  return out;
+}

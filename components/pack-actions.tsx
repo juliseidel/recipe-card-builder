@@ -1,13 +1,17 @@
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
 import { PdfExportButton } from "./pdf-export-button";
+import { PackDeleteButton } from "./pack-delete-button";
 
 type PackActionsProps = {
   brand: Brand;
   pack: Pack;
+  /** Custom-pack id — when provided, the delete button appears next to
+   *  the export button. Curated packs leave this undefined. */
+  customPackId?: string;
 };
 
-export function PackActions({ brand, pack }: PackActionsProps) {
+export function PackActions({ brand, pack, customPackId }: PackActionsProps) {
   return (
     <section
       className="border-b"
@@ -30,18 +34,30 @@ export function PackActions({ brand, pack }: PackActionsProps) {
           </span>
         </div>
 
-        <PdfExportButton
-          type="pack"
-          brandSlug={brand.slug}
-          packSlug={pack.slug}
-          variant="hero"
-          label="Komplettes Pack als PDF"
-          tint={{
-            bg: pack.mood.background,
-            ink: pack.mood.ink,
-            accent: pack.mood.accent,
-          }}
-        />
+        <div className="flex items-center gap-2">
+          {customPackId ? (
+            <PackDeleteButton
+              packId={customPackId}
+              brandSlug={brand.slug}
+              tint={{
+                ink: pack.mood.ink,
+                inkSoft: pack.mood.inkSoft,
+              }}
+            />
+          ) : null}
+          <PdfExportButton
+            type="pack"
+            brandSlug={brand.slug}
+            packSlug={pack.slug}
+            variant="hero"
+            label="Komplettes Pack als PDF"
+            tint={{
+              bg: pack.mood.background,
+              ink: pack.mood.ink,
+              accent: pack.mood.accent,
+            }}
+          />
+        </div>
       </div>
     </section>
   );

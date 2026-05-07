@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { brands, getBrand } from "@/lib/brands";
 import { getPacksForBrand } from "@/lib/packs";
-import { getCustomPacksForBrandServer } from "@/lib/custom-packs-server";
+import { getCustomPacksWithIdsForBrandServer } from "@/lib/custom-packs-server";
 import { SiteHeader } from "@/components/site-header";
 import { BrandHero } from "@/components/brand-hero";
 import { PackCard } from "@/components/pack-card";
@@ -47,9 +47,15 @@ export default async function BrandPage({ params }: BrandPageProps) {
   }
 
   const staticPacks = getPacksForBrand(brand.slug);
-  const customPacks = await getCustomPacksForBrandServer(brand.slug);
+  const customPacksWithIds = await getCustomPacksWithIdsForBrandServer(
+    brand.slug
+  );
   // Custom packs first so newly-created concepts surface to the top of the
   // grid — same ordering principle the recipe grid uses.
+  const customPacks = customPacksWithIds.map((c) => c.pack);
+  const customIdBySlug = new Map(
+    customPacksWithIds.map((c) => [c.pack.slug, c.id])
+  );
   const packs = [...customPacks, ...staticPacks];
   const totalRecipes = packs.reduce((sum, p) => sum + p.recipeCount, 0);
 
@@ -109,10 +115,17 @@ export default async function BrandPage({ params }: BrandPageProps) {
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {packs.map((pack) => (
-              <PackCard key={pack.slug} pack={pack} brand={brand} />
-            ))}
+            {/* New-pack card sits at the top so the call-to-action is the
+                first thing the user sees in the grid. */}
             <NewPackCard brand={brand} />
+            {packs.map((pack) => (
+              <PackCard
+                key={pack.slug}
+                pack={pack}
+                brand={brand}
+                customPackId={customIdBySlug.get(pack.slug)}
+              />
+            ))}
           </div>
         </section>
       </main>

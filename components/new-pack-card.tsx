@@ -15,8 +15,14 @@ export function NewPackCard({ brand }: NewPackCardProps) {
         background: brand.tokens.surface,
       }}
     >
-      {/* Top row — only the "Neu starten" pill, no pack-number label */}
-      <div className="flex items-start justify-end gap-3 px-6 pt-5">
+      {/* Top row matched to pack-card layout */}
+      <div className="flex items-start justify-between gap-3 px-6 pt-5">
+        <span
+          className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em]"
+          style={{ color: brand.tokens.inkMuted }}
+        >
+          Pack 06
+        </span>
         <span
           className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em]"
           style={{

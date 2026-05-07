@@ -194,7 +194,23 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
         /* swallow — cover gen is best-effort */
       });
     }
+    // Tell the workspace + pack-detail pages to drop their cached server
+    // render so a back-navigation shows the new pack instantly. We await
+    // this so the user landing on the pack page sees fresh data.
+    await fetch("/api/packs/revalidate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        brandSlug: brand.slug,
+        packSlug: saved.slug,
+      }),
+    }).catch(() => {
+      /* non-blocking */
+    });
     router.push(`/${brand.slug}/${saved.slug}`);
+    // refresh() forces the new route to fetch fresh data instead of using
+    // any client-side cached version of /[brand]/[pack].
+    router.refresh();
   };
 
   return (
@@ -772,7 +788,12 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
                 <span className="font-mono">Pack-Cover</span>
               </div>
               {previewPack ? (
-                <PackCover brand={brand} pack={previewPack} totalRecipes={0} />
+                <PackCover
+                  brand={brand}
+                  pack={previewPack}
+                  totalRecipes={0}
+                  hideCoverSlot
+                />
               ) : null}
             </div>
 

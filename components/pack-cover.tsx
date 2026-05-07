@@ -7,6 +7,10 @@ type PackCoverProps = {
   brand: Brand;
   pack: Pack;
   totalRecipes: number;
+  /** When true, the right-hand cover image (or skeleton) is hidden. The
+   *  text section stretches to fill the row. Used by the pack editor's
+   *  live preview where the actual cover only appears after save. */
+  hideCoverSlot?: boolean;
 };
 
 const fontClassMap: Record<Pack["displayFont"], string> = {
@@ -15,8 +19,14 @@ const fontClassMap: Record<Pack["displayFont"], string> = {
   "inter-tight": "font-sans font-bold tracking-[-0.02em]",
 };
 
-export function PackCover({ brand, pack, totalRecipes }: PackCoverProps) {
+export function PackCover({
+  brand,
+  pack,
+  totalRecipes,
+  hideCoverSlot = false,
+}: PackCoverProps) {
   const fontClass = fontClassMap[pack.displayFont];
+  const orderLabel = String(pack.number).padStart(2, "0");
 
   return (
     <section
@@ -50,14 +60,20 @@ export function PackCover({ brand, pack, totalRecipes }: PackCoverProps) {
           Bienes Workspace
         </Link>
 
-        <div className="mt-8 grid grid-cols-1 gap-12 lg:grid-cols-[1.5fr_1fr] lg:items-center lg:gap-16">
+        <div
+          className={
+            hideCoverSlot
+              ? "mt-8 flex flex-col gap-6"
+              : "mt-8 grid grid-cols-1 gap-12 lg:grid-cols-[1.5fr_1fr] lg:items-center lg:gap-16"
+          }
+        >
           <div className="flex flex-col gap-6">
             <div className="flex flex-wrap items-center gap-2.5">
               <span
                 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em]"
                 style={{ color: pack.mood.inkSoft }}
               >
-                {pack.category}
+                Pack {orderLabel} · {pack.category}
               </span>
             </div>
 
@@ -107,25 +123,27 @@ export function PackCover({ brand, pack, totalRecipes }: PackCoverProps) {
             </div>
           </div>
 
-          <div className="relative">
-            <div
-              className="relative aspect-[3/4] overflow-hidden rounded-[var(--radius-card)] lg:aspect-[4/5]"
-              style={{
-                boxShadow:
-                  "0 1px 0 rgba(0,0,0,0.05), 0 24px 48px -28px rgba(0,0,0,0.4)",
-                maxWidth: "420px",
-                marginLeft: "auto",
-              }}
-            >
-              <PackCoverImage
-                pack={pack}
-                brandSlug={brand.slug}
-                alt={`${pack.title} – ${pack.tagline}`}
-                sizes="(min-width: 1024px) 420px, 100vw"
-                pollWhenEmpty={!pack.coverImage}
-              />
+          {hideCoverSlot ? null : (
+            <div className="relative">
+              <div
+                className="relative aspect-[3/4] overflow-hidden rounded-[var(--radius-card)] lg:aspect-[4/5]"
+                style={{
+                  boxShadow:
+                    "0 1px 0 rgba(0,0,0,0.05), 0 24px 48px -28px rgba(0,0,0,0.4)",
+                  maxWidth: "420px",
+                  marginLeft: "auto",
+                }}
+              >
+                <PackCoverImage
+                  pack={pack}
+                  brandSlug={brand.slug}
+                  alt={`${pack.title} – ${pack.tagline}`}
+                  sizes="(min-width: 1024px) 420px, 100vw"
+                  pollWhenEmpty={!pack.coverImage}
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </section>
