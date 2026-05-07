@@ -337,9 +337,9 @@ function EnrichmentToast({
             {mode === "done"
               ? "Fertig"
               : mode === "both"
-              ? "Gemini analysiert · Flux rendert · ~30–60 Sek"
+              ? "Gemini schreibt Story + Mikros · Flux rendert · ~30–60 Sek"
               : mode === "hero"
-              ? "Flux 2 Pro · noch ~15–25 Sek · Mikros sind bereits drin"
+              ? "Flux 2 Pro · noch ~15–25 Sek · Story & Mikros sind bereits drin"
               : "Gemini 2.5 Flash · noch ~5 Sek · Bild ist bereits drin"}
           </span>
         </div>

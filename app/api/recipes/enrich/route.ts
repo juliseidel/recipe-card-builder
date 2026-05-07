@@ -1,10 +1,13 @@
 import { NextResponse, after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateMicros } from "@/lib/ai/generate-micros";
+import { generateStory } from "@/lib/ai/generate-story";
 import { generateImageSpec } from "@/lib/ai/recipe-image-spec";
 import { buildPrompt } from "@/lib/ai/image-prompts";
 import { generateImage, downloadImage } from "@/lib/ai/bfl-flux";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
+import { getBrand } from "@/lib/brands";
+import { getPack } from "@/lib/packs";
 import type { Recipe } from "@/lib/recipes";
 
 // Server route that fills in Gemini-derived micros AND a Flux 2 Pro hero
@@ -52,7 +55,7 @@ export async function POST(req: Request) {
   const supabase = getServerSupabase();
   const { data: row, error } = await supabase
     .from("recipes")
-    .select("id, brand_slug, data")
+    .select("id, brand_slug, pack_slug, data")
     .eq("id", body.recipeId)
     .maybeSingle();
   if (error || !row) {
@@ -64,12 +67,23 @@ export async function POST(req: Request) {
 
   const recipe = row.data as Recipe;
   const brandSlug = (row.brand_slug as string) || "biene";
+  const packSlug = (row.pack_slug as string) || recipe.packSlug;
+  const brand = getBrand(brandSlug);
+  const pack = getPack(brandSlug, packSlug);
 
   const needsMicros =
     !recipe.nutrition?.micros || recipe.nutrition.micros.length === 0;
   const needsHero = !recipe.hero;
+  // Story is "needed" if the description is empty or still equals the
+  // pack-level fallback we wrote at save time. Once the user types their
+  // own description (or a previous AI-Story has run), we leave it alone.
+  const needsStory =
+    Boolean(brand && pack) &&
+    (!recipe.description ||
+      recipe.description.trim() === "" ||
+      recipe.description.trim() === pack?.description.trim());
 
-  if (!needsMicros && !needsHero) {
+  if (!needsMicros && !needsHero && !needsStory) {
     return NextResponse.json({
       status: "already-enriched",
       recipeId: row.id,
@@ -113,12 +127,35 @@ export async function POST(req: Request) {
     });
   }
 
+  if (needsStory && brand && pack) {
+    after(async () => {
+      try {
+        const story = await generateStory(recipe, pack, brand);
+        if (story && story.length > 20) {
+          // Only overwrite if the user hasn't typed their own copy in the
+          // meantime. mergeRecipeData re-reads the row inside the merge.
+          await mergeRecipeData(row.id, (current) => {
+            const userTouched =
+              current.description &&
+              current.description.trim() !== "" &&
+              current.description.trim() !== pack.description.trim();
+            if (userTouched) return {};
+            return { description: story };
+          });
+        }
+      } catch (err) {
+        console.error("[enrich] story failed for", body.recipeId, err);
+      }
+    });
+  }
+
   return NextResponse.json(
     {
       status: "enriching",
       recipeId: row.id,
       micros: needsMicros,
       hero: needsHero,
+      story: needsStory,
     },
     { status: 202 }
   );
