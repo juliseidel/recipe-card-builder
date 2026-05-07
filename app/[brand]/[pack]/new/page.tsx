@@ -29,6 +29,11 @@ import { SiteHeader } from "@/components/site-header";
 import { RecipeCardPreview } from "@/components/recipe-card-preview";
 import { RecipeCardFull } from "@/components/recipe-card-full";
 import { IngredientCombobox } from "@/components/ingredient-combobox";
+import {
+  InstagramImportCard,
+  type ImportSource,
+} from "@/components/instagram-import-card";
+import type { ParsedInstagramRecipe } from "@/lib/ai/parse-instagram";
 
 // Editor models a recipe as TWO lists of groups, each with its own items.
 // The first group is always the Hauptgruppe (name: null) and never gets
@@ -78,6 +83,21 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   }, [staticPack, brandSlug, packSlug]);
 
   const pack: Pack | undefined = staticPack ?? customPack ?? undefined;
+
+  // Erstellungs-Modus: "manual" = klassisches Tippen, "instagram" = Auto-Fill
+  // aus einem Reel/Post-Link. Defaults auf "manual", damit der bestehende
+  // Workflow 1:1 unveraendert ist.
+  const [mode, setMode] = useState<"manual" | "instagram">("manual");
+  // Wenn ein Instagram-Import erfolgreich war, halten wir Source-Infos hier,
+  // damit die Import-Card als kollabiertes Banner mit Direktlink rendern
+  // kann und der Confidence-Badge sichtbar bleibt.
+  const [importedSource, setImportedSource] = useState<ImportSource | null>(
+    null
+  );
+  const [importedConfidence, setImportedConfidence] = useState<
+    "high" | "medium" | "low" | null
+  >(null);
+  const [importedNotes, setImportedNotes] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
@@ -270,6 +290,104 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   ];
   const missingCount = requirements.filter((r) => !r.ok).length;
   const isValid = missingCount === 0;
+
+  // Form mit den Werten aus einem erfolgreichen Instagram-Import fuellen.
+  // Wir bauen das Group-Container-Modell (Hauptgruppe + benannte Gruppen)
+  // aus dem flachen Recipe-Format auf, damit das Form-State-Modell weiter
+  // 1:1 mit dem Manuell-Modus funktioniert.
+  const handleImported = (
+    parsed: ParsedInstagramRecipe,
+    source: ImportSource
+  ) => {
+    setTitle(parsed.title);
+    setSubtitle(parsed.subtitle);
+    setDescription(parsed.description);
+    setPrepTime(String(parsed.prepTime));
+    setCookTime(parsed.cookTime ? String(parsed.cookTime) : "");
+    setDifficulty(parsed.difficulty);
+    setServings(String(parsed.servings));
+    setTags(parsed.tags ?? []);
+    setKcal(parsed.nutrition.kcal ? String(parsed.nutrition.kcal) : "");
+    setProtein(
+      parsed.nutrition.protein ? String(parsed.nutrition.protein) : ""
+    );
+    setCarbs(parsed.nutrition.carbs ? String(parsed.nutrition.carbs) : "");
+    setFat(parsed.nutrition.fat ? String(parsed.nutrition.fat) : "");
+    setNutritionBasis(parsed.nutritionBasis);
+
+    // Zutaten in Group-Container-Modell ueberfuehren. Hauptgruppe = items
+    // ohne group; pro distinct group-Name eine zusaetzliche Gruppe in der
+    // Reihenfolge ihres ersten Auftretens (so wie Bienes Captions sie
+    // typischerweise schreiben: Hauptzutaten zuerst, dann "Fuer die
+    // Glasur").
+    const main: IngredientItem[] = [];
+    const groupMap = new Map<string, IngredientItem[]>();
+    for (const ing of parsed.ingredients) {
+      const item: IngredientItem = {
+        amount: ing.amount,
+        name: ing.name,
+      };
+      const groupName = ing.group?.trim();
+      if (groupName) {
+        const list = groupMap.get(groupName) ?? [];
+        list.push(item);
+        groupMap.set(groupName, list);
+      } else {
+        main.push(item);
+      }
+    }
+    const newIngredientGroups: IngredientGroupState[] = [
+      {
+        name: null,
+        items:
+          main.length > 0 ? main : [{ amount: "", name: "" }],
+      },
+      ...Array.from(groupMap.entries()).map(([name, items]) => ({
+        name,
+        items,
+      })),
+    ];
+    setIngredientGroups(newIngredientGroups);
+
+    // Schritte analog: Hauptgruppe + benannte Gruppen
+    const mainSteps: StepItem[] = [];
+    const stepGroupMap = new Map<string, StepItem[]>();
+    for (const st of parsed.steps) {
+      const item: StepItem = { text: st.text };
+      const groupName = st.group?.trim();
+      if (groupName) {
+        const list = stepGroupMap.get(groupName) ?? [];
+        list.push(item);
+        stepGroupMap.set(groupName, list);
+      } else {
+        mainSteps.push(item);
+      }
+    }
+    const newStepGroups: StepGroupState[] = [
+      {
+        name: null,
+        items: mainSteps.length > 0 ? mainSteps : [{ text: "" }],
+      },
+      ...Array.from(stepGroupMap.entries()).map(([name, items]) => ({
+        name,
+        items,
+      })),
+    ];
+    setStepGroups(newStepGroups);
+
+    setImportedSource(source);
+    setImportedConfidence(parsed.confidence);
+    setImportedNotes(parsed.notes);
+  };
+
+  // "Anderer Link"-Klick auf der Import-Card. Das Form bleibt mit den
+  // bisherigen Werten gefuellt — der User kann jederzeit die Ergebnisse
+  // behalten und nochmal importieren.
+  const handleResetImport = () => {
+    setImportedSource(null);
+    setImportedConfidence(null);
+    setImportedNotes(null);
+  };
 
   if (!brand) {
     return (
@@ -700,6 +818,63 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                 <option key={s} value={s} />
               ))}
             </datalist>
+
+            {/* MODE-SWITCHER — Selbst aufbauen vs. Aus Instagram-Link.
+                Sitzt ganz oben in der Form-Spalte, damit der User direkt
+                nach dem Aufruf der Seite entscheiden kann. Beim Wechsel
+                bleiben bereits eingetragene Werte erhalten — perfekt fuer
+                "erst importieren, dann manuell ergaenzen". */}
+            <div
+              className="flex flex-col gap-1"
+              role="tablist"
+              aria-label="Erstellungs-Modus"
+            >
+              <span
+                className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+                style={{ color: brand.tokens.inkMuted }}
+              >
+                Wie willst du diese Karte erstellen?
+              </span>
+              <div
+                className="grid grid-cols-1 gap-2 rounded-2xl p-1.5 sm:grid-cols-2"
+                style={{
+                  background: brand.tokens.surface,
+                  border: `1px solid ${brand.tokens.line}`,
+                }}
+              >
+                <ModeTab
+                  label="Selbst aufbauen"
+                  description="Schritt fuer Schritt eintragen"
+                  icon="manual"
+                  active={mode === "manual"}
+                  onClick={() => setMode("manual")}
+                  pack={pack}
+                />
+                <ModeTab
+                  label="Aus Instagram-Link"
+                  description="Reel oder Post — KI fuellt das Form"
+                  icon="instagram"
+                  active={mode === "instagram"}
+                  onClick={() => setMode("instagram")}
+                  pack={pack}
+                />
+              </div>
+            </div>
+
+            {/* IMPORT-CARD — nur sichtbar im "instagram"-Mode.
+                Bei erfolgreichem Import kollabiert sie zu einem Banner mit
+                Source-Info + Confidence-Badge; das Form unten ist dann
+                ausgefuellt und der User reviewt nur. */}
+            {mode === "instagram" ? (
+              <InstagramImportCard
+                pack={pack}
+                onImported={handleImported}
+                onReset={handleResetImport}
+                importedSource={importedSource}
+                importedConfidence={importedConfidence}
+                importedNotes={importedNotes}
+              />
+            ) : null}
 
             {/* Section 1: Karten-Layout
                 — pick once on the pack's first card, then inherited by
@@ -1647,6 +1822,105 @@ function PreviewTabButton({
     >
       {label}
     </button>
+  );
+}
+
+// Mode-Switcher-Tab. Zwei nebeneinander = die zwei Wege, eine Karte zu
+// erstellen ("Selbst aufbauen" vs. "Aus Instagram-Link"). Aktive Variante
+// ist mit dem Pack-Mood-Akzent eingefaerbt, inaktive bleibt dezent.
+function ModeTab({
+  label,
+  description,
+  icon,
+  active,
+  onClick,
+  pack,
+}: {
+  label: string;
+  description: string;
+  icon: "manual" | "instagram";
+  active: boolean;
+  onClick: () => void;
+  pack: Pack;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className="group flex items-start gap-3 rounded-xl px-3.5 py-3 text-left transition-all"
+      style={{
+        background: active ? pack.mood.accent : "transparent",
+        color: active ? "white" : pack.mood.ink,
+        boxShadow: active
+          ? `0 1px 2px ${pack.mood.ink}10, 0 4px 16px ${pack.mood.accent}30`
+          : "none",
+      }}
+    >
+      <span
+        className="mt-0.5 grid size-8 flex-shrink-0 place-items-center rounded-lg"
+        style={{
+          background: active
+            ? "rgba(255,255,255,0.18)"
+            : pack.mood.accent + "12",
+          color: active ? "white" : pack.mood.accent,
+        }}
+        aria-hidden
+      >
+        {icon === "manual" ? <ModeManualIcon /> : <ModeInstagramIcon />}
+      </span>
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="text-[14px] font-semibold leading-tight">
+          {label}
+        </span>
+        <span
+          className="text-[12px] leading-snug"
+          style={{
+            color: active ? "rgba(255,255,255,0.85)" : pack.mood.inkSoft,
+          }}
+        >
+          {description}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function ModeManualIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+      <path
+        d="M2.5 11l1-3.5 5.5-5.5 2.5 2.5-5.5 5.5L2.5 11z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8.5 3.5l2 2"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ModeInstagramIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+      <rect
+        x="1.75"
+        y="1.75"
+        width="10.5"
+        height="10.5"
+        rx="3"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <circle cx="7" cy="7" r="2.3" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="10.1" cy="3.9" r="0.75" fill="currentColor" />
+    </svg>
   );
 }
 

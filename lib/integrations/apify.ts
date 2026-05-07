@@ -1,0 +1,197 @@
+// Apify-Client fuer Instagram-Post-Scraping. Wir nutzen den "instagram-post-
+// scraper" Actor und den synchronen "run-sync-get-dataset-items"-Endpoint:
+// schickt einen Run los, wartet bis Apify fertig ist, gibt das Dataset direkt
+// zurueck. Kein Polling-Loop noetig, kein eigener Job-State.
+//
+// Docs: https://apify.com/apify/instagram-post-scraper
+
+const APIFY_BASE = "https://api.apify.com/v2";
+// Apify-Actor-ID fuer den Instagram-Post-Scraper. "~"-Form (statt "/") weil
+// die Apify-API in URL-Pfaden Tilden statt Slashes erwartet.
+const ACTOR_ID = "apify~instagram-post-scraper";
+
+export type InstagramPost = {
+  /** Vollstaendige Bildunterschrift / Caption — das ist, was Gemini parst. */
+  caption: string;
+  /** Hauptbild-URL (CDN, public). Bei Reels: Cover-Frame. */
+  displayUrl: string | null;
+  /** URL des Posts selbst — fuer Source-Attribution. */
+  postUrl: string;
+  /** @username des Erstellers (z. B. "bienesfitlife"). */
+  ownerUsername: string | null;
+  /** Hashtags des Posts (ohne #-Prefix). */
+  hashtags: string[];
+  /** Typ des Posts: "Image", "Video" (Reel), "Sidecar" (Carousel). */
+  type: string | null;
+};
+
+export class ApifyError extends Error {
+  constructor(
+    message: string,
+    public status?: number,
+    public detail?: unknown
+  ) {
+    super(message);
+    this.name = "ApifyError";
+  }
+}
+
+// Akzeptiert ALLE Instagram-URL-Formate, die Creators reinwerfen koennten:
+//   https://www.instagram.com/p/SHORTCODE/
+//   https://www.instagram.com/reel/SHORTCODE/
+//   https://www.instagram.com/reels/SHORTCODE/
+//   https://instagram.com/p/SHORTCODE/?igsh=...
+//   instagram.com/p/SHORTCODE
+// Trim, normalisiert auf https, schneidet Query-Strings ab — Apify will den
+// reinen Permalink ohne Tracking-Params.
+export function normalizeInstagramUrl(raw: string): string | null {
+  if (!raw) return null;
+  let url = raw.trim();
+  if (!url) return null;
+
+  // Schema haendisch ergaenzen wenn der User nur "instagram.com/p/..." kopiert.
+  if (!/^https?:\/\//i.test(url)) {
+    url = `https://${url}`;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+
+  const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
+  if (host !== "instagram.com" && host !== "m.instagram.com") {
+    return null;
+  }
+
+  // Pfad muss /p/<code>/, /reel/<code>/ oder /reels/<code>/ sein. Das
+  // Trailing-Slash schreibt Apify selbst dran — wir liefern es trotzdem mit.
+  const segments = parsed.pathname.split("/").filter(Boolean);
+  if (segments.length < 2) return null;
+  const [type, code] = segments;
+  if (!/^[A-Za-z0-9_-]+$/.test(code ?? "")) return null;
+  if (!["p", "reel", "reels", "tv"].includes(type)) return null;
+
+  // Wir kanonisieren auf /p/<code>/ — Apify akzeptiert das fuer Reels und
+  // Posts gleichermassen, und es haelt den Cache-Key konsistent.
+  return `https://www.instagram.com/${type}/${code}/`;
+}
+
+export async function scrapeInstagramPost(
+  url: string
+): Promise<InstagramPost> {
+  const apiToken = process.env.APIFY_TOKEN;
+  if (!apiToken) {
+    throw new ApifyError("APIFY_TOKEN ist nicht gesetzt");
+  }
+
+  const normalized = normalizeInstagramUrl(url);
+  if (!normalized) {
+    throw new ApifyError(
+      "Das ist keine gueltige Instagram-URL. Erwartet: instagram.com/p/... oder /reel/..."
+    );
+  }
+
+  // run-sync-get-dataset-items: startet den Actor, blockiert bis fertig,
+  // liefert das Dataset direkt im Response-Body. Timeout serverseitig 5 min,
+  // wir cappen client-seitig auf 45 s (Vercel-Lambda-Limit ist 60 s).
+  const endpoint = `${APIFY_BASE}/acts/${ACTOR_ID}/run-sync-get-dataset-items?token=${apiToken}&format=json`;
+
+  const body = {
+    directUrls: [normalized],
+    resultsLimit: 1,
+    // addParentData=false: wir wollen nur den Post-Caption, nicht das Profil.
+    addParentData: false,
+  };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45_000);
+
+  let res: Response;
+  try {
+    res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeout);
+    const isAbort = (err as Error).name === "AbortError";
+    throw new ApifyError(
+      isAbort
+        ? "Apify-Anfrage hat zu lange gedauert (>45 s). Bitte erneut versuchen."
+        : `Netzwerk-Fehler: ${(err as Error).message}`
+    );
+  }
+  clearTimeout(timeout);
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    // 401 = Token ungueltig, 402 = Free-Tier ausgereizt, 404 = Actor nicht
+    // gefunden (der Actor-Slug hat sich geaendert). Klare Meldung pro Fall.
+    if (res.status === 401) {
+      throw new ApifyError(
+        "Apify-Token ungueltig oder abgelaufen.",
+        401,
+        errText
+      );
+    }
+    if (res.status === 402) {
+      throw new ApifyError(
+        "Apify-Limit erreicht. Bitte spaeter erneut versuchen oder Free-Tier upgraden.",
+        402,
+        errText
+      );
+    }
+    throw new ApifyError(
+      `Apify-Fehler ${res.status}: ${errText.slice(0, 300)}`,
+      res.status,
+      errText
+    );
+  }
+
+  const items = (await res.json()) as Array<{
+    caption?: string;
+    displayUrl?: string;
+    url?: string;
+    ownerUsername?: string;
+    hashtags?: string[];
+    type?: string;
+    error?: string;
+    errorDescription?: string;
+  }>;
+
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new ApifyError(
+      "Apify hat keinen Post zurueckgeliefert. Eventuell ist der Post privat oder geloescht."
+    );
+  }
+
+  const item = items[0];
+
+  // Apify gibt bei privaten / geloeschten Posts oft ein Item mit error-Feld
+  // zurueck statt eines HTTP-Errors.
+  if (item.error || item.errorDescription) {
+    throw new ApifyError(
+      item.errorDescription ?? item.error ?? "Post nicht erreichbar."
+    );
+  }
+
+  if (!item.caption || item.caption.trim().length < 20) {
+    throw new ApifyError(
+      "Dieser Post hat keine ausreichende Beschreibung. Schau, ob du einen Reel oder Post mit ausgeschriebenem Rezept findest."
+    );
+  }
+
+  return {
+    caption: item.caption.trim(),
+    displayUrl: item.displayUrl ?? null,
+    postUrl: item.url ?? normalized,
+    ownerUsername: item.ownerUsername ?? null,
+    hashtags: item.hashtags ?? [],
+    type: item.type ?? null,
+  };
+}
