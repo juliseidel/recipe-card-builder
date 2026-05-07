@@ -3,7 +3,7 @@
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getBrand } from "@/lib/brands";
+import { getBrand, type Brand } from "@/lib/brands";
 import { getPack, type CardLayout, type Pack } from "@/lib/packs";
 import { getCustomPack, updateCustomPackLayout } from "@/lib/custom-packs";
 import type { CustomPack } from "@/lib/custom-packs";
@@ -27,6 +27,7 @@ import {
 import { tagSuggestions } from "@/lib/common-tags";
 import { SiteHeader } from "@/components/site-header";
 import { RecipeCardPreview } from "@/components/recipe-card-preview";
+import { RecipeCardFull } from "@/components/recipe-card-full";
 import { IngredientCombobox } from "@/components/ingredient-combobox";
 
 // Editor models a recipe as TWO lists of groups, each with its own items.
@@ -101,6 +102,12 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     }
   }, [customPack?.cardLayout]);
 
+  // Preview mode toggle: thumbnail = how the card looks in the pack grid;
+  // full = how the card looks when opened (Recipe-Detail view) — same
+  // component the live site uses, scaled down to fit the sidebar.
+  const [previewMode, setPreviewMode] = useState<"thumbnail" | "full">(
+    "full"
+  );
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [ingredientGroups, setIngredientGroups] = useState<
@@ -1311,7 +1318,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
 
           {/* PREVIEW COLUMN */}
           <aside className="lg:sticky lg:top-[148px] lg:self-start">
-            <div className="mb-4 flex items-baseline justify-between gap-3">
+            <div className="mb-3 flex items-baseline justify-between gap-3">
               <span
                 className="text-[11px] font-semibold uppercase tracking-[0.18em]"
                 style={{ color: brand.tokens.inkMuted }}
@@ -1322,16 +1329,49 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                 className="text-[11px]"
                 style={{ color: brand.tokens.inkMuted }}
               >
-                so erscheint sie im Pack
+                {previewMode === "thumbnail"
+                  ? "so erscheint sie im Pack"
+                  : "so sieht die Karte geöffnet aus"}
               </span>
             </div>
 
-            {previewRecipe ? (
-              <RecipeCardPreview
-                brand={brand}
+            {/* Mode toggle — pill switcher between thumbnail and full card.
+                Both views update live as the user types. */}
+            <div
+              className="mb-4 inline-flex w-full overflow-hidden rounded-full border p-1"
+              style={{
+                borderColor: brand.tokens.line,
+                background: brand.tokens.surface,
+              }}
+            >
+              <PreviewTabButton
+                label="Volle Karte"
+                active={previewMode === "full"}
+                onClick={() => setPreviewMode("full")}
                 pack={pack}
-                recipe={previewRecipe}
               />
+              <PreviewTabButton
+                label="Karten-Vorschau"
+                active={previewMode === "thumbnail"}
+                onClick={() => setPreviewMode("thumbnail")}
+                pack={pack}
+              />
+            </div>
+
+            {previewRecipe ? (
+              previewMode === "thumbnail" ? (
+                <RecipeCardPreview
+                  brand={brand}
+                  pack={pack}
+                  recipe={previewRecipe}
+                />
+              ) : (
+                <FullCardPreview
+                  brand={brand}
+                  pack={pack}
+                  recipe={previewRecipe}
+                />
+              )
             ) : null}
 
             {/* Pflicht-Checklist */}
@@ -1567,5 +1607,75 @@ function NutriField({
         <UnitSuffix label={unit} />
       </div>
     </Field>
+  );
+}
+
+// Tab-style button used in the preview-mode pill switcher.
+function PreviewTabButton({
+  label,
+  active,
+  onClick,
+  pack,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  pack: Pack;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex-1 rounded-full px-3 py-1.5 text-[12px] font-semibold transition-all"
+      style={{
+        background: active ? pack.mood.accent : "transparent",
+        color: active ? "white" : "var(--color-ink-muted)",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+// Renders the actual recipe-detail card (same component the live site uses)
+// scaled down to fit the editor sidebar. CSS `zoom` shrinks the layout +
+// flow so the sidebar stays scrollable instead of overflowing horizontally,
+// and the detail card renders in its full Desktop grid (not the
+// single-column responsive fallback).
+function FullCardPreview({
+  brand,
+  pack,
+  recipe,
+}: {
+  brand: Brand;
+  pack: Pack;
+  recipe: Recipe;
+}) {
+  return (
+    <div
+      className="overflow-hidden rounded-2xl border"
+      style={{
+        borderColor: "var(--color-line)",
+        background: pack.mood.background,
+      }}
+    >
+      <div
+        // Force a Desktop-class viewport for the inner card so its lg:
+        // breakpoints fire (split title/photo, multi-column body, etc.)
+        // even though the sidebar is narrow. The outer `zoom` then
+        // shrinks the rendered pixels to fit.
+        style={{
+          zoom: 0.5,
+          width: "1100px",
+        }}
+      >
+        <RecipeCardFull
+          brand={brand}
+          pack={pack}
+          recipe={recipe}
+          totalRecipes={1}
+        />
+      </div>
+    </div>
   );
 }
