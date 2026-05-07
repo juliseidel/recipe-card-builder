@@ -1,7 +1,11 @@
 import { notFound } from "next/navigation";
 import { brands, getBrand } from "@/lib/brands";
 import { getPacksForBrand, mergeAndRenumberPacks } from "@/lib/packs";
-import { getCustomPacksWithIdsForBrandServer } from "@/lib/custom-packs-server";
+import {
+  getCustomPacksWithIdsForBrandServer,
+  getCustomRecipeCountsForBrand,
+  getHiddenRecipeCountsForBrand,
+} from "@/lib/custom-packs-server";
 import { SiteHeader } from "@/components/site-header";
 import { BrandHero } from "@/components/brand-hero";
 import { PackCard } from "@/components/pack-card";
@@ -47,9 +51,17 @@ export default async function BrandPage({ params }: BrandPageProps) {
   }
 
   const staticPacks = getPacksForBrand(brand.slug);
-  const customPacksWithIds = await getCustomPacksWithIdsForBrandServer(
-    brand.slug
-  );
+  const [customPacksWithIds, customRecipeCounts, hiddenRecipeCounts] =
+    await Promise.all([
+      getCustomPacksWithIdsForBrandServer(brand.slug),
+      // One aggregate query for ALL custom recipes across the brand → keyed
+      // by pack slug. Used right below to add live custom-recipe totals to
+      // each pack's count badge.
+      getCustomRecipeCountsForBrand(brand.slug),
+      // Same pattern for hidden curated recipes — subtracted from the count
+      // so a user who hides cards sees the badge tick down.
+      getHiddenRecipeCountsForBrand(brand.slug),
+    ]);
   // Curated packs first (1..5), then custom packs in creation order
   // (oldest → 6, next → 7, …). Numbers get rewritten to position-in-array
   // so deleting position 6 promotes 7 → 6 on the next render.
@@ -57,7 +69,22 @@ export default async function BrandPage({ params }: BrandPageProps) {
   const customIdBySlug = new Map(
     customPacksWithIds.map((c) => [c.pack.slug, c.id])
   );
-  const packs = mergeAndRenumberPacks(staticPacks, customPacks);
+  // Override each pack's stored recipeCount with the LIVE total:
+  //   curated stored count
+  // + any custom recipes the user dropped into this pack
+  // − any curated recipes the user hid from this pack
+  // Custom packs start at recipeCount=0 (they have no curated baseline) so
+  // the formula reduces to the custom-recipe total for them, which is what
+  // the badge should show.
+  const packs = mergeAndRenumberPacks(staticPacks, customPacks).map((p) => ({
+    ...p,
+    recipeCount: Math.max(
+      0,
+      p.recipeCount +
+        (customRecipeCounts[p.slug] ?? 0) -
+        (hiddenRecipeCounts[p.slug] ?? 0)
+    ),
+  }));
   const totalRecipes = packs.reduce((sum, p) => sum + p.recipeCount, 0);
   const nextPackNumber = packs.length + 1;
 

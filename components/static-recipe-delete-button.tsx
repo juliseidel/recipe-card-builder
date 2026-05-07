@@ -38,6 +38,14 @@ export function StaticRecipeDeleteButton({
     }
     setDeleting(true);
     await hideRecipe(brandSlug, packSlug, recipeSlug);
+    // Drop the workspace + pack-detail caches so the recipe-count badge and
+    // the recipe grid reflect the hide on back-navigation. Without this the
+    // user would see the just-deleted card flash back into view for ~30 s.
+    await fetch("/api/packs/revalidate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ brandSlug, packSlug }),
+    }).catch(() => {});
     router.push(`/${brandSlug}/${packSlug}`);
   };
 
