@@ -14,7 +14,10 @@ export function BrandCard({ brand }: BrandCardProps) {
       style={{ background: brand.tokens.surface }}
     >
       <div
-        className="relative aspect-[4/5] overflow-hidden"
+        // Square instead of 4/5 — the source photo is near-square and the
+        // taller crop made the card feel stretched. Square keeps the brand
+        // photo prominent without dominating the column height.
+        className="relative aspect-square overflow-hidden"
         style={{ background: brand.tokens.background }}
       >
         <Image
@@ -46,17 +49,17 @@ export function BrandCard({ brand }: BrandCardProps) {
           </span>
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1.5 p-6 text-white">
-          <span className="text-[12.5px] font-medium uppercase tracking-[0.16em] opacity-85">
+        <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1 p-5 text-white">
+          <span className="text-[11.5px] font-medium uppercase tracking-[0.16em] opacity-85">
             {brand.handle}
           </span>
-          <h3 className="font-display text-[48px] leading-[0.94] tracking-[-0.015em]">
+          <h3 className="font-display text-[36px] leading-[0.94] tracking-[-0.015em]">
             {brand.name}
           </h3>
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-4 p-6">
+      <div className="flex flex-1 flex-col gap-3 p-5">
         <div className="flex flex-col gap-1">
           <span className="text-[11.5px] font-semibold uppercase tracking-[0.16em] text-ink-subtle">
             {brand.fullName}
@@ -66,25 +69,25 @@ export function BrandCard({ brand }: BrandCardProps) {
           </p>
         </div>
 
-        <div className="flex items-center gap-4 border-t border-line pt-4 text-sm">
+        <div className="flex items-center gap-3.5 border-t border-line pt-3 text-sm">
           <span className="flex flex-col gap-0.5">
-            <span className="font-display text-[26px] leading-none text-ink">
+            <span className="font-display text-[22px] leading-none text-ink">
               {brand.packCount}
             </span>
-            <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">
               Packs
             </span>
           </span>
-          <span className="h-8 w-px bg-line" />
+          <span className="h-7 w-px bg-line" />
           <span className="flex flex-col gap-0.5">
-            <span className="font-display text-[26px] leading-none text-ink">
+            <span className="font-display text-[22px] leading-none text-ink">
               {brand.recipeCount}
             </span>
-            <span className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">
               Rezepte
             </span>
           </span>
-          <span className="ml-auto inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink transition-transform duration-300 group-hover:translate-x-0.5">
+          <span className="ml-auto inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink transition-transform duration-300 group-hover:translate-x-0.5">
             Workspace öffnen
             <svg
               width="14"

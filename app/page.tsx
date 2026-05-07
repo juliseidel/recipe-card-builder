@@ -12,75 +12,65 @@ export default function Home() {
       <SiteHeader />
 
       <main className="flex-1">
-        {/* HERO ────────────────────────────────────────────────────────── */}
-        <section className="relative mx-auto max-w-[1400px] px-6 pt-20 pb-16 lg:px-10 lg:pt-28 lg:pb-24">
-          {/* Subtle inline ornament — pulls the page toward editorial cookbook
-              vibe and away from saas dashboard. Pure CSS, no asset weight. */}
-          <span
-            aria-hidden
-            className="pointer-events-none absolute right-10 top-24 hidden h-px w-24 bg-line-strong/60 lg:block"
-          />
+        {/* HERO + WORKSPACES on one screen ─────────────────────────────────
+            On large screens the whole thing fits above the fold:
+            left = headline + stats, right = the brand card itself. No more
+            scrolling past a 92-pt headline before the user sees the actual
+            tool. */}
+        <section className="mx-auto max-w-[1400px] px-6 pt-10 pb-16 lg:px-10 lg:pt-14 lg:pb-20">
+          <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[1.05fr_1fr] lg:gap-14">
+            {/* LEFT — copy column */}
+            <div className="flex flex-col gap-6 lg:pt-4">
+              <div className="inline-flex items-center gap-2.5 self-start rounded-full border border-line bg-surface/90 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted shadow-soft backdrop-blur">
+                <span className="size-1.5 rounded-full bg-honey" />
+                Studio für Rezept-Creator
+              </div>
 
-          <div className="flex max-w-3xl flex-col gap-8">
-            <div className="inline-flex items-center gap-2.5 self-start rounded-full border border-line bg-surface/90 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted shadow-soft backdrop-blur">
-              <span className="size-1.5 rounded-full bg-honey" />
-              Studio für Rezept-Creator
-            </div>
+              <h1 className="font-display text-[40px] font-normal leading-[0.98] tracking-[-0.02em] text-ink sm:text-[52px] lg:text-[60px]">
+                Schöne Rezeptkarten,
+                <br />
+                <span className="italic text-ink-muted">die nach dir aussehen.</span>
+              </h1>
 
-            <h1 className="font-display text-[56px] font-normal leading-[0.96] tracking-[-0.02em] text-ink sm:text-[76px] lg:text-[92px]">
-              Schöne Rezeptkarten,
-              <br />
-              <span className="italic text-ink-muted">die nach dir aussehen.</span>
-            </h1>
-
-            <p className="max-w-[58ch] text-[18px] leading-[1.6] text-ink-muted">
-              Lade deine Rezepte rein, wähle ein Layout — du bekommst ein
-              komplettes Pack zurück. Cover, Karten, Nährwerte, druckfertig.
-              In deiner Sprache, mit deinen Werten, in deinem Look.
-            </p>
-
-            {/* Stats: less prominent than before — these are a quiet "what's
-                inside" line, not the hero's main job. */}
-            <dl className="mt-2 flex flex-wrap items-baseline gap-x-10 gap-y-3 text-ink-muted">
-              <Stat value={brands.length} label={brands.length === 1 ? "Workspace" : "Workspaces"} />
-              <Divider />
-              <Stat value={totalPacks} label="Packs" />
-              <Divider />
-              <Stat value={totalRecipes} label="Rezepte" />
-              <Divider />
-              <Stat value={5} label="Layout-Stile" />
-            </dl>
-          </div>
-        </section>
-
-        {/* WORKSPACES ─────────────────────────────────────────────────── */}
-        <section className="mx-auto max-w-[1400px] px-6 pb-24 lg:px-10 lg:pb-32">
-          <div className="mb-8 flex flex-col gap-3 border-t border-line pt-8 sm:flex-row sm:items-end sm:justify-between">
-            <div className="flex flex-col gap-1.5">
-              <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-subtle">
-                Deine Creator
-              </span>
-              <h2 className="font-display text-[32px] leading-none tracking-[-0.01em] text-ink">
-                Wähle einen Workspace.
-              </h2>
-              <p className="mt-0.5 text-[14px] text-ink-muted">
-                Jeder Creator bekommt eigene Farben, Schriften und Pack-Sammlung —
-                damit jedes Pack nach der Person aussieht, nicht nach generischer Vorlage.
+              <p className="max-w-[48ch] text-[15.5px] leading-[1.6] text-ink-muted">
+                Lade deine Rezepte rein, wähle ein Layout — du bekommst ein
+                komplettes Pack zurück. Cover, Karten, Nährwerte, druckfertig.
+                In deiner Sprache, mit deinen Werten, in deinem Look.
               </p>
-            </div>
-          </div>
 
-          <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
-            {brands.map((brand) => (
-              <BrandCard key={brand.slug} brand={brand} />
-            ))}
-            <NewBrandCard />
+              <dl className="mt-1 flex flex-wrap items-baseline gap-x-7 gap-y-2.5 text-ink-muted">
+                <Stat value={brands.length} label={brands.length === 1 ? "Workspace" : "Workspaces"} />
+                <Divider />
+                <Stat value={totalPacks} label="Packs" />
+                <Divider />
+                <Stat value={totalRecipes} label="Rezepte" />
+                <Divider />
+                <Stat value={5} label="Layouts" />
+              </dl>
+            </div>
+
+            {/* RIGHT — workspaces column. Single brand → simple stack of
+                BrandCard + NewBrandCard. If brands.length grows past two we
+                fall back to a 2-col grid so we don't ship infinite-tall
+                stacks on Desktop. */}
+            <div
+              className={
+                brands.length <= 1
+                  ? "flex flex-col gap-5 sm:grid sm:grid-cols-2 sm:gap-5 lg:flex lg:flex-col"
+                  : "grid grid-cols-1 gap-5 sm:grid-cols-2"
+              }
+            >
+              {brands.map((brand) => (
+                <BrandCard key={brand.slug} brand={brand} />
+              ))}
+              <NewBrandCard />
+            </div>
           </div>
         </section>
       </main>
 
       <footer className="border-t border-line bg-surface/40">
-        <div className="mx-auto flex max-w-[1400px] flex-col items-start justify-between gap-3 px-6 py-8 text-[13px] text-ink-muted sm:flex-row sm:items-center lg:px-10">
+        <div className="mx-auto flex max-w-[1400px] flex-col items-start justify-between gap-3 px-6 py-7 text-[13px] text-ink-muted sm:flex-row sm:items-center lg:px-10">
           <p>
             Recipe Card Builder —{" "}
             <span className="text-ink">druckfertige Karten in Minuten.</span>
@@ -96,11 +86,11 @@ export default function Home() {
 
 function Stat({ value, label }: { value: number | string; label: string }) {
   return (
-    <div className="flex items-baseline gap-2">
-      <dt className="font-display text-[28px] leading-none text-ink">
+    <div className="flex items-baseline gap-1.5">
+      <dt className="font-display text-[24px] leading-none text-ink">
         {value}
       </dt>
-      <dd className="text-[12px] font-medium uppercase tracking-[0.14em] text-ink-subtle">
+      <dd className="text-[11px] font-medium uppercase tracking-[0.14em] text-ink-subtle">
         {label}
       </dd>
     </div>
@@ -109,6 +99,6 @@ function Stat({ value, label }: { value: number | string; label: string }) {
 
 function Divider() {
   return (
-    <span aria-hidden className="hidden h-4 w-px bg-line-strong/60 sm:inline-block" />
+    <span aria-hidden className="hidden h-3.5 w-px bg-line-strong/60 sm:inline-block" />
   );
 }
