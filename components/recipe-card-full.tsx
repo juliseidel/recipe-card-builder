@@ -1,7 +1,40 @@
 import Image from "next/image";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
-import type { Recipe } from "@/lib/recipes";
+import {
+  normalizeStep,
+  nutritionBasisLabel,
+  nutritionBasisLabelShort,
+  nutritionBasisInline,
+  type Recipe,
+} from "@/lib/recipes";
+
+// Web mirror of lib/pdf/helpers.ts#groupSteps — groups recipe steps by
+// their optional `group` field so layouts can render "Für den Teig" /
+// "Glasur" sections with continuous global numbering.
+type WebStepGroup = {
+  name: string | null;
+  items: Array<{ text: string; index: number }>;
+};
+function groupRecipeSteps(steps: Recipe["steps"]): WebStepGroup[] {
+  const main: WebStepGroup = { name: null, items: [] };
+  const groups = new Map<string, WebStepGroup>();
+  steps.forEach((raw, idx) => {
+    const s = normalizeStep(raw);
+    const item = { text: s.text, index: idx };
+    if (s.group) {
+      if (!groups.has(s.group))
+        groups.set(s.group, { name: s.group, items: [] });
+      groups.get(s.group)!.items.push(item);
+    } else {
+      main.items.push(item);
+    }
+  });
+  const out: WebStepGroup[] = [];
+  if (main.items.length > 0) out.push(main);
+  groups.forEach((g) => out.push(g));
+  return out;
+}
 
 type RecipeCardFullProps = {
   brand: Brand;
@@ -225,7 +258,7 @@ function EditorialLayout({
           pack={pack}
         />
         <EditorialStatTile
-          label="Pro Portion"
+          label={nutritionBasisLabelShort(recipe.nutritionBasis)}
           value={String(recipe.nutrition.kcal)}
           sub={`kcal · ${recipe.nutrition.carbs}g KH · ${recipe.nutrition.fat}g Fett`}
           pack={pack}
@@ -234,7 +267,7 @@ function EditorialLayout({
         <EditorialStatTile
           label="Eiweiß"
           value={`${recipe.nutrition.protein}g`}
-          sub="pro Portion"
+          sub={nutritionBasisInline(recipe.nutritionBasis)}
           pack={pack}
         />
         <EditorialStatTile
@@ -364,20 +397,38 @@ function EditorialLayout({
             </span>
           </div>
           <ol className="mt-5 flex flex-col gap-5">
-            {recipe.steps.map((step, idx) => (
-              <li key={idx} className="grid grid-cols-[2.4rem_1fr] gap-3">
-                <span
-                  className="font-display text-[28px] leading-none tabular-nums"
-                  style={{ color: pack.mood.accent }}
-                >
-                  {idx + 1}
-                </span>
-                <span
-                  className="text-[15px] leading-[1.55]"
-                  style={{ color: pack.mood.ink }}
-                >
-                  {step}
-                </span>
+            {groupRecipeSteps(recipe.steps).map((group, gIdx) => (
+              <li key={`sg-${gIdx}`} className="contents">
+                {group.name ? (
+                  <li
+                    className="text-[11px] font-semibold uppercase tracking-[0.22em]"
+                    style={{
+                      color: pack.mood.accent,
+                      marginTop: gIdx > 0 ? "0.5rem" : 0,
+                    }}
+                  >
+                    {group.name}
+                  </li>
+                ) : null}
+                {group.items.map((item) => (
+                  <li
+                    key={item.index}
+                    className="grid grid-cols-[2.4rem_1fr] gap-3"
+                  >
+                    <span
+                      className="font-display text-[28px] leading-none tabular-nums"
+                      style={{ color: pack.mood.accent }}
+                    >
+                      {item.index + 1}
+                    </span>
+                    <span
+                      className="text-[15px] leading-[1.55]"
+                      style={{ color: pack.mood.ink }}
+                    >
+                      {item.text}
+                    </span>
+                  </li>
+                ))}
               </li>
             ))}
           </ol>
@@ -426,7 +477,7 @@ function EditorialNutrientBanner({
           className="text-[10px] font-medium uppercase tracking-[0.14em]"
           style={{ color: pack.mood.inkSoft }}
         >
-          Mikronährstoffe pro Portion
+          Mikronährstoffe {nutritionBasisInline(recipe.nutritionBasis)}
         </span>
       </div>
       <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
@@ -603,7 +654,7 @@ function PatisserieLayout({
         recipe={recipe}
         pack={pack}
         variant="pills"
-        perPortionLabel={`pro ${portionsLabel === "Stücke" ? "Stück" : "Stück"}`}
+        perPortionLabel={nutritionBasisInline(recipe.nutritionBasis)}
       />
 
       {/* Body */}
@@ -950,14 +1001,14 @@ function SportLayout({
         <VolumenStat
           emoji="🔥"
           value={String(recipe.nutrition.kcal)}
-          label="kcal pro Portion"
+          label={`kcal ${nutritionBasisInline(recipe.nutritionBasis)}`}
           pack={pack}
           highlight
         />
         <VolumenStat
           emoji="💪"
           value={`${recipe.nutrition.protein}g`}
-          label="Eiweiß pro Portion"
+          label={`Eiweiß ${nutritionBasisInline(recipe.nutritionBasis)}`}
           pack={pack}
         />
       </div>
@@ -978,7 +1029,7 @@ function SportLayout({
             className="text-[10px] font-medium uppercase tracking-[0.14em]"
             style={{ color: pack.mood.inkSoft }}
           >
-            pro Portion · von 50 / 80 / 35 g Skala
+            {nutritionBasisInline(recipe.nutritionBasis)} · von 50 / 80 / 35 g Skala
           </span>
         </div>
         <div className="flex flex-col gap-3">
@@ -1106,35 +1157,53 @@ function SportLayout({
             </span>
           </div>
           <ol className="mt-5 flex flex-col">
-            {recipe.steps.map((step, idx) => (
-              <li
-                key={idx}
-                className="grid grid-cols-[2.4rem_1fr] gap-3 pb-5 last:pb-0"
-              >
-                <div className="flex flex-col items-center">
-                  <span
-                    className="font-display text-[28px] leading-none tabular-nums"
-                    style={{ color: pack.mood.accent }}
+            {groupRecipeSteps(recipe.steps).map((group, gIdx) => (
+              <li key={`sg-${gIdx}`} className="contents">
+                {group.name ? (
+                  <li
+                    className="pb-3 text-[11px] font-semibold uppercase tracking-[0.22em]"
+                    style={{
+                      color: pack.mood.accent,
+                      paddingTop: gIdx > 0 ? "0.5rem" : 0,
+                    }}
                   >
-                    {idx + 1}
-                  </span>
-                  {idx < recipe.steps.length - 1 ? (
-                    <span
-                      className="mt-2 block w-0.5 flex-1"
-                      style={{
-                        background: pack.mood.accent + "30",
-                        minHeight: 32,
-                      }}
-                      aria-hidden
-                    />
-                  ) : null}
-                </div>
-                <span
-                  className="text-[15px] leading-[1.55]"
-                  style={{ color: pack.mood.ink }}
-                >
-                  {step}
-                </span>
+                    {group.name}
+                  </li>
+                ) : null}
+                {group.items.map((item) => {
+                  const isLast = item.index === recipe.steps.length - 1;
+                  return (
+                    <li
+                      key={item.index}
+                      className="grid grid-cols-[2.4rem_1fr] gap-3 pb-5 last:pb-0"
+                    >
+                      <div className="flex flex-col items-center">
+                        <span
+                          className="font-display text-[28px] leading-none tabular-nums"
+                          style={{ color: pack.mood.accent }}
+                        >
+                          {item.index + 1}
+                        </span>
+                        {!isLast ? (
+                          <span
+                            className="mt-2 block w-0.5 flex-1"
+                            style={{
+                              background: pack.mood.accent + "30",
+                              minHeight: 32,
+                            }}
+                            aria-hidden
+                          />
+                        ) : null}
+                      </div>
+                      <span
+                        className="text-[15px] leading-[1.55]"
+                        style={{ color: pack.mood.ink }}
+                      >
+                        {item.text}
+                      </span>
+                    </li>
+                  );
+                })}
               </li>
             ))}
           </ol>
@@ -1260,14 +1329,14 @@ function DashboardLayout({
             />
             <DashRow
               icon="🔥"
-              label="Pro Portion"
+              label={nutritionBasisLabelShort(recipe.nutritionBasis)}
               value={`${recipe.nutrition.kcal} kcal`}
               pack={pack}
               highlight
             />
             <DashRow
               icon="💪"
-              label="Eiweiß / Portion"
+              label={`Eiweiß / ${nutritionBasisLabelShort(recipe.nutritionBasis).replace(/^Pro /, "")}`}
               value={`${recipe.nutrition.protein} g`}
               pack={pack}
             />
@@ -1442,22 +1511,40 @@ function SectionList({
         </ul>
       ) : (
         <ol className="flex flex-col gap-4">
-          {recipe.steps.map((step, idx) => (
-            <li key={idx} className="grid grid-cols-[2.2rem_1fr] gap-3">
-              <span
-                className={`font-display text-[28px] leading-none tabular-nums ${
-                  bold ? "font-bold" : ""
-                }`}
-                style={{ color: pack.mood.accent }}
-              >
-                {idx + 1}
-              </span>
-              <span
-                className="text-[15px] leading-[1.55]"
-                style={{ color: pack.mood.ink }}
-              >
-                {step}
-              </span>
+          {groupRecipeSteps(recipe.steps).map((group, gIdx) => (
+            <li key={`sg-${gIdx}`} className="contents">
+              {group.name ? (
+                <li
+                  className="text-[11px] font-semibold uppercase tracking-[0.22em]"
+                  style={{
+                    color: pack.mood.accent,
+                    paddingTop: gIdx > 0 ? "0.25rem" : 0,
+                  }}
+                >
+                  {group.name}
+                </li>
+              ) : null}
+              {group.items.map((item) => (
+                <li
+                  key={item.index}
+                  className="grid grid-cols-[2.2rem_1fr] gap-3"
+                >
+                  <span
+                    className={`font-display text-[28px] leading-none tabular-nums ${
+                      bold ? "font-bold" : ""
+                    }`}
+                    style={{ color: pack.mood.accent }}
+                  >
+                    {item.index + 1}
+                  </span>
+                  <span
+                    className="text-[15px] leading-[1.55]"
+                    style={{ color: pack.mood.ink }}
+                  >
+                    {item.text}
+                  </span>
+                </li>
+              ))}
             </li>
           ))}
         </ol>
@@ -1470,13 +1557,18 @@ function MacrosBlock({
   recipe,
   pack,
   variant,
-  perPortionLabel = "pro Portion",
+  perPortionLabel,
 }: {
   recipe: Recipe;
   pack: Pack;
   variant: "strip" | "pills" | "bold" | "hero";
   perPortionLabel?: string;
 }) {
+  // Default the label to whatever the recipe's nutrition basis is. Callers
+  // may still override (legacy: editorial layout passed "pro Portion" as a
+  // baked-in default before this field existed).
+  const basisLabel =
+    perPortionLabel ?? nutritionBasisInline(recipe.nutritionBasis);
   const items = [
     { label: "Eiweiß", value: `${recipe.nutrition.protein}g` },
     { label: "Kohlenhydrate", value: `${recipe.nutrition.carbs}g` },
@@ -1511,7 +1603,7 @@ function MacrosBlock({
             className="text-[10px] font-medium uppercase tracking-[0.14em]"
             style={{ color: pack.mood.inkSoft }}
           >
-            pro Portion ({recipe.nutrition.kcal} kcal)
+            {basisLabel} ({recipe.nutrition.kcal} kcal)
           </span>
         </div>
         <div className="flex flex-col gap-3.5">
@@ -1564,7 +1656,7 @@ function MacrosBlock({
         >
           {recipe.nutrition.kcal} kcal
           <span className="text-[10px] font-normal italic opacity-80">
-            {perPortionLabel}
+            {basisLabel}
           </span>
         </span>
         {items.map((item) => (
@@ -1794,7 +1886,7 @@ function MicrosPanel({
           className="text-[10px] font-medium uppercase tracking-[0.14em]"
           style={{ color: pack.mood.inkSoft }}
         >
-          Mikronährstoffe pro Portion · % Tagesbedarf
+          Mikronährstoffe {nutritionBasisInline(recipe.nutritionBasis)} · % Tagesbedarf
         </span>
       </div>
 
