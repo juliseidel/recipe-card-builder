@@ -6,9 +6,14 @@
 // Docs: https://apify.com/apify/instagram-post-scraper
 
 const APIFY_BASE = "https://api.apify.com/v2";
-// Apify-Actor-ID fuer den Instagram-Post-Scraper. "~"-Form (statt "/") weil
+// Apify-Actor-ID fuer den Instagram-Scraper. "~"-Form (statt "/") weil
 // die Apify-API in URL-Pfaden Tilden statt Slashes erwartet.
-const ACTOR_ID = "apify~instagram-post-scraper";
+//
+// Wir nutzen "instagram-scraper" (den universellen, nicht
+// "instagram-post-scraper"). Grund: post-scraper verlangt einen Username
+// als Pflicht-Input — wir wollen aber direkt URL-basiert scrapen, ohne
+// dass der User vorher den Account-Namen separat eintippen muss.
+const ACTOR_ID = "apify~instagram-scraper";
 
 export type InstagramPost = {
   /** Vollstaendige Bildunterschrift / Caption — das ist, was Gemini parst. */
@@ -99,11 +104,14 @@ export async function scrapeInstagramPost(
   // wir cappen client-seitig auf 45 s (Vercel-Lambda-Limit ist 60 s).
   const endpoint = `${APIFY_BASE}/acts/${ACTOR_ID}/run-sync-get-dataset-items?token=${apiToken}&format=json`;
 
+  // Input-Schema des "instagram-scraper":
+  // - directUrls: Array von Post-/Reel-URLs (genau das, was wir liefern)
+  // - resultsType: "posts" → wir wollen die Post-Daten incl. caption
+  // - resultsLimit: 1 → wir scrapen nur einen einzigen Post pro Aufruf
   const body = {
     directUrls: [normalized],
+    resultsType: "posts",
     resultsLimit: 1,
-    // addParentData=false: wir wollen nur den Post-Caption, nicht das Profil.
-    addParentData: false,
   };
 
   const controller = new AbortController();
