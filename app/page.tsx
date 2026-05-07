@@ -12,65 +12,74 @@ export default function Home() {
       <SiteHeader />
 
       <main className="flex-1">
-        {/* HERO + WORKSPACES on one screen ─────────────────────────────────
-            On large screens the whole thing fits above the fold:
-            left = headline + stats, right = the brand card itself. No more
-            scrolling past a 92-pt headline before the user sees the actual
-            tool. */}
-        <section className="mx-auto max-w-[1400px] px-6 pt-10 pb-16 lg:px-10 lg:pt-14 lg:pb-20">
-          <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[1.05fr_1fr] lg:gap-14">
-            {/* LEFT — copy column */}
-            <div className="flex flex-col gap-6 lg:pt-4">
-              <div className="inline-flex items-center gap-2.5 self-start rounded-full border border-line bg-surface/90 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted shadow-soft backdrop-blur">
-                <span className="size-1.5 rounded-full bg-honey" />
-                Studio für Rezept-Creator
-              </div>
+        {/* Tool-style page header — clear, calm, no marketing hero. The job
+            here is "pick a workspace and start building", not "convince you
+            to use the product". One eyebrow, a small headline, a one-liner. */}
+        <section className="mx-auto max-w-[1280px] px-6 pt-10 pb-7 lg:px-10 lg:pt-12">
+          <div className="flex flex-col gap-2.5">
+            <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-subtle">
+              Studio · für Rezept-Creator
+            </span>
+            <h1 className="font-display text-[34px] leading-[1.05] tracking-[-0.01em] text-ink sm:text-[40px]">
+              Workspaces
+            </h1>
+            <p className="max-w-[60ch] text-[14.5px] leading-[1.55] text-ink-muted">
+              Wähle einen Creator-Workspace, um seine Pack-Sammlung zu öffnen.
+              Jeder Workspace bringt eigene Farben, Schriften und ein
+              Pack-Set mit — fertig zum Posten oder Drucken.
+            </p>
+          </div>
+        </section>
 
-              <h1 className="font-display text-[40px] font-normal leading-[0.98] tracking-[-0.02em] text-ink sm:text-[52px] lg:text-[60px]">
-                Schöne Rezeptkarten,
-                <br />
-                <span className="italic text-ink-muted">die nach dir aussehen.</span>
-              </h1>
+        {/* Card grid — 1/2/3 cols. Cards themselves are deliberately mid-sized
+            (aspect-[5/4] image, compact body) so 3 of them fit in a row at
+            lg without dominating the viewport. */}
+        <section className="mx-auto max-w-[1280px] px-6 pb-16 lg:px-10 lg:pb-20">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {brands.map((brand) => (
+              <BrandCard key={brand.slug} brand={brand} />
+            ))}
+            <NewBrandCard />
+          </div>
 
-              <p className="max-w-[48ch] text-[15.5px] leading-[1.6] text-ink-muted">
-                Lade deine Rezepte rein, wähle ein Layout — du bekommst ein
-                komplettes Pack zurück. Cover, Karten, Nährwerte, druckfertig.
-                In deiner Sprache, mit deinen Werten, in deinem Look.
-              </p>
-
-              <dl className="mt-1 flex flex-wrap items-baseline gap-x-7 gap-y-2.5 text-ink-muted">
-                <Stat value={brands.length} label={brands.length === 1 ? "Workspace" : "Workspaces"} />
-                <Divider />
-                <Stat value={totalPacks} label="Packs" />
-                <Divider />
-                <Stat value={totalRecipes} label="Rezepte" />
-                <Divider />
-                <Stat value={5} label="Layouts" />
-              </dl>
-            </div>
-
-            {/* RIGHT — workspaces column. Single brand → simple stack of
-                BrandCard + NewBrandCard. If brands.length grows past two we
-                fall back to a 2-col grid so we don't ship infinite-tall
-                stacks on Desktop. */}
-            <div
-              className={
-                brands.length <= 1
-                  ? "flex flex-col gap-5 sm:grid sm:grid-cols-2 sm:gap-5 lg:flex lg:flex-col"
-                  : "grid grid-cols-1 gap-5 sm:grid-cols-2"
-              }
-            >
-              {brands.map((brand) => (
-                <BrandCard key={brand.slug} brand={brand} />
-              ))}
-              <NewBrandCard />
-            </div>
+          {/* Quiet stats line at the bottom — gives Ingo a sense of the
+              tool's content without front-loading the page with marketing
+              numbers. */}
+          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-line pt-5 text-[12px] text-ink-subtle">
+            <span className="font-mono uppercase tracking-[0.16em]">
+              In Studio
+            </span>
+            <span>
+              <span className="font-display text-[15px] text-ink">
+                {brands.length}
+              </span>{" "}
+              {brands.length === 1 ? "Workspace" : "Workspaces"}
+            </span>
+            <span aria-hidden className="text-line-strong">·</span>
+            <span>
+              <span className="font-display text-[15px] text-ink">
+                {totalPacks}
+              </span>{" "}
+              Packs
+            </span>
+            <span aria-hidden className="text-line-strong">·</span>
+            <span>
+              <span className="font-display text-[15px] text-ink">
+                {totalRecipes}
+              </span>{" "}
+              Rezepte
+            </span>
+            <span aria-hidden className="text-line-strong">·</span>
+            <span>
+              <span className="font-display text-[15px] text-ink">5</span>{" "}
+              Layout-Stile
+            </span>
           </div>
         </section>
       </main>
 
       <footer className="border-t border-line bg-surface/40">
-        <div className="mx-auto flex max-w-[1400px] flex-col items-start justify-between gap-3 px-6 py-7 text-[13px] text-ink-muted sm:flex-row sm:items-center lg:px-10">
+        <div className="mx-auto flex max-w-[1280px] flex-col items-start justify-between gap-3 px-6 py-7 text-[13px] text-ink-muted sm:flex-row sm:items-center lg:px-10">
           <p>
             Recipe Card Builder —{" "}
             <span className="text-ink">druckfertige Karten in Minuten.</span>
@@ -81,24 +90,5 @@ export default function Home() {
         </div>
       </footer>
     </div>
-  );
-}
-
-function Stat({ value, label }: { value: number | string; label: string }) {
-  return (
-    <div className="flex items-baseline gap-1.5">
-      <dt className="font-display text-[24px] leading-none text-ink">
-        {value}
-      </dt>
-      <dd className="text-[11px] font-medium uppercase tracking-[0.14em] text-ink-subtle">
-        {label}
-      </dd>
-    </div>
-  );
-}
-
-function Divider() {
-  return (
-    <span aria-hidden className="hidden h-3.5 w-px bg-line-strong/60 sm:inline-block" />
   );
 }
