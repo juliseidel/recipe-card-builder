@@ -21,21 +21,23 @@ import { SiteHeader } from "@/components/site-header";
 import { RecipeCardPreview } from "@/components/recipe-card-preview";
 import { IngredientCombobox } from "@/components/ingredient-combobox";
 
-// Editor models a recipe as TWO flat row lists (ingredients, steps) where
-// each row is either a content item or a group-header. On save, headers
-// collapse into the `group` field of the rows that follow them, producing
-// the standard Recipe shape. This UI model is what lets "Für den Teig" /
-// "Glasur" / "Schoko-Variante A" sectioning feel natural to enter without
-// nested drag-drop UX.
-type IngredientRow =
-  | { kind: "header"; name: string }
-  | { kind: "reset" } // explicit "back to main group" marker
-  | { kind: "item"; amount: string; name: string };
-
-type StepRow =
-  | { kind: "header"; name: string }
-  | { kind: "reset" }
-  | { kind: "step"; text: string };
+// Editor models a recipe as TWO lists of groups, each with its own items.
+// The first group is always the Hauptgruppe (name: null) and never gets
+// removed. Additional groups have a name like "Für den Teig" / "Glasur" /
+// "Schoko-Variante A" and live below the Hauptgruppe. Each group has its
+// own "+ Zutat" / "+ Schritt" button so the user can target items to a
+// specific group without juggling row-order — and switch back and forth
+// freely between Hauptgruppe and any named group.
+type IngredientItem = { amount: string; name: string };
+type StepItem = { text: string };
+type IngredientGroupState = {
+  name: string | null; // null = Hauptgruppe (always present, always first)
+  items: IngredientItem[];
+};
+type StepGroupState = {
+  name: string | null;
+  items: StepItem[];
+};
 
 type NewRecipePageProps = {
   params: Promise<{ brand: string; pack: string }>;
@@ -57,16 +59,30 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   const [servings, setServings] = useState("2");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
-  const [ingredientRows, setIngredientRows] = useState<IngredientRow[]>([
-    { kind: "item", amount: "", name: "" },
-    { kind: "item", amount: "", name: "" },
-    { kind: "item", amount: "", name: "" },
+  const [ingredientGroups, setIngredientGroups] = useState<
+    IngredientGroupState[]
+  >([
+    {
+      name: null, // Hauptgruppe — always first, always present
+      items: [
+        { amount: "", name: "" },
+        { amount: "", name: "" },
+        { amount: "", name: "" },
+      ],
+    },
   ]);
-  const [stepRows, setStepRows] = useState<StepRow[]>([
-    { kind: "step", text: "" },
-    { kind: "step", text: "" },
-    { kind: "step", text: "" },
+  const [stepGroups, setStepGroups] = useState<StepGroupState[]>([
+    {
+      name: null,
+      items: [{ text: "" }, { text: "" }, { text: "" }],
+    },
   ]);
+  // Track which (groupIdx, itemIdx) currently has focus — used by the
+  // unit-quick-actions to know where to apply.
+  const [focusedIngredient, setFocusedIngredient] = useState<{
+    g: number;
+    i: number;
+  } | null>(null);
   const [kcal, setKcal] = useState("");
   const [protein, setProtein] = useState("");
   const [carbs, setCarbs] = useState("");
@@ -76,49 +92,40 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [focusedIngredientIdx, setFocusedIngredientIdx] = useState<number | null>(
-    null
-  );
 
-  // Walk the ingredient rows once: track the current group header and
-  // attach it as `group` to every subsequent item until the next header
-  // or reset marker.
+  // Flatten the group-container model into the standard Recipe shape on
+  // save: walk groups in order, walk each group's items, attach the group
+  // name to every non-empty item.
   const builtIngredients: Ingredient[] = useMemo(() => {
-    let currentGroup: string | null = null;
     const out: Ingredient[] = [];
-    for (const row of ingredientRows) {
-      if (row.kind === "header") {
-        currentGroup = row.name.trim() || null;
-      } else if (row.kind === "reset") {
-        currentGroup = null;
-      } else if (row.amount.trim() || row.name.trim()) {
+    for (const g of ingredientGroups) {
+      const groupName = g.name?.trim() || null;
+      for (const item of g.items) {
+        if (!item.amount.trim() && !item.name.trim()) continue;
         out.push({
-          amount: row.amount.trim(),
-          name: row.name.trim(),
-          ...(currentGroup ? { group: currentGroup } : {}),
+          amount: item.amount.trim(),
+          name: item.name.trim(),
+          ...(groupName ? { group: groupName } : {}),
         });
       }
     }
     return out;
-  }, [ingredientRows]);
+  }, [ingredientGroups]);
 
   const builtSteps: RecipeStep[] = useMemo(() => {
-    let currentGroup: string | null = null;
     const out: RecipeStep[] = [];
-    for (const row of stepRows) {
-      if (row.kind === "header") {
-        currentGroup = row.name.trim() || null;
-      } else if (row.kind === "reset") {
-        currentGroup = null;
-      } else if (row.text.trim()) {
+    for (const g of stepGroups) {
+      const groupName = g.name?.trim() || null;
+      for (const item of g.items) {
+        if (!item.text.trim()) continue;
         out.push({
-          text: row.text.trim(),
-          ...(currentGroup ? { group: currentGroup } : {}),
+          text: item.text.trim(),
+          ...(groupName ? { group: groupName } : {}),
         });
       }
     }
     return out;
-  }, [stepRows]);
+  }, [stepGroups]);
 
   const previewRecipe: Recipe | null = useMemo(() => {
     if (!pack) return null;
@@ -269,113 +276,161 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     }
   };
 
-  // Row helpers — ingredient list
-  const updateIngredientRow = (idx: number, patch: Partial<IngredientRow>) => {
-    setIngredientRows((prev) =>
-      prev.map((r, k) => (k === idx ? ({ ...r, ...patch } as IngredientRow) : r))
+  // Group-container helpers — INGREDIENTS
+  const updateIngredientItem = (
+    g: number,
+    i: number,
+    patch: Partial<IngredientItem>
+  ) => {
+    setIngredientGroups((prev) =>
+      prev.map((group, k) =>
+        k === g
+          ? {
+              ...group,
+              items: group.items.map((it, j) =>
+                j === i ? { ...it, ...patch } : it
+              ),
+            }
+          : group
+      )
     );
   };
-  const removeIngredientRow = (idx: number) => {
-    setIngredientRows((prev) => {
-      if (prev.length <= 1) return prev;
-      const next = prev.filter((_, k) => k !== idx);
+  const removeIngredientItem = (g: number, i: number) => {
+    setIngredientGroups((prev) =>
+      prev.map((group, k) =>
+        k === g
+          ? {
+              ...group,
+              // Always keep at least one item slot in the Hauptgruppe so
+              // it's never visually empty. Named groups can drop to zero
+              // items — in that case the user can remove the group itself.
+              items:
+                group.items.length <= 1 && group.name === null
+                  ? group.items
+                  : group.items.filter((_, j) => j !== i),
+            }
+          : group
+      )
+    );
+    if (focusedIngredient?.g === g && focusedIngredient.i === i) {
+      setFocusedIngredient(null);
+    }
+  };
+  const addIngredientItemTo = (g: number) => {
+    setIngredientGroups((prev) => {
+      const next = prev.map((group, k) =>
+        k === g
+          ? { ...group, items: [...group.items, { amount: "", name: "" }] }
+          : group
+      );
+      const target = next[g];
+      if (target) {
+        setFocusedIngredient({ g, i: target.items.length - 1 });
+      }
       return next;
     });
-    if (focusedIngredientIdx === idx) setFocusedIngredientIdx(null);
-  };
-  const addIngredientItem = () => {
-    setIngredientRows((prev) => [
-      ...prev,
-      { kind: "item", amount: "", name: "" },
-    ]);
-    setFocusedIngredientIdx(ingredientRows.length);
   };
   const addIngredientGroup = () => {
-    setIngredientRows((prev) => [...prev, { kind: "header", name: "" }]);
-  };
-  // Insert a new item directly after a specific row (used when the user
-  // hits Enter on a group header — the new ingredient should appear under
-  // that group, not at the end of the entire list).
-  const addIngredientItemAfter = (idx: number) => {
-    setIngredientRows((prev) => [
-      ...prev.slice(0, idx + 1),
-      { kind: "item", amount: "", name: "" },
-      ...prev.slice(idx + 1),
-    ]);
-    setFocusedIngredientIdx(idx + 1);
-  };
-  // "Back to main group" — appends an explicit `reset` marker (rendered as
-  // a subtle "Hauptgruppe"-divider) plus a fresh empty item. Distinct from
-  // an empty `header` row, which would render as a blank named-group input
-  // — that confused users who clicked "+ Gruppe" and expected to type a
-  // name immediately.
-  const addIngredientItemMainGroup = () => {
-    setIngredientRows((prev) => [
+    setIngredientGroups((prev) => [
       ...prev,
-      { kind: "reset" },
-      { kind: "item", amount: "", name: "" },
+      { name: "", items: [{ amount: "", name: "" }] },
     ]);
-    setFocusedIngredientIdx(ingredientRows.length + 1);
   };
-
-  // Row helpers — step list (mirrors ingredient helpers above)
-  const updateStepRow = (idx: number, patch: Partial<StepRow>) => {
-    setStepRows((prev) =>
-      prev.map((r, k) => (k === idx ? ({ ...r, ...patch } as StepRow) : r))
+  const removeIngredientGroup = (g: number) => {
+    if (g === 0) return; // never remove the Hauptgruppe
+    setIngredientGroups((prev) => {
+      const removed = prev[g];
+      // Move any non-empty items from the deleted group to the Hauptgruppe
+      // so the user doesn't lose work — they can clean up there.
+      const survivors = removed?.items.filter(
+        (it) => it.amount.trim() || it.name.trim()
+      ) ?? [];
+      return prev
+        .map((group, k) =>
+          k === 0 && survivors.length > 0
+            ? { ...group, items: [...group.items, ...survivors] }
+            : group
+        )
+        .filter((_, k) => k !== g);
+    });
+  };
+  const setIngredientGroupName = (g: number, name: string) => {
+    setIngredientGroups((prev) =>
+      prev.map((group, k) => (k === g ? { ...group, name } : group))
     );
   };
-  const removeStepRow = (idx: number) => {
-    setStepRows((prev) => (prev.length <= 1 ? prev : prev.filter((_, k) => k !== idx)));
+
+  // Group-container helpers — STEPS (mirrors ingredient helpers)
+  const updateStepItem = (g: number, i: number, patch: Partial<StepItem>) => {
+    setStepGroups((prev) =>
+      prev.map((group, k) =>
+        k === g
+          ? {
+              ...group,
+              items: group.items.map((it, j) =>
+                j === i ? { ...it, ...patch } : it
+              ),
+            }
+          : group
+      )
+    );
   };
-  const addStepItem = () => {
-    setStepRows((prev) => [...prev, { kind: "step", text: "" }]);
+  const removeStepItem = (g: number, i: number) => {
+    setStepGroups((prev) =>
+      prev.map((group, k) =>
+        k === g
+          ? {
+              ...group,
+              items:
+                group.items.length <= 1 && group.name === null
+                  ? group.items
+                  : group.items.filter((_, j) => j !== i),
+            }
+          : group
+      )
+    );
+  };
+  const addStepItemTo = (g: number) => {
+    setStepGroups((prev) =>
+      prev.map((group, k) =>
+        k === g ? { ...group, items: [...group.items, { text: "" }] } : group
+      )
+    );
   };
   const addStepGroup = () => {
-    setStepRows((prev) => [...prev, { kind: "header", name: "" }]);
-  };
-  const addStepItemAfter = (idx: number) => {
-    setStepRows((prev) => [
-      ...prev.slice(0, idx + 1),
-      { kind: "step", text: "" },
-      ...prev.slice(idx + 1),
-    ]);
-  };
-  const addStepItemMainGroup = () => {
-    setStepRows((prev) => [
+    setStepGroups((prev) => [
       ...prev,
-      { kind: "reset" },
-      { kind: "step", text: "" },
+      { name: "", items: [{ text: "" }] },
     ]);
   };
+  const removeStepGroup = (g: number) => {
+    if (g === 0) return;
+    setStepGroups((prev) => {
+      const removed = prev[g];
+      const survivors = removed?.items.filter((it) => it.text.trim()) ?? [];
+      return prev
+        .map((group, k) =>
+          k === 0 && survivors.length > 0
+            ? { ...group, items: [...group.items, ...survivors] }
+            : group
+        )
+        .filter((_, k) => k !== g);
+    });
+  };
+  const setStepGroupName = (g: number, name: string) => {
+    setStepGroups((prev) =>
+      prev.map((group, k) => (k === g ? { ...group, name } : group))
+    );
+  };
 
-  // Walk both lists once to find the currently active (last non-empty)
-  // group. The "+ Zutat" / "+ Schritt" buttons use this to label
-  // themselves accurately ("zur Gruppe Glasur") and to decide whether the
-  // "Hauptgruppe"-escape button is needed. Reset rows clear the active
-  // group back to null.
-  function activeGroup<T extends { kind: string }>(rows: T[]): string | null {
-    let g: string | null = null;
-    for (const row of rows) {
-      if (row.kind === "header") {
-        const name = ((row as { name?: string }).name ?? "").trim();
-        g = name || null;
-      } else if (row.kind === "reset") {
-        g = null;
-      }
-    }
-    return g;
-  }
-  const activeIngredientGroup = activeGroup(ingredientRows);
-  const activeStepGroup = activeGroup(stepRows);
-
-  // Number rendering for items: walk rows and compute the running step
-  // number, skipping headers. Ingredient items don't show numbers, only steps.
-  const stepNumberFor = (idx: number): number => {
+  // Continuous global step number across all groups — same convention as
+  // the layout renderers.
+  const stepGlobalIndex = (groupIdx: number, itemIdx: number): number => {
     let n = 0;
-    for (let i = 0; i <= idx; i++) {
-      if (stepRows[i].kind === "step") n++;
+    for (let g = 0; g < groupIdx; g++) {
+      n += stepGroups[g].items.length;
     }
-    return n;
+    return n + itemIdx + 1;
   };
 
   return (
@@ -718,121 +773,125 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
               </div>
             </section>
 
-            {/* Section 3: Zutaten — with optional group headers */}
+            {/* Section 3: Zutaten — group containers */}
             <section className="editor-section editor-card">
               <SectionHeader number={3} title="Zutaten" pack={pack} required>
-                Tippe an — Vorschläge erscheinen automatisch. Mit „+ Gruppe" lassen sich
-                Zutaten in Sektionen wie „Für den Teig" / „Glasur" gliedern.
+                Hauptgruppe oben. Mit „+ Neue Gruppe" lassen sich Zutaten in
+                Sektionen wie „Für den Teig" / „Glasur" gliedern. Jede Gruppe
+                hat einen eigenen „+ Zutat"-Button.
               </SectionHeader>
 
-              <div className="mt-5 flex flex-col gap-2">
-                {ingredientRows.map((row, idx) => {
-                  if (row.kind === "header") {
-                    return (
+              <div className="mt-5 flex flex-col gap-5">
+                {ingredientGroups.map((group, gIdx) => (
+                  <div
+                    key={gIdx}
+                    className="flex flex-col gap-2"
+                    style={
+                      gIdx > 0
+                        ? {
+                            paddingTop: 8,
+                            borderTop: `1px solid ${brand.tokens.line}`,
+                          }
+                        : undefined
+                    }
+                  >
+                    {gIdx === 0 ? (
+                      <div className="flex items-baseline gap-2 pb-1">
+                        <span
+                          className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em]"
+                          style={{ color: pack.mood.inkSoft }}
+                        >
+                          Hauptgruppe
+                        </span>
+                      </div>
+                    ) : (
                       <GroupSeparator
-                        key={idx}
-                        value={row.name}
-                        onChange={(v) =>
-                          updateIngredientRow(idx, { name: v })
-                        }
-                        onSubmit={() => addIngredientItemAfter(idx)}
-                        onRemove={() => removeIngredientRow(idx)}
+                        value={group.name ?? ""}
+                        onChange={(v) => setIngredientGroupName(gIdx, v)}
+                        onSubmit={() => addIngredientItemTo(gIdx)}
+                        onRemove={() => removeIngredientGroup(gIdx)}
                         pack={pack}
                         kind="ingredient"
                       />
-                    );
-                  }
-                  if (row.kind === "reset") {
-                    return (
-                      <MainGroupReset
-                        key={idx}
-                        pack={pack}
-                        onRemove={() => removeIngredientRow(idx)}
-                      />
-                    );
-                  }
-                  const isFocused = focusedIngredientIdx === idx;
-                  return (
-                    <div
-                      key={idx}
-                      className={`editor-row grid grid-cols-[7rem_1fr_auto] items-start gap-2 rounded-2xl p-2 transition-colors ${
-                        isFocused ? "bg-canvas-alt/40" : ""
-                      }`}
-                    >
-                      <input
-                        type="text"
-                        value={row.amount}
-                        onChange={(e) =>
-                          updateIngredientRow(idx, { amount: e.target.value })
-                        }
-                        onFocus={() => setFocusedIngredientIdx(idx)}
-                        placeholder="200 g"
-                        className="editor-input"
-                        aria-label={`Menge Zutat ${idx + 1}`}
-                      />
-                      <IngredientCombobox
-                        value={row.name}
-                        onChange={(v) =>
-                          updateIngredientRow(idx, { name: v })
-                        }
-                        onFocus={() => setFocusedIngredientIdx(idx)}
-                        suggestions={ingredientSuggestions}
-                        pack={pack}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeIngredientRow(idx)}
-                        disabled={ingredientRows.length === 1}
-                        className="grid size-[42px] place-items-center rounded-xl border text-[15px] transition-colors hover:bg-canvas-alt disabled:opacity-30"
-                        style={{
-                          borderColor: brand.tokens.line,
-                          color: brand.tokens.inkMuted,
-                        }}
-                        aria-label="Zutat entfernen"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  );
-                })}
-
-                <div
-                  className="mt-3 flex flex-wrap items-center gap-2 border-t pt-4"
-                  style={{ borderColor: brand.tokens.line }}
-                >
-                  <button
-                    type="button"
-                    onClick={addIngredientItem}
-                    className="editor-button-primary"
-                    style={{
-                      background: pack.mood.background,
-                      color: pack.mood.ink,
-                    }}
-                  >
-                    + Zutat hinzufügen
-                    {activeIngredientGroup ? (
-                      <span
-                        className="ml-1.5 font-mono text-[10px] font-normal uppercase tracking-[0.1em] opacity-70"
-                      >
-                        · zur „{activeIngredientGroup}"
-                      </span>
-                    ) : null}
-                  </button>
-                  {activeIngredientGroup ? (
+                    )}
+                    {group.items.map((item, iIdx) => {
+                      const isFocused =
+                        focusedIngredient?.g === gIdx &&
+                        focusedIngredient?.i === iIdx;
+                      const canRemove =
+                        gIdx > 0 || group.items.length > 1;
+                      return (
+                        <div
+                          key={iIdx}
+                          className={`editor-row grid grid-cols-[7rem_1fr_auto] items-start gap-2 rounded-2xl p-2 transition-colors ${
+                            isFocused ? "bg-canvas-alt/40" : ""
+                          }`}
+                        >
+                          <input
+                            type="text"
+                            value={item.amount}
+                            onChange={(e) =>
+                              updateIngredientItem(gIdx, iIdx, {
+                                amount: e.target.value,
+                              })
+                            }
+                            onFocus={() =>
+                              setFocusedIngredient({ g: gIdx, i: iIdx })
+                            }
+                            placeholder="200 g"
+                            className="editor-input"
+                            aria-label={`Menge Zutat ${iIdx + 1}`}
+                          />
+                          <IngredientCombobox
+                            value={item.name}
+                            onChange={(v) =>
+                              updateIngredientItem(gIdx, iIdx, { name: v })
+                            }
+                            onFocus={() =>
+                              setFocusedIngredient({ g: gIdx, i: iIdx })
+                            }
+                            suggestions={ingredientSuggestions}
+                            pack={pack}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeIngredientItem(gIdx, iIdx)}
+                            disabled={!canRemove}
+                            className="grid size-[42px] place-items-center rounded-xl border text-[15px] transition-colors hover:bg-canvas-alt disabled:opacity-30"
+                            style={{
+                              borderColor: brand.tokens.line,
+                              color: brand.tokens.inkMuted,
+                            }}
+                            aria-label="Zutat entfernen"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
                     <button
                       type="button"
-                      onClick={addIngredientItemMainGroup}
-                      className="editor-button-primary"
+                      onClick={() => addIngredientItemTo(gIdx)}
+                      className="self-start text-[12px] font-semibold uppercase tracking-[0.14em] transition-opacity hover:opacity-100"
                       style={{
-                        background: "transparent",
                         color: pack.mood.inkSoft,
-                        border: `1px solid ${pack.mood.ink}25`,
+                        opacity: 0.7,
                       }}
-                      title="Eine Zutat außerhalb der aktuellen Gruppe hinzufügen"
                     >
-                      ↶ Zutat (Hauptgruppe)
+                      + Zutat
+                      {gIdx === 0
+                        ? " zur Hauptgruppe"
+                        : group.name?.trim()
+                          ? ` zur „${group.name.trim()}"`
+                          : " zur Gruppe"}
                     </button>
-                  ) : null}
+                  </div>
+                ))}
+
+                <div
+                  className="mt-2 flex flex-wrap items-center gap-2 border-t pt-4"
+                  style={{ borderColor: brand.tokens.line }}
+                >
                   <button
                     type="button"
                     onClick={addIngredientGroup}
@@ -843,17 +902,13 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                       border: `1px dashed ${pack.mood.ink}40`,
                     }}
                   >
-                    + Gruppe
+                    + Neue Gruppe
                   </button>
                   <span
                     className="ml-auto text-[11px] font-semibold uppercase tracking-[0.14em]"
                     style={{ color: pack.mood.inkSoft }}
                   >
-                    Schnell-Einheit
-                    {focusedIngredientIdx !== null
-                      ? ` (Zeile ${focusedIngredientIdx + 1})`
-                      : ""}
-                    :
+                    Schnell-Einheit:
                   </span>
                   {commonUnits.map((unit) => (
                     <button
@@ -861,28 +916,35 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
-                        let targetIdx = focusedIngredientIdx;
-                        if (
-                          targetIdx === null ||
-                          ingredientRows[targetIdx]?.kind !== "item"
-                        ) {
-                          targetIdx =
-                            ingredientRows
-                              .map((r, i) => ({ r, i }))
-                              .reverse()
-                              .find(
-                                ({ r }) =>
-                                  r.kind === "item" && r.amount === ""
-                              )?.i ?? null;
+                        // Apply unit to focused ingredient if any; else to
+                        // the last empty-amount item in the active focus
+                        // group; else fall back to Hauptgruppe.
+                        let target = focusedIngredient;
+                        if (!target) {
+                          for (let g = 0; g < ingredientGroups.length; g++) {
+                            const items = ingredientGroups[g].items;
+                            for (let i = items.length - 1; i >= 0; i--) {
+                              if (items[i].amount === "") {
+                                target = { g, i };
+                                break;
+                              }
+                            }
+                            if (target) break;
+                          }
                         }
-                        if (targetIdx === null) return;
-                        const row = ingredientRows[targetIdx];
-                        if (row.kind !== "item") return;
-                        const numMatch = row.amount.match(/^(\d+(?:[.,]\d+)?)/);
+                        if (!target) return;
+                        const item =
+                          ingredientGroups[target.g]?.items[target.i];
+                        if (!item) return;
+                        const numMatch = item.amount.match(
+                          /^(\d+(?:[.,]\d+)?)/
+                        );
                         const newAmount = numMatch
                           ? `${numMatch[1]} ${unit}`
                           : `1 ${unit}`;
-                        updateIngredientRow(targetIdx, { amount: newAmount });
+                        updateIngredientItem(target.g, target.i, {
+                          amount: newAmount,
+                        });
                       }}
                       className="editor-chip"
                     >
@@ -893,110 +955,114 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
               </div>
             </section>
 
-            {/* Section 4: Zubereitung — with optional group headers */}
+            {/* Section 4: Zubereitung — group containers */}
             <section className="editor-section editor-card">
               <SectionHeader number={4} title="Zubereitung" pack={pack} required>
-                Schritt für Schritt. „+ Gruppe" für Sektionen wie „Teig",
-                „Glasur" oder Varianten.
+                Hauptgruppe oben. „+ Neue Gruppe" für Sektionen wie „Teig",
+                „Glasur" oder Varianten. Jede Gruppe hat einen eigenen
+                „+ Schritt"-Button. Nummerierung läuft global durch.
               </SectionHeader>
 
-              <div className="mt-5 flex flex-col gap-3">
-                {stepRows.map((row, idx) => {
-                  if (row.kind === "header") {
-                    return (
+              <div className="mt-5 flex flex-col gap-5">
+                {stepGroups.map((group, gIdx) => (
+                  <div
+                    key={gIdx}
+                    className="flex flex-col gap-3"
+                    style={
+                      gIdx > 0
+                        ? {
+                            paddingTop: 8,
+                            borderTop: `1px solid ${brand.tokens.line}`,
+                          }
+                        : undefined
+                    }
+                  >
+                    {gIdx === 0 ? (
+                      <div className="flex items-baseline gap-2 pb-1">
+                        <span
+                          className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em]"
+                          style={{ color: pack.mood.inkSoft }}
+                        >
+                          Hauptgruppe
+                        </span>
+                      </div>
+                    ) : (
                       <GroupSeparator
-                        key={idx}
-                        value={row.name}
-                        onChange={(v) => updateStepRow(idx, { name: v })}
-                        onSubmit={() => addStepItemAfter(idx)}
-                        onRemove={() => removeStepRow(idx)}
+                        value={group.name ?? ""}
+                        onChange={(v) => setStepGroupName(gIdx, v)}
+                        onSubmit={() => addStepItemTo(gIdx)}
+                        onRemove={() => removeStepGroup(gIdx)}
                         pack={pack}
                         kind="step"
                       />
-                    );
-                  }
-                  if (row.kind === "reset") {
-                    return (
-                      <MainGroupReset
-                        key={idx}
-                        pack={pack}
-                        onRemove={() => removeStepRow(idx)}
-                      />
-                    );
-                  }
-                  return (
-                    <div
-                      key={idx}
-                      className="editor-row grid grid-cols-[2.5rem_1fr_auto] items-start gap-3"
-                    >
-                      <span
-                        className="grid size-10 place-items-center rounded-xl font-display text-[18px] tabular-nums"
-                        style={{
-                          background: pack.mood.background,
-                          color: pack.mood.ink,
-                        }}
-                      >
-                        {stepNumberFor(idx)}
-                      </span>
-                      <textarea
-                        value={row.text}
-                        onChange={(e) =>
-                          updateStepRow(idx, { text: e.target.value })
-                        }
-                        placeholder={`Schritt ${stepNumberFor(idx)}: was tut man jetzt?`}
-                        rows={2}
-                        className="editor-input resize-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeStepRow(idx)}
-                        disabled={stepRows.length === 1}
-                        className="grid size-10 place-items-center rounded-xl border text-[16px] transition-colors hover:bg-canvas-alt disabled:opacity-30"
-                        style={{
-                          borderColor: brand.tokens.line,
-                          color: brand.tokens.inkMuted,
-                        }}
-                        aria-label="Schritt entfernen"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  );
-                })}
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={addStepItem}
-                    className="editor-button-primary"
-                    style={{
-                      background: pack.mood.background,
-                      color: pack.mood.ink,
-                    }}
-                  >
-                    + Schritt hinzufügen
-                    {activeStepGroup ? (
-                      <span
-                        className="ml-1.5 font-mono text-[10px] font-normal uppercase tracking-[0.1em] opacity-70"
-                      >
-                        · zur „{activeStepGroup}"
-                      </span>
-                    ) : null}
-                  </button>
-                  {activeStepGroup ? (
+                    )}
+                    {group.items.map((item, iIdx) => {
+                      const num = stepGlobalIndex(gIdx, iIdx);
+                      const canRemove = gIdx > 0 || group.items.length > 1;
+                      return (
+                        <div
+                          key={iIdx}
+                          className="editor-row grid grid-cols-[2.5rem_1fr_auto] items-start gap-3"
+                        >
+                          <span
+                            className="grid size-10 place-items-center rounded-xl font-display text-[18px] tabular-nums"
+                            style={{
+                              background: pack.mood.background,
+                              color: pack.mood.ink,
+                            }}
+                          >
+                            {num}
+                          </span>
+                          <textarea
+                            value={item.text}
+                            onChange={(e) =>
+                              updateStepItem(gIdx, iIdx, {
+                                text: e.target.value,
+                              })
+                            }
+                            placeholder={`Schritt ${num}: was tut man jetzt?`}
+                            rows={2}
+                            className="editor-input resize-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeStepItem(gIdx, iIdx)}
+                            disabled={!canRemove}
+                            className="grid size-10 place-items-center rounded-xl border text-[16px] transition-colors hover:bg-canvas-alt disabled:opacity-30"
+                            style={{
+                              borderColor: brand.tokens.line,
+                              color: brand.tokens.inkMuted,
+                            }}
+                            aria-label="Schritt entfernen"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
                     <button
                       type="button"
-                      onClick={addStepItemMainGroup}
-                      className="editor-button-primary"
+                      onClick={() => addStepItemTo(gIdx)}
+                      className="self-start text-[12px] font-semibold uppercase tracking-[0.14em] transition-opacity hover:opacity-100"
                       style={{
-                        background: "transparent",
                         color: pack.mood.inkSoft,
-                        border: `1px solid ${pack.mood.ink}25`,
+                        opacity: 0.7,
                       }}
-                      title="Einen Schritt außerhalb der aktuellen Gruppe hinzufügen"
                     >
-                      ↶ Schritt (Hauptgruppe)
+                      + Schritt
+                      {gIdx === 0
+                        ? " zur Hauptgruppe"
+                        : group.name?.trim()
+                          ? ` zur „${group.name.trim()}"`
+                          : " zur Gruppe"}
                     </button>
-                  ) : null}
+                  </div>
+                ))}
+
+                <div
+                  className="mt-2 flex flex-wrap items-center gap-2 border-t pt-4"
+                  style={{ borderColor: brand.tokens.line }}
+                >
                   <button
                     type="button"
                     onClick={addStepGroup}
@@ -1007,7 +1073,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                       border: `1px dashed ${pack.mood.ink}40`,
                     }}
                   >
-                    + Gruppe
+                    + Neue Gruppe
                   </button>
                 </div>
               </div>
@@ -1304,53 +1370,6 @@ function GroupSeparator({
         className="grid size-7 flex-shrink-0 place-items-center rounded-full text-[13px] transition-colors hover:bg-canvas-alt"
         style={{ color: pack.mood.inkSoft }}
         aria-label="Gruppe entfernen"
-      >
-        ×
-      </button>
-    </div>
-  );
-}
-
-// "Back to main group" marker — inserted by the secondary escape button
-// when the user wants to add an item outside the active group. Renders as
-// a dotted divider with a "HAUPTGRUPPE"-label so the user can see where
-// the group ends. Has no input field — to start a new group the user
-// clicks "+ Gruppe" again.
-function MainGroupReset({
-  pack,
-  onRemove,
-}: {
-  pack: NonNullable<ReturnType<typeof getPack>>;
-  onRemove: () => void;
-}) {
-  return (
-    <div className="my-1 flex items-center gap-3 py-1">
-      <div
-        className="h-px flex-1"
-        style={{
-          background: `repeating-linear-gradient(to right, ${pack.mood.ink}33 0 4px, transparent 4px 8px)`,
-        }}
-        aria-hidden
-      />
-      <span
-        className="flex-shrink-0 font-mono text-[10px] font-semibold uppercase tracking-[0.18em]"
-        style={{ color: pack.mood.inkSoft }}
-      >
-        ↑ Hauptgruppe
-      </span>
-      <div
-        className="h-px flex-1"
-        style={{
-          background: `repeating-linear-gradient(to right, ${pack.mood.ink}33 0 4px, transparent 4px 8px)`,
-        }}
-        aria-hidden
-      />
-      <button
-        type="button"
-        onClick={onRemove}
-        className="grid size-6 flex-shrink-0 place-items-center rounded-full text-[12px] opacity-60 transition-opacity hover:opacity-100"
-        style={{ color: pack.mood.inkSoft }}
-        aria-label="Hauptgruppen-Trenner entfernen"
       >
         ×
       </button>
