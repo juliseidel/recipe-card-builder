@@ -14,10 +14,12 @@ export function BrandCard({ brand }: BrandCardProps) {
       style={{ background: brand.tokens.surface }}
     >
       <div
-        // Square instead of 4/5 — the source photo is near-square and the
-        // taller crop made the card feel stretched. Square keeps the brand
-        // photo prominent without dominating the column height.
-        className="relative aspect-square overflow-hidden"
+        // 5/4 (wider than tall) keeps the card compact in a 3-col grid —
+        // square pushed the card height past 500 px which dominated the
+        // viewport. The source photo is near-square, so the 5/4 crop
+        // shaves the top/bottom slightly; object-position keeps her face
+        // centred.
+        className="relative aspect-[5/4] overflow-hidden"
         style={{ background: brand.tokens.background }}
       >
         <Image
@@ -25,18 +27,17 @@ export function BrandCard({ brand }: BrandCardProps) {
           alt={`${brand.name} – ${brand.fullName}`}
           fill
           sizes="(min-width: 1280px) 480px, (min-width: 768px) 50vw, 100vw"
-          // object-position: keep her face in frame even after the 4:5 crop.
-          // The source is near-square, so the default centre crop loses the
-          // top of her head; pulling the focus up to ~30% from the top keeps
-          // face + dish + hands all visible in the card.
-          className="object-cover object-[50%_28%] transition-transform duration-300 ease-out group-hover:scale-[1.04]"
+          // object-position: keep her face in frame after the 5/4 crop.
+          // Source is near-square, so the wider crop trims top + bottom;
+          // pulling focus up to ~32% from the top keeps face + dish visible.
+          className="object-cover object-[50%_32%] transition-transform duration-300 ease-out group-hover:scale-[1.04]"
           priority
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-black/10" />
 
-        <div className="absolute inset-x-0 top-0 flex items-start justify-between p-5">
+        <div className="absolute inset-x-0 top-0 flex items-start justify-between p-3.5">
           <span
-            className="inline-flex items-center gap-2 rounded-full bg-white/95 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink shadow-soft backdrop-blur"
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink shadow-soft backdrop-blur"
           >
             <span
               className="size-1.5 animate-pulse rounded-full"
@@ -44,68 +45,57 @@ export function BrandCard({ brand }: BrandCardProps) {
             />
             Aktiv
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-white backdrop-blur">
-            {brand.stats.followers} Follower
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white backdrop-blur">
+            {brand.stats.followers}
           </span>
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1 p-5 text-white">
-          <span className="text-[11.5px] font-medium uppercase tracking-[0.16em] opacity-85">
+        <div className="absolute inset-x-0 bottom-0 flex flex-col gap-0.5 p-4 text-white">
+          <span className="text-[10.5px] font-medium uppercase tracking-[0.16em] opacity-85">
             {brand.handle}
           </span>
-          <h3 className="font-display text-[36px] leading-[0.94] tracking-[-0.015em]">
+          <h3 className="font-display text-[26px] leading-[0.94] tracking-[-0.015em]">
             {brand.name}
           </h3>
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 p-5">
-        <div className="flex flex-col gap-1">
-          <span className="text-[11.5px] font-semibold uppercase tracking-[0.16em] text-ink-subtle">
-            {brand.fullName}
+      <div className="flex items-center gap-3 px-4 py-3.5 text-sm">
+        <span className="flex items-baseline gap-1">
+          <span className="font-display text-[18px] leading-none text-ink">
+            {brand.packCount}
           </span>
-          <p className="text-[15px] leading-relaxed text-ink-muted">
-            {brand.tagline}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3.5 border-t border-line pt-3 text-sm">
-          <span className="flex flex-col gap-0.5">
-            <span className="font-display text-[22px] leading-none text-ink">
-              {brand.packCount}
-            </span>
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">
-              Packs
-            </span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">
+            Packs
           </span>
-          <span className="h-7 w-px bg-line" />
-          <span className="flex flex-col gap-0.5">
-            <span className="font-display text-[22px] leading-none text-ink">
-              {brand.recipeCount}
-            </span>
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">
-              Rezepte
-            </span>
+        </span>
+        <span aria-hidden className="text-ink-subtle">·</span>
+        <span className="flex items-baseline gap-1">
+          <span className="font-display text-[18px] leading-none text-ink">
+            {brand.recipeCount}
           </span>
-          <span className="ml-auto inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink transition-transform duration-300 group-hover:translate-x-0.5">
-            Workspace öffnen
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 14 14"
-              fill="none"
-              aria-hidden
-            >
-              <path
-                d="M3 7h8m0 0L7.5 3.5M11 7l-3.5 3.5"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">
+            Rezepte
           </span>
-        </div>
+        </span>
+        <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-semibold text-ink transition-transform duration-300 group-hover:translate-x-0.5">
+          Öffnen
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 14 14"
+            fill="none"
+            aria-hidden
+          >
+            <path
+              d="M3 7h8m0 0L7.5 3.5M11 7l-3.5 3.5"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
       </div>
     </Link>
   );
