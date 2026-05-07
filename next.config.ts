@@ -7,6 +7,18 @@ const nextConfig: NextConfig = {
   },
   images: {
     qualities: [75, 90, 95],
+    // Hero images for custom recipes are uploaded to Supabase Storage by
+    // /api/recipes/enrich. The next/image component blocks external URLs
+    // unless the domain is whitelisted here — without this, hero <Image>
+    // tags render as broken images even when recipe.hero is set correctly
+    // in the database.
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
+    ],
   },
   // PDF rendering reads font + brand images at runtime via fs. The dynamic
   // path.join(...) calls don't get traced automatically, so include them
