@@ -85,26 +85,7 @@ export function RecipeCardPreview({
         }}
       />
 
-      <div className="relative z-10 flex items-start justify-between p-5">
-        <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-white/85">
-          {isCustom ? (
-            <span
-              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5"
-              style={{
-                background: pack.mood.accent + "60",
-                color: "white",
-              }}
-            >
-              Eigene Karte
-            </span>
-          ) : (
-            <>
-              Pack {String(pack.number).padStart(2, "0")} · Karte{" "}
-              {String(recipe.number).padStart(2, "0")}
-            </>
-          )}
-        </span>
-
+      <div className="relative z-10 flex items-start justify-end p-5">
         <div className="flex items-center gap-2">
           {onDelete ? (
             <button

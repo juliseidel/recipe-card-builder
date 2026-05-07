@@ -150,7 +150,16 @@ export async function processJob(jobId: string): Promise<void> {
       storagePath = `${pack.slug}__${recipe.slug}.pdf`;
       downloadName = `${safeFilename(recipe.title)}.pdf`;
     } else {
-      const recipes = await getRecipesForPack(job.pack_slug);
+      // Pack PDF includes both curated recipes and any custom cards the user
+      // saved into this pack. We merge them and sort by recipe.number so the
+      // index, recipe pages, and nutrition table all read in the same order.
+      const [staticRecipes, customRecipes] = await Promise.all([
+        getRecipesForPack(job.pack_slug),
+        loadCustomRecipesForPack(supabase, job.pack_slug),
+      ]);
+      const recipes = [...staticRecipes, ...customRecipes].sort(
+        (a, b) => a.number - b.number
+      );
       if (recipes.length === 0) {
         await markFailed(supabase, jobId, "Pack has no recipes");
         return;
@@ -251,6 +260,28 @@ async function countCustomRecipes(
     .eq("is_custom", true);
   if (error) return 0;
   return count ?? 0;
+}
+
+// Reads custom recipes for a pack from Supabase server-side. Mirrors the
+// client-side helper in lib/custom-recipes.ts but doesn't need the browser
+// client. Used by the pack-PDF renderer so user-saved cards show up next to
+// the curated set in cover, index, recipes, and nutrition overview.
+async function loadCustomRecipesForPack(
+  supabase: SupabaseClient,
+  packSlug: string
+): Promise<Recipe[]> {
+  const { data, error } = await supabase
+    .from("recipes")
+    .select("data")
+    .eq("pack_slug", packSlug)
+    .eq("is_custom", true);
+  if (error) {
+    console.warn("[pdf-jobs] loadCustomRecipesForPack failed", error);
+    return [];
+  }
+  return (data ?? [])
+    .map((row) => row.data as Recipe | undefined)
+    .filter((r): r is Recipe => Boolean(r));
 }
 
 async function markFailed(

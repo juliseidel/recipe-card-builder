@@ -158,17 +158,18 @@ function EditorialPage({
             fontWeight: 600,
           }}
         >
-          PACK {pad2(pack.number)} · {pack.title.toUpperCase()}
+          {pack.title.toUpperCase()}
         </Text>
         <Text
           style={{
             fontSize: 7.5,
-            letterSpacing: 1.6,
+            letterSpacing: 1.4,
             color: t.inkSoft,
-            fontWeight: 600,
+            fontStyle: "italic",
+            fontFamily: "Fraunces",
           }}
         >
-          KARTE {pad2(recipe.number)} / {pad2(totalRecipes)}
+          {pack.tagline ?? ""}
         </Text>
       </View>
 
@@ -582,7 +583,6 @@ function PatisseriePage({
               color: t.inkSoft,
             }}
           >
-            № {pad2(recipe.number)} / {pad2(totalRecipes)} ·{" "}
             {pack.title.toUpperCase()}
           </Text>
           <Text
@@ -905,8 +905,7 @@ function MinimalPage({
               color: t.inkSoft,
             }}
           >
-            {pack.title.toUpperCase()} · {pad2(recipe.number)} /{" "}
-            {pad2(totalRecipes)}
+            {pack.title.toUpperCase()}
           </Text>
           <Text
             style={{
@@ -1335,8 +1334,7 @@ function SportPage({
               color: t.inkSoft,
             }}
           >
-            PACK {pad2(pack.number)} · {pack.title.toUpperCase()} · KARTE{" "}
-            {pad2(recipe.number)} / {pad2(totalRecipes)}
+            {pack.title.toUpperCase()}
           </Text>
           <Text
             style={{
@@ -1994,10 +1992,7 @@ function DashboardPage({
             {weekDay}
           </Text>
         </View>
-        <Text style={{ fontSize: 8.5, color: t.inkSoft }}>
-          Pack {pad2(pack.number)} · {pack.title} · Karte {pad2(recipe.number)} /{" "}
-          {pad2(totalRecipes)}
-        </Text>
+        <Text style={{ fontSize: 8.5, color: t.inkSoft }}>{pack.title}</Text>
         <View style={{ flex: 1 }} />
         <Text style={{ fontSize: 8.5, color: t.accent, fontWeight: 600 }}>
           MEALPREP-READY

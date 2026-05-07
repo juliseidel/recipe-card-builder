@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getBrand } from "@/lib/brands";
@@ -11,7 +11,11 @@ import type {
   Recipe,
   RecipeStep,
 } from "@/lib/recipes";
-import { addCustomRecipe, slugify } from "@/lib/custom-recipes";
+import {
+  addCustomRecipe,
+  countCustomRecipesForPack,
+  slugify,
+} from "@/lib/custom-recipes";
 import {
   ingredientSuggestions,
   commonUnits,
@@ -92,6 +96,24 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Custom-recipe count loaded once on mount so the live preview can show
+  // the actual upcoming card number (instead of a placeholder), and so the
+  // save handler can assign a sequential number.
+  const [customCountInPack, setCustomCountInPack] = useState(0);
+
+  useEffect(() => {
+    if (!pack) return;
+    let active = true;
+    void countCustomRecipesForPack(pack.slug).then((count) => {
+      if (active) setCustomCountInPack(count);
+    });
+    return () => {
+      active = false;
+    };
+  }, [pack]);
+
+  const upcomingNumber =
+    (pack?.recipeCount ?? 0) + customCountInPack + 1;
 
   // Flatten the group-container model into the standard Recipe shape on
   // save: walk groups in order, walk each group's items, attach the group
@@ -132,7 +154,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     return {
       slug: slugify(title) || "neue-karte",
       packSlug: pack.slug,
-      number: 99,
+      number: upcomingNumber,
       title: title || "Neue Rezeptkarte",
       subtitle: subtitle || "Subtitle erscheint hier",
       description: description || "",
@@ -157,6 +179,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     };
   }, [
     pack,
+    upcomingNumber,
     title,
     subtitle,
     description,
@@ -210,7 +233,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
       brandSlug: brand.slug,
       slug,
       packSlug: pack.slug,
-      number: 99,
+      baseRecipeCount: pack.recipeCount,
       title: title.trim(),
       subtitle: subtitle.trim() || title.trim(),
       description: description.trim(),

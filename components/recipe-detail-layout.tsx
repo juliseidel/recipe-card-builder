@@ -74,17 +74,6 @@ export function RecipeDetailLayout({
             <span style={{ color: pack.mood.ink, fontWeight: 500 }}>
               {recipe.title}
             </span>
-            {isCustom ? (
-              <span
-                className="ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]"
-                style={{
-                  background: pack.mood.ink,
-                  color: pack.mood.background,
-                }}
-              >
-                Eigene Karte
-              </span>
-            ) : null}
           </nav>
 
           <div className="flex items-center gap-2">

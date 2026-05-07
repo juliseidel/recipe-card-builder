@@ -175,21 +175,24 @@ function EditorialLayout({
       className="mx-auto w-full max-w-[960px] overflow-hidden rounded-[var(--radius-card)] border bg-white"
       style={baseShellStyle(pack, brand)}
     >
-      {/* TOP MARKER BAR */}
+      {/* TOP MARKER BAR — slim pack tagline strip; pack-title sits in the
+          page breadcrumb already, so this row only carries pack-mood. */}
       <header
-        className="flex items-center justify-between gap-3 border-b px-8 py-4 text-[10px] font-semibold uppercase tracking-[0.22em] sm:px-12"
+        className="flex items-center justify-between gap-3 border-b px-8 py-3 text-[10px] font-semibold uppercase tracking-[0.22em] sm:px-12"
         style={{
           borderColor: pack.mood.ink + "1a",
           background: pack.mood.background + "40",
         }}
       >
-        <span style={{ color: pack.mood.inkSoft }}>
-          Pack {String(pack.number).padStart(2, "0")} · {pack.title}
-        </span>
-        <span className="font-mono" style={{ color: pack.mood.inkSoft }}>
-          Karte {String(recipe.number).padStart(2, "0")} /{" "}
-          {String(totalRecipes).padStart(2, "0")}
-        </span>
+        <span style={{ color: pack.mood.inkSoft }}>{pack.title}</span>
+        {pack.tagline ? (
+          <span
+            className="hidden font-mono italic normal-case sm:inline"
+            style={{ color: pack.mood.inkSoft, opacity: 0.7, letterSpacing: 0 }}
+          >
+            {pack.tagline}
+          </span>
+        ) : null}
       </header>
 
       {/* TITLE SECTION — photo LEFT, title content RIGHT. The other side-
@@ -635,7 +638,7 @@ function PatisserieLayout({
             className="font-mono text-[11px] font-semibold uppercase tracking-[0.22em]"
             style={{ color: pack.mood.inkSoft }}
           >
-            № {String(recipe.number).padStart(2, "0")} / {String(totalRecipes).padStart(2, "0")} · {pack.title}
+            {pack.title}
           </span>
           <h1
             className="font-display text-[60px] italic leading-[0.95] tracking-[-0.01em] sm:text-[72px]"
@@ -752,7 +755,7 @@ function MinimalLayout({
             className="text-[11px] font-semibold uppercase tracking-[0.22em]"
             style={{ color: pack.mood.inkSoft }}
           >
-            {pack.title} · {String(recipe.number).padStart(2, "0")} / {String(totalRecipes).padStart(2, "0")}
+            {pack.title}
           </span>
           <span
             className="font-display text-[140px] leading-[0.85] tabular-nums"
@@ -946,9 +949,7 @@ function SportLayout({
             className="text-[10px] font-semibold uppercase tracking-[0.22em]"
             style={{ color: pack.mood.inkSoft }}
           >
-            Pack {String(pack.number).padStart(2, "0")} · {pack.title} · Karte{" "}
-            {String(recipe.number).padStart(2, "0")} /{" "}
-            {String(totalRecipes).padStart(2, "0")}
+            {pack.title}
           </span>
           <h1
             className="font-display text-[44px] italic leading-[0.96] tracking-[-0.01em] sm:text-[56px]"
@@ -1355,13 +1356,7 @@ function DashboardLayout({
         >
           {weekDay}
         </span>
-        <span style={{ color: pack.mood.inkSoft }}>
-          Pack {String(pack.number).padStart(2, "0")} · {pack.title}
-        </span>
-        <span style={{ color: pack.mood.inkSoft, opacity: 0.5 }}>·</span>
-        <span style={{ color: pack.mood.inkSoft }}>
-          Karte {String(recipe.number).padStart(2, "0")} / {String(totalRecipes).padStart(2, "0")}
-        </span>
+        <span style={{ color: pack.mood.inkSoft }}>{pack.title}</span>
         <span className="ml-auto" style={{ color: pack.mood.accent }}>
           ✓ Mealprep-Ready
         </span>

@@ -1,6 +1,18 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
 import type { Recipe } from "@/lib/recipes";
+import {
+  getCustomRecipesForPack,
+  type CustomRecipe,
+} from "@/lib/custom-recipes";
+import {
+  getHiddenKeys,
+  makeHiddenKey,
+  type HiddenKey,
+} from "@/lib/hidden-recipes";
 
 type NutritionOverviewProps = {
   brand: Brand;
@@ -11,8 +23,40 @@ type NutritionOverviewProps = {
 export function NutritionOverview({
   brand,
   pack,
-  recipes,
+  recipes: staticRecipes,
 }: NutritionOverviewProps) {
+  // Custom recipes are loaded client-side so the table reflects newly saved
+  // cards without needing a full page revalidation. Hidden static recipes are
+  // omitted to match what the user sees in the grid.
+  const [customRecipes, setCustomRecipes] = useState<CustomRecipe[]>([]);
+  const [hiddenKeys, setHiddenKeys] = useState<Set<HiddenKey>>(new Set());
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all([
+      getCustomRecipesForPack(pack.slug),
+      getHiddenKeys(),
+    ]).then(([custom, hidden]) => {
+      if (!active) return;
+      setCustomRecipes(custom);
+      setHiddenKeys(hidden);
+    });
+    return () => {
+      active = false;
+    };
+  }, [pack.slug]);
+
+  // Merge: visible static + all custom, ordered by recipe.number so the
+  // index reads naturally (Pack-curated 01-N first, custom cards after).
+  const recipes = useMemo(() => {
+    const visibleStatic = staticRecipes.filter(
+      (r) => !hiddenKeys.has(makeHiddenKey(brand.slug, pack.slug, r.slug))
+    );
+    return [...visibleStatic, ...customRecipes].sort(
+      (a, b) => a.number - b.number
+    );
+  }, [staticRecipes, customRecipes, hiddenKeys, brand.slug, pack.slug]);
+
   const totals = recipes.reduce(
     (acc, recipe) => ({
       kcal: acc.kcal + recipe.nutrition.kcal,
@@ -23,12 +67,14 @@ export function NutritionOverview({
     { kcal: 0, protein: 0, carbs: 0, fat: 0 }
   );
 
-  const averages = {
-    kcal: Math.round(totals.kcal / recipes.length),
-    protein: Math.round(totals.protein / recipes.length),
-    carbs: Math.round(totals.carbs / recipes.length),
-    fat: Math.round(totals.fat / recipes.length),
-  };
+  const averages = recipes.length
+    ? {
+        kcal: Math.round(totals.kcal / recipes.length),
+        protein: Math.round(totals.protein / recipes.length),
+        carbs: Math.round(totals.carbs / recipes.length),
+        fat: Math.round(totals.fat / recipes.length),
+      }
+    : { kcal: 0, protein: 0, carbs: 0, fat: 0 };
 
   return (
     <section className="mx-auto max-w-[1400px] px-6 pt-14 pb-12 lg:px-10 lg:pt-20">

@@ -72,20 +72,50 @@ export async function getCustomRecipe(
   return data ? rowToCustomRecipe(data) : undefined;
 }
 
+// Counts existing custom recipes for a pack — used to auto-assign sequential
+// recipe.number values to new custom cards. Cheap (head=true), no row fetch.
+export async function countCustomRecipesForPack(
+  packSlug: string
+): Promise<number> {
+  const supabase = getSupabase();
+  if (!supabase) return 0;
+  const { count, error } = await supabase
+    .from("recipes")
+    .select("*", { count: "exact", head: true })
+    .eq("pack_slug", packSlug)
+    .eq("is_custom", true);
+  if (error) {
+    console.error("[recipes-db] countCustomRecipesForPack", error);
+    return 0;
+  }
+  return count ?? 0;
+}
+
 export async function addCustomRecipe(
-  recipe: Omit<CustomRecipe, "id" | "isCustom" | "createdAt"> & {
+  recipe: Omit<CustomRecipe, "id" | "isCustom" | "createdAt" | "number"> & {
     brandSlug: string;
+    // Curated-recipe count for this pack — passed in by the editor so we can
+    // assign the next sequential number without a second roundtrip to read
+    // static-recipe metadata. Custom cards land at baseRecipeCount + customCount
+    // + 1 so the Mega-Number in the Minimal layout reads naturally instead of
+    // showing a placeholder "99".
+    baseRecipeCount: number;
   }
 ): Promise<CustomRecipe | null> {
   const supabase = getSupabase();
   if (!supabase) return null;
 
-  const { brandSlug, slug: recipeSlug, packSlug, ...rest } = recipe;
+  const { brandSlug, slug: recipeSlug, packSlug, baseRecipeCount, ...rest } =
+    recipe;
+
+  const customCount = await countCustomRecipesForPack(packSlug);
+  const number = baseRecipeCount + customCount + 1;
 
   const dataPayload: Recipe = {
     ...rest,
     slug: recipeSlug,
     packSlug,
+    number,
   };
 
   const { data, error } = await supabase
