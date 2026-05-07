@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getBrand } from "@/lib/brands";
 import { getPack } from "@/lib/packs";
+import { getCustomPackServer } from "@/lib/custom-packs-server";
 import {
   getRecipe,
   getRecipesForPack,
@@ -94,7 +95,9 @@ export async function processJob(jobId: string): Promise<void> {
   if (job.status === "ready" || job.status === "failed") return;
 
   const brand = getBrand(job.brand_slug);
-  const pack = getPack(job.brand_slug, job.pack_slug);
+  const pack =
+    getPack(job.brand_slug, job.pack_slug) ??
+    (await getCustomPackServer(job.brand_slug, job.pack_slug));
   if (!brand || !pack) {
     await markFailed(supabase, jobId, "Brand or pack not found");
     return;

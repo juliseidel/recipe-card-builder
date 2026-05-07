@@ -4,7 +4,8 @@ import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getBrand } from "@/lib/brands";
-import { getPack } from "@/lib/packs";
+import { getPack, type Pack } from "@/lib/packs";
+import { getCustomPack } from "@/lib/custom-packs";
 import type {
   Ingredient,
   NutritionBasis,
@@ -50,8 +51,29 @@ type NewRecipePageProps = {
 export default function NewRecipePage({ params }: NewRecipePageProps) {
   const { brand: brandSlug, pack: packSlug } = use(params);
   const brand = getBrand(brandSlug);
-  const pack = getPack(brandSlug, packSlug);
+  const staticPack = getPack(brandSlug, packSlug);
   const router = useRouter();
+
+  // If the pack isn't in the static catalogue, it might be a user-created
+  // custom pack stored in Supabase. Load it client-side and use it the same
+  // way as a static pack — Editor doesn't care which kind it is.
+  const [customPack, setCustomPack] = useState<Pack | null>(null);
+  const [packLoaded, setPackLoaded] = useState(Boolean(staticPack));
+
+  useEffect(() => {
+    if (staticPack) return;
+    let active = true;
+    void getCustomPack(brandSlug, packSlug).then((found) => {
+      if (!active) return;
+      setCustomPack(found ?? null);
+      setPackLoaded(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, [staticPack, brandSlug, packSlug]);
+
+  const pack: Pack | undefined = staticPack ?? customPack ?? undefined;
 
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
@@ -213,12 +235,22 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   const missingCount = requirements.filter((r) => !r.ok).length;
   const isValid = missingCount === 0;
 
-  if (!brand || !pack) {
+  if (!brand) {
     return (
       <div className="flex min-h-screen flex-col">
         <SiteHeader />
         <main className="flex flex-1 items-center justify-center text-ink-muted">
-          Workspace oder Pack nicht gefunden.
+          Workspace nicht gefunden.
+        </main>
+      </div>
+    );
+  }
+  if (!pack) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <SiteHeader />
+        <main className="flex flex-1 items-center justify-center text-ink-muted">
+          {packLoaded ? "Pack nicht gefunden." : "Pack wird geladen…"}
         </main>
       </div>
     );

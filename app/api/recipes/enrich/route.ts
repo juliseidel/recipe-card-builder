@@ -8,6 +8,7 @@ import { generateImage, downloadImage } from "@/lib/ai/bfl-flux";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 import { getBrand } from "@/lib/brands";
 import { getPack } from "@/lib/packs";
+import { getCustomPackServer } from "@/lib/custom-packs-server";
 import type { Recipe } from "@/lib/recipes";
 
 // Server route that fills in Gemini-derived micros AND a Flux 2 Pro hero
@@ -69,7 +70,9 @@ export async function POST(req: Request) {
   const brandSlug = (row.brand_slug as string) || "biene";
   const packSlug = (row.pack_slug as string) || recipe.packSlug;
   const brand = getBrand(brandSlug);
-  const pack = getPack(brandSlug, packSlug);
+  const pack =
+    getPack(brandSlug, packSlug) ??
+    (await getCustomPackServer(brandSlug, packSlug));
 
   const needsMicros =
     !recipe.nutrition?.micros || recipe.nutrition.micros.length === 0;

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getBrand } from "@/lib/brands";
 import { getPack, packs } from "@/lib/packs";
+import { getCustomPackServer } from "@/lib/custom-packs-server";
 import { getRecipesForPack } from "@/lib/recipes";
 import { SiteHeader } from "@/components/site-header";
 import { PackCover } from "@/components/pack-cover";
@@ -8,15 +9,18 @@ import { PackActions } from "@/components/pack-actions";
 import { RecipeGrid } from "@/components/recipe-grid";
 import { NutritionOverview } from "@/components/nutrition-overview";
 
-// Static generation per pack — the recipe catalogue rarely changes, so caching
-// the rendered page for five minutes turns a Supabase round-trip into a CDN
-// hit. Custom and hidden recipes are loaded client-side, so they stay fresh
-// independent of this revalidation window.
+// Static generation per curated pack. Custom packs aren't pre-rendered (they
+// don't exist at build time); Next falls back to on-demand rendering for
+// any slug not in this list, which is exactly what we want for user-created
+// concepts.
 export async function generateStaticParams() {
   return packs.map((p) => ({ brand: p.brandSlug, pack: p.slug }));
 }
 
-export const revalidate = 300;
+// Custom packs change as the user works in them — disable static caching for
+// dynamic-param requests so a freshly-created pack is reachable immediately.
+export const dynamicParams = true;
+export const revalidate = 60;
 
 type PackPageProps = {
   params: Promise<{ brand: string; pack: string }>;
@@ -25,7 +29,9 @@ type PackPageProps = {
 export async function generateMetadata({ params }: PackPageProps) {
   const { brand: brandSlug, pack: packSlug } = await params;
   const brand = getBrand(brandSlug);
-  const pack = getPack(brandSlug, packSlug);
+  const pack =
+    getPack(brandSlug, packSlug) ??
+    (await getCustomPackServer(brandSlug, packSlug));
 
   if (!brand || !pack) {
     return { title: "Pack nicht gefunden · Recipe Card Builder" };
@@ -40,7 +46,11 @@ export async function generateMetadata({ params }: PackPageProps) {
 export default async function PackPage({ params }: PackPageProps) {
   const { brand: brandSlug, pack: packSlug } = await params;
   const brand = getBrand(brandSlug);
-  const pack = getPack(brandSlug, packSlug);
+  // Try curated packs first, fall back to user-created custom packs in
+  // Supabase. The rest of the page is layout-agnostic so both work the same.
+  const pack =
+    getPack(brandSlug, packSlug) ??
+    (await getCustomPackServer(brandSlug, packSlug));
 
   if (!brand || !pack) {
     notFound();

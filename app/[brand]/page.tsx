@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { brands, getBrand } from "@/lib/brands";
 import { getPacksForBrand } from "@/lib/packs";
+import { getCustomPacksForBrandServer } from "@/lib/custom-packs-server";
 import { SiteHeader } from "@/components/site-header";
 import { BrandHero } from "@/components/brand-hero";
 import { PackCard } from "@/components/pack-card";
@@ -44,7 +45,11 @@ export default async function BrandPage({ params }: BrandPageProps) {
     notFound();
   }
 
-  const packs = getPacksForBrand(brand.slug);
+  const staticPacks = getPacksForBrand(brand.slug);
+  const customPacks = await getCustomPacksForBrandServer(brand.slug);
+  // Custom packs first so newly-created concepts surface to the top of the
+  // grid — same ordering principle the recipe grid uses.
+  const packs = [...customPacks, ...staticPacks];
   const totalRecipes = packs.reduce((sum, p) => sum + p.recipeCount, 0);
 
   return (

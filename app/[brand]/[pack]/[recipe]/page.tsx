@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getBrand } from "@/lib/brands";
 import { getPack } from "@/lib/packs";
+import { getCustomPackServer } from "@/lib/custom-packs-server";
 import { getRecipe, getRecipesForPack } from "@/lib/recipes";
 import { RecipeDetailLayout } from "@/components/recipe-detail-layout";
 import { CustomRecipeView } from "@/components/custom-recipe-view";
@@ -13,7 +14,9 @@ type RecipePageProps = {
 export async function generateMetadata({ params }: RecipePageProps) {
   const { brand: brandSlug, pack: packSlug, recipe: recipeSlug } = await params;
   const brand = getBrand(brandSlug);
-  const pack = getPack(brandSlug, packSlug);
+  const pack =
+    getPack(brandSlug, packSlug) ??
+    (await getCustomPackServer(brandSlug, packSlug));
   const recipe = await getRecipe(packSlug, recipeSlug);
 
   if (!brand || !pack) {
@@ -36,7 +39,9 @@ export async function generateMetadata({ params }: RecipePageProps) {
 export default async function RecipePage({ params }: RecipePageProps) {
   const { brand: brandSlug, pack: packSlug, recipe: recipeSlug } = await params;
   const brand = getBrand(brandSlug);
-  const pack = getPack(brandSlug, packSlug);
+  const pack =
+    getPack(brandSlug, packSlug) ??
+    (await getCustomPackServer(brandSlug, packSlug));
 
   if (!brand || !pack) {
     notFound();
