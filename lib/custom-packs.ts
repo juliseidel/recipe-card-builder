@@ -1,6 +1,6 @@
 "use client";
 
-import type { Pack } from "./packs";
+import type { CardLayout, Pack } from "./packs";
 import { getSupabase } from "./supabase";
 
 // Stored in Supabase. We persist the whole Pack shape (minus auto fields)
@@ -112,6 +112,38 @@ export async function addCustomPack(input: {
     return null;
   }
   return rowToCustomPack(data);
+}
+
+// Updates the cardLayout on a custom pack. Used when the user picks a
+// layout while creating the pack's first recipe — that choice locks in
+// the layout for every subsequent card in the same pack so the eventual
+// pack PDF reads as one design language instead of a patchwork.
+export async function updateCustomPackLayout(
+  packId: string,
+  cardLayout: CardLayout
+): Promise<boolean> {
+  const supabase = getSupabase();
+  if (!supabase) return false;
+  const { data: row, error: readErr } = await supabase
+    .from("packs")
+    .select("data")
+    .eq("id", packId)
+    .maybeSingle();
+  if (readErr || !row) {
+    console.error("[packs-db] updateCustomPackLayout read", readErr);
+    return false;
+  }
+  const pack = row.data as Pack;
+  const updated: Pack = { ...pack, cardLayout };
+  const { error: writeErr } = await supabase
+    .from("packs")
+    .update({ data: updated })
+    .eq("id", packId);
+  if (writeErr) {
+    console.error("[packs-db] updateCustomPackLayout write", writeErr);
+    return false;
+  }
+  return true;
 }
 
 export async function removeCustomPack(id: string): Promise<boolean> {

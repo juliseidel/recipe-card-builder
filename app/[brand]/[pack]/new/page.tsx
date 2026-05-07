@@ -5,8 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getBrand } from "@/lib/brands";
 import { getPack, type CardLayout, type Pack } from "@/lib/packs";
-import { getCustomPack } from "@/lib/custom-packs";
+import { getCustomPack, updateCustomPackLayout } from "@/lib/custom-packs";
+import type { CustomPack } from "@/lib/custom-packs";
 import { LayoutPicker } from "@/components/layout-picker";
+import { layoutPresets } from "@/lib/pack-presets";
 import type {
   Ingredient,
   NutritionBasis,
@@ -56,9 +58,9 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   const router = useRouter();
 
   // If the pack isn't in the static catalogue, it might be a user-created
-  // custom pack stored in Supabase. Load it client-side and use it the same
-  // way as a static pack — Editor doesn't care which kind it is.
-  const [customPack, setCustomPack] = useState<Pack | null>(null);
+  // custom pack stored in Supabase. Keep the full CustomPack (with id) so we
+  // can write back the chosen layout when this is the pack's first card.
+  const [customPack, setCustomPack] = useState<CustomPack | null>(null);
   const [packLoaded, setPackLoaded] = useState(Boolean(staticPack));
 
   useEffect(() => {
@@ -84,14 +86,13 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   const [difficulty, setDifficulty] =
     useState<Recipe["difficulty"]>("Einfach");
   const [servings, setServings] = useState("2");
-  // Per-recipe card layout — defaults to whatever the pack uses, but the
-  // user can pick any of the five layouts independently. Stored on the
-  // recipe so each card renders in its own style.
+  // Card layout — picked once when the user creates the pack's first
+  // card, then locked in for every subsequent card. Static curated packs
+  // ship with a layout already set; custom packs default to "editorial"
+  // until the first save overrides it.
   const [cardLayout, setCardLayout] = useState<CardLayout>(
     staticPack?.cardLayout ?? "editorial"
   );
-  // Once a custom pack finishes loading, seed the picker with its default
-  // layout — but only if the user hasn't picked one yet.
   const cardLayoutTouchedRef = useRef(false);
   useEffect(() => {
     if (cardLayoutTouchedRef.current) return;
@@ -99,6 +100,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
       setCardLayout(customPack.cardLayout);
     }
   }, [customPack?.cardLayout]);
+
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [ingredientGroups, setIngredientGroups] = useState<
@@ -152,6 +154,15 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
 
   const upcomingNumber =
     (pack?.recipeCount ?? 0) + customCountInPack + 1;
+
+  // Layout-picker is only shown for the pack's first recipe. After that
+  // every new card inherits the choice. Static packs always inherit the
+  // pack's pre-set layout.
+  const isStaticPack = Boolean(staticPack);
+  const canPickLayout = !isStaticPack && customCountInPack === 0;
+  const lockedLayoutPreset = layoutPresets.find(
+    (l) => l.id === (pack?.cardLayout ?? cardLayout)
+  );
 
   // Flatten the group-container model into the standard Recipe shape on
   // save: walk groups in order, walk each group's items, attach the group
@@ -285,6 +296,13 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     setSaving(true);
     setError(null);
     const slug = `${slugify(title)}-${Date.now().toString(36).slice(-4)}`;
+    // Lock the layout into the pack on the very first card. Subsequent
+    // saves see canPickLayout=false and skip this step. Static packs ship
+    // with a layout already, so we never write to them here.
+    if (canPickLayout && customPack?.id) {
+      await updateCustomPackLayout(customPack.id, cardLayout);
+    }
+
     const saved = await addCustomRecipe({
       brandSlug: brand.slug,
       slug,
@@ -663,26 +681,65 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
               ))}
             </datalist>
 
-            {/* Section 1: Karten-Layout — pick per card so each recipe can
-                have its own visual feel (overrides the pack default). */}
+            {/* Section 1: Karten-Layout
+                — pick once on the pack's first card, then inherited by
+                every subsequent card so the pack PDF reads as one design. */}
             <section className="editor-section editor-card">
-              <SectionHeader number={1} title="Karten-Layout" pack={pack}>
-                Wie soll diese Karte aussehen? Fünf Layouts zur Wahl.
+              <SectionHeader
+                number={1}
+                title="Karten-Layout"
+                pack={pack}
+              >
+                {canPickLayout
+                  ? "Erste Karte des Packs — wähle das Layout. Alle weiteren Karten in diesem Pack übernehmen es automatisch."
+                  : `Layout ist im Pack festgelegt: ${lockedLayoutPreset?.title ?? cardLayout}.`}
               </SectionHeader>
               <div className="mt-6">
-                <LayoutPicker
-                  value={cardLayout}
-                  onChange={(id) => {
-                    setCardLayout(id);
-                    cardLayoutTouchedRef.current = true;
-                  }}
-                  accent={pack.mood.accent}
-                  thumbnailMood={{
-                    background: pack.mood.background,
-                    accent: pack.mood.accent,
-                    ink: pack.mood.ink,
-                  }}
-                />
+                {canPickLayout ? (
+                  <LayoutPicker
+                    value={cardLayout}
+                    onChange={(id) => {
+                      setCardLayout(id);
+                      cardLayoutTouchedRef.current = true;
+                    }}
+                    accent={pack.mood.accent}
+                    thumbnailMood={{
+                      background: pack.mood.background,
+                      accent: pack.mood.accent,
+                      ink: pack.mood.ink,
+                    }}
+                  />
+                ) : (
+                  <div
+                    className="flex items-center justify-between gap-4 rounded-2xl border-2 p-4"
+                    style={{
+                      borderColor: pack.mood.accent + "40",
+                      background: pack.mood.accent + "0d",
+                    }}
+                  >
+                    <div className="flex flex-col gap-1">
+                      <span
+                        className="text-[14px] font-semibold"
+                        style={{ color: pack.mood.accent }}
+                      >
+                        {lockedLayoutPreset?.title ?? cardLayout}
+                      </span>
+                      <span
+                        className="text-[12px] leading-snug"
+                        style={{ color: "var(--color-ink-muted)" }}
+                      >
+                        {lockedLayoutPreset?.description ??
+                          "Layout vom Pack vererbt — sorgt für ein einheitliches Pack-PDF."}
+                      </span>
+                    </div>
+                    <span
+                      className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em]"
+                      style={{ color: pack.mood.accent }}
+                    >
+                      Pack-Standard
+                    </span>
+                  </div>
+                )}
               </div>
             </section>
 
