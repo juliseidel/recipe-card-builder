@@ -42,11 +42,16 @@ export type BrandImageStyle = {
 //     assumption from earlier iterations)
 //   - small wooden cutting board ALWAYS in the soft upper background, holding
 //     a tiny ceramic bowl with one or two key recipe ingredients
-//   - fresh parsley scattered loosely across the cutting board AND across
-//     the counter near the dish — her trademark
 //   - dishes are plated up (rustic grey ceramic plate, white cake plate),
 //     pans only when genuinely served from the pan
 //   - bright natural daylight, not warm-amber, not moody
+//
+// REMOVED 2026-05-07: "scattered parsley on counter+board" was an over-
+// generalisation from her savoury reels. On baked goods, sweet desserts and
+// snacks (Pack 1, Pack 3, most of Pack 4) it reads as random green flecks
+// next to chocolate cakes — the opposite of polished. Parsley is now
+// explicitly negated; the cutting board with main-ingredient bowl is the
+// only universal signature element.
 export const BIENE_STYLE: BrandImageStyle = {
   brandSlug: "biene",
   // Five lighting strings, all daylight-neutral. Bienes reels are bright
@@ -73,26 +78,30 @@ export const BIENE_STYLE: BrandImageStyle = {
   // legitimately serve from the pan). Tilt-out forces the bird's-eye angle
   // for flat/mixed dishes — Flux 2 Pro otherwise drifts to a 30°
   // three-quarter view even when the prompt requests overhead.
+  //
+  // Greens-out: Flux carries a strong cookbook bias and adds parsley/herb
+  // sprigs as default garnish even when the prompt is silent on it. We
+  // negate it aggressively here. "no parsley" alone wasn't enough in
+  // testing — it kept rendering loose green leaves which look like parsley
+  // even if Flux semantically classed them as something else.
   negativeAddition:
-    "no styled food magazine, no decorative props, no recipe title overlay, no large letters in the image, no instagram caption text, no cast-iron pan as the main vessel, no frying pan, no skillet, no cream-coloured counter, no oak wood counter, no marble counter, no beige countertop, no parsley in the ingredient bowl, no herbs in the ingredient bowl, no garnish in the ingredient bowl",
+    "no styled food magazine, no decorative props, no recipe title overlay, no large letters in the image, no instagram caption text, no cast-iron pan as the main vessel, no frying pan, no skillet, no cream-coloured counter, no oak wood counter, no marble counter, no beige countertop, no parsley anywhere in the image, no parsley sprigs, no scattered parsley on the counter, no scattered parsley on the cutting board, no decorative green herbs around the dish, no random green leaves on the countertop, no scattered greenery, no scattered herbs of any kind, no fresh herb garnish that is not part of this recipe, no basil leaves on the counter, no mint leaves on the counter, no garnish in the ingredient bowl",
   // No "smartphone reel" or "phone" — both trigger Flux 2 Pro's reel-frame
   // mode, which renders headline overlays. "Natural unstaged" gets the
   // same look without the trigger word.
   cameraAesthetic:
     "natural unstaged food photograph, homemade-feeling, no studio look",
   // Bienes signature framing: cutting board with a MAIN-INGREDIENT bowl in
-  // the soft background, loose-scattered parsley on board and counter.
+  // the soft background. NO scattered greens on counter or board — that
+  // earlier hypothesis didn't survive contact with the sweet/baked dishes
+  // (Pack 1 Backwelt, Pack 3 Snacks, half of Pack 4 Meal-Prep).
   //
-  // CRITICAL distinction observed in iter 13: Gemini conflated the bowl
-  // ingredient with the parsley garnish and put parsley in the bowl on a
-  // cheese-pasta recipe. The fix is to separate the two roles emphatically:
-  // (a) the bowl holds the recipe's MAIN HEADLINE INGREDIENT (the thing
-  //     that names the dish — cheese for cheese-pasta, blueberries for
-  //     blueberry-cheesecake, eggs for an omelette);
-  // (b) the parsley is the universal garnish on counter/board, NEVER the
-  //     bowl content.
+  // CRITICAL distinction (kept from iter 13): the bowl holds the recipe's
+  // MAIN HEADLINE INGREDIENT (the thing that NAMES the dish — cheese for
+  // cheese-pasta, blueberries for blueberry-cheesecake, eggs for an
+  // omelette). NEVER parsley, herbs, salt, oil or garnish in the bowl.
   heroElementGuidance:
-    "Return a complete English phrase. Fill in the recipe's MAIN HEADLINE INGREDIENT — the ingredient that NAMES the dish — in its MOST PHOTOGENIC AND ICONIC FORM (e.g. for 'Käse-Nudeln': grated parmesan or shaved hard cheese, NEVER sliced processed cheese or sandwich cheese; for 'Erdbeer-Cheesecake': fresh whole strawberries, NEVER strawberry sauce; for 'Banana-Bread-Pudding': fresh sliced banana, NEVER bottled banana sauce; for 'Schoko-Biskuitrolle': cocoa powder or chocolate shavings, NEVER pre-made chocolate sauce). NEVER pick parsley, herbs, salt, oil, or any garnish — those are NOT main ingredients. The phrase: 'separately on the counter in the soft upper background of the scene sits a small wooden cutting board, and on top of that cutting board rests a small ceramic bowl of [MAIN HEADLINE INGREDIENT IN ITS MOST PHOTOGENIC FORM, NEVER parsley or herbs]; a few sprigs of fresh parsley are scattered loosely across the cutting board and across the counter near the dish'. The cutting board sits on the counter as a SEPARATE prop in the background — the dish bowl is in the foreground, NOT placed on top of the cutting board. The cutting board, the small ingredient bowl, AND the scattered parsley MUST all be present — it is Biene's signature framing.",
+    "Return a complete English phrase. Fill in the recipe's MAIN HEADLINE INGREDIENT — the ingredient that NAMES the dish — in its MOST PHOTOGENIC AND ICONIC FORM (e.g. for 'Käse-Nudeln': grated parmesan or shaved hard cheese, NEVER sliced processed cheese or sandwich cheese; for 'Erdbeer-Cheesecake': fresh whole strawberries, NEVER strawberry sauce; for 'Banana-Bread-Pudding': fresh sliced banana, NEVER bottled banana sauce; for 'Schoko-Biskuitrolle': cocoa powder or chocolate shavings, NEVER pre-made chocolate sauce). NEVER pick parsley, herbs, salt, oil, or any garnish — those are NOT main ingredients. The phrase: 'separately on the counter in the soft upper background of the scene sits a small wooden cutting board, and on top of that cutting board rests a small ceramic bowl of [MAIN HEADLINE INGREDIENT IN ITS MOST PHOTOGENIC FORM]'. The cutting board sits on the counter as a SEPARATE prop in the background — the dish bowl is in the foreground, NOT placed on top of the cutting board. Both the cutting board AND the small ingredient bowl MUST be present — that is Biene's signature framing. The countertop around the dish stays clean — NO scattered herbs, NO scattered green leaves, NO decorative greenery anywhere outside the dish itself.",
   // Per-shape angle overrides. Calibrated against Bienes real reels:
   // pasta-bowls and plated mains shoot top-down (most of her content),
   // layered desserts (cheesecake, tiramisu) shoot 30° three-quarter so
