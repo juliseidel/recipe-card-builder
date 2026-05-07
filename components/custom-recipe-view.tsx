@@ -41,6 +41,11 @@ export function CustomRecipeView({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const confirmTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Verhindert mehrfache Enrich-Trigger pro Mount. Der Editor sendet
+  // bereits einen fire-and-forget Trigger nach Save, aber der wird vom
+  // Browser manchmal beim router.push abgebrochen — in dem Fall springt
+  // dieser Fallback an und triggert idempotent nochmal.
+  const enrichTriggeredRef = useRef(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -98,6 +103,27 @@ export function CustomRecipeView({
       if (pollTimer) clearTimeout(pollTimer);
     };
   }, [pack.slug, recipeSlug, staticRecipes]);
+
+  // Fallback-Enrich-Trigger: sobald wir das Recipe geladen haben und
+  // erkennen, dass Mikros oder Hero fehlen, triggern wir den Enrich-
+  // Endpoint EINMAL pro Mount. Idempotent — der Endpoint prueft selbst,
+  // ob noch etwas zu tun ist, und returnt sonst sofort. Schuetzt gegen
+  // den Fall, dass der Editor-seitige fire-and-forget Fetch beim
+  // router.push abgebrochen wurde und die Lambda nie ankam.
+  useEffect(() => {
+    if (!recipe?.id || enrichTriggeredRef.current) return;
+    const hasMicros = (recipe.nutrition?.micros?.length ?? 0) > 0;
+    const hasHero = Boolean(recipe.hero);
+    if (hasMicros && hasHero) return;
+    enrichTriggeredRef.current = true;
+    void fetch("/api/recipes/enrich", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipeId: recipe.id }),
+    }).catch(() => {
+      /* swallow — wenn das auch failed, sehen wir das im Polling-Timeout */
+    });
+  }, [recipe?.id, recipe?.nutrition?.micros?.length, recipe?.hero]);
 
   if (!loaded) {
     return (
