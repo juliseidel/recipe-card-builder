@@ -14,10 +14,11 @@ export async function generateStaticParams() {
   return brands.map((b) => ({ brand: b.slug }));
 }
 
-// Re-render in the background every 5 minutes so any future data changes
-// land without a redeploy. Custom recipes are loaded client-side and stay
-// fresh independent of this cadence.
-export const revalidate = 300;
+// Short revalidate window (30s) so newly-created custom packs surface
+// quickly in the workspace grid without the user needing a hard reload.
+// Curated content is identical across requests, so the cache hit ratio is
+// still high even with the lower window.
+export const revalidate = 30;
 
 type BrandPageProps = {
   params: Promise<{ brand: string }>;

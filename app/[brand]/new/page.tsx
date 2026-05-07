@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getBrand } from "@/lib/brands";
@@ -45,6 +45,39 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Optional user-uploaded cover. When set, we use this URL directly and
+  // skip the AI generation step. When null, save kicks off Flux 2 Pro.
+  const [uploadedCoverUrl, setUploadedCoverUrl] = useState<string | null>(
+    null
+  );
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadCover = async (file: File) => {
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("packSlug", slugifyPack(title) || "pack");
+      const res = await fetch("/api/packs/cover-upload", {
+        method: "POST",
+        body: form,
+      });
+      const json = await res.json();
+      if (!res.ok || !json.url) {
+        throw new Error(json.error ?? "Upload fehlgeschlagen");
+      }
+      setUploadedCoverUrl(json.url as string);
+    } catch (err) {
+      setUploadError(
+        err instanceof Error ? err.message : "Upload fehlgeschlagen"
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const selectedMood = useMemo(() => {
     if (customMood) return customMood;
@@ -70,7 +103,7 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
         description.trim() ||
         "Beschreibe in 1–2 Sätzen, worum es in diesem Pack geht.",
       recipeCount: 0,
-      coverImage: PENDING_COVER,
+      coverImage: uploadedCoverUrl ?? PENDING_COVER,
       mood: selectedMood,
       displayFont,
       // Pack-level fallback layout. Used only when a recipe doesn't pick its
@@ -87,6 +120,7 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
     category,
     selectedMood,
     displayFont,
+    uploadedCoverUrl,
   ]);
 
   // Only Pack-Titel is required — everything else has a sensible fallback
@@ -136,7 +170,7 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
         description:
           description.trim() ||
           `Eigene Sammlung in ${brand.name}s Welt. Karten kannst du im Editor erstellen, jede mit ihrem eigenen Layout.`,
-        coverImage: PENDING_COVER,
+        coverImage: uploadedCoverUrl ?? PENDING_COVER,
         mood: selectedMood,
         displayFont,
         // Default fallback — recipes pick their own layout on creation.
@@ -149,17 +183,17 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
       setError("Konnte das Pack nicht speichern. Bitte erneut versuchen.");
       return;
     }
-    // Fire-and-forget: kick off Flux 2 Pro pack-cover generation. The cover
-    // appears once the AI render lands and the pack page revalidates. Errors
-    // are logged server-side but never block the redirect — the user lands
-    // on the pack page either way.
-    void fetch("/api/packs/enrich", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ packId: saved.id }),
-    }).catch(() => {
-      /* swallow — cover gen is best-effort */
-    });
+    // Fire-and-forget AI cover generation — only if the user didn't upload
+    // their own image. With an upload, the pack already has its cover URL.
+    if (!uploadedCoverUrl) {
+      void fetch("/api/packs/enrich", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packId: saved.id }),
+      }).catch(() => {
+        /* swallow — cover gen is best-effort */
+      });
+    }
     router.push(`/${brand.slug}/${saved.slug}`);
   };
 
@@ -310,10 +344,142 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
               </details>
             </section>
 
-            {/* Section 2 — Mood */}
+            {/* Section 2 — Pack-Cover */}
             <section className="editor-section editor-card flex flex-col gap-5">
               <SectionHeader
                 num="02"
+                title="Pack-Cover"
+                hint="Eigenes Bild hochladen oder von der KI passend generieren lassen."
+              />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex flex-col items-start gap-2 rounded-2xl border-2 p-4 text-left transition-all"
+                  style={{
+                    borderColor: uploadedCoverUrl
+                      ? selectedMood.accent
+                      : "var(--color-line)",
+                    background: uploadedCoverUrl
+                      ? selectedMood.accent + "10"
+                      : "white",
+                  }}
+                  disabled={uploading}
+                >
+                  <div className="flex w-full items-center justify-between gap-2">
+                    <span
+                      className="text-[14px] font-semibold"
+                      style={{
+                        color: uploadedCoverUrl
+                          ? selectedMood.accent
+                          : "var(--color-ink)",
+                      }}
+                    >
+                      Eigenes Bild hochladen
+                    </span>
+                    <UploadIcon
+                      color={
+                        uploadedCoverUrl
+                          ? selectedMood.accent
+                          : "var(--color-ink-muted)"
+                      }
+                    />
+                  </div>
+                  <p
+                    className="text-[12px] leading-snug"
+                    style={{ color: "var(--color-ink-muted)" }}
+                  >
+                    {uploading
+                      ? "Wird hochgeladen…"
+                      : uploadedCoverUrl
+                      ? "Eigenes Bild ist gesetzt — wird beim Speichern verwendet"
+                      : "JPG, PNG oder WEBP, max. 8 MB"}
+                  </p>
+                  {uploadedCoverUrl ? (
+                    <span
+                      className="font-mono text-[10.5px] uppercase tracking-[0.14em]"
+                      style={{ color: selectedMood.accent }}
+                    >
+                      ✓ Aktiv
+                    </span>
+                  ) : null}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadedCoverUrl(null);
+                    setUploadError(null);
+                  }}
+                  className="flex flex-col items-start gap-2 rounded-2xl border-2 p-4 text-left transition-all"
+                  style={{
+                    borderColor: !uploadedCoverUrl
+                      ? selectedMood.accent
+                      : "var(--color-line)",
+                    background: !uploadedCoverUrl
+                      ? selectedMood.accent + "10"
+                      : "white",
+                  }}
+                >
+                  <div className="flex w-full items-center justify-between gap-2">
+                    <span
+                      className="text-[14px] font-semibold"
+                      style={{
+                        color: !uploadedCoverUrl
+                          ? selectedMood.accent
+                          : "var(--color-ink)",
+                      }}
+                    >
+                      KI generiert passend
+                    </span>
+                    <SparkleIcon
+                      color={
+                        !uploadedCoverUrl
+                          ? selectedMood.accent
+                          : "var(--color-ink-muted)"
+                      }
+                    />
+                  </div>
+                  <p
+                    className="text-[12px] leading-snug"
+                    style={{ color: "var(--color-ink-muted)" }}
+                  >
+                    Flux 2 Pro generiert nach dem Speichern automatisch ein
+                    Cookbook-Cover passend zu Pack-Titel, Kategorie und Farben
+                    (~30 Sek).
+                  </p>
+                </button>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleUploadCover(file);
+                  // Reset so the same file can be re-selected
+                  e.target.value = "";
+                }}
+              />
+              {uploadError ? (
+                <p
+                  className="rounded-xl border px-4 py-2.5 text-[12.5px]"
+                  style={{
+                    borderColor: "#dc2626",
+                    background: "#fee2e2",
+                    color: "#991b1b",
+                  }}
+                >
+                  {uploadError}
+                </p>
+              ) : null}
+            </section>
+
+            {/* Section 3 — Mood */}
+            <section className="editor-section editor-card flex flex-col gap-5">
+              <SectionHeader
+                num="03"
                 title="Farb-Stimmung"
                 hint='Acht Presets — oder klick auf „Eigene Farben" für deine eigene Palette.'
               />
@@ -461,10 +627,10 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
               </div>
             </section>
 
-            {/* Section 3 — Typography */}
+            {/* Section 4 — Typography */}
             <section className="editor-section editor-card flex flex-col gap-5">
               <SectionHeader
-                num="03"
+                num="04"
                 title="Typografie"
                 hint="Display-Schrift für Pack-Cover und Titel auf den Karten."
               />
@@ -695,6 +861,34 @@ function Field({
       </span>
       {children}
     </label>
+  );
+}
+
+function UploadIcon({ color }: { color: string }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+      <path
+        d="M11 14V5m0 0L7.5 8.5M11 5l3.5 3.5M4 16v.5A2.5 2.5 0 0 0 6.5 19h9a2.5 2.5 0 0 0 2.5-2.5V16"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function SparkleIcon({ color }: { color: string }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+      <path
+        d="M11 3v3m0 10v3M3 11h3m10 0h3M5.5 5.5l2 2m7 7l2 2M5.5 16.5l2-2m7-7l2-2"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <circle cx="11" cy="11" r="1.5" fill={color} />
+    </svg>
   );
 }
 

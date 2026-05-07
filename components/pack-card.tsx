@@ -1,7 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
+import { PackCardCoverImage } from "./pack-cover-image";
 
 type PackCardProps = {
   pack: Pack;
@@ -52,44 +52,16 @@ export function PackCard({ pack, brand }: PackCardProps) {
       </div>
 
       {/* Hero image — falls back to a shimmer skeleton while a custom pack
-          waits for its Flux-generated cover. */}
+          waits for its Flux-generated cover. The client-side image polls
+          Supabase every 4s until the cover lands, then fades in. */}
       <div className="relative mx-6 mt-4 aspect-[4/3.4] overflow-hidden rounded-2xl">
-        {pack.coverImage ? (
-          <Image
-            src={pack.coverImage}
-            alt={`${pack.title} – ${pack.tagline}`}
-            fill
-            sizes="(min-width: 1280px) 420px, (min-width: 768px) 50vw, 100vw"
-            className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.06]"
-            priority
-          />
-        ) : (
-          <div
-            className="relative h-full w-full overflow-hidden"
-            style={
-              {
-                background: `linear-gradient(135deg, ${pack.mood.background} 0%, ${pack.mood.accent}26 100%)`,
-                "--shimmer-base": pack.mood.background,
-                "--shimmer-glow": pack.mood.accent + "30",
-              } as React.CSSProperties
-            }
-            aria-hidden
-          >
-            <div className="absolute inset-0 skeleton-shimmer" />
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-4 text-center">
-              <span
-                className="size-1.5 rounded-full pending-dot"
-                style={{ background: pack.mood.accent }}
-              />
-              <span
-                className="font-mono text-[10px] uppercase tracking-[0.18em]"
-                style={{ color: pack.mood.ink }}
-              >
-                Cover wird gestaltet
-              </span>
-            </div>
-          </div>
-        )}
+        <PackCardCoverImage
+          pack={pack}
+          brandSlug={brand.slug}
+          alt={`${pack.title} – ${pack.tagline}`}
+          sizes="(min-width: 1280px) 420px, (min-width: 768px) 50vw, 100vw"
+          pollWhenEmpty={!pack.coverImage}
+        />
       </div>
 
       {/* Text body */}
