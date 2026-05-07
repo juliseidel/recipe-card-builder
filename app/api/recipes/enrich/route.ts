@@ -93,26 +93,35 @@ export async function POST(req: Request) {
     });
   }
 
-  // Two independent background tasks. Earlier we ran both inside one
-  // Promise.allSettled and wrote to the DB at the end — that meant micros
-  // (≈ 2-3 s with Gemini) had to wait for the hero render (15-90 s with
-  // Flux 2 Pro under load), so the detail-view polling timed out before
-  // anything appeared in the DB. Now each task writes its own field via
-  // a fetch-merge-write helper as soon as it's ready. Polling sees micros
-  // within seconds and the hero whenever Flux is done.
+  // ─── MIKROS: SYNC vor der Response ──────────────────────────────────
+  // Frueher lief das in after() parallel zu Hero + Story. Das hatte
+  // zwei Probleme auf Vercel:
+  //   1. Wenn der Editor-Trigger als fire-and-forget (kurz vor router.push)
+  //      lief, hat der Browser den Fetch beim Navigieren manchmal abgebrochen
+  //      — die Lambda startete in dem Fall gar nicht erst.
+  //   2. Wenn die Hero-Pipeline (Flux 2 Pro) 60s+ brauchte und das Lambda-
+  //      Limit erreicht war, wurden alle after()-Tasks abgewuergt — auch
+  //      Mikros, die eigentlich nach 5s laengst durch gewesen waeren.
+  // Fix: Mikros laufen synchron VOR der Response. Wenn der Endpoint 200
+  // returnt, sind die Mikros garantiert in der DB. Das Detail-Polling
+  // sieht sie beim ersten Refetch.
   if (needsMicros) {
-    after(async () => {
-      try {
-        const micros = await generateMicros(recipe);
-        await mergeRecipeData(row.id, (current) => ({
-          nutrition: { ...current.nutrition, micros },
-        }));
-      } catch (err) {
-        console.error("[enrich] micros failed for", body.recipeId, err);
-      }
-    });
+    try {
+      const micros = await generateMicros(recipe);
+      await mergeRecipeData(row.id, (current) => ({
+        nutrition: { ...current.nutrition, micros },
+      }));
+    } catch (err) {
+      console.error("[enrich] micros failed sync for", body.recipeId, err);
+      // Wir failen nicht hart — Hero + Story sollen trotzdem laufen.
+    }
   }
 
+  // ─── HERO + STORY: ASYNC nach der Response ──────────────────────────
+  // Hero ist der lange Pol (Flux 2 Pro, 15-90s), Story braucht ~3-5s
+  // bei Gemini. Beide laufen in after() weiter, nachdem die Response
+  // schon raus ist. Das Detail-Polling holt die Werte ab, sobald sie
+  // in der DB stehen.
   if (needsHero) {
     after(async () => {
       try {
