@@ -1,9 +1,15 @@
 import { notFound } from "next/navigation";
 import { getBrand } from "@/lib/brands";
-import { getPack, packs } from "@/lib/packs";
+import {
+  getPack,
+  getPacksForBrand,
+  mergeAndRenumberPacks,
+  packs,
+} from "@/lib/packs";
 import {
   getCustomPackByIdServer,
   getCustomPackServer,
+  getCustomPacksWithIdsForBrandServer,
 } from "@/lib/custom-packs-server";
 import { getRecipesForPack } from "@/lib/recipes";
 import { SiteHeader } from "@/components/site-header";
@@ -56,11 +62,22 @@ export default async function PackPage({ params }: PackPageProps) {
   const customRow = staticPack
     ? null
     : await getCustomPackByIdServer(brandSlug, packSlug);
-  const pack = staticPack ?? customRow?.pack;
+  const rawPack = staticPack ?? customRow?.pack;
 
-  if (!brand || !pack) {
+  if (!brand || !rawPack) {
     notFound();
   }
+
+  // Look up the pack's display number from the same merged+renumbered
+  // list the workspace uses, so "Pack 06" stays consistent across the
+  // two pages and shifts down after a delete (Pack 7 → Pack 6, etc).
+  const allStatic = getPacksForBrand(brandSlug);
+  const allCustom = await getCustomPacksWithIdsForBrandServer(brandSlug);
+  const merged = mergeAndRenumberPacks(
+    allStatic,
+    allCustom.map((c) => c.pack)
+  );
+  const pack = merged.find((p) => p.slug === packSlug) ?? rawPack;
 
   const recipes = await getRecipesForPack(pack.slug);
 

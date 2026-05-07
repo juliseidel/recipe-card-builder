@@ -74,10 +74,14 @@ export async function getCustomPackByIdServer(
 }
 
 // Same as above but also returns the row IDs so the workspace grid can
-// wire up per-pack delete buttons (the `Pack` type doesn't carry an id).
+// wire up per-pack delete buttons. Carries createdAt onto the pack so
+// mergeAndRenumberPacks can sort custom packs in creation order
+// (oldest → lowest number).
 export async function getCustomPacksWithIdsForBrandServer(
   brandSlug: string
-): Promise<Array<{ pack: Pack; id: string }>> {
+): Promise<
+  Array<{ pack: Pack & { createdAt: number }; id: string }>
+> {
   if (!hasServerSupabase()) return [];
   const supabase: SupabaseClient = getServerSupabase();
   const { data, error } = await supabase
@@ -85,7 +89,7 @@ export async function getCustomPacksWithIdsForBrandServer(
     .select("id, data, created_at")
     .eq("brand_slug", brandSlug)
     .eq("is_custom", true)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: true });
   if (error) {
     console.warn(
       "[packs-server] getCustomPacksWithIdsForBrandServer",
@@ -93,11 +97,14 @@ export async function getCustomPacksWithIdsForBrandServer(
     );
     return [];
   }
-  const out: Array<{ pack: Pack; id: string }> = [];
+  const out: Array<{ pack: Pack & { createdAt: number }; id: string }> = [];
   for (const row of data ?? []) {
     const pack = row.data as Pack | undefined;
     if (!pack) continue;
-    out.push({ pack, id: row.id as string });
+    out.push({
+      pack: { ...pack, createdAt: new Date(row.created_at as string).getTime() },
+      id: row.id as string,
+    });
   }
   return out;
 }

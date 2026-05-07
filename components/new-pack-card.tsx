@@ -3,9 +3,14 @@ import type { Brand } from "@/lib/brands";
 
 type NewPackCardProps = {
   brand: Brand;
+  /** The number this pack would receive when saved — workspace counts
+   *  static + custom packs and passes (count + 1). Falls back to 6 for
+   *  callers that haven't been updated yet. */
+  nextNumber?: number;
 };
 
-export function NewPackCard({ brand }: NewPackCardProps) {
+export function NewPackCard({ brand, nextNumber = 6 }: NewPackCardProps) {
+  const orderLabel = String(nextNumber).padStart(2, "0");
   return (
     <Link
       href={`/${brand.slug}/new`}
@@ -21,7 +26,7 @@ export function NewPackCard({ brand }: NewPackCardProps) {
           className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em]"
           style={{ color: brand.tokens.inkMuted }}
         >
-          Pack 06
+          Pack {orderLabel}
         </span>
         <span
           className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em]"

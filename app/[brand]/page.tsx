@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { brands, getBrand } from "@/lib/brands";
-import { getPacksForBrand } from "@/lib/packs";
+import { getPacksForBrand, mergeAndRenumberPacks } from "@/lib/packs";
 import { getCustomPacksWithIdsForBrandServer } from "@/lib/custom-packs-server";
 import { SiteHeader } from "@/components/site-header";
 import { BrandHero } from "@/components/brand-hero";
@@ -50,14 +50,16 @@ export default async function BrandPage({ params }: BrandPageProps) {
   const customPacksWithIds = await getCustomPacksWithIdsForBrandServer(
     brand.slug
   );
-  // Custom packs first so newly-created concepts surface to the top of the
-  // grid — same ordering principle the recipe grid uses.
+  // Curated packs first (1..5), then custom packs in creation order
+  // (oldest → 6, next → 7, …). Numbers get rewritten to position-in-array
+  // so deleting position 6 promotes 7 → 6 on the next render.
   const customPacks = customPacksWithIds.map((c) => c.pack);
   const customIdBySlug = new Map(
     customPacksWithIds.map((c) => [c.pack.slug, c.id])
   );
-  const packs = [...customPacks, ...staticPacks];
+  const packs = mergeAndRenumberPacks(staticPacks, customPacks);
   const totalRecipes = packs.reduce((sum, p) => sum + p.recipeCount, 0);
+  const nextPackNumber = packs.length + 1;
 
   return (
     <div
@@ -117,7 +119,7 @@ export default async function BrandPage({ params }: BrandPageProps) {
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {/* New-pack card sits at the top so the call-to-action is the
                 first thing the user sees in the grid. */}
-            <NewPackCard brand={brand} />
+            <NewPackCard brand={brand} nextNumber={nextPackNumber} />
             {packs.map((pack) => (
               <PackCard
                 key={pack.slug}

@@ -147,3 +147,30 @@ export function getPack(brandSlug: string, packSlug: string): Pack | undefined {
     (pack) => pack.brandSlug === brandSlug && pack.slug === packSlug
   );
 }
+
+// Helper used by the workspace and pack-detail page so the displayed
+// pack-number stays consistent across navigations and stays gap-free
+// after a delete.
+//
+// Order:
+//   1. Curated packs sorted by their authored number (1..N).
+//   2. Custom packs in creation order (oldest first → lowest custom
+//      number, newest last → highest).
+//
+// Numbering: position-in-array + 1, overwriting whatever was stored on
+// each pack. So with 5 curated packs and 3 custom packs we get
+// 1,2,3,4,5,6,7,8 — and after deleting position 6 the previous 7 and 8
+// become 6 and 7 automatically on the next render.
+export function mergeAndRenumberPacks(
+  staticPacks: Pack[],
+  customPacks: Array<Pack & { createdAt?: number }>
+): Pack[] {
+  const sortedStatic = [...staticPacks].sort((a, b) => a.number - b.number);
+  const sortedCustom = [...customPacks].sort(
+    (a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0)
+  );
+  return [...sortedStatic, ...sortedCustom].map((pack, idx) => ({
+    ...pack,
+    number: idx + 1,
+  }));
+}
