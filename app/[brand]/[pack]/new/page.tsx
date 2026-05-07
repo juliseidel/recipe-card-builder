@@ -1,11 +1,12 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getBrand } from "@/lib/brands";
-import { getPack, type Pack } from "@/lib/packs";
+import { getPack, type CardLayout, type Pack } from "@/lib/packs";
 import { getCustomPack } from "@/lib/custom-packs";
+import { LayoutPicker } from "@/components/layout-picker";
 import type {
   Ingredient,
   NutritionBasis,
@@ -83,6 +84,21 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   const [difficulty, setDifficulty] =
     useState<Recipe["difficulty"]>("Einfach");
   const [servings, setServings] = useState("2");
+  // Per-recipe card layout — defaults to whatever the pack uses, but the
+  // user can pick any of the five layouts independently. Stored on the
+  // recipe so each card renders in its own style.
+  const [cardLayout, setCardLayout] = useState<CardLayout>(
+    staticPack?.cardLayout ?? "editorial"
+  );
+  // Once a custom pack finishes loading, seed the picker with its default
+  // layout — but only if the user hasn't picked one yet.
+  const cardLayoutTouchedRef = useRef(false);
+  useEffect(() => {
+    if (cardLayoutTouchedRef.current) return;
+    if (customPack?.cardLayout) {
+      setCardLayout(customPack.cardLayout);
+    }
+  }, [customPack?.cardLayout]);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [ingredientGroups, setIngredientGroups] = useState<
@@ -183,6 +199,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
       slug: slugify(title) || "neue-karte",
       packSlug: pack.slug,
       number: upcomingNumber,
+      cardLayout,
       title: title || "Neue Rezeptkarte",
       subtitle: previewSubtitle,
       description: previewDescription,
@@ -208,6 +225,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   }, [
     pack,
     upcomingNumber,
+    cardLayout,
     title,
     previewSubtitle,
     previewDescription,
@@ -272,6 +290,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
       slug,
       packSlug: pack.slug,
       baseRecipeCount: pack.recipeCount,
+      cardLayout,
       title: title.trim(),
       // Subtitle and description fall back to pack-level copy so cards with
       // sparse user input (only a title, no story) still render with the
@@ -644,9 +663,32 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
               ))}
             </datalist>
 
-            {/* Section 1: Eckdaten */}
+            {/* Section 1: Karten-Layout — pick per card so each recipe can
+                have its own visual feel (overrides the pack default). */}
             <section className="editor-section editor-card">
-              <SectionHeader number={1} title="Eckdaten" pack={pack}>
+              <SectionHeader number={1} title="Karten-Layout" pack={pack}>
+                Wie soll diese Karte aussehen? Fünf Layouts zur Wahl.
+              </SectionHeader>
+              <div className="mt-6">
+                <LayoutPicker
+                  value={cardLayout}
+                  onChange={(id) => {
+                    setCardLayout(id);
+                    cardLayoutTouchedRef.current = true;
+                  }}
+                  accent={pack.mood.accent}
+                  thumbnailMood={{
+                    background: pack.mood.background,
+                    accent: pack.mood.accent,
+                    ink: pack.mood.ink,
+                  }}
+                />
+              </div>
+            </section>
+
+            {/* Section 2: Eckdaten */}
+            <section className="editor-section editor-card">
+              <SectionHeader number={2} title="Eckdaten" pack={pack}>
                 Was kommt auf die Karte
               </SectionHeader>
 
@@ -747,7 +789,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
 
             {/* Section 2: Tags — pre-defined chips + free-form input */}
             <section className="editor-section editor-card">
-              <SectionHeader number={2} title="Tags" pack={pack}>
+              <SectionHeader number={3} title="Tags" pack={pack}>
                 Vorschläge anklicken oder eigene tippen
               </SectionHeader>
 
@@ -839,7 +881,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
 
             {/* Section 3: Zutaten — group containers */}
             <section className="editor-section editor-card">
-              <SectionHeader number={3} title="Zutaten" pack={pack} required>
+              <SectionHeader number={4} title="Zutaten" pack={pack} required>
                 Hauptgruppe oben. Mit „+ Neue Gruppe" lassen sich Zutaten in
                 Sektionen wie „Für den Teig" / „Glasur" gliedern. Jede Gruppe
                 hat einen eigenen „+ Zutat"-Button.
@@ -1021,7 +1063,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
 
             {/* Section 4: Zubereitung — group containers */}
             <section className="editor-section editor-card">
-              <SectionHeader number={4} title="Zubereitung" pack={pack} required>
+              <SectionHeader number={5} title="Zubereitung" pack={pack} required>
                 Hauptgruppe oben. „+ Neue Gruppe" für Sektionen wie „Teig",
                 „Glasur" oder Varianten. Jede Gruppe hat einen eigenen
                 „+ Schritt"-Button. Nummerierung läuft global durch.
@@ -1145,7 +1187,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
 
             {/* Section 5: Nährwerte — with basis selector */}
             <section className="editor-section editor-card">
-              <SectionHeader number={5} title="Nährwerte" pack={pack} required>
+              <SectionHeader number={6} title="Nährwerte" pack={pack} required>
                 Werte beziehen sich auf die unten gewählte Bezugsgröße. Kalorien
                 ist Pflicht.
               </SectionHeader>

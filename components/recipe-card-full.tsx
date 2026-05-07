@@ -59,7 +59,10 @@ type RecipeCardFullProps = {
 };
 
 export function RecipeCardFull(props: RecipeCardFullProps) {
-  switch (props.pack.cardLayout) {
+  // Per-recipe layout override wins over pack.cardLayout. Lets users pick
+  // a layout per card in the editor independent of the pack default.
+  const layout = props.recipe.cardLayout ?? props.pack.cardLayout;
+  switch (layout) {
     case "editorial":
       return <EditorialLayout {...props} />;
     case "patisserie":

@@ -30,7 +30,10 @@ export type RecipeCardPdfProps = {
 };
 
 export function RecipeCardPdfPage(props: RecipeCardPdfProps) {
-  return LAYOUTS[props.pack.cardLayout](props);
+  // Per-recipe layout override wins over pack.cardLayout — same rule as
+  // the web renderer in components/recipe-card-full.tsx.
+  const layout = props.recipe.cardLayout ?? props.pack.cardLayout;
+  return LAYOUTS[layout](props);
 }
 
 const LAYOUTS: Record<CardLayout, (p: RecipeCardPdfProps) => React.JSX.Element> = {

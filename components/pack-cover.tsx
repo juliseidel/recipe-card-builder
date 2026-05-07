@@ -3,6 +3,52 @@ import Link from "next/link";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
 
+// Skeleton shown while a custom pack waits for its Flux-generated cover.
+// Mirrors the cream-gradient + shimmer language used for recipe heroes so
+// the loading state reads as the same kind of "AI is working" signal.
+function PackCoverSkeleton({ pack }: { pack: Pack }) {
+  return (
+    <div
+      className="relative h-full w-full overflow-hidden hero-breathe"
+      style={
+        {
+          background: `linear-gradient(135deg, ${pack.mood.background} 0%, ${pack.mood.accent}26 100%)`,
+          "--shimmer-base": pack.mood.background,
+          "--shimmer-glow": pack.mood.accent + "30",
+        } as React.CSSProperties
+      }
+    >
+      <div className="absolute inset-0 skeleton-shimmer" aria-hidden />
+      <div
+        className="absolute inset-0"
+        style={{
+          background: `radial-gradient(ellipse at 30% 20%, transparent 30%, ${pack.mood.ink}1f 100%)`,
+        }}
+        aria-hidden
+      />
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center">
+        <span
+          className="size-2 rounded-full pending-dot"
+          style={{ background: pack.mood.accent }}
+          aria-hidden
+        />
+        <span
+          className="font-display text-[20px] italic leading-tight"
+          style={{ color: pack.mood.ink }}
+        >
+          Pack-Cover wird gestaltet
+        </span>
+        <span
+          className="font-mono text-[10px] uppercase tracking-[0.2em]"
+          style={{ color: pack.mood.inkSoft, opacity: 0.7 }}
+        >
+          Flux 2 Pro · ~30 Sek
+        </span>
+      </div>
+    </div>
+  );
+}
+
 type PackCoverProps = {
   brand: Brand;
   pack: Pack;
@@ -118,14 +164,18 @@ export function PackCover({ brand, pack, totalRecipes }: PackCoverProps) {
                 marginLeft: "auto",
               }}
             >
-              <Image
-                src={pack.coverImage}
-                alt={`${pack.title} – ${pack.tagline}`}
-                fill
-                sizes="(min-width: 1024px) 420px, 100vw"
-                className="object-cover"
-                priority
-              />
+              {pack.coverImage ? (
+                <Image
+                  src={pack.coverImage}
+                  alt={`${pack.title} – ${pack.tagline}`}
+                  fill
+                  sizes="(min-width: 1024px) 420px, 100vw"
+                  className="object-cover"
+                  priority
+                />
+              ) : (
+                <PackCoverSkeleton pack={pack} />
+              )}
             </div>
           </div>
         </div>

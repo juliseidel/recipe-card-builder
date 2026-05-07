@@ -4,20 +4,16 @@ import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getBrand } from "@/lib/brands";
-import { getPacksForBrand, type CardLayout, type Pack } from "@/lib/packs";
+import { getPacksForBrand, type Pack } from "@/lib/packs";
 import { addCustomPack, slugifyPack } from "@/lib/custom-packs";
-import {
-  layoutPresets,
-  moodPresets,
-  displayFontOptions,
-} from "@/lib/pack-presets";
+import { moodPresets, displayFontOptions } from "@/lib/pack-presets";
 import { SiteHeader } from "@/components/site-header";
 import { PackCover } from "@/components/pack-cover";
 
-// Default cover used if the user doesn't upload one. Each curated pack ships
-// its own image; for custom packs we fall back to the brand's first pack
-// cover so there's never a broken-image preview.
-const DEFAULT_COVER = "/brands/biene/packs/pack-1.jpg";
+// Initial cover for custom packs is left empty — AI generation kicks in
+// fire-and-forget after save and writes the real URL back into the pack
+// row. PackCover renders a skeleton while the field is empty.
+const PENDING_COVER = "";
 
 type PackEditorPageProps = {
   params: Promise<{ brand: string }>;
@@ -34,19 +30,28 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
   const [tagline, setTagline] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
-  const [layoutId, setLayoutId] = useState<CardLayout>("editorial");
   const [moodId, setMoodId] = useState(moodPresets[0].id);
+  // Custom-mood picker — when null, we use the named preset above. When set,
+  // it overrides moodId. Four colours with derived defaults so the user
+  // doesn't have to hand-pick contrast pairs.
+  const [customMood, setCustomMood] = useState<{
+    background: string;
+    accent: string;
+    ink: string;
+    inkSoft: string;
+  } | null>(null);
   const [displayFont, setDisplayFont] = useState<Pack["displayFont"]>(
     "fraunces"
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedMood = useMemo(
-    () =>
-      moodPresets.find((m) => m.id === moodId)?.mood ?? moodPresets[0].mood,
-    [moodId]
-  );
+  const selectedMood = useMemo(() => {
+    if (customMood) return customMood;
+    return (
+      moodPresets.find((m) => m.id === moodId)?.mood ?? moodPresets[0].mood
+    );
+  }, [customMood, moodId]);
 
   // Live-preview pack assembled from the form inputs. When fields are empty
   // we show placeholders so the cover doesn't look broken — the save button
@@ -65,10 +70,12 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
         description.trim() ||
         "Beschreibe in 1–2 Sätzen, worum es in diesem Pack geht.",
       recipeCount: 0,
-      coverImage: DEFAULT_COVER,
+      coverImage: PENDING_COVER,
       mood: selectedMood,
       displayFont,
-      cardLayout: layoutId,
+      // Pack-level fallback layout. Used only when a recipe doesn't pick its
+      // own — the user picks a per-card layout in the recipe editor.
+      cardLayout: "editorial",
     };
   }, [
     brand,
@@ -80,17 +87,13 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
     category,
     selectedMood,
     displayFont,
-    layoutId,
   ]);
 
-  // Required fields for the save button
+  // Only Pack-Titel is required — everything else has a sensible fallback
+  // (subtitle / tagline / description default to a derived line so the cover
+  // never looks broken). This keeps the editor fast for casual users.
   const requirements = [
     { label: "Pack-Titel", ok: title.trim().length >= 3 },
-    { label: "Tagline", ok: tagline.trim().length >= 5 },
-    {
-      label: "Beschreibung",
-      ok: description.trim().length >= 10,
-    },
   ];
   const missingCount = requirements.filter((r) => !r.ok).length;
   const isValid = missingCount === 0;
@@ -125,14 +128,19 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
       pack: {
         slug,
         title: title.trim(),
+        // Sensible defaults for fields the user left blank — keeps the cover
+        // looking complete without forcing the user to fill 5 fields.
         subtitle: subtitle.trim() || category.trim() || "Eigenes Konzept",
         category: category.trim() || "Eigenes Konzept",
-        tagline: tagline.trim(),
-        description: description.trim(),
-        coverImage: DEFAULT_COVER,
+        tagline: tagline.trim() || `${title.trim()} — Bienes neue Sammlung`,
+        description:
+          description.trim() ||
+          `Eigene Sammlung in ${brand.name}s Welt. Karten kannst du im Editor erstellen, jede mit ihrem eigenen Layout.`,
+        coverImage: PENDING_COVER,
         mood: selectedMood,
         displayFont,
-        cardLayout: layoutId,
+        // Default fallback — recipes pick their own layout on creation.
+        cardLayout: "editorial",
       },
     });
 
@@ -141,6 +149,17 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
       setError("Konnte das Pack nicht speichern. Bitte erneut versuchen.");
       return;
     }
+    // Fire-and-forget: kick off Flux 2 Pro pack-cover generation. The cover
+    // appears once the AI render lands and the pack page revalidates. Errors
+    // are logged server-side but never block the redirect — the user lands
+    // on the pack page either way.
+    void fetch("/api/packs/enrich", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ packId: saved.id }),
+    }).catch(() => {
+      /* swallow — cover gen is best-effort */
+    });
     router.push(`/${brand.slug}/${saved.slug}`);
   };
 
@@ -209,132 +228,106 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
                   maxLength={60}
                 />
               </Field>
-              <Field label="Untertitel" hint="Eine Zeile, was das Pack auszeichnet">
-                <input
-                  className="editor-input"
-                  type="text"
-                  placeholder='z. B. „High-Protein Frühstücke unter 400 kcal"'
-                  value={subtitle}
-                  onChange={(e) => setSubtitle(e.target.value)}
-                  maxLength={80}
-                />
-              </Field>
-              <Field
-                label="Tagline"
-                hint="Kurzer Teaser mit konkreten Recipe-Namen"
-                required
+              <details className="group rounded-xl border border-dashed px-4 py-3 transition-colors hover:border-solid"
+                style={{ borderColor: "var(--color-line-strong)" }}
               >
-                <input
-                  className="editor-input"
-                  type="text"
-                  placeholder='z. B. „Overnight Oats, Protein-Pancakes, Frischkäse-Toast"'
-                  value={tagline}
-                  onChange={(e) => setTagline(e.target.value)}
-                  maxLength={140}
-                />
-              </Field>
-              <Field
-                label="Beschreibung"
-                hint="2 Sätze. Wird auf der Cover-Seite gezeigt."
-                required
-              >
-                <textarea
-                  className="editor-input min-h-[88px] resize-none"
-                  placeholder='z. B. „Sieben unkomplizierte Frühstücke unter 400 kcal mit hohem Proteingehalt — vorbereitet am Sonntag, fertig in 5 Minuten am Morgen."'
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  maxLength={240}
-                />
-              </Field>
-              <Field
-                label="Kategorie"
-                hint='Optional · z. B. „Frühstück", „Snacks"'
-              >
-                <input
-                  className="editor-input"
-                  type="text"
-                  placeholder="Frühstück"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  maxLength={40}
-                />
-              </Field>
+                <summary
+                  className="flex cursor-pointer items-center justify-between text-[12.5px] font-semibold"
+                  style={{ color: "var(--color-ink-muted)" }}
+                >
+                  <span className="flex items-center gap-2">
+                    <span>Mehr Details (optional)</span>
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-[0.14em]"
+                      style={{
+                        background: "var(--color-canvas-alt)",
+                        color: "var(--color-ink-subtle)",
+                      }}
+                    >
+                      kein Pflicht
+                    </span>
+                  </span>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.16em] group-open:hidden">
+                    aufklappen
+                  </span>
+                  <span className="hidden font-mono text-[10px] uppercase tracking-[0.16em] group-open:inline">
+                    zuklappen
+                  </span>
+                </summary>
+                <div className="mt-4 flex flex-col gap-5">
+                  <Field
+                    label="Untertitel"
+                    hint="Eine Zeile, was das Pack auszeichnet"
+                  >
+                    <input
+                      className="editor-input"
+                      type="text"
+                      placeholder='z. B. „High-Protein Frühstücke unter 400 kcal"'
+                      value={subtitle}
+                      onChange={(e) => setSubtitle(e.target.value)}
+                      maxLength={80}
+                    />
+                  </Field>
+                  <Field
+                    label="Tagline"
+                    hint="Kurzer Teaser mit konkreten Recipe-Namen"
+                  >
+                    <input
+                      className="editor-input"
+                      type="text"
+                      placeholder='z. B. „Overnight Oats, Protein-Pancakes, Frischkäse-Toast"'
+                      value={tagline}
+                      onChange={(e) => setTagline(e.target.value)}
+                      maxLength={140}
+                    />
+                  </Field>
+                  <Field
+                    label="Beschreibung"
+                    hint="2 Sätze · wird auf der Cover-Seite gezeigt"
+                  >
+                    <textarea
+                      className="editor-input min-h-[88px] resize-none"
+                      placeholder='z. B. „Sieben unkomplizierte Frühstücke unter 400 kcal mit hohem Proteingehalt — vorbereitet am Sonntag, fertig in 5 Minuten am Morgen."'
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      maxLength={240}
+                    />
+                  </Field>
+                  <Field
+                    label="Kategorie"
+                    hint='z. B. „Frühstück", „Snacks"'
+                  >
+                    <input
+                      className="editor-input"
+                      type="text"
+                      placeholder="Frühstück"
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      maxLength={40}
+                    />
+                  </Field>
+                </div>
+              </details>
             </section>
 
-            {/* Section 2 — Layout */}
+            {/* Section 2 — Mood */}
             <section className="editor-section editor-card flex flex-col gap-5">
               <SectionHeader
                 num="02"
-                title="Karten-Layout"
-                hint="Wie sehen die Rezeptkarten in diesem Pack aus? Alle Karten teilen sich ein Layout."
-              />
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {layoutPresets.map((preset) => {
-                  const active = layoutId === preset.id;
-                  return (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => setLayoutId(preset.id)}
-                      className="flex flex-col items-start gap-1.5 rounded-2xl border-2 p-4 text-left transition-all"
-                      style={{
-                        borderColor: active
-                          ? selectedMood.accent
-                          : "var(--color-line)",
-                        background: active
-                          ? selectedMood.accent + "10"
-                          : "white",
-                      }}
-                    >
-                      <div className="flex w-full items-center justify-between gap-2">
-                        <span
-                          className="text-[14px] font-semibold"
-                          style={{
-                            color: active
-                              ? selectedMood.accent
-                              : "var(--color-ink)",
-                          }}
-                        >
-                          {preset.title}
-                        </span>
-                        <LayoutThumbnail
-                          layout={preset.id}
-                          mood={selectedMood}
-                        />
-                      </div>
-                      <p
-                        className="text-[12px] leading-snug"
-                        style={{ color: "var(--color-ink-muted)" }}
-                      >
-                        {preset.description}
-                      </p>
-                      <p
-                        className="mt-1 text-[10.5px] font-semibold uppercase tracking-[0.14em]"
-                        style={{ color: "var(--color-ink-subtle)" }}
-                      >
-                        Best für: {preset.bestFor}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
-            {/* Section 3 — Mood */}
-            <section className="editor-section editor-card flex flex-col gap-5">
-              <SectionHeader
-                num="03"
                 title="Farb-Stimmung"
-                hint="Eine Palette für alle Karten. Acht Presets mit Bienes Cream-Base."
+                hint='Acht Presets — oder klick auf „Eigene Farben" für deine eigene Palette.'
               />
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {moodPresets.map((preset) => {
-                  const active = moodId === preset.id;
+                  const active = !customMood && moodId === preset.id;
                   return (
                     <button
                       key={preset.id}
                       type="button"
-                      onClick={() => setMoodId(preset.id)}
+                      onClick={() => {
+                        setMoodId(preset.id);
+                        setCustomMood(null);
+                      }}
                       className="group flex flex-col items-stretch gap-2 rounded-2xl border-2 p-3 text-left transition-all"
                       style={{
                         borderColor: active
@@ -376,12 +369,102 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
                   );
                 })}
               </div>
+
+              {/* Custom-mood toggle + 4-color picker */}
+              <div
+                className="rounded-2xl border-2 p-4"
+                style={{
+                  borderColor: customMood
+                    ? selectedMood.accent
+                    : "var(--color-line)",
+                  background: customMood ? selectedMood.accent + "08" : "white",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (customMood) {
+                      setCustomMood(null);
+                    } else {
+                      // Seed from the currently selected preset so the picker
+                      // doesn't start at white-on-white.
+                      const seed =
+                        moodPresets.find((m) => m.id === moodId)?.mood ??
+                        moodPresets[0].mood;
+                      setCustomMood({ ...seed });
+                    }
+                  }}
+                  className="flex w-full items-center justify-between text-left"
+                >
+                  <div className="flex flex-col">
+                    <span
+                      className="text-[13px] font-semibold"
+                      style={{ color: "var(--color-ink)" }}
+                    >
+                      Eigene Farben
+                    </span>
+                    <span
+                      className="text-[11px]"
+                      style={{ color: "var(--color-ink-muted)" }}
+                    >
+                      Vier Farben für Hintergrund, Akzent und Text — frei wählbar.
+                    </span>
+                  </div>
+                  <span
+                    className="rounded-full border px-3 py-1 text-[11px] font-semibold"
+                    style={{
+                      borderColor: customMood
+                        ? selectedMood.accent
+                        : "var(--color-line-strong)",
+                      color: customMood
+                        ? selectedMood.accent
+                        : "var(--color-ink-muted)",
+                      background: customMood
+                        ? selectedMood.accent + "12"
+                        : "transparent",
+                    }}
+                  >
+                    {customMood ? "Aktiv — zurück zu Presets" : "Aktivieren"}
+                  </span>
+                </button>
+
+                {customMood ? (
+                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <ColorInput
+                      label="Hintergrund"
+                      value={customMood.background}
+                      onChange={(v) =>
+                        setCustomMood({ ...customMood, background: v })
+                      }
+                    />
+                    <ColorInput
+                      label="Akzent"
+                      value={customMood.accent}
+                      onChange={(v) =>
+                        setCustomMood({ ...customMood, accent: v })
+                      }
+                    />
+                    <ColorInput
+                      label="Tinte"
+                      value={customMood.ink}
+                      onChange={(v) => setCustomMood({ ...customMood, ink: v })}
+                    />
+                    <ColorInput
+                      label="Tinte (weich)"
+                      value={customMood.inkSoft}
+                      onChange={(v) =>
+                        setCustomMood({ ...customMood, inkSoft: v })
+                      }
+                    />
+                  </div>
+                ) : null}
+              </div>
             </section>
 
-            {/* Section 4 — Typography */}
+            {/* Section 3 — Typography */}
             <section className="editor-section editor-card flex flex-col gap-5">
               <SectionHeader
-                num="04"
+                num="03"
                 title="Typografie"
                 hint="Display-Schrift für Pack-Cover und Titel auf den Karten."
               />
@@ -531,10 +614,11 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
               className="mt-3 text-[11px] leading-relaxed"
               style={{ color: "var(--color-ink-muted)" }}
             >
-              So sieht das Pack-Cover aus, bevor du Karten anlegst. Sobald du
-              eine Karte erstellst, wird sie in der gewählten Layout-Variante
-              gerendert — alle Karten in diesem Pack teilen sich Layout, Farben
-              und Typografie.
+              So sieht das Pack-Cover aus. Beim Speichern generiert die KI im
+              Hintergrund (~30 Sek) ein passendes Hero-Bild für deinen Pack —
+              du landest direkt auf der Pack-Seite, das Bild taucht auf, sobald
+              es fertig ist. Karten kannst du dann anlegen und für jede einzeln
+              ein Layout wählen.
             </p>
           </aside>
         </div>
@@ -614,81 +698,46 @@ function Field({
   );
 }
 
-// Tiny SVG schematic showing each layout's structural fingerprint. Not a
-// pixel-perfect preview — just enough to differentiate "magazine" vs
-// "polaroid" vs "minimal-with-mega-number" vs "macro-bars" vs "data-rows".
-function LayoutThumbnail({
-  layout,
-  mood,
+// Two-column row in the custom-mood picker: HTML color picker + hex text
+// input bound to the same value. Either one updates the parent state.
+function ColorInput({
+  label,
+  value,
+  onChange,
 }: {
-  layout: CardLayout;
-  mood: { background: string; accent: string; ink: string };
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
 }) {
-  const stroke = mood.ink;
-  const fill = mood.accent;
-  const bg = mood.background;
   return (
-    <svg width="48" height="36" viewBox="0 0 48 36" aria-hidden>
-      <rect width="48" height="36" rx="4" fill={bg} opacity="0.5" />
-      {layout === "editorial" && (
-        <>
-          <rect x="3" y="3" width="42" height="10" rx="1.5" fill={fill} opacity="0.75" />
-          <rect x="3" y="15" width="22" height="2" rx="0.5" fill={stroke} />
-          <rect x="3" y="19" width="14" height="2" rx="0.5" fill={stroke} opacity="0.6" />
-          <rect x="3" y="25" width="42" height="2" rx="0.5" fill={fill} opacity="0.4" />
-          <rect x="3" y="29" width="42" height="2" rx="0.5" fill={fill} opacity="0.4" />
-        </>
-      )}
-      {layout === "patisserie" && (
-        <>
-          <rect x="3" y="3" width="22" height="3" rx="0.5" fill={stroke} />
-          <rect x="3" y="9" width="18" height="2" rx="0.5" fill={stroke} opacity="0.6" />
-          <rect
-            x="28"
-            y="6"
-            width="16"
-            height="14"
-            rx="2"
-            fill={fill}
-            opacity="0.85"
-            transform="rotate(-3 36 13)"
-          />
-          <rect x="3" y="22" width="42" height="2" rx="0.5" fill={fill} opacity="0.5" />
-          <rect x="3" y="27" width="18" height="2" rx="0.5" fill={stroke} opacity="0.4" />
-          <rect x="25" y="27" width="20" height="2" rx="0.5" fill={stroke} opacity="0.4" />
-        </>
-      )}
-      {layout === "minimal" && (
-        <>
-          <rect x="3" y="3" width="14" height="2" rx="0.5" fill={stroke} opacity="0.5" />
-          <text x="3" y="22" fontSize="14" fontWeight="bold" fill={fill}>
-            01
-          </text>
-          <rect x="20" y="9" width="24" height="3" rx="0.5" fill={stroke} />
-          <rect x="20" y="14" width="20" height="2" rx="0.5" fill={stroke} opacity="0.5" />
-          <rect x="20" y="20" width="24" height="10" rx="1" fill={fill} opacity="0.7" />
-        </>
-      )}
-      {layout === "sport" && (
-        <>
-          <rect x="3" y="3" width="14" height="2" rx="0.5" fill={stroke} opacity="0.5" />
-          <rect x="3" y="9" width="22" height="3" rx="0.5" fill={stroke} />
-          <rect x="3" y="16" width="20" height="3" rx="1.5" fill={fill} />
-          <rect x="3" y="22" width="14" height="3" rx="1.5" fill={fill} opacity="0.7" />
-          <rect x="3" y="28" width="18" height="3" rx="1.5" fill={fill} opacity="0.5" />
-          <rect x="29" y="9" width="16" height="22" rx="1.5" fill={fill} opacity="0.7" />
-        </>
-      )}
-      {layout === "dashboard" && (
-        <>
-          <rect x="3" y="3" width="42" height="6" rx="1" fill={fill} opacity="0.6" />
-          <rect x="3" y="13" width="22" height="2" rx="0.5" fill={stroke} />
-          <rect x="3" y="18" width="14" height="2" rx="0.5" fill={stroke} opacity="0.5" />
-          <rect x="3" y="23" width="14" height="2" rx="0.5" fill={stroke} opacity="0.5" />
-          <rect x="3" y="28" width="14" height="2" rx="0.5" fill={stroke} opacity="0.5" />
-          <rect x="29" y="13" width="16" height="18" rx="1" fill={fill} opacity="0.6" />
-        </>
-      )}
-    </svg>
+    <label className="flex flex-col gap-1.5">
+      <span
+        className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+        style={{ color: "var(--color-ink-muted)" }}
+      >
+        {label}
+      </span>
+      <div
+        className="flex items-center gap-2 rounded-xl border bg-white px-2 py-1.5"
+        style={{ borderColor: "var(--color-line)" }}
+      >
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="size-7 cursor-pointer rounded-md border-0 bg-transparent p-0"
+          style={{ background: value }}
+        />
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="min-w-0 flex-1 bg-transparent text-[12px] font-mono uppercase tracking-[0.04em] outline-none"
+          style={{ color: "var(--color-ink)" }}
+          maxLength={7}
+        />
+      </div>
+    </label>
   );
 }
+

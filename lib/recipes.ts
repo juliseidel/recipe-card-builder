@@ -58,6 +58,13 @@ export type Recipe = {
   hero?: string;
   sourceUrl?: string;
   sourceLabel?: string;
+  /**
+   * Optional per-recipe layout override. When set, the renderer uses this
+   * instead of pack.cardLayout. Lets the user pick a layout per card from
+   * the recipe editor — independent of which layout the pack defaults to.
+   * Static curated recipes leave this undefined and inherit the pack layout.
+   */
+  cardLayout?: import("./packs").CardLayout;
 };
 
 // Normalise a step entry (string or object) to the canonical RecipeStep shape.
