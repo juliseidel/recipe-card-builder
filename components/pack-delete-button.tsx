@@ -32,7 +32,16 @@ export function PackDeleteButton({
       return;
     }
     setDeleting(true);
-    await removeCustomPack(packId);
+    const ok = await removeCustomPack(packId);
+    if (!ok) {
+      // Don't navigate away if Supabase rejected the delete — show the
+      // user the button is back to "klick again" instead of stuck in the
+      // spinner.
+      setDeleting(false);
+      setConfirming(false);
+      console.error("[pack-delete] delete failed for", packId);
+      return;
+    }
     await fetch("/api/packs/revalidate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

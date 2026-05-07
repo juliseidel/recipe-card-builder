@@ -49,9 +49,22 @@ export function PackCard({ pack, brand, customPackId }: PackCardProps) {
       return;
     }
     setDeleting(true);
-    await removeCustomPack(customPackId);
-    // refresh() pulls a fresh server-render of the workspace so the deleted
-    // pack disappears from the grid without a hard reload.
+    const ok = await removeCustomPack(customPackId);
+    if (!ok) {
+      // Roll the UI back so the user can try again instead of being
+      // stuck in a "lösche…" spinner forever.
+      setDeleting(false);
+      setConfirmingDelete(false);
+      console.error("[pack-card] delete failed for", customPackId);
+      return;
+    }
+    // Drop the workspace's cached server render — without this, the
+    // 30-second revalidate window keeps the deleted pack visible.
+    await fetch("/api/packs/revalidate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ brandSlug: brand.slug }),
+    }).catch(() => {});
     router.refresh();
   };
 
