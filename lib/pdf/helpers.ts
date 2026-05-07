@@ -1,4 +1,4 @@
-import type { Recipe } from "@/lib/recipes";
+import { normalizeStep, type Recipe } from "@/lib/recipes";
 
 export type IngredientItem = {
   amount: string;
@@ -43,21 +43,74 @@ export function groupIngredients(
   const groups = new Map<string, IngredientGroup>();
 
   ingredients.forEach((ing) => {
-    const { group, remainingNote } = detectGroup(ing.note);
+    // Explicit ing.group (set by editor) wins over note-based detection
+    // (which exists for the curated 37 recipes that ship as text).
+    let groupName: string | null = ing.group?.trim() || null;
+    let cleanedNote: string | undefined = ing.note;
+    if (!groupName) {
+      const detected = detectGroup(ing.note);
+      groupName = detected.group;
+      cleanedNote = detected.remainingNote;
+    }
     const item: IngredientItem = {
       amount: ing.amount,
       name: ing.name,
-      note: remainingNote,
+      note: cleanedNote,
     };
-    if (group) {
-      if (!groups.has(group)) groups.set(group, { name: group, items: [] });
-      groups.get(group)!.items.push(item);
+    if (groupName) {
+      if (!groups.has(groupName))
+        groups.set(groupName, { name: groupName, items: [] });
+      groups.get(groupName)!.items.push(item);
     } else {
       main.items.push(item);
     }
   });
 
   const result: IngredientGroup[] = [];
+  if (main.items.length > 0) result.push(main);
+  groups.forEach((g) => result.push(g));
+  return result;
+}
+
+export type StepItem = {
+  text: string;
+  /** Original index in recipe.steps — used to keep numbering continuous
+   *  across the whole list, not restart per group. */
+  index: number;
+};
+
+export type StepGroup = {
+  name: string | null;
+  items: StepItem[];
+};
+
+// Group steps the same way ingredients are grouped: a step's optional
+// `group` field means "this step belongs to the [group] section". Steps
+// without a group go into the main (unnamed) group. Numbering in the
+// returned items stays globally continuous so renderers don't restart.
+//
+// Used by every layout that wants to render "Für den Teig: 1, 2 / Für die
+// Glasur: 3, 4" sectioning. Backwards-compatible with steps that ship as
+// plain strings (those just don't have a group, so everything lands in
+// main).
+export function groupSteps(steps: Recipe["steps"]): StepGroup[] {
+  const main: StepGroup = { name: null, items: [] };
+  const groups = new Map<string, StepGroup>();
+
+  steps.forEach((raw, idx) => {
+    const step = normalizeStep(raw);
+    const item: StepItem = { text: step.text, index: idx };
+    if (step.group) {
+      if (!groups.has(step.group)) {
+        groups.set(step.group, { name: step.group, items: [] });
+      }
+      groups.get(step.group)!.items.push(item);
+    } else {
+      main.items.push(item);
+    }
+  });
+
+  const result: StepGroup[] = [];
   if (main.items.length > 0) result.push(main);
   groups.forEach((g) => result.push(g));
   return result;

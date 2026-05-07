@@ -2,6 +2,11 @@ export type Ingredient = {
   amount: string;
   name: string;
   note?: string;
+  /** Explicit subgroup name ("Für den Teig", "Glasur", "Schoko-Variante").
+   *  Curated recipes use note-based markers ("Für die Mayo · gekocht");
+   *  the editor produces the explicit field so users can name groups
+   *  freely without needing to match the legacy detection regex. */
+  group?: string;
 };
 
 export type Micronutrient = {
@@ -20,6 +25,19 @@ export type Nutrition = {
   micros?: Micronutrient[];
 };
 
+// Steps support optional grouping ("Für den Teig:", "Für die Glasur:") via
+// the `group` field. Plain strings are accepted for backwards compatibility
+// — all 37 curated recipes were written that way.
+export type RecipeStep = {
+  text: string;
+  group?: string;
+};
+
+// What the displayed nutrition values are in reference to. "portion" is the
+// historical default; the editor lets users pick what fits the dish (a
+// muffin recipe is more naturally communicated "pro Stück" than per portion).
+export type NutritionBasis = "portion" | "piece" | "per100g" | "total";
+
 export type Recipe = {
   slug: string;
   packSlug: string;
@@ -33,12 +51,78 @@ export type Recipe = {
   servings: number;
   tags: string[];
   ingredients: Ingredient[];
-  steps: string[];
+  steps: Array<string | RecipeStep>;
   nutrition: Nutrition;
+  /** What the nutrition values are per. Defaults to "portion" for backward compat. */
+  nutritionBasis?: NutritionBasis;
   hero?: string;
   sourceUrl?: string;
   sourceLabel?: string;
 };
+
+// Normalise a step entry (string or object) to the canonical RecipeStep shape.
+// Callers can rely on .text and .group being defined consistently.
+export function normalizeStep(
+  s: string | RecipeStep
+): RecipeStep {
+  return typeof s === "string" ? { text: s } : s;
+}
+
+// Returns the human-readable label for the nutrition basis. Used in headers
+// like "Nährwerte pro Stück". Always uppercase + diacritics intact.
+export function nutritionBasisLabel(basis: NutritionBasis | undefined): string {
+  switch (basis) {
+    case "piece":
+      return "PRO STÜCK";
+    case "per100g":
+      return "PRO 100 G";
+    case "total":
+      return "GESAMTES REZEPT";
+    case "portion":
+    case undefined:
+    default:
+      return "PRO PORTION";
+  }
+}
+
+// Sentence-case version for body copy (e.g. "Pro Stück" inside descriptive
+// text, where the all-caps label would be too shouty).
+export function nutritionBasisLabelShort(
+  basis: NutritionBasis | undefined
+): string {
+  switch (basis) {
+    case "piece":
+      return "Pro Stück";
+    case "per100g":
+      return "Pro 100 g";
+    case "total":
+      return "Gesamtes Rezept";
+    case "portion":
+    case undefined:
+    default:
+      return "Pro Portion";
+  }
+}
+
+// Inline form used inside sentences ("350 kcal pro Stück"). Keeps the German
+// noun capitalisation but lowercases the leading "pro/im" so it reads as
+// flowing text, not a header.
+export function nutritionBasisInline(
+  basis: NutritionBasis | undefined
+): string {
+  switch (basis) {
+    case "piece":
+      return "pro Stück";
+    case "per100g":
+      return "pro 100 g";
+    case "total":
+      return "im ganzen Rezept";
+    case "portion":
+    case undefined:
+    default:
+      return "pro Portion";
+  }
+}
 
 export const recipes: Recipe[] = [
   // ─── Pack 1: Feierabend-Klassiker (7 Rezepte, original von @bienesfitlife) ───

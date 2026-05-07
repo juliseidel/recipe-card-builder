@@ -1,9 +1,15 @@
 import { Page, View, Text, Image } from "@react-pdf/renderer";
 import type { Brand } from "@/lib/brands";
 import type { Pack, CardLayout } from "@/lib/packs";
-import type { Recipe } from "@/lib/recipes";
+import {
+  nutritionBasisLabel,
+  nutritionBasisLabelShort,
+  nutritionBasisInline,
+  type Recipe,
+} from "@/lib/recipes";
 import {
   groupIngredients,
+  groupSteps,
   totalTime,
   pad2,
   portionsLabel,
@@ -304,7 +310,7 @@ function EditorialPage({
           compact
         />
         <PortionTile
-          label="PRO PORTION"
+          label={nutritionBasisLabel(recipe.nutritionBasis)}
           value={String(recipe.nutrition.kcal)}
           sub={`kcal · ${recipe.nutrition.carbs}g KH · ${recipe.nutrition.fat}g Fett`}
           theme={t}
@@ -316,7 +322,7 @@ function EditorialPage({
         <PortionTile
           label="EIWEISS"
           value={`${recipe.nutrition.protein}g`}
-          sub="pro Portion"
+          sub={nutritionBasisInline(recipe.nutritionBasis)}
           theme={t}
           borderRight
           compact
@@ -478,7 +484,7 @@ function EditorialMicrosBanner({
             textTransform: "uppercase",
           }}
         >
-          Mikronährstoffe pro Portion · % Tagesbedarf
+          Mikronährstoffe {nutritionBasisInline(recipe.nutritionBasis)} · % Tagesbedarf
         </Text>
       </View>
       <View style={{ flexDirection: "row", gap: 8 }}>
@@ -1455,7 +1461,7 @@ function SportPage({
         <VolumenStatTile
           dotColor={t.accent}
           value={String(recipe.nutrition.kcal)}
-          label="kcal pro Portion"
+          label={`kcal ${nutritionBasisInline(recipe.nutritionBasis)}`}
           theme={t}
           borderRight
           highlight
@@ -1464,7 +1470,7 @@ function SportPage({
         <VolumenStatTile
           dotColor={t.accent}
           value={`${recipe.nutrition.protein}g`}
-          label="Eiweiß pro Portion"
+          label={`Eiweiß ${nutritionBasisInline(recipe.nutritionBasis)}`}
           theme={t}
           padV={d.statsPadV}
         />
@@ -1508,7 +1514,7 @@ function SportPage({
               textTransform: "uppercase",
             }}
           >
-            pro Portion · von 50 / 80 / 35 g Skala
+            {nutritionBasisInline(recipe.nutritionBasis)} · von 50 / 80 / 35 g Skala
           </Text>
         </View>
         {macroBars.map((m) => (
@@ -1709,49 +1715,72 @@ function SportPage({
             </Text>
           </View>
           <View style={{ marginTop: 8 }}>
-            {recipe.steps.map((step, idx) => (
-              <View
-                key={idx}
-                style={{
-                  flexDirection: "row",
-                  marginBottom: d.stepMarginBottom,
-                  gap: 8,
-                }}
-              >
-                <View style={{ width: 22, alignItems: "center" }}>
+            {groupSteps(recipe.steps).map((group, gIdx) => (
+              <View key={`sg-${gIdx}`}>
+                {group.name ? (
                   <Text
                     style={{
-                      fontFamily: "Fraunces",
-                      fontSize: 18,
+                      fontFamily: "Inter",
+                      fontSize: 8,
+                      fontWeight: 600,
+                      letterSpacing: 1.4,
                       color: t.accent,
-                      lineHeight: 1,
+                      textTransform: "uppercase",
+                      marginTop: gIdx > 0 ? 6 : 0,
+                      marginBottom: 5,
                     }}
                   >
-                    {idx + 1}
+                    {group.name}
                   </Text>
-                  {idx < recipe.steps.length - 1 ? (
+                ) : null}
+                {group.items.map((item) => {
+                  const isLast = item.index === recipe.steps.length - 1;
+                  return (
                     <View
+                      key={item.index}
                       style={{
-                        marginTop: 4,
-                        width: 1.5,
-                        flex: 1,
-                        minHeight: 18,
-                        backgroundColor: withAlpha(t.accent, 0.3),
+                        flexDirection: "row",
+                        marginBottom: d.stepMarginBottom,
+                        gap: 8,
                       }}
-                    />
-                  ) : null}
-                </View>
-                <Text
-                  style={{
-                    flex: 1,
-                    fontSize: d.stepFontSize,
-                    lineHeight: 1.45,
-                    color: t.ink,
-                    paddingBottom: 4,
-                  }}
-                >
-                  {step}
-                </Text>
+                    >
+                      <View style={{ width: 22, alignItems: "center" }}>
+                        <Text
+                          style={{
+                            fontFamily: "Fraunces",
+                            fontSize: 18,
+                            color: t.accent,
+                            lineHeight: 1,
+                          }}
+                        >
+                          {item.index + 1}
+                        </Text>
+                        {!isLast ? (
+                          <View
+                            style={{
+                              marginTop: 4,
+                              width: 1.5,
+                              flex: 1,
+                              minHeight: 18,
+                              backgroundColor: withAlpha(t.accent, 0.3),
+                            }}
+                          />
+                        ) : null}
+                      </View>
+                      <Text
+                        style={{
+                          flex: 1,
+                          fontSize: d.stepFontSize,
+                          lineHeight: 1.45,
+                          color: t.ink,
+                          paddingBottom: 4,
+                        }}
+                      >
+                        {item.text}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
             ))}
           </View>
@@ -2018,7 +2047,7 @@ function DashboardPage({
           >
             <DashRow label="Ergibt" value={`${recipe.servings} ${pl}`} theme={t} />
             <DashRow
-              label="Pro Portion"
+              label={nutritionBasisLabelShort(recipe.nutritionBasis)}
               value={`${recipe.nutrition.kcal} kcal`}
               theme={t}
               highlight
@@ -2332,7 +2361,7 @@ function StepsList({
   stepFontSize = 9.5,
   stepNumFontSize = 18,
 }: {
-  steps: string[];
+  steps: Recipe["steps"];
   theme: ReturnType<typeof packTheme>;
   bold?: boolean;
   checklist?: boolean;
@@ -2340,36 +2369,63 @@ function StepsList({
   stepFontSize?: number;
   stepNumFontSize?: number;
 }) {
+  const groups = groupSteps(steps);
   return (
     <View style={{ marginTop: 8 }}>
-      {steps.map((step, idx) => (
-        <View
-          key={idx}
-          style={{ flexDirection: "row", marginBottom: stepMarginBottom, gap: 6 }}
-        >
-          <Text
-            style={{
-              fontFamily: "Fraunces",
-              fontSize: stepNumFontSize,
-              fontWeight: bold ? 700 : 400,
-              color: theme.accent,
-              width: 18,
-              lineHeight: 1,
-            }}
-          >
-            {idx + 1}
-          </Text>
-          <Text
-            style={{
-              flex: 1,
-              fontSize: stepFontSize,
-              lineHeight: 1.45,
-              color: theme.ink,
-            }}
-          >
-            {checklist ? <Text style={{ color: theme.inkSubtle }}>☐ </Text> : null}
-            {step}
-          </Text>
+      {groups.map((group, gIdx) => (
+        <View key={`g-${gIdx}`}>
+          {group.name ? (
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 8,
+                fontWeight: 600,
+                letterSpacing: 1.4,
+                color: theme.accent,
+                textTransform: "uppercase",
+                marginTop: gIdx > 0 ? 6 : 0,
+                marginBottom: 5,
+              }}
+            >
+              {group.name}
+            </Text>
+          ) : null}
+          {group.items.map((item) => (
+            <View
+              key={item.index}
+              style={{
+                flexDirection: "row",
+                marginBottom: stepMarginBottom,
+                gap: 6,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: "Fraunces",
+                  fontSize: stepNumFontSize,
+                  fontWeight: bold ? 700 : 400,
+                  color: theme.accent,
+                  width: 18,
+                  lineHeight: 1,
+                }}
+              >
+                {item.index + 1}
+              </Text>
+              <Text
+                style={{
+                  flex: 1,
+                  fontSize: stepFontSize,
+                  lineHeight: 1.45,
+                  color: theme.ink,
+                }}
+              >
+                {checklist ? (
+                  <Text style={{ color: theme.inkSubtle }}>☐ </Text>
+                ) : null}
+                {item.text}
+              </Text>
+            </View>
+          ))}
         </View>
       ))}
     </View>
@@ -2708,7 +2764,7 @@ function MicrosStrip({
             textTransform: "uppercase",
           }}
         >
-          Mikronährstoffe pro Portion · % Tagesbedarf
+          Mikronährstoffe {nutritionBasisInline(recipe?.nutritionBasis)} · % Tagesbedarf
         </Text>
       </View>
       <View

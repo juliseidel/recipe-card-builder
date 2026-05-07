@@ -5,7 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getBrand } from "@/lib/brands";
 import { getPack } from "@/lib/packs";
-import type { Ingredient, Recipe } from "@/lib/recipes";
+import type {
+  Ingredient,
+  NutritionBasis,
+  Recipe,
+  RecipeStep,
+} from "@/lib/recipes";
 import { addCustomRecipe, slugify } from "@/lib/custom-recipes";
 import {
   ingredientSuggestions,
@@ -15,6 +20,20 @@ import { tagSuggestions } from "@/lib/common-tags";
 import { SiteHeader } from "@/components/site-header";
 import { RecipeCardPreview } from "@/components/recipe-card-preview";
 import { IngredientCombobox } from "@/components/ingredient-combobox";
+
+// Editor models a recipe as TWO flat row lists (ingredients, steps) where
+// each row is either a content item or a group-header. On save, headers
+// collapse into the `group` field of the rows that follow them, producing
+// the standard Recipe shape. This UI model is what lets "Für den Teig" /
+// "Glasur" / "Schoko-Variante A" sectioning feel natural to enter without
+// nested drag-drop UX.
+type IngredientRow =
+  | { kind: "header"; name: string }
+  | { kind: "item"; amount: string; name: string };
+
+type StepRow =
+  | { kind: "header"; name: string }
+  | { kind: "step"; text: string };
 
 type NewRecipePageProps = {
   params: Promise<{ brand: string; pack: string }>;
@@ -35,16 +54,23 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     useState<Recipe["difficulty"]>("Einfach");
   const [servings, setServings] = useState("2");
   const [tags, setTags] = useState<string[]>([]);
-  const [ingredients, setIngredients] = useState<Ingredient[]>([
-    { amount: "", name: "" },
-    { amount: "", name: "" },
-    { amount: "", name: "" },
+  const [tagInput, setTagInput] = useState("");
+  const [ingredientRows, setIngredientRows] = useState<IngredientRow[]>([
+    { kind: "item", amount: "", name: "" },
+    { kind: "item", amount: "", name: "" },
+    { kind: "item", amount: "", name: "" },
   ]);
-  const [steps, setSteps] = useState<string[]>(["", "", ""]);
+  const [stepRows, setStepRows] = useState<StepRow[]>([
+    { kind: "step", text: "" },
+    { kind: "step", text: "" },
+    { kind: "step", text: "" },
+  ]);
   const [kcal, setKcal] = useState("");
   const [protein, setProtein] = useState("");
   const [carbs, setCarbs] = useState("");
   const [fat, setFat] = useState("");
+  const [nutritionBasis, setNutritionBasis] =
+    useState<NutritionBasis>("portion");
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,8 +78,40 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     null
   );
 
-  const cleanIngredients = ingredients.filter((i) => i.amount || i.name);
-  const cleanSteps = steps.filter((s) => s.trim());
+  // Walk the ingredient rows once: track the current group header and
+  // attach it as `group` to every subsequent item until the next header.
+  const builtIngredients: Ingredient[] = useMemo(() => {
+    let currentGroup: string | null = null;
+    const out: Ingredient[] = [];
+    for (const row of ingredientRows) {
+      if (row.kind === "header") {
+        currentGroup = row.name.trim() || null;
+      } else if (row.amount.trim() || row.name.trim()) {
+        out.push({
+          amount: row.amount.trim(),
+          name: row.name.trim(),
+          ...(currentGroup ? { group: currentGroup } : {}),
+        });
+      }
+    }
+    return out;
+  }, [ingredientRows]);
+
+  const builtSteps: RecipeStep[] = useMemo(() => {
+    let currentGroup: string | null = null;
+    const out: RecipeStep[] = [];
+    for (const row of stepRows) {
+      if (row.kind === "header") {
+        currentGroup = row.name.trim() || null;
+      } else if (row.text.trim()) {
+        out.push({
+          text: row.text.trim(),
+          ...(currentGroup ? { group: currentGroup } : {}),
+        });
+      }
+    }
+    return out;
+  }, [stepRows]);
 
   const previewRecipe: Recipe | null = useMemo(() => {
     if (!pack) return null;
@@ -69,16 +127,19 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
       difficulty,
       servings: parseInt(servings) || 1,
       tags,
-      ingredients: cleanIngredients.length
-        ? cleanIngredients
+      ingredients: builtIngredients.length
+        ? builtIngredients
         : [{ amount: "—", name: "Zutaten" }],
-      steps: cleanSteps.length ? cleanSteps : ["Zubereitung erscheint hier."],
+      steps: builtSteps.length
+        ? builtSteps
+        : [{ text: "Zubereitung erscheint hier." }],
       nutrition: {
         kcal: parseInt(kcal) || 0,
         protein: parseInt(protein) || 0,
         carbs: parseInt(carbs) || 0,
         fat: parseInt(fat) || 0,
       },
+      nutritionBasis,
     };
   }, [
     pack,
@@ -90,19 +151,20 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     difficulty,
     servings,
     tags,
-    cleanIngredients,
-    cleanSteps,
+    builtIngredients,
+    builtSteps,
     kcal,
     protein,
     carbs,
     fat,
+    nutritionBasis,
   ]);
 
   // Required fields tracking — used for save-button counter
   const requirements: { label: string; ok: boolean }[] = [
     { label: "Titel", ok: title.trim().length > 0 },
-    { label: "mindestens 1 Zutat", ok: cleanIngredients.length >= 1 },
-    { label: "mindestens 1 Schritt", ok: cleanSteps.length >= 1 },
+    { label: "mindestens 1 Zutat", ok: builtIngredients.length >= 1 },
+    { label: "mindestens 1 Schritt", ok: builtSteps.length >= 1 },
     { label: "Kalorien", ok: parseInt(kcal) > 0 },
   ];
   const missingCount = requirements.filter((r) => !r.ok).length;
@@ -143,22 +205,23 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
       difficulty,
       servings: parseInt(servings) || 1,
       tags,
-      ingredients: cleanIngredients,
-      steps: cleanSteps,
+      ingredients: builtIngredients,
+      steps: builtSteps,
       nutrition: {
         kcal: parseInt(kcal) || 0,
         protein: parseInt(protein) || 0,
         carbs: parseInt(carbs) || 0,
         fat: parseInt(fat) || 0,
       },
+      nutritionBasis,
     });
     if (!saved) {
       setSaving(false);
       setError("Konnte die Karte nicht speichern. Bitte erneut versuchen.");
       return;
     }
-    // Fire-and-forget: kick off Gemini micro-enrichment in the background.
-    // The detail page will poll and reveal micros when ready.
+    // Fire-and-forget: kick off Gemini micros + Flux 2 Pro hero in parallel.
+    // The detail page polls and reveals both when ready.
     void fetch("/api/recipes/enrich", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -172,16 +235,81 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     }, 350);
   };
 
-  const toggleTag = (tag: string) => {
-    setTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
+  // Tag operations — accept both pre-defined chips and free-typed tags.
+  const addTag = (raw: string) => {
+    const clean = raw.trim().replace(/^,+|,+$/g, "").trim();
+    if (!clean) return;
+    if (tags.some((t) => t.toLowerCase() === clean.toLowerCase())) return;
+    setTags((prev) => [...prev, clean]);
+  };
+  const removeTag = (tag: string) => {
+    setTags((prev) => prev.filter((t) => t !== tag));
+  };
+  const toggleSuggestedTag = (tag: string) => {
+    if (tags.includes(tag)) removeTag(tag);
+    else addTag(tag);
+  };
+  const handleTagInputKey: React.KeyboardEventHandler<HTMLInputElement> = (
+    e
+  ) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addTag(tagInput);
+      setTagInput("");
+    } else if (e.key === "Backspace" && !tagInput && tags.length > 0) {
+      // Convenience: empty backspace deletes the last tag
+      removeTag(tags[tags.length - 1]);
+    }
   };
 
-  const setIngredientAt = (idx: number, patch: Partial<Ingredient>) => {
-    setIngredients((prev) =>
-      prev.map((i, k) => (k === idx ? { ...i, ...patch } : i))
+  // Row helpers — ingredient list
+  const updateIngredientRow = (idx: number, patch: Partial<IngredientRow>) => {
+    setIngredientRows((prev) =>
+      prev.map((r, k) => (k === idx ? ({ ...r, ...patch } as IngredientRow) : r))
     );
+  };
+  const removeIngredientRow = (idx: number) => {
+    setIngredientRows((prev) => {
+      if (prev.length <= 1) return prev;
+      const next = prev.filter((_, k) => k !== idx);
+      return next;
+    });
+    if (focusedIngredientIdx === idx) setFocusedIngredientIdx(null);
+  };
+  const addIngredientItem = () => {
+    setIngredientRows((prev) => [
+      ...prev,
+      { kind: "item", amount: "", name: "" },
+    ]);
+  };
+  const addIngredientGroup = () => {
+    setIngredientRows((prev) => [...prev, { kind: "header", name: "" }]);
+  };
+
+  // Row helpers — step list
+  const updateStepRow = (idx: number, patch: Partial<StepRow>) => {
+    setStepRows((prev) =>
+      prev.map((r, k) => (k === idx ? ({ ...r, ...patch } as StepRow) : r))
+    );
+  };
+  const removeStepRow = (idx: number) => {
+    setStepRows((prev) => (prev.length <= 1 ? prev : prev.filter((_, k) => k !== idx)));
+  };
+  const addStepItem = () => {
+    setStepRows((prev) => [...prev, { kind: "step", text: "" }]);
+  };
+  const addStepGroup = () => {
+    setStepRows((prev) => [...prev, { kind: "header", name: "" }]);
+  };
+
+  // Number rendering for items: walk rows and compute the running step
+  // number, skipping headers. Ingredient items don't show numbers, only steps.
+  const stepNumberFor = (idx: number): number => {
+    let n = 0;
+    for (let i = 0; i <= idx; i++) {
+      if (stepRows[i].kind === "step") n++;
+    }
+    return n;
   };
 
   return (
@@ -432,20 +560,21 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
               </div>
             </section>
 
-            {/* Section 2: Tags */}
+            {/* Section 2: Tags — pre-defined chips + free-form input */}
             <section className="editor-section editor-card">
               <SectionHeader number={2} title="Tags" pack={pack}>
-                Auswählen oder durch Komma ergänzen
+                Vorschläge anklicken oder eigene tippen
               </SectionHeader>
 
-              <div className="mt-5">
+              <div className="mt-5 flex flex-col gap-4">
+                {/* Active tags */}
                 {tags.length > 0 ? (
-                  <div className="mb-4 flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {tags.map((tag) => (
                       <button
                         key={tag}
                         type="button"
-                        onClick={() => toggleTag(tag)}
+                        onClick={() => removeTag(tag)}
                         className="editor-chip editor-chip-active"
                       >
                         {tag}
@@ -455,6 +584,57 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                   </div>
                 ) : null}
 
+                {/* Free-form input */}
+                <div
+                  className="flex items-center gap-2 rounded-full border px-3 py-1.5"
+                  style={{
+                    borderColor: brand.tokens.line,
+                    background: brand.tokens.surface,
+                  }}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                    aria-hidden
+                    style={{ color: pack.mood.inkSoft, flexShrink: 0 }}
+                  >
+                    <path
+                      d="M7 2v10M2 7h10"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleTagInputKey}
+                    placeholder="Eigenen Tag tippen und Enter drücken"
+                    className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-ink-subtle"
+                    style={{ color: pack.mood.ink }}
+                  />
+                  {tagInput.trim() ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        addTag(tagInput);
+                        setTagInput("");
+                      }}
+                      className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em]"
+                      style={{
+                        background: pack.mood.ink,
+                        color: pack.mood.background,
+                      }}
+                    >
+                      + Hinzufügen
+                    </button>
+                  ) : null}
+                </div>
+
+                {/* Suggested chips */}
                 <div className="flex flex-wrap gap-2">
                   {tagSuggestions
                     .filter((t) => !tags.includes(t))
@@ -462,7 +642,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                       <button
                         key={tag}
                         type="button"
-                        onClick={() => toggleTag(tag)}
+                        onClick={() => toggleSuggestedTag(tag)}
                         className="editor-chip"
                       >
                         + {tag}
@@ -472,14 +652,50 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
               </div>
             </section>
 
-            {/* Section 3: Zutaten */}
+            {/* Section 3: Zutaten — with optional group headers */}
             <section className="editor-section editor-card">
               <SectionHeader number={3} title="Zutaten" pack={pack} required>
-                Tippe an — passende Vorschläge erscheinen automatisch
+                Tippe an — Vorschläge erscheinen automatisch. Mit „+ Gruppe" lassen sich
+                Zutaten in Sektionen wie „Für den Teig" / „Glasur" gliedern.
               </SectionHeader>
 
-              <div className="mt-5 flex flex-col gap-2.5">
-                {ingredients.map((ingredient, idx) => {
+              <div className="mt-5 flex flex-col gap-2">
+                {ingredientRows.map((row, idx) => {
+                  if (row.kind === "header") {
+                    return (
+                      <div
+                        key={idx}
+                        className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-2xl border-l-2 px-3 py-2"
+                        style={{
+                          borderLeftColor: pack.mood.accent,
+                          background: pack.mood.background + "60",
+                        }}
+                      >
+                        <input
+                          type="text"
+                          value={row.name}
+                          onChange={(e) =>
+                            updateIngredientRow(idx, { name: e.target.value })
+                          }
+                          placeholder="Gruppen-Name (z. B. Für den Teig, Glasur, Topping)"
+                          className="bg-transparent text-[13px] font-semibold uppercase tracking-[0.14em] outline-none placeholder:text-ink-subtle"
+                          style={{ color: pack.mood.inkSoft }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeIngredientRow(idx)}
+                          className="grid size-[34px] place-items-center rounded-xl border text-[14px] transition-colors hover:bg-canvas-alt"
+                          style={{
+                            borderColor: brand.tokens.line,
+                            color: brand.tokens.inkMuted,
+                          }}
+                          aria-label="Gruppe entfernen"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  }
                   const isFocused = focusedIngredientIdx === idx;
                   return (
                     <div
@@ -490,9 +706,9 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                     >
                       <input
                         type="text"
-                        value={ingredient.amount}
+                        value={row.amount}
                         onChange={(e) =>
-                          setIngredientAt(idx, { amount: e.target.value })
+                          updateIngredientRow(idx, { amount: e.target.value })
                         }
                         onFocus={() => setFocusedIngredientIdx(idx)}
                         placeholder="200 g"
@@ -500,23 +716,18 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                         aria-label={`Menge Zutat ${idx + 1}`}
                       />
                       <IngredientCombobox
-                        value={ingredient.name}
-                        onChange={(v) => setIngredientAt(idx, { name: v })}
+                        value={row.name}
+                        onChange={(v) =>
+                          updateIngredientRow(idx, { name: v })
+                        }
                         onFocus={() => setFocusedIngredientIdx(idx)}
                         suggestions={ingredientSuggestions}
                         pack={pack}
                       />
                       <button
                         type="button"
-                        onClick={() => {
-                          if (ingredients.length === 1) return;
-                          setIngredients(
-                            ingredients.filter((_, i) => i !== idx)
-                          );
-                          if (focusedIngredientIdx === idx)
-                            setFocusedIngredientIdx(null);
-                        }}
-                        disabled={ingredients.length === 1}
+                        onClick={() => removeIngredientRow(idx)}
+                        disabled={ingredientRows.length === 1}
                         className="grid size-[42px] place-items-center rounded-xl border text-[15px] transition-colors hover:bg-canvas-alt disabled:opacity-30"
                         style={{
                           borderColor: brand.tokens.line,
@@ -530,16 +741,13 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                   );
                 })}
 
-                <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-4" style={{ borderColor: brand.tokens.line }}>
+                <div
+                  className="mt-3 flex flex-wrap items-center gap-2 border-t pt-4"
+                  style={{ borderColor: brand.tokens.line }}
+                >
                   <button
                     type="button"
-                    onClick={() => {
-                      setIngredients([
-                        ...ingredients,
-                        { amount: "", name: "" },
-                      ]);
-                      setFocusedIngredientIdx(ingredients.length);
-                    }}
+                    onClick={addIngredientItem}
                     className="editor-button-primary"
                     style={{
                       background: pack.mood.background,
@@ -548,8 +756,20 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                   >
                     + Zutat hinzufügen
                   </button>
+                  <button
+                    type="button"
+                    onClick={addIngredientGroup}
+                    className="editor-button-primary"
+                    style={{
+                      background: "transparent",
+                      color: pack.mood.ink,
+                      border: `1px dashed ${pack.mood.ink}40`,
+                    }}
+                  >
+                    + Gruppe
+                  </button>
                   <span
-                    className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+                    className="ml-auto text-[11px] font-semibold uppercase tracking-[0.14em]"
                     style={{ color: pack.mood.inkSoft }}
                   >
                     Schnell-Einheit
@@ -564,22 +784,28 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
-                        // Apply to focused ingredient row, or last empty row as fallback
                         let targetIdx = focusedIngredientIdx;
-                        if (targetIdx === null) {
-                          targetIdx = ingredients
-                            .map((i, idx) => ({ i, idx }))
-                            .reverse()
-                            .find(({ i }) => i.amount === "")?.idx ?? null;
+                        if (
+                          targetIdx === null ||
+                          ingredientRows[targetIdx]?.kind !== "item"
+                        ) {
+                          targetIdx =
+                            ingredientRows
+                              .map((r, i) => ({ r, i }))
+                              .reverse()
+                              .find(
+                                ({ r }) =>
+                                  r.kind === "item" && r.amount === ""
+                              )?.i ?? null;
                         }
                         if (targetIdx === null) return;
-                        const current = ingredients[targetIdx]?.amount || "";
-                        // If amount already has a number, keep it and replace unit; else "1 unit"
-                        const numMatch = current.match(/^(\d+(?:[.,]\d+)?)/);
+                        const row = ingredientRows[targetIdx];
+                        if (row.kind !== "item") return;
+                        const numMatch = row.amount.match(/^(\d+(?:[.,]\d+)?)/);
                         const newAmount = numMatch
                           ? `${numMatch[1]} ${unit}`
                           : `1 ${unit}`;
-                        setIngredientAt(targetIdx, { amount: newAmount });
+                        updateIngredientRow(targetIdx, { amount: newAmount });
                       }}
                       className="editor-chip"
                     >
@@ -590,105 +816,182 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
               </div>
             </section>
 
-            {/* Section 4: Zubereitung */}
+            {/* Section 4: Zubereitung — with optional group headers */}
             <section className="editor-section editor-card">
               <SectionHeader number={4} title="Zubereitung" pack={pack} required>
-                Schritt für Schritt
+                Schritt für Schritt. „+ Gruppe" für Sektionen wie „Teig",
+                „Glasur" oder Varianten.
               </SectionHeader>
 
               <div className="mt-5 flex flex-col gap-3">
-                {steps.map((step, idx) => (
-                  <div
-                    key={idx}
-                    className="editor-row grid grid-cols-[2.5rem_1fr_auto] items-start gap-3"
+                {stepRows.map((row, idx) => {
+                  if (row.kind === "header") {
+                    return (
+                      <div
+                        key={idx}
+                        className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-2xl border-l-2 px-3 py-2"
+                        style={{
+                          borderLeftColor: pack.mood.accent,
+                          background: pack.mood.background + "60",
+                        }}
+                      >
+                        <input
+                          type="text"
+                          value={row.name}
+                          onChange={(e) =>
+                            updateStepRow(idx, { name: e.target.value })
+                          }
+                          placeholder="Gruppen-Name (z. B. Teig zubereiten, Glasur, Variante mit Schoko)"
+                          className="bg-transparent text-[13px] font-semibold uppercase tracking-[0.14em] outline-none placeholder:text-ink-subtle"
+                          style={{ color: pack.mood.inkSoft }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeStepRow(idx)}
+                          className="grid size-[34px] place-items-center rounded-xl border text-[14px] transition-colors hover:bg-canvas-alt"
+                          style={{
+                            borderColor: brand.tokens.line,
+                            color: brand.tokens.inkMuted,
+                          }}
+                          aria-label="Gruppe entfernen"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div
+                      key={idx}
+                      className="editor-row grid grid-cols-[2.5rem_1fr_auto] items-start gap-3"
+                    >
+                      <span
+                        className="grid size-10 place-items-center rounded-xl font-display text-[18px] tabular-nums"
+                        style={{
+                          background: pack.mood.background,
+                          color: pack.mood.ink,
+                        }}
+                      >
+                        {stepNumberFor(idx)}
+                      </span>
+                      <textarea
+                        value={row.text}
+                        onChange={(e) =>
+                          updateStepRow(idx, { text: e.target.value })
+                        }
+                        placeholder={`Schritt ${stepNumberFor(idx)}: was tut man jetzt?`}
+                        rows={2}
+                        className="editor-input resize-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeStepRow(idx)}
+                        disabled={stepRows.length === 1}
+                        className="grid size-10 place-items-center rounded-xl border text-[16px] transition-colors hover:bg-canvas-alt disabled:opacity-30"
+                        style={{
+                          borderColor: brand.tokens.line,
+                          color: brand.tokens.inkMuted,
+                        }}
+                        aria-label="Schritt entfernen"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={addStepItem}
+                    className="editor-button-primary"
+                    style={{
+                      background: pack.mood.background,
+                      color: pack.mood.ink,
+                    }}
                   >
-                    <span
-                      className="grid size-10 place-items-center rounded-xl font-display text-[18px] tabular-nums"
-                      style={{
-                        background: pack.mood.background,
-                        color: pack.mood.ink,
-                      }}
-                    >
-                      {idx + 1}
-                    </span>
-                    <textarea
-                      value={step}
-                      onChange={(e) => {
-                        const next = [...steps];
-                        next[idx] = e.target.value;
-                        setSteps(next);
-                      }}
-                      placeholder={`Schritt ${idx + 1}: was tut man jetzt?`}
-                      rows={2}
-                      className="editor-input resize-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (steps.length === 1) return;
-                        setSteps(steps.filter((_, i) => i !== idx));
-                      }}
-                      disabled={steps.length === 1}
-                      className="grid size-10 place-items-center rounded-xl border text-[16px] transition-colors hover:bg-canvas-alt disabled:opacity-30"
-                      style={{
-                        borderColor: brand.tokens.line,
-                        color: brand.tokens.inkMuted,
-                      }}
-                      aria-label="Schritt entfernen"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setSteps([...steps, ""])}
-                  className="editor-button-primary mt-1 self-start"
-                  style={{
-                    background: pack.mood.background,
-                    color: pack.mood.ink,
-                  }}
-                >
-                  + Schritt hinzufügen
-                </button>
+                    + Schritt hinzufügen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={addStepGroup}
+                    className="editor-button-primary"
+                    style={{
+                      background: "transparent",
+                      color: pack.mood.ink,
+                      border: `1px dashed ${pack.mood.ink}40`,
+                    }}
+                  >
+                    + Gruppe
+                  </button>
+                </div>
               </div>
             </section>
 
-            {/* Section 5: Nährwerte */}
+            {/* Section 5: Nährwerte — with basis selector */}
             <section className="editor-section editor-card">
               <SectionHeader number={5} title="Nährwerte" pack={pack} required>
-                Pro Portion · kcal ist Pflicht
+                Werte beziehen sich auf die unten gewählte Bezugsgröße. Kalorien
+                ist Pflicht.
               </SectionHeader>
 
-              <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <NutriField
-                  label="Kalorien"
-                  unit="kcal"
-                  value={kcal}
-                  onChange={setKcal}
-                  required
-                />
-                <NutriField
-                  label="Eiweiß"
-                  unit="g"
-                  value={protein}
-                  onChange={setProtein}
-                />
-                <NutriField
-                  label="Kohlenh."
-                  unit="g"
-                  value={carbs}
-                  onChange={setCarbs}
-                />
-                <NutriField
-                  label="Fett"
-                  unit="g"
-                  value={fat}
-                  onChange={setFat}
-                />
+              <div className="mt-5 flex flex-col gap-5">
+                <Field label="Bezugsgröße">
+                  <div className="pill-group flex-wrap" role="radiogroup">
+                    {(
+                      [
+                        { value: "portion", label: "Pro Portion" },
+                        { value: "piece", label: "Pro Stück" },
+                        { value: "per100g", label: "Pro 100 g" },
+                        { value: "total", label: "Gesamtes Rezept" },
+                      ] as Array<{ value: NutritionBasis; label: string }>
+                    ).map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={nutritionBasis === opt.value}
+                        onClick={() => setNutritionBasis(opt.value)}
+                        className={`pill-group-btn ${
+                          nutritionBasis === opt.value
+                            ? "pill-group-btn-active"
+                            : ""
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  <NutriField
+                    label="Kalorien"
+                    unit="kcal"
+                    value={kcal}
+                    onChange={setKcal}
+                    required
+                  />
+                  <NutriField
+                    label="Eiweiß"
+                    unit="g"
+                    value={protein}
+                    onChange={setProtein}
+                  />
+                  <NutriField
+                    label="Kohlenh."
+                    unit="g"
+                    value={carbs}
+                    onChange={setCarbs}
+                  />
+                  <NutriField
+                    label="Fett"
+                    unit="g"
+                    value={fat}
+                    onChange={setFat}
+                  />
+                </div>
               </div>
             </section>
-
           </div>
 
           {/* PREVIEW COLUMN */}
@@ -761,7 +1064,8 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
               style={{ color: brand.tokens.inkMuted }}
             >
               Karte wird in der Datenbank gespeichert — sofort für alle
-              sichtbar. Sobald du speicherst, landest du auf der Vollansicht.
+              sichtbar. Mikronährstoffe und Hero-Bild werden im Hintergrund
+              ergänzt (~30–60 Sekunden) und erscheinen ohne Refresh.
             </p>
           </aside>
         </div>

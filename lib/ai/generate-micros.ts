@@ -48,10 +48,31 @@ Wichtig:
 • Beachte: MORE Sahne Protein liefert oft Calcium + Vitamin B12, Eier liefern Vitamin A/D/B12, grünes Gemüse liefert Folat + Eisen, Hülsenfrüchte liefern Eisen + Magnesium etc.
 • Antworte IMMER strukturiert nach dem vorgegebenen JSON-Schema — keine Erklärungen außerhalb.`;
 
+// Human-readable label for whatever basis the macros are reported in. Gemini
+// uses this verbatim so the micros it derives stay on the same scale as the
+// macros the user typed in (e.g. a muffin recipe enters macros "pro Stück"
+// — micros must come back per Stück too, not per portion).
+function basisLabelDe(basis: Recipe["nutritionBasis"]): string {
+  switch (basis) {
+    case "piece":
+      return "pro Stück";
+    case "per100g":
+      return "pro 100 g";
+    case "total":
+      return "für das gesamte Rezept";
+    case "portion":
+    case undefined:
+    default:
+      return "pro Portion";
+  }
+}
+
 function formatRecipeForPrompt(recipe: Recipe): string {
   const ingredients = recipe.ingredients
     .map((i) => `  • ${i.amount} ${i.name}${i.note ? ` (${i.note})` : ""}`)
     .join("\n");
+
+  const basis = basisLabelDe(recipe.nutritionBasis);
 
   return [
     `Rezept: ${recipe.title}`,
@@ -61,13 +82,15 @@ function formatRecipeForPrompt(recipe: Recipe): string {
     `Zutaten (für ${recipe.servings} Portion${recipe.servings === 1 ? "" : "en"}):`,
     ingredients,
     ``,
-    `Bekannte Makros pro Portion: ${recipe.nutrition.kcal} kcal · ${recipe.nutrition.protein}g Eiweiß · ${recipe.nutrition.carbs}g KH · ${recipe.nutrition.fat}g Fett`,
+    `Bekannte Makros ${basis}: ${recipe.nutrition.kcal} kcal · ${recipe.nutrition.protein}g Eiweiß · ${recipe.nutrition.carbs}g KH · ${recipe.nutrition.fat}g Fett`,
   ].join("\n");
 }
 
 export async function generateMicros(recipe: Recipe): Promise<Micronutrient[]> {
+  const basis = basisLabelDe(recipe.nutritionBasis);
   const prompt = [
-    `Berechne die Mikronährstoffe für folgendes Rezept PRO PORTION.`,
+    `Berechne die Mikronährstoffe für folgendes Rezept ${basis.toUpperCase()}.`,
+    `WICHTIG: Die Werte müssen sich auf dieselbe Bezugsgröße (${basis}) beziehen wie die Makros oben.`,
     ``,
     formatRecipeForPrompt(recipe),
     ``,
