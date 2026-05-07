@@ -281,12 +281,36 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
       ...prev,
       { kind: "item", amount: "", name: "" },
     ]);
+    setFocusedIngredientIdx(ingredientRows.length);
   };
   const addIngredientGroup = () => {
     setIngredientRows((prev) => [...prev, { kind: "header", name: "" }]);
   };
+  // Insert a new item directly after a specific row (used when the user
+  // hits Enter on a group header — the new ingredient should appear under
+  // that group, not at the end of the entire list).
+  const addIngredientItemAfter = (idx: number) => {
+    setIngredientRows((prev) => [
+      ...prev.slice(0, idx + 1),
+      { kind: "item", amount: "", name: "" },
+      ...prev.slice(idx + 1),
+    ]);
+    setFocusedIngredientIdx(idx + 1);
+  };
+  // "Back to main group" — appends an empty header (which resets the active
+  // group to null at save time) plus a fresh empty item. The empty header
+  // renders as a subtle "Hauptgruppe"-divider so the user sees what
+  // happened.
+  const addIngredientItemMainGroup = () => {
+    setIngredientRows((prev) => [
+      ...prev,
+      { kind: "header", name: "" },
+      { kind: "item", amount: "", name: "" },
+    ]);
+    setFocusedIngredientIdx(ingredientRows.length + 1);
+  };
 
-  // Row helpers — step list
+  // Row helpers — step list (mirrors ingredient helpers above)
   const updateStepRow = (idx: number, patch: Partial<StepRow>) => {
     setStepRows((prev) =>
       prev.map((r, k) => (k === idx ? ({ ...r, ...patch } as StepRow) : r))
@@ -301,6 +325,39 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   const addStepGroup = () => {
     setStepRows((prev) => [...prev, { kind: "header", name: "" }]);
   };
+  const addStepItemAfter = (idx: number) => {
+    setStepRows((prev) => [
+      ...prev.slice(0, idx + 1),
+      { kind: "step", text: "" },
+      ...prev.slice(idx + 1),
+    ]);
+  };
+  const addStepItemMainGroup = () => {
+    setStepRows((prev) => [
+      ...prev,
+      { kind: "header", name: "" },
+      { kind: "step", text: "" },
+    ]);
+  };
+
+  // Walk both lists once to find the currently active (last non-empty)
+  // group. The "+ Zutat" / "+ Schritt" buttons use this to label
+  // themselves accurately ("zur Gruppe Glasur") and to decide whether the
+  // "Hauptgruppe"-escape button is needed.
+  function activeGroup<T extends { kind: "header"; name: string } | { kind: string }>(
+    rows: T[]
+  ): string | null {
+    let g: string | null = null;
+    for (const row of rows) {
+      if (row.kind === "header") {
+        const name = (row as { name: string }).name.trim();
+        g = name || null;
+      }
+    }
+    return g;
+  }
+  const activeIngredientGroup = activeGroup(ingredientRows);
+  const activeStepGroup = activeGroup(stepRows);
 
   // Number rendering for items: walk rows and compute the running step
   // number, skipping headers. Ingredient items don't show numbers, only steps.
@@ -669,6 +726,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                         onChange={(v) =>
                           updateIngredientRow(idx, { name: v })
                         }
+                        onSubmit={() => addIngredientItemAfter(idx)}
                         onRemove={() => removeIngredientRow(idx)}
                         pack={pack}
                         kind="ingredient"
@@ -734,7 +792,29 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                     }}
                   >
                     + Zutat hinzufügen
+                    {activeIngredientGroup ? (
+                      <span
+                        className="ml-1.5 font-mono text-[10px] font-normal uppercase tracking-[0.1em] opacity-70"
+                      >
+                        · zur „{activeIngredientGroup}"
+                      </span>
+                    ) : null}
                   </button>
+                  {activeIngredientGroup ? (
+                    <button
+                      type="button"
+                      onClick={addIngredientItemMainGroup}
+                      className="editor-button-primary"
+                      style={{
+                        background: "transparent",
+                        color: pack.mood.inkSoft,
+                        border: `1px solid ${pack.mood.ink}25`,
+                      }}
+                      title="Eine Zutat außerhalb der aktuellen Gruppe hinzufügen"
+                    >
+                      ↶ Zutat (Hauptgruppe)
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     onClick={addIngredientGroup}
@@ -810,6 +890,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                         key={idx}
                         value={row.name}
                         onChange={(v) => updateStepRow(idx, { name: v })}
+                        onSubmit={() => addStepItemAfter(idx)}
                         onRemove={() => removeStepRow(idx)}
                         pack={pack}
                         kind="step"
@@ -866,7 +947,29 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                     }}
                   >
                     + Schritt hinzufügen
+                    {activeStepGroup ? (
+                      <span
+                        className="ml-1.5 font-mono text-[10px] font-normal uppercase tracking-[0.1em] opacity-70"
+                      >
+                        · zur „{activeStepGroup}"
+                      </span>
+                    ) : null}
                   </button>
+                  {activeStepGroup ? (
+                    <button
+                      type="button"
+                      onClick={addStepItemMainGroup}
+                      className="editor-button-primary"
+                      style={{
+                        background: "transparent",
+                        color: pack.mood.inkSoft,
+                        border: `1px solid ${pack.mood.ink}25`,
+                      }}
+                      title="Einen Schritt außerhalb der aktuellen Gruppe hinzufügen"
+                    >
+                      ↶ Schritt (Hauptgruppe)
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     onClick={addStepGroup}
@@ -1108,16 +1211,25 @@ function UnitSuffix({ label }: { label: string }) {
 // (left rule · "Gruppe ↓" hint · italic name · right rule · remove button)
 // rather than a chunky filled block. The "↓" is the affordance: everything
 // below the divider belongs to this group until the next divider.
+//
+// Two visual modes driven by `value`:
+//   - non-empty → "Gruppe ↓ Glasur" — full named header
+//   - empty     → dotted "Hauptgruppe" indicator — used as a "back to main
+//                 group" reset marker after the user has been in a group
 function GroupSeparator({
   value,
   onChange,
   onRemove,
+  onSubmit,
   pack,
   kind,
 }: {
   value: string;
   onChange: (v: string) => void;
   onRemove: () => void;
+  /** Called when the user hits Enter inside the group-name input. The
+   *  parent uses this to insert a new item row directly underneath. */
+  onSubmit?: () => void;
   pack: NonNullable<ReturnType<typeof getPack>>;
   kind: "ingredient" | "step";
 }) {
@@ -1125,6 +1237,55 @@ function GroupSeparator({
     kind === "step"
       ? "z. B. Glasur zubereiten, Variante mit Schoko"
       : "z. B. Für den Teig, Glasur, Topping";
+
+  // Reset / "Hauptgruppe" marker: the empty header that gets inserted by
+  // the "+ Zutat (Hauptgruppe)" escape button. Show it as a subtle
+  // dashed divider so the user knows the next items aren't in any group.
+  if (value.trim() === "") {
+    return (
+      <div className="my-1 flex items-center gap-3 py-1">
+        <div
+          className="h-px flex-1"
+          style={{
+            background: `repeating-linear-gradient(to right, ${pack.mood.ink}33 0 4px, transparent 4px 8px)`,
+          }}
+          aria-hidden
+        />
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && onSubmit) {
+              e.preventDefault();
+              onSubmit();
+            }
+          }}
+          placeholder="Hauptgruppe (klick um zu benennen)"
+          className="min-w-0 max-w-[16rem] flex-shrink bg-transparent text-center font-mono text-[10px] font-semibold uppercase tracking-[0.18em] outline-none placeholder:opacity-60"
+          style={{ color: pack.mood.inkSoft }}
+          aria-label="Gruppe benennen"
+        />
+        <div
+          className="h-px flex-1"
+          style={{
+            background: `repeating-linear-gradient(to right, ${pack.mood.ink}33 0 4px, transparent 4px 8px)`,
+          }}
+          aria-hidden
+        />
+        <button
+          type="button"
+          onClick={onRemove}
+          className="grid size-6 flex-shrink-0 place-items-center rounded-full text-[12px] opacity-60 transition-opacity hover:opacity-100"
+          style={{ color: pack.mood.inkSoft }}
+          aria-label="Trenner entfernen"
+        >
+          ×
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="my-1 flex items-center gap-3 py-1">
       <div
@@ -1142,6 +1303,12 @@ function GroupSeparator({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && onSubmit) {
+            e.preventDefault();
+            onSubmit();
+          }
+        }}
         placeholder={placeholder}
         className="min-w-0 flex-1 bg-transparent font-display text-[15px] italic outline-none placeholder:opacity-50"
         style={{ color: pack.mood.ink }}

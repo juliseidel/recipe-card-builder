@@ -106,13 +106,22 @@ function groupIngredients(
   const groupMap = new Map<string, IngredientGroup>();
 
   ingredients.forEach((ing) => {
-    const { group, remainingNote } = detectIngredientGroup(ing.note);
-    const item = { amount: ing.amount, name: ing.name, note: remainingNote };
-    if (group) {
-      if (!groupMap.has(group)) {
-        groupMap.set(group, { name: group, items: [] });
+    // Editor-produced ingredients carry the group name explicitly; the
+    // curated 37 recipes encode it as a "für die X" / keyword note. We
+    // try the explicit field first, then fall back to note-based detection.
+    let groupName: string | null = ing.group?.trim() || null;
+    let cleanedNote: string | undefined = ing.note;
+    if (!groupName) {
+      const detected = detectIngredientGroup(ing.note);
+      groupName = detected.group;
+      cleanedNote = detected.remainingNote;
+    }
+    const item = { amount: ing.amount, name: ing.name, note: cleanedNote };
+    if (groupName) {
+      if (!groupMap.has(groupName)) {
+        groupMap.set(groupName, { name: groupName, items: [] });
       }
-      groupMap.get(group)!.items.push(item);
+      groupMap.get(groupName)!.items.push(item);
     } else {
       mainGroup.items.push(item);
     }
@@ -1095,9 +1104,19 @@ function SportLayout({
             </span>
           </div>
           <ul className="mt-5 flex flex-col">
-            {recipe.ingredients.map((ing, idx) => (
+            {groupIngredients(recipe.ingredients).map((group, gIdx) => (
+              <li key={`g-${gIdx}`} className="contents">
+                {group.name ? (
+                  <li
+                    className={`text-[11px] font-semibold uppercase tracking-[0.22em] ${gIdx > 0 ? "mt-3" : ""} pb-1.5`}
+                    style={{ color: pack.mood.accent }}
+                  >
+                    {group.name}
+                  </li>
+                ) : null}
+                {group.items.map((ing, idx) => (
               <li
-                key={`${ing.name}-${idx}`}
+                key={`${ing.name}-${gIdx}-${idx}`}
                 className={`grid grid-cols-[1.25rem_4rem_1fr] items-baseline gap-3 border-b ${
                   isSparse ? "py-3" : "py-2"
                 }`}
@@ -1132,6 +1151,8 @@ function SportLayout({
                     </span>
                   ) : null}
                 </span>
+              </li>
+            ))}
               </li>
             ))}
           </ul>
@@ -1471,41 +1492,55 @@ function SectionList({
       </h2>
       {isIngredients ? (
         <ul className="flex flex-col">
-          {recipe.ingredients.map((ingredient, idx) => (
-            <li
-              key={`${ingredient.name}-${idx}`}
-              className={`grid grid-cols-[4.2rem_1fr] items-start gap-3 ${
-                minimal ? "py-2" : "border-b py-2.5"
-              }`}
-              style={{
-                borderColor: pack.mood.ink + "12",
-                color: pack.mood.ink,
-              }}
-            >
-              <span
-                className={`font-mono text-[12px] tabular-nums break-words leading-snug ${
-                  bold ? "font-semibold" : ""
-                }`}
-                style={{ color: pack.mood.inkSoft }}
-              >
-                {ingredient.amount}
-              </span>
-              <span
-                className={`text-[14px] leading-snug ${
-                  bold ? "font-semibold" : ""
-                }`}
-              >
-                {checklist ? <span className="mr-2 opacity-50">☐</span> : null}
-                {ingredient.name}
-                {ingredient.note ? (
+          {groupIngredients(recipe.ingredients).map((group, gIdx) => (
+            <li key={`g-${gIdx}`} className="contents">
+              {group.name ? (
+                <li
+                  className={`text-[11px] font-semibold uppercase tracking-[0.22em] ${gIdx > 0 ? "mt-3" : ""} pb-1.5`}
+                  style={{ color: pack.mood.accent }}
+                >
+                  {group.name}
+                </li>
+              ) : null}
+              {group.items.map((ingredient, idx) => (
+                <li
+                  key={`${ingredient.name}-${gIdx}-${idx}`}
+                  className={`grid grid-cols-[4.2rem_1fr] items-start gap-3 ${
+                    minimal ? "py-2" : "border-b py-2.5"
+                  }`}
+                  style={{
+                    borderColor: pack.mood.ink + "12",
+                    color: pack.mood.ink,
+                  }}
+                >
                   <span
-                    className="block text-[11px] italic"
+                    className={`font-mono text-[12px] tabular-nums break-words leading-snug ${
+                      bold ? "font-semibold" : ""
+                    }`}
                     style={{ color: pack.mood.inkSoft }}
                   >
-                    {ingredient.note}
+                    {ingredient.amount}
                   </span>
-                ) : null}
-              </span>
+                  <span
+                    className={`text-[14px] leading-snug ${
+                      bold ? "font-semibold" : ""
+                    }`}
+                  >
+                    {checklist ? (
+                      <span className="mr-2 opacity-50">☐</span>
+                    ) : null}
+                    {ingredient.name}
+                    {ingredient.note ? (
+                      <span
+                        className="block text-[11px] italic"
+                        style={{ color: pack.mood.inkSoft }}
+                      >
+                        {ingredient.note}
+                      </span>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
             </li>
           ))}
         </ul>
