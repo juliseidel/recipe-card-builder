@@ -13,11 +13,11 @@ export type ImportSource = {
 type Props = {
   pack: Pack;
   /** Wird aufgerufen, sobald Apify + Gemini fertig sind und das Form
-   *  gefuellt werden kann. Die Editor-Page haengt sich daran und setzt
+   *  gefüllt werden kann. Die Editor-Page hängt sich daran und setzt
    *  ihre State-Variablen. */
   onImported: (recipe: ParsedInstagramRecipe, source: ImportSource) => void;
   /** Optional: zeigt nach erfolgreichem Import einen Reset-Button, der
-   *  zurueck in den "leeren" Import-Zustand schaltet. */
+   *  zurück in den "leeren" Import-Zustand schaltet. */
   onReset?: () => void;
   /** Wenn das Parent bereits einen erfolgreichen Import hat, zeigen wir
    *  den Source-Banner statt des Eingabe-Felds. */
@@ -183,7 +183,7 @@ export function InstagramImportCard({
                   className="mt-1 text-[12px] leading-snug"
                   style={{ color: pack.mood.inkSoft }}
                 >
-                  Felder unten sind ausgefuellt — pruef sie kurz und passe an,
+                  Felder unten sind ausgefüllt — prüf sie kurz und passe an,
                   was du brauchst.
                 </span>
               )}
@@ -240,8 +240,8 @@ export function InstagramImportCard({
             className="text-[13px] leading-snug"
             style={{ color: pack.mood.inkSoft }}
           >
-            Reel- oder Post-URL einfuegen — wir lesen Caption und Naehrwerte
-            aus und fuellen die Felder unten automatisch.
+            Reel- oder Post-URL einfügen — wir lesen Caption und Nährwerte
+            aus und füllen die Felder unten automatisch.
           </p>
         </div>
       </div>
@@ -331,7 +331,7 @@ export function InstagramImportCard({
             ›
           </span>
           <StageDot
-            label="Felder fuellen"
+            label="Felder füllen"
             active={false}
             done={false}
             color={pack.mood.accent}
@@ -357,8 +357,8 @@ export function InstagramImportCard({
         className="mt-4 text-[11.5px] leading-relaxed"
         style={{ color: pack.mood.inkSoft }}
       >
-        Funktioniert mit oeffentlichen Reels und Posts. Privatkonten und
-        Posts ohne Rezept-Caption koennen nicht eingelesen werden.
+        Funktioniert mit öffentlichen Reels und Posts. Privatkonten und
+        Posts ohne Rezept-Caption können nicht eingelesen werden.
       </p>
     </div>
   );

@@ -11,7 +11,7 @@ import { parseRecipeFromCaption } from "@/lib/ai/parse-instagram";
 // halten es konsistent mit den anderen API-Routes des Projekts).
 export const runtime = "nodejs";
 // Apify (synchron) + Gemini (Schema-Parsing) zusammen: typischerweise 8-25 s,
-// im Worst Case bis ~40 s. 60 s gibt uns Puffer fuer Vercel-Lambda.
+// im Worst Case bis ~40 s. 60 s gibt uns Puffer für Vercel-Lambda.
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "Das ist keine gueltige Instagram-URL. Erwartet: instagram.com/p/... oder /reel/...",
+          "Das ist keine gültige Instagram-URL. Erwartet: instagram.com/p/... oder /reel/...",
       },
       { status: 400 }
     );
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
       {
         error: parsed.error,
         stage: "parse",
-        // Wir geben die Caption + Source-Info trotzdem zurueck, damit das UI
+        // Wir geben die Caption + Source-Info trotzdem zurück, damit das UI
         // dem User wenigstens Bild + Link anbieten kann statt komplett leer.
         source: {
           url: post.postUrl,
