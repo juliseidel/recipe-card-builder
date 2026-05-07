@@ -333,3 +333,117 @@ select.editor-input {
   width: 0;
   animation: editorial-bar-fill 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+/* ─── Enrichment / Loading States ───
+   Used while custom recipes wait for Gemini micros + Flux hero.
+   Shimmer reads from --shimmer-base (idle tint) and --shimmer-glow
+   (pass-through highlight). 2.4 s loop, eased so it doesn't feel mechanical. */
+@keyframes shimmer-sweep {
+  0% {
+    background-position: -180% 0;
+  }
+  100% {
+    background-position: 180% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background-color: var(--shimmer-base, rgba(255, 255, 255, 0.55));
+  background-image: linear-gradient(
+    100deg,
+    transparent 18%,
+    var(--shimmer-glow, rgba(255, 255, 255, 0.85)) 50%,
+    transparent 82%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  background-position: -180% 0;
+  animation: shimmer-sweep 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+@keyframes hero-breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.015);
+    opacity: 0.96;
+  }
+}
+
+.hero-breathe {
+  animation: hero-breathe 4s ease-in-out infinite;
+}
+
+@keyframes pending-dot {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scale(1.4);
+    opacity: 1;
+  }
+}
+
+.pending-dot {
+  animation: pending-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes content-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.content-fade-in {
+  animation: content-fade-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes toast-slide-down {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -16px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.toast-slide-down {
+  animation: toast-slide-down 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes toast-fade-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+}
+
+.toast-fade-out {
+  animation: toast-fade-out 0.4s ease-in forwards;
+}
+
+/* Stage-progress bar — shows estimated remaining time as a slow fill that
+   resets between stages. Reads --progress-from + --progress-duration. */
+@keyframes progress-creep {
+  from {
+    transform: scaleX(var(--progress-from, 0));
+  }
+  to {
+    transform: scaleX(0.92);
+  }
+}
+
+.progress-creep {
+  transform-origin: left;
+  animation: progress-creep var(--progress-duration, 30s) cubic-bezier(0.1, 0.4, 0.3, 1) forwards;
+}

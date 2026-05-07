@@ -8,6 +8,20 @@ import {
   nutritionBasisInline,
   type Recipe,
 } from "@/lib/recipes";
+import {
+  HeroSkeleton,
+  MicrosSkeletonBanner,
+  MicrosSkeletonStrip,
+} from "./enrichment-skeletons";
+
+// While a custom recipe waits for Gemini micros + Flux hero we want the
+// card itself to make the gap visible — otherwise the pack-cover fallback
+// looks like a finished card with weirdly missing micros. `EnrichingState`
+// tracks each piece so we can swap in a skeleton per slot independently.
+export type EnrichingState = {
+  hero: boolean;
+  micros: boolean;
+};
 
 // Web mirror of lib/pdf/helpers.ts#groupSteps — groups recipe steps by
 // their optional `group` field so layouts can render "Für den Teig" /
@@ -41,6 +55,7 @@ type RecipeCardFullProps = {
   pack: Pack;
   recipe: Recipe;
   totalRecipes: number;
+  enriching?: EnrichingState;
 };
 
 export function RecipeCardFull(props: RecipeCardFullProps) {
@@ -149,6 +164,7 @@ function EditorialLayout({
   pack,
   recipe,
   totalRecipes,
+  enriching,
 }: RecipeCardFullProps) {
   const totalTime = recipe.prepTime + (recipe.cookTime ?? 0);
   const grouped = groupIngredients(recipe.ingredients);
@@ -193,14 +209,18 @@ function EditorialLayout({
                 "0 1px 0 rgba(43,31,25,0.05), 0 28px 50px -22px rgba(43,31,25,0.28)",
             }}
           >
-            <Image
-              src={recipe.hero ?? pack.coverImage}
-              alt={recipe.title}
-              fill
-              sizes="(min-width: 1024px) 320px, 100vw"
-              className="object-cover"
-              priority
-            />
+            {enriching?.hero ? (
+              <HeroSkeleton pack={pack} />
+            ) : (
+              <Image
+                src={recipe.hero ?? pack.coverImage}
+                alt={recipe.title}
+                fill
+                sizes="(min-width: 1024px) 320px, 100vw"
+                className="object-cover content-fade-in"
+                priority
+              />
+            )}
           </div>
         </div>
 
@@ -253,7 +273,11 @@ function EditorialLayout({
       {/* NUTRIENT BANNER — pack-5 signature move: Mikros are surfaced HERE,
           right after the title, instead of in the footer like every other
           pack. Bars animate in via CSS keyframe on mount. */}
-      <EditorialNutrientBanner recipe={recipe} pack={pack} />
+      {enriching?.micros ? (
+        <MicrosSkeletonBanner pack={pack} />
+      ) : (
+        <EditorialNutrientBanner recipe={recipe} pack={pack} />
+      )}
 
       {/* 4-TILE STATS BAR */}
       <div
@@ -593,6 +617,7 @@ function PatisserieLayout({
   pack,
   recipe,
   totalRecipes,
+  enriching,
 }: RecipeCardFullProps) {
   const totalTime = recipe.prepTime + (recipe.cookTime ?? 0);
   const portionsLabel = recipe.servings === 1 ? "Stück" : "Stücke";
@@ -646,14 +671,18 @@ function PatisserieLayout({
               transform: "rotate(-2deg)",
             }}
           >
-            <Image
-              src={recipe.hero ?? pack.coverImage}
-              alt={recipe.title}
-              fill
-              sizes="280px"
-              className="object-cover"
-              priority
-            />
+            {enriching?.hero ? (
+              <HeroSkeleton pack={pack} shape="polaroid" />
+            ) : (
+              <Image
+                src={recipe.hero ?? pack.coverImage}
+                alt={recipe.title}
+                fill
+                sizes="280px"
+                className="object-cover content-fade-in"
+                priority
+              />
+            )}
           </div>
         </div>
       </div>
@@ -685,7 +714,13 @@ function PatisserieLayout({
         />
       </div>
 
-      <CardFooter brand={brand} pack={pack} recipe={recipe} italic />
+      <CardFooter
+        brand={brand}
+        pack={pack}
+        recipe={recipe}
+        italic
+        enriching={enriching}
+      />
     </article>
   );
 }
@@ -702,6 +737,7 @@ function MinimalLayout({
   pack,
   recipe,
   totalRecipes,
+  enriching,
 }: RecipeCardFullProps) {
   const totalTime = recipe.prepTime + (recipe.cookTime ?? 0);
   const portionsLabel = recipe.servings === 1 ? "Portion" : "Stücke";
@@ -749,14 +785,18 @@ function MinimalLayout({
             className="relative aspect-square overflow-hidden rounded-2xl"
             style={{ background: pack.mood.background }}
           >
-            <Image
-              src={recipe.hero ?? pack.coverImage}
-              alt={recipe.title}
-              fill
-              sizes="320px"
-              className="object-cover"
-              priority
-            />
+            {enriching?.hero ? (
+              <HeroSkeleton pack={pack} />
+            ) : (
+              <Image
+                src={recipe.hero ?? pack.coverImage}
+                alt={recipe.title}
+                fill
+                sizes="320px"
+                className="object-cover content-fade-in"
+                priority
+              />
+            )}
           </div>
           <div
             className="grid grid-cols-3 gap-3 rounded-2xl border p-4 text-center"
@@ -796,7 +836,7 @@ function MinimalLayout({
         <SectionList recipe={recipe} pack={pack} kind="steps" minimal />
       </div>
 
-      <CardFooter brand={brand} pack={pack} recipe={recipe} />
+      <CardFooter brand={brand} pack={pack} recipe={recipe} enriching={enriching} />
     </article>
   );
 }
@@ -855,6 +895,7 @@ function SportLayout({
   pack,
   recipe,
   totalRecipes,
+  enriching,
 }: RecipeCardFullProps) {
   const totalTime = recipe.prepTime + (recipe.cookTime ?? 0);
   const portionsLabel = recipe.servings === 1 ? "Portion" : "Portionen";
@@ -959,14 +1000,18 @@ function SportLayout({
                 "0 1px 0 rgba(43,31,25,0.05), 0 22px 40px -16px rgba(43,31,25,0.22)",
             }}
           >
-            <Image
-              src={recipe.hero ?? pack.coverImage}
-              alt={recipe.title}
-              fill
-              sizes="(min-width: 1024px) 340px, 100vw"
-              className="object-cover"
-              priority
-            />
+            {enriching?.hero ? (
+              <HeroSkeleton pack={pack} />
+            ) : (
+              <Image
+                src={recipe.hero ?? pack.coverImage}
+                alt={recipe.title}
+                fill
+                sizes="(min-width: 1024px) 340px, 100vw"
+                className="object-cover content-fade-in"
+                priority
+              />
+            )}
           </div>
         </div>
       </header>
@@ -1231,7 +1276,7 @@ function SportLayout({
         </section>
       </div>
 
-      <CardFooter brand={brand} pack={pack} recipe={recipe} />
+      <CardFooter brand={brand} pack={pack} recipe={recipe} enriching={enriching} />
     </article>
   );
 }
@@ -1287,6 +1332,7 @@ function DashboardLayout({
   pack,
   recipe,
   totalRecipes,
+  enriching,
 }: RecipeCardFullProps) {
   const totalTime = recipe.prepTime + (recipe.cookTime ?? 0);
   const portionsLabel = recipe.servings === 1 ? "Portion" : "Portionen";
@@ -1377,18 +1423,24 @@ function DashboardLayout({
         </div>
 
         <div className="relative h-full min-h-[280px] lg:min-h-0">
-          <Image
-            src={recipe.hero ?? pack.coverImage}
-            alt={recipe.title}
-            fill
-            sizes="(min-width: 1024px) 360px, 100vw"
-            className="object-cover"
-            priority
-          />
-          <div
-            className="absolute inset-0 mix-blend-multiply"
-            style={{ background: pack.mood.background, opacity: 0.18 }}
-          />
+          {enriching?.hero ? (
+            <HeroSkeleton pack={pack} />
+          ) : (
+            <>
+              <Image
+                src={recipe.hero ?? pack.coverImage}
+                alt={recipe.title}
+                fill
+                sizes="(min-width: 1024px) 360px, 100vw"
+                className="object-cover content-fade-in"
+                priority
+              />
+              <div
+                className="absolute inset-0 mix-blend-multiply"
+                style={{ background: pack.mood.background, opacity: 0.18 }}
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -1406,7 +1458,7 @@ function DashboardLayout({
         <SectionList recipe={recipe} pack={pack} kind="steps" checklist />
       </div>
 
-      <CardFooter brand={brand} pack={pack} recipe={recipe} />
+      <CardFooter brand={brand} pack={pack} recipe={recipe} enriching={enriching} />
     </article>
   );
 }
@@ -1817,6 +1869,7 @@ function CardFooter({
   recipe,
   italic = false,
   hideMicros = false,
+  enriching,
 }: {
   brand: Brand;
   pack: Pack;
@@ -1825,10 +1878,15 @@ function CardFooter({
   // Pack 5 (Editorial) renders the micros banner at the top instead of in
   // the footer — set this to skip the default MicrosPanel rendering.
   hideMicros?: boolean;
+  enriching?: EnrichingState;
 }) {
   return (
     <>
-      {hideMicros ? null : <MicrosPanel recipe={recipe} pack={pack} />}
+      {hideMicros
+        ? null
+        : enriching?.micros
+        ? <MicrosSkeletonStrip pack={pack} />
+        : <MicrosPanel recipe={recipe} pack={pack} />}
       <div
         className="flex flex-wrap items-center justify-between gap-3 border-t px-8 py-4 sm:px-10"
         style={{

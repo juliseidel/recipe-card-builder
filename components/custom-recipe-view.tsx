@@ -214,67 +214,6 @@ export function CustomRecipeView({
     </button>
   );
 
-  // Background-enrichment toast. Only visible while Gemini micros or the
-  // Flux hero are still in flight after a save. Shows the user what's
-  // actually happening so they know a half-rendered card is mid-process,
-  // not broken.
-  const enrichingToast =
-    pending.micros || pending.hero ? (
-      <div
-        className="fixed left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full border bg-white/95 px-5 py-2.5 shadow-[0_8px_30px_rgba(0,0,0,0.15)] backdrop-blur-md"
-        style={{
-          bottom: 24,
-          borderColor: pack.mood.ink + "1f",
-        }}
-        role="status"
-        aria-live="polite"
-      >
-        <span
-          className="size-3.5 animate-spin rounded-full border-[2px] border-t-transparent"
-          style={{
-            borderColor: pack.mood.accent + "30",
-            borderTopColor: pack.mood.accent,
-          }}
-          aria-hidden
-        />
-        <span
-          className="text-[12.5px] font-medium leading-none"
-          style={{ color: pack.mood.ink }}
-        >
-          {pending.micros && pending.hero ? (
-            <>
-              Mikronährstoffe + Bild werden generiert
-              <span
-                className="ml-1.5 font-mono"
-                style={{ color: pack.mood.inkSoft }}
-              >
-                · ca. 30–60 Sek
-              </span>
-            </>
-          ) : pending.hero ? (
-            <>
-              <span style={{ color: pack.mood.accent }}>✓</span>{" "}
-              Mikronährstoffe ·{" "}
-              <span style={{ color: pack.mood.ink }}>Bild wird generiert</span>
-              <span
-                className="ml-1.5 font-mono"
-                style={{ color: pack.mood.inkSoft }}
-              >
-                · gleich fertig
-              </span>
-            </>
-          ) : (
-            <>
-              <span style={{ color: pack.mood.accent }}>✓</span> Bild ·{" "}
-              <span style={{ color: pack.mood.ink }}>
-                Mikronährstoffe werden berechnet
-              </span>
-            </>
-          )}
-        </span>
-      </div>
-    ) : null;
-
   return (
     <>
       <RecipeDetailLayout
@@ -286,8 +225,217 @@ export function CustomRecipeView({
         next={next}
         isCustom
         deleteAction={deleteAction}
+        enriching={pending.hero || pending.micros ? pending : undefined}
       />
-      {enrichingToast}
+      <EnrichmentToast pending={pending} pack={pack} />
     </>
+  );
+}
+
+// ════════════════════════════════════════════════
+// EnrichmentToast — top-center, prominent, stage-aware.
+//
+// Three stages: (1) both pending, (2) only hero pending (micros came back
+// fast from Gemini), (3) "complete" celebration card that auto-dismisses
+// after 2.5 s so the user gets explicit closure when the slow Flux render
+// lands.
+//
+// `previousState` lets us hold the toast in a "✓ done" state for a beat
+// before fading out, instead of vanishing the moment polling stops.
+// ════════════════════════════════════════════════
+function EnrichmentToast({
+  pending,
+  pack,
+}: {
+  pending: { micros: boolean; hero: boolean };
+  pack: Pack;
+}) {
+  const [showCompleted, setShowCompleted] = useState(false);
+  const wasPendingRef = useRef(false);
+
+  useEffect(() => {
+    const isPending = pending.micros || pending.hero;
+    if (wasPendingRef.current && !isPending) {
+      // Just finished — celebrate for 2.5 s
+      setShowCompleted(true);
+      const t = setTimeout(() => setShowCompleted(false), 2500);
+      return () => clearTimeout(t);
+    }
+    wasPendingRef.current = isPending;
+  }, [pending.micros, pending.hero]);
+
+  const visible = pending.micros || pending.hero || showCompleted;
+  if (!visible) return null;
+
+  // Pick stage label, mode and progress duration. Progress fills at a slow
+  // rate that roughly matches the actual remaining wait, never reaching
+  // 100 % because that would imply we're done before we are.
+  let mode: "both" | "hero" | "micros" | "done";
+  if (showCompleted) mode = "done";
+  else if (pending.micros && pending.hero) mode = "both";
+  else if (pending.hero) mode = "hero";
+  else mode = "micros";
+
+  return (
+    <div
+      className={`fixed left-1/2 top-6 z-50 flex w-[min(94vw,520px)] flex-col gap-2.5 rounded-2xl border bg-white/95 px-5 py-4 shadow-[0_18px_48px_-16px_rgba(26,18,11,0.32)] backdrop-blur-xl ${
+        showCompleted ? "toast-fade-out" : "toast-slide-down"
+      }`}
+      style={{
+        borderColor: pack.mood.ink + "1f",
+      }}
+      role="status"
+      aria-live="polite"
+    >
+      <div className="flex items-center gap-3">
+        {mode === "done" ? (
+          <CheckBadge color={pack.mood.accent} />
+        ) : (
+          <span
+            className="relative flex size-5 items-center justify-center"
+            aria-hidden
+          >
+            <span
+              className="absolute inset-0 rounded-full pending-dot"
+              style={{ background: pack.mood.accent + "30" }}
+            />
+            <span
+              className="relative size-2 rounded-full"
+              style={{ background: pack.mood.accent }}
+            />
+          </span>
+        )}
+        <div className="flex flex-1 flex-col gap-0.5">
+          <span
+            className="text-[12.5px] font-semibold leading-tight"
+            style={{ color: pack.mood.ink }}
+          >
+            {mode === "done"
+              ? "Karte komplett — Mikros & Bild sind drin"
+              : mode === "both"
+              ? "Bienes Küche zaubert deine Karte"
+              : mode === "hero"
+              ? "KI rendert dein Hero-Bild"
+              : "Mikronährstoffe werden analysiert"}
+          </span>
+          <span
+            className="font-mono text-[10.5px] uppercase tracking-[0.14em]"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            {mode === "done"
+              ? "Fertig"
+              : mode === "both"
+              ? "Gemini analysiert · Flux rendert · ~30–60 Sek"
+              : mode === "hero"
+              ? "Flux 2 Pro · noch ~15–25 Sek · Mikros sind bereits drin"
+              : "Gemini 2.5 Flash · noch ~5 Sek · Bild ist bereits drin"}
+          </span>
+        </div>
+      </div>
+
+      {/* Stage chips — ✓ for done, pulsing dot for active */}
+      <div className="flex items-center gap-2 pt-0.5">
+        <StageChip
+          label="Mikros"
+          state={pending.micros ? "active" : "done"}
+          accent={pack.mood.accent}
+          inkSoft={pack.mood.inkSoft}
+          ink={pack.mood.ink}
+        />
+        <StageChip
+          label="Hero-Bild"
+          state={pending.hero ? "active" : "done"}
+          accent={pack.mood.accent}
+          inkSoft={pack.mood.inkSoft}
+          ink={pack.mood.ink}
+        />
+      </div>
+
+      {/* Progress creep — visual hint that work is happening, never reaches
+          100 % so the user doesn't feel cheated when reality lags */}
+      {mode !== "done" ? (
+        <div
+          className="relative h-0.5 w-full overflow-hidden rounded-full"
+          style={{ background: pack.mood.ink + "10" }}
+          aria-hidden
+        >
+          <div
+            key={mode}
+            className="absolute inset-y-0 left-0 right-0 origin-left rounded-full progress-creep"
+            style={
+              {
+                background: pack.mood.accent,
+                "--progress-from": mode === "both" ? "0" : "0.5",
+                "--progress-duration": mode === "both" ? "45s" : "20s",
+              } as React.CSSProperties
+            }
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function StageChip({
+  label,
+  state,
+  accent,
+  inkSoft,
+  ink,
+}: {
+  label: string;
+  state: "active" | "done";
+  accent: string;
+  inkSoft: string;
+  ink: string;
+}) {
+  const isDone = state === "done";
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] transition-all"
+      style={{
+        borderColor: isDone ? accent + "55" : ink + "1a",
+        background: isDone ? accent + "12" : "transparent",
+        color: isDone ? accent : inkSoft,
+      }}
+    >
+      {isDone ? (
+        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden>
+          <path
+            d="M2 6.5L4.5 9L10 3.5"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ) : (
+        <span
+          className="size-1.5 rounded-full pending-dot"
+          style={{ background: accent }}
+        />
+      )}
+      {label}
+    </span>
+  );
+}
+
+function CheckBadge({ color }: { color: string }) {
+  return (
+    <span
+      className="flex size-5 items-center justify-center rounded-full"
+      style={{ background: color + "1a", color }}
+      aria-hidden
+    >
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <path
+          d="M2 6.5L4.5 9L10 3.5"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </span>
   );
 }

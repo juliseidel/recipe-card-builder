@@ -143,10 +143,6 @@ docs/
 
 ## Was bewusst nicht da ist
 
-- **KI-Bildgenerierung pro Rezept** — Brief erwähnt Jans Pipeline. Aktuell teilen
-  sich alle Karten eines Packs das Cover-Image. Per-Recipe-Hero-Felder sind
-  schon vorbereitet (`recipe.hero` in `lib/recipes.ts`), aber die Generation
-  ist Phase 2.
 - **CMYK in der Live-App** — Vercel-Serverless hat kein Ghostscript. Hybrid:
   Live RGB schnell, Submission CMYK als Build-Artefakt. Kein Cloud-Worker
   eingebunden, weil das in 5 Tagen ein Architektur-Risiko gewesen wäre.

@@ -3,7 +3,7 @@ import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
 import type { Recipe } from "@/lib/recipes";
 import { SiteHeader } from "./site-header";
-import { RecipeCardFull } from "./recipe-card-full";
+import { RecipeCardFull, type EnrichingState } from "./recipe-card-full";
 import { PdfExportButton } from "./pdf-export-button";
 
 type NavTarget = {
@@ -20,6 +20,9 @@ type Props = {
   next: NavTarget;
   isCustom?: boolean;
   deleteAction?: React.ReactNode;
+  // Set while a custom recipe waits for Gemini micros + Flux hero. The card
+  // swaps the matching slots for skeletons so the gap is visible.
+  enriching?: EnrichingState;
 };
 
 export function RecipeDetailLayout({
@@ -31,6 +34,7 @@ export function RecipeDetailLayout({
   next,
   isCustom = false,
   deleteAction,
+  enriching,
 }: Props) {
   return (
     <div
@@ -109,6 +113,7 @@ export function RecipeDetailLayout({
             pack={pack}
             recipe={recipe}
             totalRecipes={totalRecipes}
+            enriching={enriching}
           />
 
           <nav className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
