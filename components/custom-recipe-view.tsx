@@ -179,6 +179,19 @@ export function CustomRecipeView({
     }
     setDeleting(true);
     await removeCustomRecipe(recipe.id);
+    // Drop workspace + pack-detail caches so the recipe-count badge and the
+    // recipe grid both show the lower number when the user lands back on
+    // the pack page (and on a back-navigation to /[brand]).
+    await fetch("/api/packs/revalidate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        brandSlug: brand.slug,
+        packSlug: pack.slug,
+      }),
+    }).catch(() => {
+      /* non-blocking */
+    });
     router.push(`/${brand.slug}/${pack.slug}`);
   };
 

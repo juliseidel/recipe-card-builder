@@ -78,7 +78,12 @@ export function RecipeGrid({ brand, pack, staticRecipes }: RecipeGridProps) {
             if (!ok) {
               const fresh = await getCustomRecipesForPack(pack.slug);
               setCustomRecipes(fresh);
+              return;
             }
+            // Drop the workspace cache so the pack-card recipe-count badge
+            // ticks down on back-navigation. Pack-detail is fine — this
+            // component already reflects the change in local state.
+            void revalidateWorkspace(brand.slug, pack.slug);
           }}
         />
       ))}
@@ -100,10 +105,26 @@ export function RecipeGrid({ brand, pack, staticRecipes }: RecipeGridProps) {
                 next.delete(key);
                 return next;
               });
+              return;
             }
+            // Same revalidate as above — keeps the workspace badge truthful
+            // when the user hides a curated card.
+            void revalidateWorkspace(brand.slug, pack.slug);
           }}
         />
       ))}
     </div>
   );
+}
+
+// Fire-and-forget cache invalidation for the workspace + pack-detail server
+// renders after a delete/hide. Pack-detail mostly mirrors local state already
+// (this component re-renders), but a back-navigation to /[brand] would
+// otherwise show a stale recipe-count badge for ~30 s.
+async function revalidateWorkspace(brandSlug: string, packSlug: string) {
+  await fetch("/api/packs/revalidate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ brandSlug, packSlug }),
+  }).catch(() => {});
 }

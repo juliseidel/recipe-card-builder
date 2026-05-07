@@ -351,6 +351,19 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     }).catch(() => {
       /* swallow — enrichment is best-effort */
     });
+    // Drop the workspace + pack-detail server caches so the new card and the
+    // updated recipe-count badge are visible immediately on back-navigation.
+    // Awaited so the user lands on fresh server-rendered data.
+    await fetch("/api/packs/revalidate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        brandSlug: brand.slug,
+        packSlug: pack.slug,
+      }),
+    }).catch(() => {
+      /* non-blocking — counts will catch up on the next 30 s revalidate window */
+    });
     setSavedSuccess(true);
     setTimeout(() => {
       router.push(`/${brand.slug}/${pack.slug}/${saved.slug}`);

@@ -73,6 +73,61 @@ export async function getCustomPackByIdServer(
   return { pack, id: data.id as string };
 }
 
+// Aggregate count of custom recipes per pack, scoped to one brand. Used by
+// the workspace grid so each PackCard shows the LIVE recipe total instead
+// of the stale `pack.recipeCount` field (which is hardcoded for curated
+// packs and starts at 0 for custom packs and never grows). One Supabase
+// query for the whole brand — way cheaper than N count-queries per pack.
+export async function getCustomRecipeCountsForBrand(
+  brandSlug: string
+): Promise<Record<string, number>> {
+  if (!hasServerSupabase()) return {};
+  const supabase: SupabaseClient = getServerSupabase();
+  const { data, error } = await supabase
+    .from("recipes")
+    .select("pack_slug")
+    .eq("brand_slug", brandSlug)
+    .eq("is_custom", true);
+  if (error) {
+    console.warn("[packs-server] getCustomRecipeCountsForBrand", error);
+    return {};
+  }
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const slug = row.pack_slug as string | undefined;
+    if (!slug) continue;
+    counts[slug] = (counts[slug] ?? 0) + 1;
+  }
+  return counts;
+}
+
+// Aggregate count of HIDDEN curated recipes per pack, scoped to one brand.
+// Curated packs ship with their full recipe count baked in (e.g. Pack 01
+// = 10) but a user can hide individual cards from the grid; the count
+// badge needs to reflect that or it lies. One brand-scoped query, same
+// pattern as getCustomRecipeCountsForBrand above.
+export async function getHiddenRecipeCountsForBrand(
+  brandSlug: string
+): Promise<Record<string, number>> {
+  if (!hasServerSupabase()) return {};
+  const supabase: SupabaseClient = getServerSupabase();
+  const { data, error } = await supabase
+    .from("hidden_recipes")
+    .select("pack_slug")
+    .eq("brand_slug", brandSlug);
+  if (error) {
+    console.warn("[packs-server] getHiddenRecipeCountsForBrand", error);
+    return {};
+  }
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const slug = row.pack_slug as string | undefined;
+    if (!slug) continue;
+    counts[slug] = (counts[slug] ?? 0) + 1;
+  }
+  return counts;
+}
+
 // Same as above but also returns the row IDs so the workspace grid can
 // wire up per-pack delete buttons. Carries createdAt onto the pack so
 // mergeAndRenumberPacks can sort custom packs in creation order
