@@ -149,6 +149,12 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     return out;
   }, [stepGroups]);
 
+  // Custom recipes inherit their pack's tagline + description as fallback so
+  // the rendered card never has an empty subtitle or missing story block —
+  // the user can override either field but doesn't have to.
+  const previewSubtitle = subtitle.trim() || pack?.tagline || "";
+  const previewDescription = description.trim() || pack?.description || "";
+
   const previewRecipe: Recipe | null = useMemo(() => {
     if (!pack) return null;
     return {
@@ -156,8 +162,8 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
       packSlug: pack.slug,
       number: upcomingNumber,
       title: title || "Neue Rezeptkarte",
-      subtitle: subtitle || "Subtitle erscheint hier",
-      description: description || "",
+      subtitle: previewSubtitle,
+      description: previewDescription,
       prepTime: parseInt(prepTime) || 0,
       cookTime: cookTime ? parseInt(cookTime) : undefined,
       difficulty,
@@ -181,8 +187,8 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     pack,
     upcomingNumber,
     title,
-    subtitle,
-    description,
+    previewSubtitle,
+    previewDescription,
     prepTime,
     cookTime,
     difficulty,
@@ -235,8 +241,11 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
       packSlug: pack.slug,
       baseRecipeCount: pack.recipeCount,
       title: title.trim(),
-      subtitle: subtitle.trim() || title.trim(),
-      description: description.trim(),
+      // Subtitle and description fall back to pack-level copy so cards with
+      // sparse user input (only a title, no story) still render with the
+      // brand's voice instead of leaving big visual gaps.
+      subtitle: subtitle.trim() || pack.tagline,
+      description: description.trim() || pack.description,
       prepTime: parseInt(prepTime) || 0,
       cookTime: cookTime ? parseInt(cookTime) : undefined,
       difficulty,

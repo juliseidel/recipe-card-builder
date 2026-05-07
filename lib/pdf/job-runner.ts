@@ -1,7 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getBrand } from "@/lib/brands";
 import { getPack } from "@/lib/packs";
-import { getRecipe, getRecipesForPack, type Recipe } from "@/lib/recipes";
+import {
+  getRecipe,
+  getRecipesForPack,
+  mergeAndRenumber,
+  type MergeableCustom,
+  type Recipe,
+} from "@/lib/recipes";
 import { getServerSupabase } from "@/lib/supabase-server";
 import { renderPackPdf, renderRecipePdf } from "./render";
 
@@ -150,16 +156,14 @@ export async function processJob(jobId: string): Promise<void> {
       storagePath = `${pack.slug}__${recipe.slug}.pdf`;
       downloadName = `${safeFilename(recipe.title)}.pdf`;
     } else {
-      // Pack PDF includes both curated recipes and any custom cards the user
-      // saved into this pack. We merge them and sort by recipe.number so the
-      // index, recipe pages, and nutrition table all read in the same order.
+      // Pack PDF includes curated recipes + any custom cards saved into this
+      // pack. mergeAndRenumber places newest custom first and rewrites
+      // sequential 01..N numbers, matching what the web app shows.
       const [staticRecipes, customRecipes] = await Promise.all([
         getRecipesForPack(job.pack_slug),
         loadCustomRecipesForPack(supabase, job.pack_slug),
       ]);
-      const recipes = [...staticRecipes, ...customRecipes].sort(
-        (a, b) => a.number - b.number
-      );
+      const recipes = mergeAndRenumber(staticRecipes, customRecipes);
       if (recipes.length === 0) {
         await markFailed(supabase, jobId, "Pack has no recipes");
         return;
@@ -264,24 +268,31 @@ async function countCustomRecipes(
 
 // Reads custom recipes for a pack from Supabase server-side. Mirrors the
 // client-side helper in lib/custom-recipes.ts but doesn't need the browser
-// client. Used by the pack-PDF renderer so user-saved cards show up next to
-// the curated set in cover, index, recipes, and nutrition overview.
+// client. Returns each row's stored recipe + createdAt so mergeAndRenumber
+// can sort by recency.
 async function loadCustomRecipesForPack(
   supabase: SupabaseClient,
   packSlug: string
-): Promise<Recipe[]> {
+): Promise<MergeableCustom[]> {
   const { data, error } = await supabase
     .from("recipes")
-    .select("data")
+    .select("data, created_at")
     .eq("pack_slug", packSlug)
     .eq("is_custom", true);
   if (error) {
     console.warn("[pdf-jobs] loadCustomRecipesForPack failed", error);
     return [];
   }
-  return (data ?? [])
-    .map((row) => row.data as Recipe | undefined)
-    .filter((r): r is Recipe => Boolean(r));
+  const out: MergeableCustom[] = [];
+  for (const row of data ?? []) {
+    const recipe = row.data as Recipe | undefined;
+    if (!recipe) continue;
+    out.push({
+      ...recipe,
+      createdAt: new Date(row.created_at as string).getTime(),
+    });
+  }
+  return out;
 }
 
 async function markFailed(

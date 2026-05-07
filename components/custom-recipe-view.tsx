@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
-import type { Recipe } from "@/lib/recipes";
+import { mergeAndRenumber, type Recipe } from "@/lib/recipes";
 import {
   getCustomRecipe,
   getCustomRecipesForPack,
@@ -53,8 +53,20 @@ export function CustomRecipeView({
         getCustomRecipesForPack(pack.slug),
       ]);
       if (!active) return;
-      setRecipe(found ?? null);
-      setAllRecipes([...customList, ...staticRecipes]);
+      const merged = mergeAndRenumber(staticRecipes, customList);
+      // Re-pull the current recipe from the merged list so its number/index
+      // matches what nutrition table + pack PDF show. Falls back to the raw
+      // DB row if the slug somehow doesn't appear in the merge (deleted
+      // mid-fetch, etc).
+      const fromMerged = found
+        ? merged.find((r) => r.slug === found.slug)
+        : undefined;
+      setRecipe(
+        fromMerged
+          ? ({ ...(found as CustomRecipe), number: fromMerged.number } as CustomRecipe)
+          : (found ?? null)
+      );
+      setAllRecipes(merged);
       setLoaded(true);
       // Poll until both Gemini micros AND the Flux hero are written back to
       // the DB. Hero is the long pole (~15-25 s, occasionally 60-90 s under

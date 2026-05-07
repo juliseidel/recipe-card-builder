@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
-import type { Recipe } from "@/lib/recipes";
+import { mergeAndRenumber, type Recipe } from "@/lib/recipes";
 import {
   getCustomRecipesForPack,
   type CustomRecipe,
@@ -46,15 +46,13 @@ export function NutritionOverview({
     };
   }, [pack.slug]);
 
-  // Merge: visible static + all custom, ordered by recipe.number so the
-  // index reads naturally (Pack-curated 01-N first, custom cards after).
+  // Same merge logic the pack PDF uses — newest custom cards first, curated
+  // cards after, sequential 01..N numbers regardless of stored recipe.number.
   const recipes = useMemo(() => {
     const visibleStatic = staticRecipes.filter(
       (r) => !hiddenKeys.has(makeHiddenKey(brand.slug, pack.slug, r.slug))
     );
-    return [...visibleStatic, ...customRecipes].sort(
-      (a, b) => a.number - b.number
-    );
+    return mergeAndRenumber(visibleStatic, customRecipes);
   }, [staticRecipes, customRecipes, hiddenKeys, brand.slug, pack.slug]);
 
   const totals = recipes.reduce(

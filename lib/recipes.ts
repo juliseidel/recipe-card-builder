@@ -1737,6 +1737,38 @@ function staticRecipesForPack(packSlug: string): Recipe[] {
     .map(enrich);
 }
 
+// ════════════════════════════════════════════════
+// MERGE — single source of truth for "the order recipes appear in this pack"
+//
+// Custom cards always come first (newest createdAt → top), curated recipes
+// follow in their authored order. Numbers get rewritten to the merged
+// position so the index, mega-numbers and table rows all read 01..N
+// regardless of when a card was added or what number was stored on it.
+//
+// Used by:
+//  - components/nutrition-overview.tsx (pack table on the web)
+//  - lib/pdf/job-runner.ts (pack PDF render)
+//  - components/custom-recipe-view.tsx (next/prev navigation order)
+// ════════════════════════════════════════════════
+export type MergeableCustom<R extends Recipe = Recipe> = R & {
+  createdAt?: number;
+};
+
+export function mergeAndRenumber<R extends Recipe>(
+  staticRecipes: R[],
+  customRecipes: MergeableCustom<R>[]
+): R[] {
+  const sortedCustom = [...customRecipes].sort(
+    (a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)
+  );
+  const sortedStatic = [...staticRecipes].sort((a, b) => a.number - b.number);
+  const merged = [...sortedCustom, ...sortedStatic];
+  return merged.map((recipe, idx) => ({
+    ...recipe,
+    number: idx + 1,
+  })) as R[];
+}
+
 function staticRecipe(
   packSlug: string,
   recipeSlug: string
