@@ -76,63 +76,42 @@ export async function POST(req: Request) {
     });
   }
 
-  // Both enrichment paths run after the response flushes so the editor's
-  // "Karte gespeichert" success state isn't blocked by a 25 s Flux render.
-  // The detail page will pick up both fields on its next read.
-  after(async () => {
-    let updated: Recipe = recipe;
-
-    // Run micros + hero in parallel — they're independent and Flux is the
-    // long pole. Settled (not all) so a hero failure doesn't lose the micros.
-    const [microsResult, heroResult] = await Promise.allSettled([
-      needsMicros ? generateMicros(recipe) : Promise.resolve(null),
-      needsHero
-        ? generateAndUploadHero(recipe, row.id, brandSlug)
-        : Promise.resolve(null),
-    ]);
-
-    if (
-      needsMicros &&
-      microsResult.status === "fulfilled" &&
-      microsResult.value
-    ) {
-      updated = {
-        ...updated,
-        nutrition: { ...updated.nutrition, micros: microsResult.value },
-      };
-    } else if (needsMicros && microsResult.status === "rejected") {
-      console.error(
-        "[enrich] micros failed for",
-        body.recipeId,
-        microsResult.reason
-      );
-    }
-
-    if (needsHero && heroResult.status === "fulfilled" && heroResult.value) {
-      updated = { ...updated, hero: heroResult.value };
-    } else if (needsHero && heroResult.status === "rejected") {
-      console.error(
-        "[enrich] hero failed for",
-        body.recipeId,
-        heroResult.reason
-      );
-    }
-
-    // Single DB write so detail page sees both at once if both succeeded.
-    if (updated !== recipe) {
-      const { error: updateErr } = await getServerSupabase()
-        .from("recipes")
-        .update({ data: updated })
-        .eq("id", row.id);
-      if (updateErr) {
-        console.error(
-          "[enrich] DB update failed for",
-          body.recipeId,
-          updateErr
-        );
+  // Two independent background tasks. Earlier we ran both inside one
+  // Promise.allSettled and wrote to the DB at the end — that meant micros
+  // (≈ 2-3 s with Gemini) had to wait for the hero render (15-90 s with
+  // Flux 2 Pro under load), so the detail-view polling timed out before
+  // anything appeared in the DB. Now each task writes its own field via
+  // a fetch-merge-write helper as soon as it's ready. Polling sees micros
+  // within seconds and the hero whenever Flux is done.
+  if (needsMicros) {
+    after(async () => {
+      try {
+        const micros = await generateMicros(recipe);
+        await mergeRecipeData(row.id, (current) => ({
+          nutrition: { ...current.nutrition, micros },
+        }));
+      } catch (err) {
+        console.error("[enrich] micros failed for", body.recipeId, err);
       }
-    }
-  });
+    });
+  }
+
+  if (needsHero) {
+    after(async () => {
+      try {
+        const heroUrl = await generateAndUploadHero(
+          recipe,
+          row.id,
+          brandSlug
+        );
+        if (heroUrl) {
+          await mergeRecipeData(row.id, () => ({ hero: heroUrl }));
+        }
+      } catch (err) {
+        console.error("[enrich] hero failed for", body.recipeId, err);
+      }
+    });
+  }
 
   return NextResponse.json(
     {
@@ -201,5 +180,36 @@ async function ensureHeroBucket(supabase: SupabaseClient): Promise<void> {
   });
   if (error && !/already exists/i.test(error.message)) {
     console.warn("[enrich] bucket create warning:", error.message);
+  }
+}
+
+// Read-modify-write merge into recipes.data. Used when independent
+// background tasks (micros + hero) write into the same row but at
+// different times — without this, the slower task would clobber whatever
+// the faster task already persisted. The `partial` callback gets the
+// current row data so it can compose nested fields (e.g. nutrition.micros
+// without losing nutrition.kcal).
+async function mergeRecipeData(
+  id: string,
+  partial: (current: Recipe) => Partial<Recipe>
+): Promise<void> {
+  const supabase = getServerSupabase();
+  const { data: latest, error: readErr } = await supabase
+    .from("recipes")
+    .select("data")
+    .eq("id", id)
+    .maybeSingle();
+  if (readErr || !latest) {
+    console.error("[enrich] mergeRecipeData read failed", id, readErr);
+    return;
+  }
+  const current = latest.data as Recipe;
+  const merged = { ...current, ...partial(current) };
+  const { error: writeErr } = await supabase
+    .from("recipes")
+    .update({ data: merged })
+    .eq("id", id);
+  if (writeErr) {
+    console.error("[enrich] mergeRecipeData write failed", id, writeErr);
   }
 }
