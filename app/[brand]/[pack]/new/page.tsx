@@ -25,6 +25,7 @@ import {
   commonUnits,
 } from "@/lib/ingredient-suggestions";
 import { tagSuggestions } from "@/lib/common-tags";
+import { sourceLabelForUrl, isLikelyUrl } from "@/lib/source-url";
 import { SiteHeader } from "@/components/site-header";
 import { RecipeCardPreview } from "@/components/recipe-card-preview";
 import { RecipeCardFull } from "@/components/recipe-card-full";
@@ -160,6 +161,11 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   const [fat, setFat] = useState("");
   const [nutritionBasis, setNutritionBasis] =
     useState<NutritionBasis>("portion");
+  // Optional Original-Link (Instagram-Reel, TikTok, YouTube, beliebiger
+  // Link). Beim Instagram-Import wird das Feld automatisch befüllt; im
+  // manuellen Modus kann der User selbst eintippen. Aus dem Wert wird
+  // beim PDF-Render ein QR-Code im Card-Footer gerendert.
+  const [sourceUrl, setSourceUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -259,6 +265,15 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
         fat: parseInt(fat) || 0,
       },
       nutritionBasis,
+      // Original-Link uebernehmen, damit die Live-Preview den Footer-Hinweis
+      // schon anzeigt. Beim Save geht der Wert dann in die DB. Leere Strings
+      // werden zu undefined, damit Recipe.sourceUrl optional bleibt.
+      ...(sourceUrl.trim()
+        ? {
+            sourceUrl: sourceUrl.trim(),
+            sourceLabel: sourceLabelForUrl(sourceUrl.trim()),
+          }
+        : {}),
     };
   }, [
     pack,
@@ -279,6 +294,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     carbs,
     fat,
     nutritionBasis,
+    sourceUrl,
   ]);
 
   // Required fields tracking — used for save-button counter
@@ -378,6 +394,12 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     setImportedSource(source);
     setImportedConfidence(parsed.confidence);
     setImportedNotes(parsed.notes);
+    // Original-Link aus dem Import-Source uebernehmen, damit der QR-Code
+    // beim PDF-Export auf das Reel zeigt. Im manuellen Modus kann das
+    // Feld danach noch editiert werden.
+    if (source.url) {
+      setSourceUrl(source.url);
+    }
   };
 
   // "Anderer Link"-Klick auf der Import-Card. Das Form bleibt mit den
@@ -454,6 +476,12 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
         fat: parseInt(fat) || 0,
       },
       nutritionBasis,
+      ...(sourceUrl.trim()
+        ? {
+            sourceUrl: sourceUrl.trim(),
+            sourceLabel: sourceLabelForUrl(sourceUrl.trim()),
+          }
+        : {}),
     });
     if (!saved) {
       setSaving(false);
@@ -1505,6 +1533,94 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                     onChange={setFat}
                   />
                 </div>
+              </div>
+            </section>
+
+            {/* Section 6: Original-Link — optional. Wird beim Instagram-
+                Import automatisch befüllt; im manuellen Modus kann der
+                User selbst einen Reel-/TikTok-/YouTube-Link eintragen.
+                Aus dem Wert wird beim PDF-Export ein QR-Code im Card-
+                Footer gerendert. Leer = kein QR, keine Footer-Quelle. */}
+            <section className="editor-section editor-card">
+              <SectionHeader number={7} title="Original-Link" pack={pack}>
+                Optional. Wenn die Karte aus einem Reel, TikTok oder YouTube
+                stammt, kommt hier der Link rein — daraus wird im PDF ein
+                QR-Code im Footer generiert.
+              </SectionHeader>
+
+              <div className="mt-5 flex flex-col gap-3">
+                <div
+                  className="flex items-center gap-2 rounded-2xl border px-3 py-2.5 transition-colors"
+                  style={{
+                    borderColor:
+                      sourceUrl.trim() && !isLikelyUrl(sourceUrl)
+                        ? "#c0392b"
+                        : brand.tokens.line,
+                    background: brand.tokens.surface,
+                  }}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                    aria-hidden
+                    style={{ color: pack.mood.inkSoft, flexShrink: 0 }}
+                  >
+                    <path
+                      d="M5.5 8.5L8.5 5.5M6 3.5L4 5.5C2.9 6.6 2.9 8.4 4 9.5C5.1 10.6 6.9 10.6 8 9.5L8.5 9M8 10.5L10 8.5C11.1 7.4 11.1 5.6 10 4.5C8.9 3.4 7.1 3.4 6 4.5L5.5 5"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <input
+                    type="url"
+                    inputMode="url"
+                    value={sourceUrl}
+                    onChange={(e) => setSourceUrl(e.target.value)}
+                    placeholder="https://www.instagram.com/reel/…"
+                    className="flex-1 bg-transparent text-[14px] outline-none placeholder:text-ink-subtle"
+                    style={{ color: pack.mood.ink }}
+                  />
+                  {sourceUrl.trim() ? (
+                    <button
+                      type="button"
+                      onClick={() => setSourceUrl("")}
+                      className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+                      style={{ color: brand.tokens.inkMuted }}
+                      aria-label="Link entfernen"
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                </div>
+
+                {sourceUrl.trim() && isLikelyUrl(sourceUrl) ? (
+                  <p
+                    className="text-[12px]"
+                    style={{ color: brand.tokens.inkMuted }}
+                  >
+                    QR-Code im PDF-Footer wird auf{" "}
+                    <span style={{ color: pack.mood.ink, fontWeight: 600 }}>
+                      {sourceLabelForUrl(sourceUrl)}
+                    </span>{" "}
+                    zeigen.
+                  </p>
+                ) : sourceUrl.trim() && !isLikelyUrl(sourceUrl) ? (
+                  <p className="text-[12px]" style={{ color: "#c0392b" }}>
+                    Bitte eine vollständige URL eintragen (mit https://).
+                  </p>
+                ) : (
+                  <p
+                    className="text-[12px]"
+                    style={{ color: brand.tokens.inkMuted, opacity: 0.75 }}
+                  >
+                    Leer lassen, falls kein Original-Link existiert — der
+                    Footer rendert dann ohne QR.
+                  </p>
+                )}
               </div>
             </section>
           </div>
