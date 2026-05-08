@@ -484,7 +484,12 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     });
     setSavedSuccess(true);
     setTimeout(() => {
-      router.push(`/${brand.slug}/${pack.slug}/${saved.slug}`);
+      // router.replace statt router.push: die /new-Editor-Page wird damit
+      // aus der Browser-History entfernt. Wenn der User auf der frisch
+      // gespeicherten Recipe-Detail-Seite den iOS-/Browser-Zurück-Button
+      // tippt, landet er direkt in der Pack-Übersicht ("Alle Rezeptkarten")
+      // — nicht mehr auf einem leeren /new-Form. Sauberer Flow.
+      router.replace(`/${brand.slug}/${pack.slug}/${saved.slug}`);
     }, 350);
   };
 
@@ -844,7 +849,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
               >
                 <ModeTab
                   label="Selbst aufbauen"
-                  description="Schritt fuer Schritt eintragen"
+                  description="Schritt für Schritt eintragen"
                   icon="manual"
                   active={mode === "manual"}
                   onClick={() => setMode("manual")}
@@ -852,7 +857,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                 />
                 <ModeTab
                   label="Aus Instagram-Link"
-                  description="Reel oder Post — KI fuellt das Form"
+                  description="Reel oder Post — KI füllt das Form"
                   icon="instagram"
                   active={mode === "instagram"}
                   onClick={() => setMode("instagram")}
