@@ -21,9 +21,10 @@ export async function renderRecipePdf(args: {
 }): Promise<Buffer> {
   ensureFontsRegistered();
   args.onProgress?.("loading-image", 20);
-  const [heroDataUri, qrDataUri] = await Promise.all([
+  const [heroDataUri, qrDataUri, avatarDataUri] = await Promise.all([
     loadImageAsDataUri(args.recipe.hero ?? args.pack.coverImage),
     generateQrDataUri(args.recipe.sourceUrl),
+    loadImageAsDataUri(args.brand.avatar),
   ]);
   args.onProgress?.("rendering", 60);
   const buf = await renderToBuffer(
@@ -34,6 +35,7 @@ export async function renderRecipePdf(args: {
       totalRecipes: args.totalRecipes,
       heroDataUri,
       qrDataUri,
+      avatarDataUri,
     })
   );
   args.onProgress?.("done", 100);
@@ -52,22 +54,21 @@ export async function renderPackPdf(args: {
   args.onProgress?.("loading-cover", 8);
   const coverDataUri = await loadImageAsDataUri(args.pack.coverImage);
 
-  // Foreword assets: only loaded when the pack has a cached foreword.
-  // The other four packs (no foreword cached yet) skip loading entirely
-  // and render exactly as they did before — same image fetches, same
-  // page sequence, no behaviour change.
+  // Foreword text is pulled per pack from the static cache. The image
+  // path is only attempted when text exists — packs without a cached
+  // foreword fall through to the legacy cover→index sequence and don't
+  // pay an extra image fetch.
   const forewordContent = getPackForeword(args.pack.slug);
-  const forewordPaths = forewordContent
-    ? {
-        image: `/brands/${args.brand.slug}/forewords/${args.pack.slug}.jpg`,
-        avatar: args.brand.avatar,
-      }
+  const forewordImagePath = forewordContent
+    ? `/brands/${args.brand.slug}/forewords/${args.pack.slug}.jpg`
     : null;
 
   args.onProgress?.("loading-recipe-images", 20);
-  // Hero images, QR codes, and (optionally) foreword assets fan out
-  // together. Doing them in parallel keeps total wall-clock time as
-  // close as possible to the slowest single load.
+  // Hero images, QR codes, foreword image (optional), and brand avatar
+  // (always loaded — Patisserie uses it inside its recipe-page footer
+  // so the avatar is needed even when this pack has no foreword). All
+  // fan out via Promise.all so total wall-clock stays close to the
+  // slowest single asset.
   const [heroDataUris, qrDataUris, forewordImageDataUri, avatarDataUri] =
     await Promise.all([
       Promise.all(
@@ -76,12 +77,10 @@ export async function renderPackPdf(args: {
         )
       ),
       Promise.all(args.recipes.map((r) => generateQrDataUri(r.sourceUrl))),
-      forewordPaths
-        ? loadImageAsDataUri(forewordPaths.image)
+      forewordImagePath
+        ? loadImageAsDataUri(forewordImagePath)
         : Promise.resolve(null),
-      forewordPaths
-        ? loadImageAsDataUri(forewordPaths.avatar)
-        : Promise.resolve(null),
+      loadImageAsDataUri(args.brand.avatar),
     ]);
 
   args.onProgress?.("rendering", 55);

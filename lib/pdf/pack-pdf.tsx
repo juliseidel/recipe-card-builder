@@ -92,6 +92,7 @@ export function PackPdfDocument({
           totalRecipes={recipes.length}
           heroDataUri={heroDataUris[idx] ?? null}
           qrDataUri={qrDataUris[idx] ?? null}
+          avatarDataUri={avatarDataUri ?? null}
         />
       ))}
 

@@ -11,6 +11,9 @@ export type RecipePdfProps = {
   totalRecipes: number;
   heroDataUri: string | null;
   qrDataUri: string | null;
+  // Brand avatar for layouts that anchor the brand visually inside the
+  // recipe page (e.g. Patisserie's footer signature with Bienes face).
+  avatarDataUri: string | null;
 };
 
 // Single-recipe PDF wrapper. The recipe layout fills exactly one A4 page.
