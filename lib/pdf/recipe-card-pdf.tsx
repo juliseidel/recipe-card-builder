@@ -602,10 +602,34 @@ function PatisseriePage({
   // sub-groups normalise to a single "Hauptgruppe".
   const grouped = groupIngredients(recipe.ingredients);
 
-  // Pre-compute the top 8 micros so the sidebar doesn't have to handle
-  // overflow — recipe-micros.ts caps each recipe at 10 anyway, but 8
-  // fits cleanly in the available vertical space.
-  const micros = (recipe.nutrition?.micros ?? []).slice(0, 8);
+  // Title-Size dynamisch nach Laenge des Recipe-Titels. Die Sidebar ist
+  // nur 186 pt breit (innen), und @react-pdf/renderer macht keinen
+  // automatischen Word-Break an Bindestrichen — dadurch wurden Titel wie
+  // "Virale KI-Suesskartoffel-Muffins" am Rand abgeschnitten. Die
+  // Skala bringt den Titel selbst bei 32+ Zeichen sicher in 2-3 Zeilen.
+  const titleLen = recipe.title.length;
+  const titleFontSize =
+    titleLen <= 18
+      ? d.titleFontSize
+      : titleLen <= 24
+        ? Math.max(d.titleFontSize - 4, 18)
+        : titleLen <= 30
+          ? Math.max(d.titleFontSize - 8, 16)
+          : Math.max(d.titleFontSize - 12, 14);
+
+  // Mikros-Anzahl an Recipe-Density koppeln. Lange Recipes (16+ Zutaten,
+  // 9+ Steps) brauchen die ganze Body-Spalte; entsprechend bekommt die
+  // Sidebar weniger vertikalen Platz. 6 Mikros bei compact verhindert
+  // dass die Sidebar mehr Hoehe braucht als 842 pt — was sonst zu einer
+  // leeren Overflow-Seite fuehrt (passierte z.B. bei Oster-Zupfkuchen).
+  const microsLimit =
+    density === "compact" ? 5 : density === "balanced" ? 6 : 8;
+  const micros = (recipe.nutrition?.micros ?? []).slice(0, microsLimit);
+
+  // Story-Block nur bei wirklich kurzen Recipes — bei mittleren und
+  // langen frisst er Body-Hoehe, die wir fuer Zutaten + Steps brauchen.
+  const showStoryHere =
+    shouldShowStory(recipe) && density === "spacious";
 
   // Sidebar dimensions — A4 is 595 pt wide. 40 % gives 238 pt for the
   // lavender column, 60 % (357 pt) for the cream body. The body is
@@ -625,7 +649,13 @@ function PatisseriePage({
         color: t.ink,
       }}
     >
-      <View style={{ flex: 1, flexDirection: "row" }}>
+      {/* wrap={false} verhindert dass eine zu hohe Recipe-Card auf eine
+          zweite Seite fliesst — leere Lavender/Cream-Halb-Seite war die
+          Folge bei einzelnen Recipes (Pack 1 ging plötzlich auf 16 statt
+          15 Seiten). titleFontSize + microsLimit + showStoryHere sind
+          Density-aware getuned, sodass die Card auch ohne Auto-Wrap auf
+          eine A4 passt. */}
+      <View style={{ flex: 1, flexDirection: "row" }} wrap={false}>
         {/* ─── LEFT: LAVENDER SIDEBAR ─────────────────────────────── */}
         <View
           style={{
@@ -672,13 +702,13 @@ function PatisseriePage({
             </View>
 
             {/* Recipe title — the visual anchor. Italic Fraunces, large
-                but sized down for long titles so they fit on 2 lines. */}
+                but sized down for long titles so they fit on 2-3 lines. */}
             <Text
               style={{
                 fontFamily: "Fraunces",
                 fontStyle: "italic",
-                fontSize: d.titleFontSize,
-                lineHeight: 1,
+                fontSize: titleFontSize,
+                lineHeight: 1.02,
                 letterSpacing: -0.5,
                 color: t.ink,
               }}
@@ -1050,8 +1080,10 @@ function PatisseriePage({
             ))}
           </View>
 
-          {/* Bienes Story — short recipes only, fills body whitespace */}
-          {shouldShowStory(recipe) ? (
+          {/* Bienes Story — nur bei wirklich kurzen Recipes (spacious-
+              Density), wo Body-Hoehe Reserve hat. Bei mittel+langen
+              Recipes braucht der Body den Platz fuer Zutaten + Steps. */}
+          {showStoryHere ? (
             <View
               style={{
                 marginTop: 14,
