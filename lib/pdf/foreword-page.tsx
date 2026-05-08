@@ -1,45 +1,179 @@
 import { Page, View, Text, Image } from "@react-pdf/renderer";
 import type { Brand } from "@/lib/brands";
-import type { Pack } from "@/lib/packs";
+import type { Pack, CardLayout } from "@/lib/packs";
 import type { PackForewordContent } from "@/lib/ai/generate-foreword";
 import { packTheme, fontFamilyForPack, blendWithWhite } from "./theme";
 
-// The foreword page sits between the pack cover and the index. It's the
-// "booklet moment" — the spread that turns a recipe collection into
-// something that feels like a published mini-cookbook. Layout DNA is
-// chosen by the pack's cardLayout so each pack's foreword page feels
-// of-a-piece with its recipe pages.
+// Foreword page sits between cover and index. The booklet moment — what
+// turns a recipe collection into a published-feeling mini-cookbook.
 //
-// One layout is implemented per pass; ratherthan all five at once. We
-// start with patisserie (Pack 1 — Bienes Backwelt), test it on a real
-// PDF, then add the other four. The component falls back to patisserie
-// for unsupported layouts so a missing variant never crashes the render.
+// One variant per pack-cardLayout so the foreword spread feels of-a-piece
+// with the recipe pages that follow it. All five share the same
+// vocabulary (still-life image, avatar anchor, greeting/story/signoff
+// fields) but the composition is layout-DNA-specific.
 
 export type ForewordPageProps = {
   brand: Brand;
   pack: Pack;
   content: PackForewordContent;
-  // Pre-loaded data URIs — same convention as RecipeCardPdfPage and
-  // PackPdfDocument. The render-pipeline (lib/pdf/render.ts) loads them
-  // before invoking renderToBuffer.
+  // Pre-loaded data URIs — same convention as RecipeCardPdfPage.
   imageDataUri: string | null;
   avatarDataUri: string | null;
 };
 
+const VARIANTS: Record<
+  CardLayout,
+  (p: ForewordPageProps) => React.JSX.Element
+> = {
+  patisserie: PatisserieForewordPage,
+  sport: SportForewordPage,
+  minimal: MinimalForewordPage,
+  dashboard: DashboardForewordPage,
+  editorial: EditorialForewordPage,
+};
+
 export function ForewordPage(props: ForewordPageProps) {
-  // For now every pack uses the patisserie variant — it's the most
-  // booklet-y of the five layouts (polaroid-style hero, italic Fraunces
-  // body, magazine warmth) and works well even when paired with packs
-  // whose recipe-cards use a different layout. We'll add per-layout
-  // variants once Pack 1 is signed off.
-  return <PatisserieForewordPage {...props} />;
+  const layout = props.pack.cardLayout;
+  const Variant = VARIANTS[layout] ?? PatisserieForewordPage;
+  return <Variant {...props} />;
 }
 
-// ─── PATISSERIE VARIANT ──────────────────────────────────────────────────────
-// Polaroid frame for the still-life image, -2° tilt, italic Fraunces 32 pt
-// for the body, lavender pack-mood background. Mirrors the patisserie
-// recipe-card look so Pack 1 (Bienes Backwelt) has a coherent feel from
-// foreword through to the last recipe.
+// Shared bottom strip — small avatar + signature. Each variant lays the
+// rest of the page differently, but the closing handshake stays
+// consistent so a reader who flips through all 5 packs back-to-back
+// recognises Biene immediately on every foreword page.
+function AuthorStrip({
+  brand,
+  pack,
+  avatarDataUri,
+  align = "between",
+}: {
+  brand: Brand;
+  pack: Pack;
+  avatarDataUri: string | null;
+  align?: "between" | "center";
+}) {
+  const t = packTheme(pack);
+  const justifyContent: "space-between" | "center" =
+    align === "center" ? "center" : "space-between";
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent,
+        gap: 16,
+        paddingTop: 18,
+        borderTopWidth: 0.5,
+        borderTopColor: t.divider,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        {avatarDataUri ? (
+          <View
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              overflow: "hidden",
+              borderWidth: 1.5,
+              borderColor: t.accent,
+            }}
+          >
+            <Image
+              src={avatarDataUri}
+              style={{ width: 41, height: 41, objectFit: "cover" }}
+            />
+          </View>
+        ) : null}
+        <View>
+          <Text
+            style={{
+              fontSize: 9,
+              fontWeight: 600,
+              letterSpacing: 1.4,
+              color: t.inkSoft,
+              textTransform: "uppercase",
+            }}
+          >
+            {brand.name}
+          </Text>
+          <Text
+            style={{ fontSize: 8.5, color: t.inkSoft, marginTop: 1 }}
+          >
+            {brand.handle}
+          </Text>
+        </View>
+      </View>
+      {align === "between" ? (
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontStyle: "italic",
+            fontSize: 18,
+            color: t.ink,
+          }}
+        >
+          {brand.signature}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function TopStrip({
+  pack,
+  rightLabel,
+}: {
+  pack: Pack;
+  rightLabel?: string;
+}) {
+  const t = packTheme(pack);
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 8.5,
+          fontWeight: 600,
+          letterSpacing: 1.8,
+          color: t.inkSoft,
+          textTransform: "uppercase",
+        }}
+      >
+        Vorwort
+      </Text>
+      <Text
+        style={{
+          fontSize: 8.5,
+          fontWeight: 500,
+          letterSpacing: 1.4,
+          color: t.inkSoft,
+          textTransform: "uppercase",
+        }}
+      >
+        {rightLabel ??
+          `Pack ${pack.number.toString().padStart(2, "0")} · ${pack.title}`}
+      </Text>
+    </View>
+  );
+}
+
+// ─── PATISSERIE — Pack 1 (Bienes Backwelt) ──────────────────────────────────
+// Polaroid frame for the still-life, -2° tilt, italic Fraunces body,
+// lavender mood. The original prototype layout — kept intact since user
+// signed it off.
 function PatisserieForewordPage({
   brand,
   pack,
@@ -49,20 +183,12 @@ function PatisserieForewordPage({
 }: ForewordPageProps) {
   const t = packTheme(pack);
   const titleFont = fontFamilyForPack(pack);
-
-  // The polaroid frame needs a softer-than-white inner so it doesn't look
-  // like a clipped sticker against the page. We blend the pack mood
-  // background with white at 70 % to land somewhere creamy and warm.
   const polaroidPaper = blendWithWhite(t.bg, 0.7);
 
   return (
     <Page
       size="A4"
-      style={{
-        backgroundColor: t.bg,
-        fontFamily: "Inter",
-        color: t.ink,
-      }}
+      style={{ backgroundColor: t.bg, fontFamily: "Inter", color: t.ink }}
     >
       <View
         style={{
@@ -74,39 +200,8 @@ function PatisserieForewordPage({
           justifyContent: "space-between",
         }}
       >
-        {/* TOP STRIP — small section label, mirrors the cover */}
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 8.5,
-              fontWeight: 600,
-              letterSpacing: 1.8,
-              color: t.inkSoft,
-              textTransform: "uppercase",
-            }}
-          >
-            Vorwort
-          </Text>
-          <Text
-            style={{
-              fontSize: 8.5,
-              fontWeight: 500,
-              letterSpacing: 1.4,
-              color: t.inkSoft,
-              textTransform: "uppercase",
-            }}
-          >
-            Pack {pack.number.toString().padStart(2, "0")} · {pack.title}
-          </Text>
-        </View>
+        <TopStrip pack={pack} />
 
-        {/* CENTER ROW — Polaroid still-life left, story right */}
         <View
           style={{
             flexDirection: "row",
@@ -117,9 +212,6 @@ function PatisserieForewordPage({
             paddingBottom: 8,
           }}
         >
-          {/* Polaroid frame with the still-life. -2° tilt + soft drop
-              shadow (faked via padding + blended-paper background) so it
-              feels physical rather than digitally pasted in. */}
           <View
             style={{
               width: 250,
@@ -128,24 +220,14 @@ function PatisserieForewordPage({
               backgroundColor: polaroidPaper,
               borderRadius: 3,
               transform: "rotate(-2deg)",
-              // react-pdf doesn't render box-shadow, so the implied
-              // depth comes from the rim of pack-mood background visible
-              // around the polaroid against the page background.
             }}
           >
             {imageDataUri ? (
               <Image
                 src={imageDataUri}
-                style={{
-                  width: 226,
-                  height: 226,
-                  objectFit: "cover",
-                }}
+                style={{ width: 226, height: 226, objectFit: "cover" }}
               />
             ) : (
-              // Empty placeholder if image asset is missing — keeps the
-              // layout intact during local dev when the PNG hasn't been
-              // generated yet. Production builds always have the image.
               <View
                 style={{
                   width: 226,
@@ -168,7 +250,6 @@ function PatisserieForewordPage({
             </Text>
           </View>
 
-          {/* Right column: greeting · story · signoff */}
           <View style={{ flex: 1, paddingTop: 12 }}>
             <Text
               style={{
@@ -181,7 +262,6 @@ function PatisserieForewordPage({
             >
               {content.greeting}
             </Text>
-
             <Text
               style={{
                 marginTop: 18,
@@ -194,7 +274,6 @@ function PatisserieForewordPage({
             >
               {content.story}
             </Text>
-
             <Text
               style={{
                 marginTop: 16,
@@ -208,78 +287,619 @@ function PatisserieForewordPage({
           </View>
         </View>
 
-        {/* BOTTOM STRIP — Avatar (small, round, the human anchor) +
-            handwritten signature on the right. Echoes how a real
-            cookbook intro page closes off. */}
+        <AuthorStrip
+          brand={brand}
+          pack={pack}
+          avatarDataUri={avatarDataUri}
+        />
+      </View>
+    </Page>
+  );
+}
+
+// ─── SPORT — Pack 2 (Volumen-Wunder) ────────────────────────────────────────
+// Square hero image right with sage-green accent border, bold sans
+// greeting in Inter-Tight, macro-bar-inspired info strip.
+function SportForewordPage({
+  brand,
+  pack,
+  content,
+  imageDataUri,
+  avatarDataUri,
+}: ForewordPageProps) {
+  const t = packTheme(pack);
+  const accentSoft = blendWithWhite(t.accent, 0.55);
+
+  return (
+    <Page
+      size="A4"
+      style={{ backgroundColor: t.bg, fontFamily: "Inter", color: t.ink }}
+    >
+      <View
+        style={{
+          flex: 1,
+          paddingHorizontal: 50,
+          paddingTop: 44,
+          paddingBottom: 36,
+          flexDirection: "column",
+          justifyContent: "space-between",
+        }}
+      >
+        <TopStrip pack={pack} />
+
         <View
           style={{
             flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 16,
-            paddingTop: 18,
-            borderTopWidth: 0.5,
-            borderTopColor: t.divider,
+            alignItems: "stretch",
+            gap: 32,
+            flex: 1,
+            paddingTop: 16,
+            paddingBottom: 16,
           }}
         >
+          {/* Left: bold greeting + story stack */}
           <View
             style={{
-              flexDirection: "row",
-              alignItems: "center",
+              flex: 1,
+              flexDirection: "column",
+              justifyContent: "center",
               gap: 12,
             }}
           >
-            {avatarDataUri ? (
+            <View
+              style={{
+                width: 36,
+                height: 4,
+                backgroundColor: t.accent,
+              }}
+            />
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 30,
+                fontWeight: 700,
+                lineHeight: 1.05,
+                color: t.ink,
+                letterSpacing: -0.6,
+                textTransform: "none",
+              }}
+            >
+              {content.greeting}
+            </Text>
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 13,
+                fontWeight: 400,
+                lineHeight: 1.6,
+                color: t.ink,
+                marginTop: 4,
+              }}
+            >
+              {content.story}
+            </Text>
+            <View
+              style={{
+                marginTop: 8,
+                paddingTop: 12,
+                borderTopWidth: 0.5,
+                borderTopColor: t.divider,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
               <View
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  overflow: "hidden",
-                  borderWidth: 1.5,
-                  borderColor: t.accent,
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: t.accent,
                 }}
-              >
-                <Image
-                  src={avatarDataUri}
-                  style={{ width: 41, height: 41, objectFit: "cover" }}
-                />
-              </View>
-            ) : null}
-            <View>
+              />
               <Text
                 style={{
-                  fontSize: 9,
+                  fontSize: 11,
                   fontWeight: 600,
-                  letterSpacing: 1.4,
-                  color: t.inkSoft,
-                  textTransform: "uppercase",
+                  color: t.ink,
+                  letterSpacing: 0.2,
                 }}
               >
-                {brand.name}
-              </Text>
-              <Text
-                style={{
-                  fontSize: 8.5,
-                  color: t.inkSoft,
-                  marginTop: 1,
-                }}
-              >
-                {brand.handle}
+                {content.signoff}
               </Text>
             </View>
           </View>
+
+          {/* Right: sharp-cornered hero with thick accent rim */}
+          <View
+            style={{
+              width: 240,
+              padding: 6,
+              backgroundColor: accentSoft,
+              borderTopWidth: 4,
+              borderTopColor: t.accent,
+              borderRadius: 2,
+              alignSelf: "center",
+            }}
+          >
+            {imageDataUri ? (
+              <Image
+                src={imageDataUri}
+                style={{ width: 228, height: 285, objectFit: "cover" }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: 228,
+                  height: 285,
+                  backgroundColor: blendWithWhite(t.accent, 0.85),
+                }}
+              />
+            )}
+            <Text
+              style={{
+                marginTop: 8,
+                fontSize: 8,
+                fontWeight: 700,
+                letterSpacing: 1.6,
+                color: t.inkSoft,
+                textTransform: "uppercase",
+                textAlign: "center",
+              }}
+            >
+              {pack.subtitle}
+            </Text>
+          </View>
+        </View>
+
+        <AuthorStrip
+          brand={brand}
+          pack={pack}
+          avatarDataUri={avatarDataUri}
+        />
+      </View>
+    </Page>
+  );
+}
+
+// ─── MINIMAL — Pack 3 (Bienes Snacks) ───────────────────────────────────────
+// Huge "Hi" as display anchor, lots of breathing room, modest still-life
+// in a small clean square. Mint mood, Apple-store calm.
+function MinimalForewordPage({
+  brand,
+  pack,
+  content,
+  imageDataUri,
+  avatarDataUri,
+}: ForewordPageProps) {
+  const t = packTheme(pack);
+
+  // Split greeting at first space so the typographic anchor lands on the
+  // shortest natural phrase. "Hi, ich bin Biene." → "Hi," / "ich bin Biene."
+  const [anchor, ...rest] = content.greeting.split(" ");
+  const subgreeting = rest.join(" ");
+
+  return (
+    <Page
+      size="A4"
+      style={{ backgroundColor: t.bg, fontFamily: "Inter", color: t.ink }}
+    >
+      <View
+        style={{
+          flex: 1,
+          paddingHorizontal: 64,
+          paddingTop: 44,
+          paddingBottom: 36,
+          flexDirection: "column",
+          justifyContent: "space-between",
+        }}
+      >
+        <TopStrip pack={pack} />
+
+        <View
+          style={{
+            flex: 1,
+            flexDirection: "column",
+            justifyContent: "center",
+            paddingTop: 8,
+            paddingBottom: 8,
+          }}
+        >
+          {/* Anchor word at huge display size — the visual move */}
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 110,
+              fontWeight: 700,
+              lineHeight: 0.92,
+              color: t.ink,
+              letterSpacing: -3.4,
+            }}
+          >
+            {anchor}
+          </Text>
+          {subgreeting ? (
+            <Text
+              style={{
+                marginTop: 4,
+                fontFamily: "Inter",
+                fontSize: 18,
+                fontWeight: 500,
+                color: t.inkSoft,
+                letterSpacing: -0.4,
+              }}
+            >
+              {subgreeting}
+            </Text>
+          ) : null}
+
+          {/* Body row: small clean square hero + story */}
+          <View
+            style={{
+              marginTop: 32,
+              flexDirection: "row",
+              alignItems: "flex-start",
+              gap: 28,
+            }}
+          >
+            <View
+              style={{
+                width: 150,
+                height: 150,
+                overflow: "hidden",
+                borderRadius: 4,
+              }}
+            >
+              {imageDataUri ? (
+                <Image
+                  src={imageDataUri}
+                  style={{ width: 150, height: 150, objectFit: "cover" }}
+                />
+              ) : (
+                <View
+                  style={{
+                    width: 150,
+                    height: 150,
+                    backgroundColor: blendWithWhite(t.accent, 0.85),
+                  }}
+                />
+              )}
+            </View>
+
+            <View style={{ flex: 1, paddingTop: 4 }}>
+              <Text
+                style={{
+                  fontFamily: "Inter",
+                  fontSize: 13,
+                  lineHeight: 1.65,
+                  color: t.ink,
+                }}
+              >
+                {content.story}
+              </Text>
+              <Text
+                style={{
+                  marginTop: 14,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: 0.4,
+                  color: t.inkSoft,
+                }}
+              >
+                {content.signoff}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <AuthorStrip
+          brand={brand}
+          pack={pack}
+          avatarDataUri={avatarDataUri}
+        />
+      </View>
+    </Page>
+  );
+}
+
+// ─── DASHBOARD — Pack 4 (Meal-Prep Heroes) ──────────────────────────────────
+// Notion-style tile composition. Hero image in a structured tile grid,
+// data-row metadata underneath, sky-blue mood, grid-aligned text.
+function DashboardForewordPage({
+  brand,
+  pack,
+  content,
+  imageDataUri,
+  avatarDataUri,
+}: ForewordPageProps) {
+  const t = packTheme(pack);
+  const tileBg = "#ffffff";
+
+  return (
+    <Page
+      size="A4"
+      style={{ backgroundColor: t.bg, fontFamily: "Inter", color: t.ink }}
+    >
+      <View
+        style={{
+          flex: 1,
+          paddingHorizontal: 50,
+          paddingTop: 44,
+          paddingBottom: 36,
+          flexDirection: "column",
+          justifyContent: "space-between",
+        }}
+      >
+        <TopStrip pack={pack} />
+
+        <View
+          style={{
+            flex: 1,
+            flexDirection: "column",
+            paddingTop: 16,
+            paddingBottom: 16,
+            gap: 14,
+          }}
+        >
+          {/* Tile 1 — hero */}
+          <View
+            style={{
+              backgroundColor: tileBg,
+              borderRadius: 6,
+              overflow: "hidden",
+              flexDirection: "row",
+              alignItems: "stretch",
+              borderWidth: 0.5,
+              borderColor: t.divider,
+            }}
+          >
+            <View style={{ width: 200, height: 200 }}>
+              {imageDataUri ? (
+                <Image
+                  src={imageDataUri}
+                  style={{ width: 200, height: 200, objectFit: "cover" }}
+                />
+              ) : (
+                <View
+                  style={{
+                    width: 200,
+                    height: 200,
+                    backgroundColor: blendWithWhite(t.accent, 0.85),
+                  }}
+                />
+              )}
+            </View>
+            <View
+              style={{
+                flex: 1,
+                paddingHorizontal: 22,
+                paddingVertical: 22,
+                justifyContent: "center",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 8,
+                  fontWeight: 700,
+                  letterSpacing: 1.6,
+                  color: t.accent,
+                  textTransform: "uppercase",
+                }}
+              >
+                Vorwort · Wochenplan
+              </Text>
+              <Text
+                style={{
+                  marginTop: 6,
+                  fontFamily: "Fraunces",
+                  fontSize: 26,
+                  lineHeight: 1.05,
+                  color: t.ink,
+                  letterSpacing: -0.4,
+                }}
+              >
+                {content.greeting}
+              </Text>
+            </View>
+          </View>
+
+          {/* Tile 2 — story body */}
+          <View
+            style={{
+              backgroundColor: tileBg,
+              borderRadius: 6,
+              padding: 22,
+              borderWidth: 0.5,
+              borderColor: t.divider,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 12.5,
+                lineHeight: 1.65,
+                color: t.ink,
+              }}
+            >
+              {content.story}
+            </Text>
+          </View>
+
+          {/* Tile 3 — signoff data row */}
+          <View
+            style={{
+              backgroundColor: tileBg,
+              borderRadius: 6,
+              paddingHorizontal: 22,
+              paddingVertical: 14,
+              borderWidth: 0.5,
+              borderColor: t.divider,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <View
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: t.accent,
+              }}
+            />
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 11,
+                fontWeight: 500,
+                color: t.ink,
+                flex: 1,
+              }}
+            >
+              {content.signoff}
+            </Text>
+            <Text
+              style={{
+                fontSize: 8,
+                fontWeight: 700,
+                letterSpacing: 1.4,
+                color: t.inkSoft,
+                textTransform: "uppercase",
+              }}
+            >
+              {pack.subtitle}
+            </Text>
+          </View>
+        </View>
+
+        <AuthorStrip
+          brand={brand}
+          pack={pack}
+          avatarDataUri={avatarDataUri}
+        />
+      </View>
+    </Page>
+  );
+}
+
+// ─── EDITORIAL — Pack 5 (Feierabend-Klassiker) ─────────────────────────────
+// Magazine-spread feel. Big still-life on top, two-column body underneath
+// with greeting as italic Fraunces drop-cap and pull-quote signoff.
+function EditorialForewordPage({
+  brand,
+  pack,
+  content,
+  imageDataUri,
+  avatarDataUri,
+}: ForewordPageProps) {
+  const t = packTheme(pack);
+
+  return (
+    <Page
+      size="A4"
+      style={{ backgroundColor: t.bg, fontFamily: "Inter", color: t.ink }}
+    >
+      <View
+        style={{
+          flex: 1,
+          paddingHorizontal: 50,
+          paddingTop: 36,
+          paddingBottom: 36,
+          flexDirection: "column",
+          justifyContent: "space-between",
+        }}
+      >
+        <TopStrip pack={pack} />
+
+        <View
+          style={{
+            flex: 1,
+            flexDirection: "column",
+            paddingTop: 14,
+            paddingBottom: 12,
+            gap: 18,
+          }}
+        >
+          {/* Wide hero band */}
+          <View style={{ width: "100%", height: 220, overflow: "hidden" }}>
+            {imageDataUri ? (
+              <Image
+                src={imageDataUri}
+                style={{ width: "100%", height: 220, objectFit: "cover" }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: "100%",
+                  height: 220,
+                  backgroundColor: blendWithWhite(t.accent, 0.85),
+                }}
+              />
+            )}
+          </View>
+
+          {/* Greeting — italic Fraunces, generous size, sits below hero */}
           <Text
             style={{
               fontFamily: "Fraunces",
               fontStyle: "italic",
-              fontSize: 18,
+              fontSize: 36,
+              lineHeight: 1.05,
               color: t.ink,
+              letterSpacing: -0.6,
             }}
           >
-            {brand.signature}
+            {content.greeting}
           </Text>
+
+          {/* Two-column body for editorial-magazine feel */}
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 24,
+              alignItems: "flex-start",
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  fontFamily: "Inter",
+                  fontSize: 11.5,
+                  lineHeight: 1.65,
+                  color: t.ink,
+                }}
+              >
+                {content.story}
+              </Text>
+            </View>
+            <View
+              style={{
+                flex: 1,
+                paddingLeft: 18,
+                borderLeftWidth: 2,
+                borderLeftColor: t.accent,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: "Fraunces",
+                  fontStyle: "italic",
+                  fontSize: 16,
+                  lineHeight: 1.45,
+                  color: t.ink,
+                }}
+              >
+                {content.signoff}
+              </Text>
+            </View>
+          </View>
         </View>
+
+        <AuthorStrip
+          brand={brand}
+          pack={pack}
+          avatarDataUri={avatarDataUri}
+        />
       </View>
     </Page>
   );
