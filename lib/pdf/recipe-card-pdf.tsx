@@ -1,4 +1,14 @@
-import { Page, View, Text, Image } from "@react-pdf/renderer";
+import {
+  Page,
+  View,
+  Text,
+  Image,
+  Svg,
+  Defs,
+  LinearGradient,
+  Stop,
+  Rect,
+} from "@react-pdf/renderer";
 import type { Brand } from "@/lib/brands";
 import type { Pack, CardLayout } from "@/lib/packs";
 import {
@@ -1302,18 +1312,50 @@ function MinimalPage({
             />
           ) : null}
 
-          {/* Dunkler Gradient unten — Image-overlay-Approximation, gibt
-              dem weissen Title-Overlay sicheren Kontrast. */}
+          {/* Dunkler Gradient unten — echter SVG linear-gradient damit
+              der Uebergang weich ist, statt einer harten Trennlinie wie
+              bei einem semi-transparent Rechteck. Das @react-pdf
+              backgroundColor unterstuetzt keinen CSS-gradient, deshalb
+              nutzen wir hier Svg+LinearGradient. Der Gradient laeuft von
+              0.62 Opacity unten zu 0 Opacity bei 60% — Title sitzt im
+              starken Bereich, der Hero-Bildinhalt darueber bleibt klar
+              sichtbar. */}
           <View
             style={{
               position: "absolute",
               left: 0,
               right: 0,
               bottom: 0,
-              height: HERO_HEIGHT * 0.55,
-              backgroundColor: "rgba(0, 0, 0, 0.32)",
+              height: HERO_HEIGHT,
             }}
-          />
+          >
+            <Svg
+              width="595"
+              height={HERO_HEIGHT}
+              viewBox={`0 0 595 ${HERO_HEIGHT}`}
+            >
+              <Defs>
+                <LinearGradient
+                  id="heroGrad"
+                  x1="0"
+                  y1={HERO_HEIGHT}
+                  x2="0"
+                  y2="0"
+                >
+                  <Stop offset="0" stopColor="#000" stopOpacity={0.62} />
+                  <Stop offset="0.45" stopColor="#000" stopOpacity={0.18} />
+                  <Stop offset="1" stopColor="#000" stopOpacity={0} />
+                </LinearGradient>
+              </Defs>
+              <Rect
+                x="0"
+                y="0"
+                width="595"
+                height={HERO_HEIGHT}
+                fill="url(#heroGrad)"
+              />
+            </Svg>
+          </View>
 
           {/* Top strip — Pack-Caption + Recipe-Number, weiss */}
           <View
@@ -2876,33 +2918,50 @@ function IngredientsList({
 }) {
   return (
     <View style={{ marginTop: 8 }}>
-      {grouped.map((g, gi) => (
-        <View key={g.name ?? `m${gi}`} style={{ marginBottom: 8 }}>
-          {g.name ? (
-            <Text
-              style={{
-                fontSize: 7,
-                letterSpacing: 1.4,
-                fontWeight: 600,
-                color: theme.inkSoft,
-                marginBottom: 4,
-                textTransform: "uppercase",
-              }}
-            >
-              Für {g.name.toLowerCase()}
-            </Text>
-          ) : null}
-          <IngredientGroupBody
-            items={g.items}
-            theme={theme}
-            bold={bold}
-            checklist={checklist}
-            rowPadV={rowPadV}
-            nameFontSize={nameFontSize}
-            noteFontSize={noteFontSize}
-          />
-        </View>
-      ))}
+      {grouped.map((g, gi) => {
+        // Sub-group separation: bei nicht-erstem Group brauchen wir
+        // sichtbaren Abstand zur vorherigen Group, sonst stoesst der
+        // Sub-Group-Header an die letzte Item-Note der vorigen Group
+        // (gerade in Pack 3 mit "Fuer Teig"/"Fuer Topping"/"Fuer Streusel"
+        // und Notes wie "oder Obst nach Wahl" haben wir Ueberlapp gesehen).
+        const isFirstGroup = gi === 0;
+        const isNamedGroup = Boolean(g.name);
+        return (
+          <View
+            key={g.name ?? `m${gi}`}
+            style={{
+              marginBottom: 8,
+              // Header braucht Atemraum oben — bei der ersten Group nicht
+              // noetig, danach verlaesslich extra padding-top.
+              paddingTop: !isFirstGroup && isNamedGroup ? 10 : 0,
+            }}
+          >
+            {g.name ? (
+              <Text
+                style={{
+                  fontSize: 7,
+                  letterSpacing: 1.4,
+                  fontWeight: 700,
+                  color: theme.accent,
+                  marginBottom: 6,
+                  textTransform: "uppercase",
+                }}
+              >
+                Für {g.name.toLowerCase()}
+              </Text>
+            ) : null}
+            <IngredientGroupBody
+              items={g.items}
+              theme={theme}
+              bold={bold}
+              checklist={checklist}
+              rowPadV={rowPadV}
+              nameFontSize={nameFontSize}
+              noteFontSize={noteFontSize}
+            />
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -3008,7 +3067,8 @@ function IngredientRow({
               fontSize: noteFont,
               fontStyle: "italic",
               color: theme.inkSoft,
-              marginTop: 0.5,
+              lineHeight: 1.35,
+              marginTop: 1.5,
             }}
           >
             {ing.note}
