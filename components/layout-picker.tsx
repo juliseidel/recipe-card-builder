@@ -128,50 +128,171 @@ export function LayoutThumbnail({
       )}
       {layout === "patisserie" && (
         <>
-          <rect x="3" y="3" width="22" height="3" rx="0.5" fill={stroke} />
+          {/* Lavender sidebar (left 40%) — title + tilted polaroid +
+              vertical micros list + avatar anchor at the bottom */}
           <rect
-            x="3"
-            y="9"
-            width="18"
-            height="2"
-            rx="0.5"
-            fill={stroke}
-            opacity="0.6"
-          />
-          <rect
-            x="28"
-            y="6"
-            width="16"
-            height="14"
-            rx="2"
+            x="0"
+            y="0"
+            width="19"
+            height="32"
             fill={fill}
             opacity="0.85"
-            transform="rotate(-3 36 13)"
+          />
+          <rect x="2" y="3" width="14" height="2" rx="0.4" fill={stroke} />
+          <rect
+            x="2"
+            y="6.5"
+            width="11"
+            height="1.5"
+            rx="0.4"
+            fill={stroke}
+            opacity="0.55"
           />
           <rect
             x="3"
+            y="10.5"
+            width="13"
+            height="9"
+            rx="1"
+            fill="white"
+            transform="rotate(-3 9.5 15)"
+          />
+          <rect
+            x="2"
             y="22"
-            width="42"
-            height="2"
-            rx="0.5"
-            fill={fill}
-            opacity="0.5"
+            width="13"
+            height="0.7"
+            rx="0.3"
+            fill={stroke}
+            opacity="0.45"
           />
           <rect
-            x="3"
-            y="27"
-            width="18"
+            x="2"
+            y="23.6"
+            width="13"
+            height="0.7"
+            rx="0.3"
+            fill={stroke}
+            opacity="0.45"
+          />
+          <rect
+            x="2"
+            y="25.2"
+            width="13"
+            height="0.7"
+            rx="0.3"
+            fill={stroke}
+            opacity="0.45"
+          />
+          <circle cx="4.5" cy="29.5" r="1.5" fill={stroke} opacity="0.7" />
+          <rect
+            x="7"
+            y="29"
+            width="8"
+            height="1.2"
+            rx="0.3"
+            fill={stroke}
+            opacity="0.55"
+          />
+
+          {/* Cream body column (right 60%) — stats strip + macro pills +
+              ingredients/steps lines */}
+          <rect
+            x="22"
+            y="3"
+            width="9"
             height="2"
-            rx="0.5"
+            rx="0.4"
+            fill={stroke}
+            opacity="0.8"
+          />
+          <rect
+            x="38"
+            y="3"
+            width="8"
+            height="2"
+            rx="0.4"
+            fill={stroke}
+            opacity="0.8"
+          />
+          <rect
+            x="22"
+            y="7"
+            width="6"
+            height="1.6"
+            rx="0.8"
+            fill={fill}
+            opacity="0.55"
+          />
+          <rect
+            x="29"
+            y="7"
+            width="7"
+            height="1.6"
+            rx="0.8"
+            fill={fill}
+            opacity="0.55"
+          />
+          <rect
+            x="37"
+            y="7"
+            width="5"
+            height="1.6"
+            rx="0.8"
+            fill={fill}
+            opacity="0.55"
+          />
+          <rect
+            x="22"
+            y="12"
+            width="22"
+            height="1.4"
+            rx="0.3"
+            fill={stroke}
+            opacity="0.45"
+          />
+          <rect
+            x="22"
+            y="14.5"
+            width="20"
+            height="1.4"
+            rx="0.3"
             fill={stroke}
             opacity="0.4"
           />
           <rect
-            x="25"
+            x="22"
+            y="17"
+            width="22"
+            height="1.4"
+            rx="0.3"
+            fill={stroke}
+            opacity="0.4"
+          />
+          <rect
+            x="22"
+            y="22"
+            width="22"
+            height="1.4"
+            rx="0.3"
+            fill={stroke}
+            opacity="0.55"
+          />
+          <rect
+            x="22"
+            y="24.5"
+            width="18"
+            height="1.4"
+            rx="0.3"
+            fill={stroke}
+            opacity="0.4"
+          />
+          <rect
+            x="22"
             y="27"
-            width="20"
-            height="2"
-            rx="0.5"
+            width="22"
+            height="1.4"
+            rx="0.3"
             fill={stroke}
             opacity="0.4"
           />

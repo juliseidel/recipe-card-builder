@@ -618,6 +618,17 @@ function EditorialStatTile({
 // Boutique-Patisserie: Polaroid-Bild rechts, italic display,
 // elegante Übergänge, weiche Formen
 // ════════════════════════════════════════════════
+// ════════════════════════════════════════════════
+// LAYOUT 2: PATISSERIE — Pack 1 (Bienes Backwelt, Lavender)
+// ════════════════════════════════════════════════
+// Magazin-Spread-Variante: lila Sidebar (40 %) hält Identity (Title,
+// Polaroid, Mikros, Author, Reel-Link), cream Body (60 %) hält das
+// eigentliche Rezept. Mirror der PDF-Variante in lib/pdf/recipe-card-pdf.tsx
+// — gleiche Designentscheidungen, gleicher Aufbau, damit die Web-Vorschau
+// 1:1 dem zeigt, was im Download-PDF steht.
+//
+// Mobil: Sidebar und Body stacken untereinander, alle Sub-Blöcke bleiben
+// in der Sidebar sichtbar (Polaroid → Mikros → Author → Reel).
 function PatisserieLayout({
   brand,
   pack,
@@ -627,106 +638,392 @@ function PatisserieLayout({
 }: RecipeCardFullProps) {
   const totalTime = recipe.prepTime + (recipe.cookTime ?? 0);
   const portionsLabel = recipe.servings === 1 ? "Stück" : "Stücke";
+  const stueckSing = "Stück";
+  const grouped = groupIngredients(recipe.ingredients);
+  const micros = (recipe.nutrition?.micros ?? []).slice(0, 8);
+  const showStory =
+    recipe.ingredients.length <= 10 && Boolean(recipe.description?.trim());
+
   return (
     <article
-      className="mx-auto w-full max-w-[860px] overflow-hidden rounded-[var(--radius-card)] border"
-      style={{
-        ...baseShellStyle(pack, brand),
-        background: pack.mood.background,
-      }}
+      className="mx-auto w-full max-w-[920px] overflow-hidden rounded-[var(--radius-card)] border"
+      style={baseShellStyle(pack, brand)}
     >
-      <div className="grid grid-cols-1 gap-8 px-10 pt-12 pb-8 lg:grid-cols-[1.3fr_1fr] lg:gap-12">
-        <div className="flex flex-col gap-5">
-          <span
-            className="font-mono text-[11px] font-semibold uppercase tracking-[0.22em]"
-            style={{ color: pack.mood.inkSoft }}
-          >
-            {pack.title}
-          </span>
-          <h1
-            className="font-display text-[60px] italic leading-[0.95] tracking-[-0.01em] sm:text-[72px]"
-            style={{ color: pack.mood.ink }}
-          >
-            {recipe.title}
-          </h1>
-          <p
-            className="font-display text-[22px] italic leading-snug"
-            style={{ color: pack.mood.inkSoft }}
-          >
-            «&nbsp;{recipe.subtitle}&nbsp;»
-          </p>
-          <div
-            className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[12px]"
-            style={{ color: pack.mood.inkSoft }}
-          >
-            <span>{totalTime} Minuten</span>
-            <span>·</span>
-            <span>ergibt {recipe.servings} {portionsLabel}</span>
-            <span>·</span>
-            <span>{recipe.difficulty}</span>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr]">
+        {/* ─── LEFT: LAVENDER SIDEBAR ───────────────────────── */}
+        <aside
+          className="flex flex-col gap-7 px-8 pt-10 pb-8 lg:px-9 lg:pt-12 lg:pb-10"
+          style={{ background: pack.mood.background, color: pack.mood.ink }}
+        >
+          <div className="flex flex-col gap-5">
+            {/* Pack caption + recipe number */}
+            <div className="flex items-baseline justify-between gap-3">
+              <span
+                className="font-mono text-[11px] font-semibold uppercase tracking-[0.22em]"
+                style={{ color: pack.mood.inkSoft }}
+              >
+                {pack.title}
+              </span>
+              <span
+                className="font-display text-[14px] italic"
+                style={{ color: pack.mood.inkSoft }}
+              >
+                {String(recipe.number).padStart(2, "0")} /{" "}
+                {String(totalRecipes).padStart(2, "0")}
+              </span>
+            </div>
 
-        {/* Polaroid image right */}
-        <div className="relative">
+            {/* Title */}
+            <h1
+              className="font-display text-[44px] italic leading-[0.95] tracking-[-0.015em] sm:text-[52px]"
+              style={{ color: pack.mood.ink }}
+            >
+              {recipe.title}
+            </h1>
+            <p
+              className="font-display text-[15px] italic leading-snug"
+              style={{ color: pack.mood.inkSoft }}
+            >
+              «&nbsp;{recipe.subtitle}&nbsp;»
+            </p>
+
+            {/* Polaroid hero */}
+            <div className="relative pt-2">
+              <div
+                className="relative mx-auto aspect-square w-full max-w-[320px] overflow-hidden rounded-md border-[8px] border-white pb-6"
+                style={{
+                  boxShadow:
+                    "0 1px 0 rgba(0,0,0,0.04), 0 22px 40px -16px rgba(0,0,0,0.22)",
+                  transform: "rotate(-2deg)",
+                }}
+              >
+                <div className="relative aspect-square w-full overflow-hidden">
+                  {enriching?.hero ? (
+                    <HeroSkeleton pack={pack} shape="polaroid" />
+                  ) : (
+                    <Image
+                      src={recipe.hero ?? pack.coverImage}
+                      alt={recipe.title}
+                      fill
+                      sizes="(min-width: 1024px) 320px, 80vw"
+                      className="object-cover content-fade-in"
+                      priority
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Mikronährstoffe als vertikale Liste — der visuelle Move
+              gegenüber den anderen 4 Layouts. Pack-Akzent treibt die
+              %-Werte; Skeleton während Gemini noch generiert. */}
+          {enriching?.micros ? (
+            <div className="flex flex-col gap-3 pt-2">
+              <span
+                className="text-[10px] font-semibold uppercase tracking-[0.22em]"
+                style={{ color: pack.mood.accent }}
+              >
+                Reich an
+              </span>
+              <MicrosSkeletonStrip pack={pack} />
+            </div>
+          ) : micros.length > 0 ? (
+            <div className="flex flex-col gap-2 pt-2">
+              <span
+                className="text-[10px] font-semibold uppercase tracking-[0.22em]"
+                style={{ color: pack.mood.accent }}
+              >
+                Reich an
+              </span>
+              <ul className="flex flex-col">
+                {micros.map((m) => (
+                  <li
+                    key={m.name}
+                    className="flex items-center gap-3 border-b py-1.5 text-[12px]"
+                    style={{ borderColor: pack.mood.ink + "1f" }}
+                  >
+                    <span
+                      className="flex-1 font-medium"
+                      style={{ color: pack.mood.ink }}
+                    >
+                      {m.name}
+                    </span>
+                    <span
+                      className="text-[10.5px]"
+                      style={{ color: pack.mood.inkSoft }}
+                    >
+                      {m.amount}
+                    </span>
+                    {typeof m.pctDaily === "number" ? (
+                      <span
+                        className="font-display w-10 text-right text-[14px] italic"
+                        style={{ color: pack.mood.ink }}
+                      >
+                        {Math.min(Math.max(m.pctDaily, 0), 100)}%
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {/* Author block: Bienes Avatar im Lila-Rim-Kreis statt
+              Bienen-Emoji. Schließt die Sidebar visuell. */}
           <div
-            className="relative mx-auto aspect-square w-full max-w-[280px] overflow-hidden rounded-3xl border-8 border-white"
-            style={{
-              boxShadow:
-                "0 1px 0 rgba(0,0,0,0.04), 0 22px 40px -16px rgba(0,0,0,0.22)",
-              transform: "rotate(-2deg)",
-            }}
+            className="flex items-center gap-3 border-t pt-5"
+            style={{ borderColor: pack.mood.accent + "55" }}
           >
-            {enriching?.hero ? (
-              <HeroSkeleton pack={pack} shape="polaroid" />
-            ) : (
+            <span
+              className="relative inline-block size-11 overflow-hidden rounded-full border-[1.5px]"
+              style={{ borderColor: pack.mood.accent }}
+            >
               <Image
-                src={recipe.hero ?? pack.coverImage}
-                alt={recipe.title}
+                src={brand.avatar}
+                alt={brand.name}
                 fill
-                sizes="280px"
-                className="object-cover content-fade-in"
-                priority
+                sizes="44px"
+                className="object-cover"
               />
-            )}
+            </span>
+            <div className="flex flex-1 flex-col leading-tight">
+              <span
+                className="font-display text-[15px] italic"
+                style={{ color: pack.mood.ink }}
+              >
+                {brand.signature}
+              </span>
+              <span
+                className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+                style={{ color: pack.mood.inkSoft }}
+              >
+                {brand.handle}
+              </span>
+            </div>
+          </div>
+
+          {/* Reel-Link-Card — im Web kein QR (User scannt sich nicht
+              selbst), sondern direkter Link zum Original-Reel. Im PDF
+              wird dieselbe Stelle als QR-Stempel gerendert. */}
+          {recipe.sourceUrl ? (
+            <a
+              href={recipe.sourceUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="flex items-center gap-3 rounded-md border p-3 transition-opacity hover:opacity-90"
+              style={{
+                background: pack.mood.accent + "1f",
+                borderColor: pack.mood.accent + "33",
+              }}
+            >
+              <span
+                className="grid size-10 place-items-center rounded-md bg-white"
+                style={{ color: pack.mood.ink }}
+                aria-hidden
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <rect
+                    x="3.5"
+                    y="3.5"
+                    width="17"
+                    height="17"
+                    rx="4.5"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  />
+                  <path
+                    d="M10 8.5v7l6-3.5-6-3.5Z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </span>
+              <span className="flex flex-1 flex-col leading-tight">
+                <span
+                  className="font-display text-[13px] italic"
+                  style={{ color: pack.mood.ink }}
+                >
+                  {recipe.sourceLabel ?? "Original-Reel ansehen"}
+                </span>
+                <span
+                  className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+                  style={{ color: pack.mood.inkSoft }}
+                >
+                  Im PDF als QR-Code
+                </span>
+              </span>
+            </a>
+          ) : null}
+        </aside>
+
+        {/* ─── RIGHT: CREAM BODY ────────────────────────────── */}
+        <div
+          className="flex flex-col gap-6 px-8 pt-10 pb-10 lg:px-10 lg:pt-12 lg:pb-12"
+          style={{ background: brand.tokens.surface, color: pack.mood.ink }}
+        >
+          {/* Stats strip top */}
+          <div
+            className="flex flex-wrap items-baseline gap-x-5 gap-y-2 border-b pb-4"
+            style={{ borderColor: pack.mood.ink + "1a" }}
+          >
+            <span className="flex items-baseline gap-1">
+              <span
+                className="font-display text-[22px] italic tracking-tight"
+                style={{ color: pack.mood.ink }}
+              >
+                {totalTime}
+              </span>
+              <span
+                className="text-[11px]"
+                style={{ color: pack.mood.inkSoft }}
+              >
+                Min
+              </span>
+            </span>
+            <span
+              className="text-[11px] opacity-50"
+              style={{ color: pack.mood.inkSoft }}
+            >
+              ·
+            </span>
+            <span className="flex items-baseline gap-1">
+              <span
+                className="font-display text-[22px] italic tracking-tight"
+                style={{ color: pack.mood.ink }}
+              >
+                {recipe.servings}
+              </span>
+              <span
+                className="text-[11px]"
+                style={{ color: pack.mood.inkSoft }}
+              >
+                {portionsLabel}
+              </span>
+            </span>
+            <span
+              className="text-[11px] opacity-50"
+              style={{ color: pack.mood.inkSoft }}
+            >
+              ·
+            </span>
+            <span
+              className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+              style={{ color: pack.mood.inkSoft }}
+            >
+              {recipe.difficulty}
+            </span>
+            <span
+              className="ml-auto flex items-baseline gap-1"
+              style={{ color: pack.mood.ink }}
+            >
+              <span
+                className="font-display text-[22px] tracking-tight"
+                style={{ color: pack.mood.ink }}
+              >
+                {recipe.nutrition.kcal}
+              </span>
+              <span
+                className="text-[11px]"
+                style={{ color: pack.mood.inkSoft }}
+              >
+                kcal {nutritionBasisInline(recipe.nutritionBasis)}
+              </span>
+            </span>
+          </div>
+
+          {/* Macros pills */}
+          <div className="flex flex-wrap gap-2">
+            {[
+              { label: "Eiweiß", value: `${recipe.nutrition.protein}g` },
+              { label: "Kohlenhydrate", value: `${recipe.nutrition.carbs}g` },
+              { label: "Fett", value: `${recipe.nutrition.fat}g` },
+            ].map((m) => (
+              <span
+                key={m.label}
+                className="inline-flex items-baseline gap-1.5 rounded-full px-3 py-1.5"
+                style={{
+                  background: pack.mood.background + "80",
+                  color: pack.mood.ink,
+                }}
+              >
+                <span className="font-display text-[14px] italic">
+                  {m.value}
+                </span>
+                <span
+                  className="text-[11px]"
+                  style={{ color: pack.mood.inkSoft }}
+                >
+                  {m.label}
+                </span>
+              </span>
+            ))}
+          </div>
+
+          {/* Bienes Story */}
+          {showStory ? (
+            <p
+              className="border-l-[3px] pl-4 font-display text-[15px] italic leading-relaxed"
+              style={{
+                borderColor: pack.mood.accent,
+                color: pack.mood.ink,
+              }}
+            >
+              {recipe.description}
+            </p>
+          ) : null}
+
+          {/* MAN NEHME */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-baseline justify-between">
+              <h2
+                className="font-display text-[20px] italic tracking-tight"
+                style={{ color: pack.mood.ink }}
+              >
+                Man nehme
+              </h2>
+              <span
+                className="text-[11px] font-semibold uppercase tracking-[0.18em]"
+                style={{ color: pack.mood.inkSoft }}
+              >
+                für {recipe.servings} {portionsLabel}
+              </span>
+            </div>
+            <SectionList
+              recipe={recipe}
+              pack={pack}
+              kind="ingredients"
+              headerStyle="italic"
+              hideHeader
+              groupedOverride={grouped}
+            />
+          </div>
+
+          {/* ZUBEREITUNG */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-baseline justify-between">
+              <h2
+                className="font-display text-[20px] italic tracking-tight"
+                style={{ color: pack.mood.ink }}
+              >
+                Zubereitung
+              </h2>
+              <span
+                className="text-[11px] font-semibold uppercase tracking-[0.18em]"
+                style={{ color: pack.mood.inkSoft }}
+              >
+                {recipe.steps.length} Schritte
+              </span>
+            </div>
+            <SectionList
+              recipe={recipe}
+              pack={pack}
+              kind="steps"
+              headerStyle="italic"
+              hideHeader
+            />
           </div>
         </div>
       </div>
-
-      {/* Macros as elegant pill row — explicit "pro Stück" */}
-      <MacrosBlock
-        recipe={recipe}
-        pack={pack}
-        variant="pills"
-        perPortionLabel={nutritionBasisInline(recipe.nutritionBasis)}
-      />
-
-      {/* Body */}
-      <div
-        className="grid grid-cols-1 gap-10 px-10 pt-10 pb-10 lg:grid-cols-[1fr_1.4fr] lg:gap-14"
-        style={{ background: brand.tokens.surface }}
-      >
-        <SectionList
-          recipe={recipe}
-          pack={pack}
-          kind="ingredients"
-          headerStyle="italic"
-        />
-        <SectionList
-          recipe={recipe}
-          pack={pack}
-          kind="steps"
-          headerStyle="italic"
-        />
-      </div>
-
-      <CardFooter
-        brand={brand}
-        pack={pack}
-        recipe={recipe}
-        italic
-        enriching={enriching}
-      />
     </article>
   );
 }
@@ -1518,6 +1815,8 @@ function SectionList({
   minimal,
   bold,
   checklist,
+  hideHeader,
+  groupedOverride,
 }: {
   recipe: Recipe;
   pack: Pack;
@@ -1526,23 +1825,36 @@ function SectionList({
   minimal?: boolean;
   bold?: boolean;
   checklist?: boolean;
+  // When the parent layout already renders its own heading row (Patisserie
+  // does — its heading sits in a flex row with a meta-label), skip the
+  // default <h2> so we don't end up with the same title twice.
+  hideHeader?: boolean;
+  // Override the grouped-ingredient computation. Patisserie's parent
+  // computes `grouped` once and passes it in to keep parent + child in
+  // sync (e.g. when both branches need access to the same group order).
+  // Other layouts can leave this undefined and SectionList groups itself.
+  groupedOverride?: IngredientGroup[];
 }) {
   const isIngredients = kind === "ingredients";
   const heading = isIngredients ? "Man nehme" : "Zubereitung";
+  const ingredientGroups =
+    groupedOverride ?? groupIngredients(recipe.ingredients);
 
   return (
     <div className="flex flex-col gap-4">
-      <h2
-        className={`text-[12px] font-semibold uppercase tracking-[0.22em] ${
-          headerStyle === "italic" ? "italic" : ""
-        }`}
-        style={{ color: pack.mood.accent }}
-      >
-        {heading}
-      </h2>
+      {hideHeader ? null : (
+        <h2
+          className={`text-[12px] font-semibold uppercase tracking-[0.22em] ${
+            headerStyle === "italic" ? "italic" : ""
+          }`}
+          style={{ color: pack.mood.accent }}
+        >
+          {heading}
+        </h2>
+      )}
       {isIngredients ? (
         <ul className="flex flex-col">
-          {groupIngredients(recipe.ingredients).map((group, gIdx) => (
+          {ingredientGroups.map((group, gIdx) => (
             <li key={`g-${gIdx}`} className="contents">
               {group.name ? (
                 <li
