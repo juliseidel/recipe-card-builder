@@ -22,8 +22,53 @@
   --radius-card: 1.5rem;
   --radius-pill: 999px;
   --shadow-card: 0 1px 0 rgba(26, 18, 11, 0.04), 0 12px 28px -16px rgba(26, 18, 11, 0.12);
-  --shadow-card-hover: 0 1px 0 rgba(26, 18, 11, 0.05), 0 24px 48px -20px rgba(26, 18, 11, 0.22);
+  --shadow-card-hover:
+    0 1px 0 rgba(26, 18, 11, 0.06),
+    0 4px 12px -4px rgba(26, 18, 11, 0.08),
+    0 28px 56px -22px rgba(26, 18, 11, 0.28);
   --shadow-soft: 0 1px 0 rgba(26, 18, 11, 0.04), 0 4px 14px -4px rgba(26, 18, 11, 0.08);
+
+  /* Easings — cubic-bezier-Kurven die natuerlicher wirken als die
+     CSS-Default-"ease". Linear-out + slight overshoot fuer Hover-Lifts,
+     ease-out fuer Page-Reveal-Animationen, schnelles ease-in fuer
+     Buttons + Form-Feedback. */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-back: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-in-soft: cubic-bezier(0.55, 0, 0.55, 0.2);
+}
+
+/* View Transitions API — aktiviert automatisches Cross-Fade zwischen
+   Pages bei Navigation. Chrome/Edge/Safari supporten das nativ; Firefox
+   faellt graceful auf instant Navigation zurueck (kein JS-Fallback
+   noetig). Drei Page-spezifische Names damit Pack-Cards von Workspace
+   zu Pack-Detail morphen statt nur cross-fade. */
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.32s;
+  animation-timing-function: var(--ease-out-soft);
+}
+
+/* Reduced-motion respect — wer prefers-reduced-motion aktiviert hat,
+   bekommt keine Page-Transitions und keine Hover-Lifts. Pflicht fuer
+   Accessibility, kostet uns nichts an Polish weil Transitions als
+   Enhancement gedacht sind. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 :root {
@@ -122,7 +167,7 @@ body {
   padding: 0.7rem 0.95rem;
   font-size: 14px;
   color: var(--color-ink);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  transition: border-color 0.22s var(--ease-out-soft), box-shadow 0.22s var(--ease-out-soft), background 0.22s var(--ease-out-soft);
   width: 100%;
 }
 
@@ -154,7 +199,7 @@ body {
   color: var(--color-ink);
   border: 1px solid var(--color-line);
   cursor: pointer;
-  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  transition: transform 0.18s var(--ease-out-back), background 0.18s var(--ease-out-soft), border-color 0.18s var(--ease-out-soft);
 }
 
 .editor-chip:hover {
@@ -177,7 +222,7 @@ body {
   padding: 0.55rem 1.1rem;
   font-weight: 600;
   font-size: 13px;
-  transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  transition: transform 0.2s var(--ease-out-back), box-shadow 0.22s var(--ease-out-soft), opacity 0.2s var(--ease-out-soft);
   cursor: pointer;
 }
 
