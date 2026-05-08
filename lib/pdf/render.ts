@@ -5,6 +5,7 @@ import type { Recipe } from "@/lib/recipes";
 import { ensureFontsRegistered } from "./fonts";
 import { loadImageAsDataUri } from "./assets";
 import { generateQrDataUri } from "./qr";
+import { getPackForeword } from "@/lib/pack-forewords";
 import { RecipePdfDocument } from "./recipe-pdf";
 import { PackPdfDocument } from "./pack-pdf";
 
@@ -51,19 +52,37 @@ export async function renderPackPdf(args: {
   args.onProgress?.("loading-cover", 8);
   const coverDataUri = await loadImageAsDataUri(args.pack.coverImage);
 
+  // Foreword assets: only loaded when the pack has a cached foreword.
+  // The other four packs (no foreword cached yet) skip loading entirely
+  // and render exactly as they did before — same image fetches, same
+  // page sequence, no behaviour change.
+  const forewordContent = getPackForeword(args.pack.slug);
+  const forewordPaths = forewordContent
+    ? {
+        image: `/brands/${args.brand.slug}/forewords/${args.pack.slug}.jpg`,
+        avatar: args.brand.avatar,
+      }
+    : null;
+
   args.onProgress?.("loading-recipe-images", 20);
-  // Hero images and QR codes are independent — fan them out together so the
-  // total wall-clock is `max(slowest hero, slowest QR)` rather than their
-  // sum. QRs are CPU-bound (a few ms each); heroes are I/O-bound (storage
-  // fetch + base64). At 10 recipes the difference is ~80 ms saved.
-  const [heroDataUris, qrDataUris] = await Promise.all([
-    Promise.all(
-      args.recipes.map((r) =>
-        loadImageAsDataUri(r.hero ?? args.pack.coverImage)
-      )
-    ),
-    Promise.all(args.recipes.map((r) => generateQrDataUri(r.sourceUrl))),
-  ]);
+  // Hero images, QR codes, and (optionally) foreword assets fan out
+  // together. Doing them in parallel keeps total wall-clock time as
+  // close as possible to the slowest single load.
+  const [heroDataUris, qrDataUris, forewordImageDataUri, avatarDataUri] =
+    await Promise.all([
+      Promise.all(
+        args.recipes.map((r) =>
+          loadImageAsDataUri(r.hero ?? args.pack.coverImage)
+        )
+      ),
+      Promise.all(args.recipes.map((r) => generateQrDataUri(r.sourceUrl))),
+      forewordPaths
+        ? loadImageAsDataUri(forewordPaths.image)
+        : Promise.resolve(null),
+      forewordPaths
+        ? loadImageAsDataUri(forewordPaths.avatar)
+        : Promise.resolve(null),
+    ]);
 
   args.onProgress?.("rendering", 55);
   const buf = await renderToBuffer(
@@ -74,6 +93,9 @@ export async function renderPackPdf(args: {
       coverDataUri,
       heroDataUris,
       qrDataUris,
+      forewordContent,
+      forewordImageDataUri,
+      avatarDataUri,
     })
   );
   args.onProgress?.("done", 100);
