@@ -80,11 +80,13 @@ export function PackCard({ pack, brand, customPackId }: PackCardProps) {
   return (
     <Link
       href={`/${brand.slug}/${pack.slug}`}
-      className="group relative flex flex-col overflow-hidden rounded-[var(--radius-card)] transition-all duration-300 hover:-translate-y-2 hover:shadow-[var(--shadow-card-hover)]"
+      className="group relative flex flex-col overflow-hidden rounded-[var(--radius-card)] hover:-translate-y-[6px] hover:shadow-[var(--shadow-card-hover)]"
       style={{
         background: pack.mood.background,
         color: pack.mood.ink,
         boxShadow: "var(--shadow-card)",
+        transition:
+          "transform 0.42s var(--ease-out-soft), box-shadow 0.42s var(--ease-out-soft)",
       }}
     >
       {/* Top row: pack number + recipe-count badge + optional delete */}
@@ -151,15 +153,24 @@ export function PackCard({ pack, brand, customPackId }: PackCardProps) {
 
       {/* Hero image — falls back to a shimmer skeleton while a custom pack
           waits for its Flux-generated cover. The client-side image polls
-          Supabase every 4s until the cover lands, then fades in. */}
+          Supabase every 4s until the cover lands, then fades in. Beim
+          Hover zoomt das Bild dezent (1.04×) — verstaerkt das Lift-
+          Gefuehl der Card ohne aufdringlich zu sein. */}
       <div className="relative mx-6 mt-4 aspect-[4/3.4] overflow-hidden rounded-2xl">
-        <PackCardCoverImage
-          pack={pack}
-          brandSlug={brand.slug}
-          alt={`${pack.title} – ${pack.tagline}`}
-          sizes="(min-width: 1280px) 420px, (min-width: 768px) 50vw, 100vw"
-          pollWhenEmpty={!pack.coverImage}
-        />
+        <div
+          className="absolute inset-0 group-hover:scale-[1.045]"
+          style={{
+            transition: "transform 0.6s var(--ease-out-soft)",
+          }}
+        >
+          <PackCardCoverImage
+            pack={pack}
+            brandSlug={brand.slug}
+            alt={`${pack.title} – ${pack.tagline}`}
+            sizes="(min-width: 1280px) 420px, (min-width: 768px) 50vw, 100vw"
+            pollWhenEmpty={!pack.coverImage}
+          />
+        </div>
       </div>
 
       {/* Text body */}
