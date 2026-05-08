@@ -673,9 +673,22 @@ function PatisserieLayout({
               </span>
             </div>
 
-            {/* Title */}
+            {/* Title — dynamische Schriftgroesse + break-words +
+                hyphens:auto, damit zusammengesetzte Substantive wie
+                "KI-Süsskartoffel-Muffins" in der schmalen Sidebar nicht
+                am Rand abgeschnitten werden. Mirror der PDF-Logic. */}
             <h1
-              className="font-display text-[44px] italic leading-[0.95] tracking-[-0.015em] sm:text-[52px]"
+              className={[
+                "font-display italic tracking-[-0.015em]",
+                "leading-[1.02] break-words [hyphens:auto]",
+                recipe.title.length <= 18
+                  ? "text-[44px] sm:text-[52px]"
+                  : recipe.title.length <= 24
+                    ? "text-[36px] sm:text-[44px]"
+                    : recipe.title.length <= 30
+                      ? "text-[30px] sm:text-[36px]"
+                      : "text-[24px] sm:text-[28px]",
+              ].join(" ")}
               style={{ color: pack.mood.ink }}
             >
               {recipe.title}
