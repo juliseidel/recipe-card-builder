@@ -23,7 +23,7 @@ export const layoutPresets: LayoutPreset[] = [
     id: "patisserie",
     title: "Patisserie",
     description:
-      "Boutique-Bäckerei: italic Display-Font, Polaroid-Foto rechts mit -2°-Drehung, Macros als elegante Pills.",
+      "Magazin-Spread: linke Sidebar in Mood-Farbe mit italic Display-Title, Polaroid-Foto, Mikronährstoffen vertikal und Avatar-Anker. Rechte Cream-Spalte mit Stats, Macro-Pills und Rezept-Body.",
     bestFor: "Backwaren, süße Desserts, anrichten-fokussierte Karten",
   },
   {
