@@ -3029,6 +3029,15 @@ function IngredientRow({
   const amountW = compact ? 38 : 50;
   const nameFont = nameFontSize ?? (compact ? 8.5 : 9.5);
   const noteFont = noteFontSize ?? (compact ? 6.5 : 7);
+  // Name + Note werden in EINEM Text-Element gerendert mit nested
+  // <Text> fuer die italic Note. Vorher waren das zwei separate
+  // <Text>-Elemente in einer flex-View — @react-pdf hat die Hoehe der
+  // Inner-View dann nicht zuverlaessig berechnet, was zur sichtbaren
+  // Ueberlappung von Name und Note fuehrte (bei Pack 3 Zimt-Streuseltaler
+  // lagen "Pflaumen" und "oder Obst nach Wahl" auf derselben Zeile).
+  // Mit dem nested Text + erzwungenem \n rendert @react-pdf den Note
+  // verlaesslich auf einer neuen Zeile innerhalb desselben Text-Blocks
+  // und reserviert die Hoehe korrekt.
   return (
     <View
       style={{
@@ -3037,6 +3046,7 @@ function IngredientRow({
         borderBottomColor: withAlpha(theme.ink, 0.08),
         paddingVertical: padV,
         gap: 5,
+        alignItems: "flex-start",
       }}
     >
       <Text
@@ -3045,36 +3055,38 @@ function IngredientRow({
           color: theme.inkSoft,
           width: amountW,
           fontWeight: bold ? 600 : 400,
+          paddingTop: 1,
         }}
       >
         {ing.amount}
       </Text>
-      <View style={{ flex: 1 }}>
-        <Text
-          style={{
-            fontSize: nameFont,
-            lineHeight: 1.3,
-            color: theme.ink,
-            fontWeight: bold ? 600 : 400,
-          }}
-        >
-          {checklist ? <Text style={{ color: theme.inkSubtle }}>☐ </Text> : null}
-          {ing.name}
-        </Text>
+      <Text
+        style={{
+          flex: 1,
+          fontSize: nameFont,
+          lineHeight: 1.3,
+          color: theme.ink,
+          fontWeight: bold ? 600 : 400,
+        }}
+      >
+        {checklist ? (
+          <Text style={{ color: theme.inkSubtle }}>☐ </Text>
+        ) : null}
+        {ing.name}
         {ing.note ? (
           <Text
             style={{
               fontSize: noteFont,
               fontStyle: "italic",
               color: theme.inkSoft,
-              lineHeight: 1.35,
-              marginTop: 1.5,
+              fontWeight: 400,
             }}
           >
+            {"\n"}
             {ing.note}
           </Text>
         ) : null}
-      </View>
+      </Text>
     </View>
   );
 }
