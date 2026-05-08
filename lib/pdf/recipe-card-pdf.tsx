@@ -1508,14 +1508,17 @@ function MinimalPage({
           style={{
             flex: 1,
             flexDirection: "row",
-            gap: 28,
+            gap: 24,
             paddingHorizontal: 36,
             paddingTop: 18,
             paddingBottom: 14,
           }}
         >
-          {/* MAN NEHME */}
-          <View style={{ width: 200 }}>
+          {/* MAN NEHME — 230 pt fuer komfortablen Platz fuer lange
+              Zutaten-Namen ("MORE Chunky Vanilla Perfection") plus
+              italic Notes ("oder Obst nach Wahl") ohne dass der Text
+              an der Spalten-Grenze umbricht und kollabiert. */}
+          <View style={{ width: 230 }}>
             <Text
               style={{
                 fontSize: 9,
@@ -2920,20 +2923,23 @@ function IngredientsList({
     <View style={{ marginTop: 8 }}>
       {grouped.map((g, gi) => {
         // Sub-group separation: bei nicht-erstem Group brauchen wir
-        // sichtbaren Abstand zur vorherigen Group, sonst stoesst der
-        // Sub-Group-Header an die letzte Item-Note der vorigen Group
-        // (gerade in Pack 3 mit "Fuer Teig"/"Fuer Topping"/"Fuer Streusel"
-        // und Notes wie "oder Obst nach Wahl" haben wir Ueberlapp gesehen).
+        // klar sichtbaren Abstand zur vorherigen Group, sonst stoesst
+        // der Sub-Group-Header an den letzten Note der vorigen Group
+        // (Pack 3 mit "Fuer Teig"/"Fuer Topping"/"Fuer Streusel" + Notes
+        // wie "oder Obst nach Wahl" und "gerne grosszuegig" hatte das
+        // Problem). 14 pt paddingTop + 14 pt marginBottom = 28 pt klare
+        // Trennung zwischen jedem Group-Block — dazu noch eine duenne
+        // Akzent-Linie als visueller Separator.
         const isFirstGroup = gi === 0;
         const isNamedGroup = Boolean(g.name);
         return (
           <View
             key={g.name ?? `m${gi}`}
             style={{
-              marginBottom: 8,
-              // Header braucht Atemraum oben — bei der ersten Group nicht
-              // noetig, danach verlaesslich extra padding-top.
-              paddingTop: !isFirstGroup && isNamedGroup ? 10 : 0,
+              marginBottom: gi === grouped.length - 1 ? 0 : 14,
+              paddingTop: !isFirstGroup && isNamedGroup ? 14 : 0,
+              borderTopWidth: !isFirstGroup && isNamedGroup ? 0.6 : 0,
+              borderTopColor: withAlpha(theme.accent, 0.35),
             }}
           >
             {g.name ? (
@@ -2943,7 +2949,7 @@ function IngredientsList({
                   letterSpacing: 1.4,
                   fontWeight: 700,
                   color: theme.accent,
-                  marginBottom: 6,
+                  marginBottom: 8,
                   textTransform: "uppercase",
                 }}
               >
@@ -3023,12 +3029,18 @@ function IngredientRow({
   noteFontSize?: number;
 }) {
   // Density overrides take precedence; legacy `compact` boolean kept for
-  // any callers that haven't migrated yet.
-  const padV = rowPadV ?? (compact ? 2.5 : 3.5);
-  const amountFont = compact ? 7 : 7.5;
-  const amountW = compact ? 38 : 50;
-  const nameFont = nameFontSize ?? (compact ? 8.5 : 9.5);
-  const noteFont = noteFontSize ?? (compact ? 6.5 : 7);
+  // any callers that haven't migrated yet. Werte hier so gewaehlt, dass
+  // jede Row mindestens genug vertikalen Atemraum hat um einen 2-zeiligen
+  // Notes-Text aufzunehmen ohne in die naechste Row zu rutschen — auch
+  // bei compact density. Amount-Spalte 50 pt damit Werte wie "1 Prise",
+  // "2-3 EL", "1 Pck" oder "100 ml" nicht selber wrappen und damit zwei
+  // Zeilen erzwingen, die dann mit dem Note-Text der gleichen Row
+  // kollidieren wuerden.
+  const padV = rowPadV ?? (compact ? 3.5 : 4.5);
+  const amountFont = compact ? 7.5 : 8;
+  const amountW = compact ? 46 : 54;
+  const nameFont = nameFontSize ?? (compact ? 9 : 9.5);
+  const noteFont = noteFontSize ?? (compact ? 7 : 7.5);
   // Name + Note werden in EINEM Text-Element gerendert mit nested
   // <Text> fuer die italic Note. Vorher waren das zwei separate
   // <Text>-Elemente in einer flex-View — @react-pdf hat die Hoehe der
