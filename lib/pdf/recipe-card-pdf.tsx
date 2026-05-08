@@ -1218,6 +1218,19 @@ const MINIMAL_DENSITY: Record<
   },
 };
 
+// ─── Cookbook-Cover layout for Pack 3 (Bienes Snacks) ──────────────────────
+// Komplett anderer Move als die anderen vier Layouts: Hero-Bild fuellt
+// die obere Haelfte als Cookbook-Cover (full-bleed, ~380 pt), Title als
+// Mega-Display-Overlay unten links auf dem Bild, Pack-Caption oben
+// links, Avatar als runder Stempel rechts. Darunter: Apple-Spec-Strip
+// (Mint-Tile mit kcal/Eiweiss/Fett/Zeit/Stueck), Body in 2 Spalten,
+// Mikros als horizontale Capsule-Pills. Footer mit Avatar + Signature +
+// Mint-getoentem QR-Stempel.
+//
+// Title-Sicherheit von Anfang an: dynamische Schriftgroesse je Laenge,
+// damit "Frozen Coconut & Strawberry Cups" (32 chars) genauso passt wie
+// "Marzipankartoffeln" (18 chars). Kein Auto-Page-Break — wrap={false}
+// auf den Page-Wrapper plus Density-aware Skala der Body-Spalten.
 function MinimalPage({
   brand,
   pack,
@@ -1225,222 +1238,526 @@ function MinimalPage({
   totalRecipes,
   heroDataUri,
   qrDataUri,
+  avatarDataUri,
 }: RecipeCardPdfProps) {
   const t = packTheme(pack);
   const time = totalTime(recipe);
   const pl = recipe.servings === 1 ? "Portion" : "Stücke";
+  const stueckSing = recipe.servings === 1 ? "Portion" : "Stück";
   const density = getDensity(recipe);
   const d = MINIMAL_DENSITY[density];
+  const grouped = groupIngredients(recipe.ingredients);
+
+  // Hero-Title-Skala: Bold Inter-Tight, weiss auf Hero-Bild. Schmale
+  // Zeichen-Zaehler-Steps damit auch zusammengesetzte Substantive
+  // ("Frozen Coconut & Strawberry Cups") immer in 2 Zeilen passen.
+  const titleLen = recipe.title.length;
+  const heroTitleSize =
+    titleLen <= 18
+      ? 56
+      : titleLen <= 24
+        ? 46
+        : titleLen <= 32
+          ? 38
+          : titleLen <= 40
+            ? 32
+            : 26;
+
+  // Hero ist 380 pt hoch — full-bleed, mit dunklem Gradient unten damit
+  // die Title-Overlay sicher lesbar bleibt egal wie hell das Hero-Bild
+  // gerade ist. Der Gradient ist als zwei gestapelte Views simuliert
+  // weil @react-pdf keinen CSS-Gradient unterstuetzt.
+  const HERO_HEIGHT = 360;
+
+  // Mikros-Limit density-aware — bei langen Snacks (selten in Pack 3,
+  // aber moeglich bei Custom-Packs mit minimal Layout) bekommt der
+  // Mikros-Strip weniger Pills.
+  const microsLimit =
+    density === "compact" ? 5 : density === "balanced" ? 7 : 9;
+  const micros = (recipe.nutrition?.micros ?? []).slice(0, microsLimit);
 
   return (
     <Page
       size="A4"
       style={{ backgroundColor: "#ffffff", fontFamily: "Inter", color: t.ink }}
     >
-      <View
-        style={{
-          flexDirection: "row",
-          paddingHorizontal: 36,
-          paddingTop: d.headPadTop,
-          paddingBottom: d.headPadBottom,
-          gap: 20,
-        }}
-        wrap={false}
-      >
-        <View style={{ flex: 1.5 }}>
-          <Text
-            style={{
-              fontSize: 7.5,
-              letterSpacing: 1.6,
-              fontWeight: 600,
-              color: t.inkSoft,
-            }}
-          >
-            {pack.title.toUpperCase()}
-          </Text>
-          <Text
-            style={{
-              fontFamily: "Fraunces",
-              fontSize: d.bigNumberFontSize,
-              color: t.accent,
-              lineHeight: 0.86,
-              marginTop: 10,
-              letterSpacing: -1.5,
-            }}
-          >
-            {pad2(recipe.number)}
-          </Text>
-          <Text
-            style={{
-              fontSize: d.titleFontSize,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: -0.4,
-              color: t.ink,
-              marginTop: 12,
-              lineHeight: 1.02,
-            }}
-          >
-            {recipe.title}
-          </Text>
-          <Text
-            style={{
-              fontSize: d.subtitleFontSize,
-              color: t.inkSoft,
-              marginTop: 4,
-              lineHeight: 1.35,
-            }}
-          >
-            {recipe.subtitle}
-          </Text>
-          <Text
-            style={{
-              fontSize: 8.5,
-              fontWeight: 600,
-              letterSpacing: 1.2,
-              color: t.accent,
-              marginTop: 8,
-              textTransform: "uppercase",
-            }}
-          >
-            ergibt {recipe.servings} {pl} · {time} Min
-          </Text>
-        </View>
-
-        <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, flexDirection: "column" }} wrap={false}>
+        {/* ─── HERO ──────────────────────────────────────────────────── */}
+        <View
+          style={{
+            position: "relative",
+            width: "100%",
+            height: HERO_HEIGHT,
+            backgroundColor: blendWithWhite(t.bg, 0.7),
+          }}
+        >
           {heroDataUri ? (
+            <Image
+              src={heroDataUri}
+              style={{
+                width: "100%",
+                height: HERO_HEIGHT,
+                objectFit: "cover",
+              }}
+            />
+          ) : null}
+
+          {/* Dunkler Gradient unten — Image-overlay-Approximation, gibt
+              dem weissen Title-Overlay sicheren Kontrast. */}
+          <View
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: HERO_HEIGHT * 0.55,
+              backgroundColor: "rgba(0, 0, 0, 0.32)",
+            }}
+          />
+
+          {/* Top strip — Pack-Caption + Recipe-Number, weiss */}
+          <View
+            style={{
+              position: "absolute",
+              top: 28,
+              left: 36,
+              right: 36,
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 8.5,
+                fontWeight: 700,
+                letterSpacing: 2.2,
+                color: "#ffffff",
+                textTransform: "uppercase",
+              }}
+            >
+              {pack.title}
+            </Text>
+            <Text
+              style={{
+                fontSize: 9,
+                fontWeight: 600,
+                letterSpacing: 1.4,
+                color: "#ffffff",
+                textTransform: "uppercase",
+              }}
+            >
+              Rezept {pad2(recipe.number)} / {pad2(totalRecipes)}
+            </Text>
+          </View>
+
+          {/* Avatar Stempel rechts unten auf dem Hero — Mint-Border, der
+              "echte Biene"-Anker. */}
+          {avatarDataUri ? (
             <View
               style={{
-                borderRadius: 10,
+                position: "absolute",
+                bottom: 26,
+                right: 36,
+                width: 56,
+                height: 56,
+                borderRadius: 28,
                 overflow: "hidden",
-                width: 150,
-                height: 150,
-                alignSelf: "flex-end",
+                borderWidth: 2.5,
+                borderColor: "#ffffff",
               }}
             >
               <Image
-                src={heroDataUri}
-                style={{ width: 150, height: 150, objectFit: "cover" }}
+                src={avatarDataUri}
+                style={{ width: 51, height: 51, objectFit: "cover" }}
               />
             </View>
           ) : null}
+
+          {/* Title overlay unten links — Bold Inter-Tight, weiss */}
           <View
             style={{
-              flexDirection: "row",
-              marginTop: 8,
-              borderRadius: 10,
-              borderWidth: 0.5,
-              borderColor: withAlpha(t.ink, 0.1),
-              backgroundColor: blendWithWhite(t.bg, 0.5),
-              paddingVertical: 10,
-              alignSelf: "flex-end",
-              width: 150,
+              position: "absolute",
+              left: 36,
+              right: 110,
+              bottom: 32,
             }}
           >
-            <MinStat
-              value={String(recipe.nutrition.kcal)}
-              label="kcal"
-              theme={t}
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: heroTitleSize,
+                fontWeight: 700,
+                letterSpacing: -0.6,
+                lineHeight: 1.02,
+                color: "#ffffff",
+                textTransform: "none",
+              }}
+            >
+              {recipe.title}
+            </Text>
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontStyle: "italic",
+                fontSize: 12,
+                color: "#ffffff",
+                opacity: 0.92,
+                marginTop: 6,
+                lineHeight: 1.35,
+              }}
+            >
+              {recipe.subtitle}
+            </Text>
+          </View>
+        </View>
+
+        {/* ─── SPEC STRIP ────────────────────────────────────────────── */}
+        <View
+          style={{
+            flexDirection: "row",
+            backgroundColor: t.bg,
+            paddingVertical: 12,
+            paddingHorizontal: 36,
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          {[
+            { value: String(recipe.nutrition.kcal), label: `kcal pro ${stueckSing}` },
+            { value: `${recipe.nutrition.protein}g`, label: "Eiweiß" },
+            { value: `${recipe.nutrition.carbs}g`, label: "Kohlenhydrate" },
+            { value: `${recipe.nutrition.fat}g`, label: "Fett" },
+            { value: `${time}`, label: "Min total" },
+            { value: String(recipe.servings), label: pl },
+          ].map((s, i) => (
+            <View
+              key={i}
+              style={{ flexDirection: "column", alignItems: "center", gap: 1 }}
+            >
+              <Text
+                style={{
+                  fontFamily: "Inter",
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: t.ink,
+                  letterSpacing: -0.4,
+                }}
+              >
+                {s.value}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 7,
+                  fontWeight: 600,
+                  letterSpacing: 1.2,
+                  color: t.inkSoft,
+                  textTransform: "uppercase",
+                }}
+              >
+                {s.label}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* ─── BODY: 2 Spalten ───────────────────────────────────────── */}
+        <View
+          style={{
+            flex: 1,
+            flexDirection: "row",
+            gap: 28,
+            paddingHorizontal: 36,
+            paddingTop: 18,
+            paddingBottom: 14,
+          }}
+        >
+          {/* MAN NEHME */}
+          <View style={{ width: 200 }}>
+            <Text
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: 2,
+                color: t.accent,
+                textTransform: "uppercase",
+                marginBottom: 6,
+              }}
+            >
+              Man nehme
+            </Text>
+            <View
+              style={{
+                width: 24,
+                height: 2,
+                backgroundColor: t.accent,
+                marginBottom: 10,
+              }}
             />
-            <MinStat
-              value={`${recipe.nutrition.protein}g`}
-              label="Eiweiß"
+            <IngredientsList
+              grouped={grouped}
               theme={t}
+              rowPadV={d.ingRowPadV}
+              nameFontSize={d.ingFontSize}
+              noteFontSize={d.ingNoteFontSize}
             />
-            <MinStat
-              value={`${recipe.nutrition.fat}g`}
-              label="Fett"
+          </View>
+
+          {/* ZUBEREITUNG */}
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: 2,
+                color: t.accent,
+                textTransform: "uppercase",
+                marginBottom: 6,
+              }}
+            >
+              Zubereitung
+            </Text>
+            <View
+              style={{
+                width: 24,
+                height: 2,
+                backgroundColor: t.accent,
+                marginBottom: 10,
+              }}
+            />
+            <StepsList
+              steps={recipe.steps}
               theme={t}
+              stepMarginBottom={d.stepMarginBottom}
+              stepFontSize={d.stepFontSize}
+              stepNumFontSize={d.stepNumFontSize}
             />
           </View>
         </View>
-      </View>
 
-      {/* BIENES STORY — only for sparse snacks (≤14 score). Most Bienes
-          snacks are short (5–7 ings + 3–5 steps) which leaves the body
-          empty; rendering recipe.description as an editorial pull-quote
-          fills that space with brand-on content. */}
-      {shouldShowStory(recipe) ? (
+        {/* ─── MIKROS-STRIP als Capsule-Pills ────────────────────────── */}
+        {micros.length > 0 ? (
+          <View
+            style={{
+              paddingHorizontal: 36,
+              paddingTop: 12,
+              paddingBottom: 14,
+              backgroundColor: blendWithWhite(t.bg, 0.55),
+              borderTopWidth: 1,
+              borderTopColor: blendWithWhite(t.accent, 0.5),
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "baseline",
+                marginBottom: 7,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 8,
+                  fontWeight: 700,
+                  letterSpacing: 1.8,
+                  color: t.accent,
+                  textTransform: "uppercase",
+                }}
+              >
+                Reich an
+              </Text>
+              <Text
+                style={{
+                  fontSize: 7,
+                  fontWeight: 600,
+                  letterSpacing: 1.2,
+                  color: t.inkSoft,
+                  textTransform: "uppercase",
+                }}
+              >
+                Mikronährstoffe pro {stueckSing} · % Tagesbedarf
+              </Text>
+            </View>
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                gap: 5,
+              }}
+            >
+              {micros.map((m) => (
+                <View
+                  key={m.name}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "baseline",
+                    gap: 4,
+                    paddingHorizontal: 9,
+                    paddingVertical: 4,
+                    backgroundColor: "#ffffff",
+                    borderRadius: 100,
+                    borderWidth: 0.5,
+                    borderColor: blendWithWhite(t.accent, 0.6),
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 8,
+                      fontWeight: 600,
+                      color: t.ink,
+                    }}
+                  >
+                    {m.name}
+                  </Text>
+                  <Text style={{ fontSize: 7.5, color: t.inkSoft }}>
+                    {m.amount}
+                  </Text>
+                  {typeof m.pctDaily === "number" ? (
+                    <Text
+                      style={{
+                        fontFamily: "Inter",
+                        fontSize: 8,
+                        fontWeight: 700,
+                        color: t.accent,
+                      }}
+                    >
+                      {Math.min(Math.max(m.pctDaily, 0), 100)}%
+                    </Text>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {/* ─── FOOTER mit Avatar + Signatur + QR-Stempel ─────────────── */}
         <View
           style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
             paddingHorizontal: 36,
-            paddingTop: 12,
-            paddingBottom: 14,
-            backgroundColor: blendWithWhite(t.bg, 0.5),
+            paddingVertical: 12,
             borderTopWidth: 1,
             borderTopColor: t.divider,
+            backgroundColor: "#ffffff",
+            gap: 16,
           }}
-          wrap={false}
         >
-          <Text
+          <View
             style={{
-              fontSize: 7,
-              fontWeight: 700,
-              letterSpacing: 1.6,
-              color: t.accent,
-              textTransform: "uppercase",
-              marginBottom: 5,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
             }}
           >
-            Bienes Story
-          </Text>
-          <Text
-            style={{
-              fontFamily: "Fraunces",
-              fontStyle: "italic",
-              fontSize: 12,
-              lineHeight: 1.5,
-              color: t.ink,
-            }}
-          >
-            {recipe.description}
-          </Text>
-        </View>
-      ) : null}
+            {avatarDataUri ? (
+              <View
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  overflow: "hidden",
+                  borderWidth: 1.2,
+                  borderColor: t.accent,
+                }}
+              >
+                <Image
+                  src={avatarDataUri}
+                  style={{ width: 30, height: 30, objectFit: "cover" }}
+                />
+              </View>
+            ) : null}
+            <View>
+              <Text
+                style={{
+                  fontFamily: "Fraunces",
+                  fontStyle: "italic",
+                  fontSize: 13,
+                  color: t.ink,
+                  lineHeight: 1.05,
+                }}
+              >
+                {brand.signature}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 7,
+                  fontWeight: 600,
+                  letterSpacing: 1.4,
+                  color: t.inkSoft,
+                  textTransform: "uppercase",
+                  marginTop: 2,
+                }}
+              >
+                {brand.handle} · {pack.title}
+              </Text>
+            </View>
+          </View>
 
-      <View
-        style={{
-          flex: 1,
-          flexDirection: "row",
-          gap: 24,
-          paddingHorizontal: 36,
-          paddingTop: d.bodyPadTop,
-          paddingBottom: d.bodyPadBottom,
-          borderTopWidth: 1,
-          borderTopColor: t.divider,
-        }}
-      >
-        <View style={{ width: 220 }}>
-          <SectionHeader label="MAN NEHME" theme={t} bold />
-          <IngredientsList
-            grouped={[{ name: null, items: recipe.ingredients }]}
-            theme={t}
-            rowPadV={d.ingRowPadV}
-            nameFontSize={d.ingFontSize}
-            noteFontSize={d.ingNoteFontSize}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <SectionHeader label="ZUBEREITUNG" theme={t} bold />
-          <StepsList
-            steps={recipe.steps}
-            theme={t}
-            stepMarginBottom={d.stepMarginBottom}
-            stepFontSize={d.stepFontSize}
-            stepNumFontSize={d.stepNumFontSize}
-          />
+          {qrDataUri ? (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                paddingHorizontal: 10,
+                paddingVertical: 7,
+                backgroundColor: blendWithWhite(t.accent, 0.78),
+                borderRadius: 5,
+                borderWidth: 0.5,
+                borderColor: blendWithWhite(t.accent, 0.45),
+              }}
+            >
+              <View
+                style={{
+                  alignItems: "flex-end",
+                  maxWidth: 84,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontStyle: "italic",
+                    fontSize: 10,
+                    color: t.ink,
+                    lineHeight: 1.15,
+                    textAlign: "right",
+                  }}
+                >
+                  {recipe.sourceLabel ?? "Original-Reel"}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 6,
+                    fontWeight: 700,
+                    letterSpacing: 1.4,
+                    color: t.inkSoft,
+                    textTransform: "uppercase",
+                    marginTop: 2,
+                  }}
+                >
+                  Smartphone scannen
+                </Text>
+              </View>
+              <View
+                style={{
+                  width: 36,
+                  height: 36,
+                  padding: 2,
+                  backgroundColor: "#ffffff",
+                  borderRadius: 3,
+                }}
+              >
+                <Image
+                  src={qrDataUri}
+                  style={{ width: 32, height: 32 }}
+                />
+              </View>
+            </View>
+          ) : null}
         </View>
       </View>
-
-      <CardFooter
-        brand={brand}
-        pack={pack}
-        recipe={recipe}
-        theme={t}
-        qrDataUri={qrDataUri}
-        microsPadTop={d.microsPadTop}
-        microsPadBottom={d.microsPadBottom}
-      />
     </Page>
   );
 }

@@ -28,10 +28,10 @@ export const layoutPresets: LayoutPreset[] = [
   },
   {
     id: "minimal",
-    title: "Minimal",
+    title: "Cookbook-Cover",
     description:
-      "Apple-Vibe: 140-px-Karten-Number, Bold Sans-Serif, viel Whitespace, kompakte 3-Stat-Box.",
-    bestFor: "Kurze Snacks, klare Typografie, kalorisch fokussiert",
+      "Hero-Bild fuellt die obere Haelfte als Cookbook-Cover, Title als Mega-Display-Overlay, Bienes Avatar als Stempel rechts. Apple-Spec-Strip mit kcal/Macros/Zeit, Mikros als Capsule-Pills, Mint-getoenter QR-Stempel.",
+    bestFor: "Snacks, Showpiece-Rezepte, Karten mit starkem Hero-Bild",
   },
   {
     id: "sport",

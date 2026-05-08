@@ -465,6 +465,11 @@ function SportForewordPage({
 // ─── MINIMAL — Pack 3 (Bienes Snacks) ───────────────────────────────────────
 // Huge "Hi" as display anchor, lots of breathing room, modest still-life
 // in a small clean square. Mint mood, Apple-store calm.
+// Cookbook-Cover-Vorwort fuer Pack 3 — Mirror der Recipe-Card-Vorlage:
+// Stillleben fuellt die obere Haelfte, Greeting + Story sitzen darunter
+// auf weissem Hintergrund mit Mint-Akzent-Streifen, Avatar als runder
+// Stempel rechts unten auf dem Stillleben (genau wie auf der Recipe-
+// Karte, damit Vorwort und Karten als zusammengehoerig gelesen werden).
 function MinimalForewordPage({
   brand,
   pack,
@@ -473,122 +478,182 @@ function MinimalForewordPage({
   avatarDataUri,
 }: ForewordPageProps) {
   const t = packTheme(pack);
-
-  // Split greeting at first space so the typographic anchor lands on the
-  // shortest natural phrase. "Hi, ich bin Biene." → "Hi," / "ich bin Biene."
-  const [anchor, ...rest] = content.greeting.split(" ");
-  const subgreeting = rest.join(" ");
+  const HERO_HEIGHT = 360;
 
   return (
     <Page
       size="A4"
-      style={{ backgroundColor: t.bg, fontFamily: "Inter", color: t.ink }}
+      style={{ backgroundColor: "#ffffff", fontFamily: "Inter", color: t.ink }}
     >
-      <View
-        style={{
-          flex: 1,
-          paddingHorizontal: 64,
-          paddingTop: 44,
-          paddingBottom: 36,
-          flexDirection: "column",
-          justifyContent: "space-between",
-        }}
-      >
-        <TopStrip pack={pack} />
+      <View style={{ flex: 1, flexDirection: "column" }}>
+        {/* HERO STILLLEBEN — full-bleed mit Top-Caption + Avatar-Stempel */}
+        <View
+          style={{
+            position: "relative",
+            width: "100%",
+            height: HERO_HEIGHT,
+            backgroundColor: blendWithWhite(t.bg, 0.7),
+          }}
+        >
+          {imageDataUri ? (
+            <Image
+              src={imageDataUri}
+              style={{ width: "100%", height: HERO_HEIGHT, objectFit: "cover" }}
+            />
+          ) : null}
 
+          {/* Subtiler dunkler Verlauf am unteren Rand fuer Avatar-
+              Lesbarkeit, falls das Stillleben sehr hell ist. */}
+          <View
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: HERO_HEIGHT * 0.4,
+              backgroundColor: "rgba(0, 0, 0, 0.18)",
+            }}
+          />
+
+          <View
+            style={{
+              position: "absolute",
+              top: 28,
+              left: 36,
+              right: 36,
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 8.5,
+                fontWeight: 700,
+                letterSpacing: 2.2,
+                color: "#ffffff",
+                textTransform: "uppercase",
+              }}
+            >
+              Vorwort
+            </Text>
+            <Text
+              style={{
+                fontSize: 9,
+                fontWeight: 600,
+                letterSpacing: 1.4,
+                color: "#ffffff",
+                textTransform: "uppercase",
+              }}
+            >
+              Pack {pack.number.toString().padStart(2, "0")} · {pack.title}
+            </Text>
+          </View>
+
+          {avatarDataUri ? (
+            <View
+              style={{
+                position: "absolute",
+                bottom: 26,
+                right: 36,
+                width: 60,
+                height: 60,
+                borderRadius: 30,
+                overflow: "hidden",
+                borderWidth: 2.5,
+                borderColor: "#ffffff",
+              }}
+            >
+              <Image
+                src={avatarDataUri}
+                style={{ width: 55, height: 55, objectFit: "cover" }}
+              />
+            </View>
+          ) : null}
+        </View>
+
+        {/* MINT-AKZENT-STREIFEN — kurzes Spec-Band, parallel zur Recipe-
+            Card. Macht den Vorwort als pack-zugehoerig erkennbar. */}
+        <View
+          style={{
+            backgroundColor: t.bg,
+            paddingHorizontal: 48,
+            paddingVertical: 14,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 14,
+          }}
+        >
+          <View style={{ width: 24, height: 2, backgroundColor: t.accent }} />
+          <Text
+            style={{
+              fontSize: 8.5,
+              fontWeight: 700,
+              letterSpacing: 2,
+              color: t.accent,
+              textTransform: "uppercase",
+            }}
+          >
+            {pack.subtitle}
+          </Text>
+        </View>
+
+        {/* BODY — Greeting + Story + Signoff in einer Spalte, viel Luft */}
         <View
           style={{
             flex: 1,
+            paddingHorizontal: 56,
+            paddingTop: 36,
+            paddingBottom: 28,
             flexDirection: "column",
             justifyContent: "center",
-            paddingTop: 8,
-            paddingBottom: 8,
+            gap: 22,
           }}
         >
-          {/* Anchor word at huge display size — the visual move */}
           <Text
             style={{
               fontFamily: "Inter",
-              fontSize: 110,
+              fontSize: 38,
               fontWeight: 700,
-              lineHeight: 0.92,
+              lineHeight: 1.04,
               color: t.ink,
-              letterSpacing: -3.4,
+              letterSpacing: -1,
             }}
           >
-            {anchor}
+            {content.greeting}
           </Text>
-          {subgreeting ? (
-            <Text
-              style={{
-                marginTop: 4,
-                fontFamily: "Inter",
-                fontSize: 18,
-                fontWeight: 500,
-                color: t.inkSoft,
-                letterSpacing: -0.4,
-              }}
-            >
-              {subgreeting}
-            </Text>
-          ) : null}
 
-          {/* Body row: small clean square hero + story */}
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 14,
+              lineHeight: 1.7,
+              color: t.ink,
+              maxWidth: 460,
+            }}
+          >
+            {content.story}
+          </Text>
+
           <View
             style={{
-              marginTop: 32,
               flexDirection: "row",
-              alignItems: "flex-start",
-              gap: 28,
+              alignItems: "center",
+              gap: 10,
+              marginTop: 4,
             }}
           >
-            <View
+            <View style={{ width: 14, height: 2, backgroundColor: t.accent }} />
+            <Text
               style={{
-                width: 150,
-                height: 150,
-                overflow: "hidden",
-                borderRadius: 4,
+                fontFamily: "Fraunces",
+                fontStyle: "italic",
+                fontSize: 14,
+                color: t.ink,
               }}
             >
-              {imageDataUri ? (
-                <Image
-                  src={imageDataUri}
-                  style={{ width: 150, height: 150, objectFit: "cover" }}
-                />
-              ) : (
-                <View
-                  style={{
-                    width: 150,
-                    height: 150,
-                    backgroundColor: blendWithWhite(t.accent, 0.85),
-                  }}
-                />
-              )}
-            </View>
-
-            <View style={{ flex: 1, paddingTop: 4 }}>
-              <Text
-                style={{
-                  fontFamily: "Inter",
-                  fontSize: 13,
-                  lineHeight: 1.65,
-                  color: t.ink,
-                }}
-              >
-                {content.story}
-              </Text>
-              <Text
-                style={{
-                  marginTop: 14,
-                  fontSize: 10,
-                  fontWeight: 600,
-                  letterSpacing: 0.4,
-                  color: t.inkSoft,
-                }}
-              >
-                {content.signoff}
-              </Text>
-            </View>
+              {content.signoff}
+            </Text>
           </View>
         </View>
 
