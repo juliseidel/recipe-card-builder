@@ -156,25 +156,25 @@ export function PdfExportButton(props: Props) {
     };
   }, [jobId]);
 
-  // Auto-trigger browser download when ready (once per file)
+  // Auto-trigger browser download when ready (once per file).
+  // Wir nutzen den Blob-Download-Trick statt window.open: das umgeht
+  // jeden Pop-up-Blocker und erzwingt ein "echtes" Download-Verhalten,
+  // unabhängig davon, ob der Cross-Origin-Server Content-Disposition
+  // sendet. Funktioniert in Safari, Chrome, Firefox + auf iOS.
   useEffect(() => {
     if (!isReady || !snap.fileUrl) return;
     if (downloadedFor.current === snap.fileUrl) return;
     downloadedFor.current = snap.fileUrl;
-    // window.open avoids navigation away from current page; the URL has
-    // ?download=filename so the browser triggers a save dialog.
-    try {
-      window.open(snap.fileUrl, "_blank", "noopener");
-      setDownloaded(true);
-    } catch {
-      /* ignored — user can still click the manual link below */
-    }
+    void triggerBlobDownload(snap.fileUrl).then((ok) => {
+      if (ok) setDownloaded(true);
+    });
   }, [isReady, snap.fileUrl]);
 
   const onClick = () => {
     if (isBusy) return;
     if (isReady && snap.fileUrl) {
-      window.open(snap.fileUrl, "_blank", "noopener");
+      // Re-Download: gleicher Blob-Trick wie beim Auto-Download.
+      void triggerBlobDownload(snap.fileUrl);
       return;
     }
     void start();
@@ -239,24 +239,11 @@ export function PdfExportButton(props: Props) {
         </span>
       </button>
 
-      {/* Compact secondary line: only shown when ready (link) or failed (error).
-       * No noise during queueing/rendering — the button itself shows progress. */}
-      {isReady && snap.fileUrl ? (
-        <div
-          className="mt-1.5 flex items-center justify-end gap-2 text-[11px]"
-          style={{ color: tint.ink, opacity: 0.7 }}
-        >
-          <a
-            href={snap.fileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline underline-offset-2"
-            style={{ color: tint.ink }}
-          >
-            Direkt-Link zum PDF
-          </a>
-        </div>
-      ) : null}
+      {/* Direkt-Link entfernt: dank des Blob-Download-Tricks startet der
+       * Browser den Save-Dialog jetzt zuverlässig automatisch — die manuelle
+       * Fallback-Zeile darunter ist damit überflüssig und würde das Layout
+       * verschieben (z. B. den nebenstehenden "Löschen"-Button asymmetrisch
+       * machen). Bei Fehler wird der Failed-Block weiter unten angezeigt. */}
       {isFailed ? (
         <div
           className="mt-1.5 flex items-center justify-end gap-2 text-[11px]"
@@ -272,6 +259,64 @@ export function PdfExportButton(props: Props) {
 function stageLabel(stage: string | null): string {
   if (!stage) return "Rendert";
   return STAGE_LABELS[stage] ?? "Rendert";
+}
+
+// Triggert einen echten Browser-Download für die übergebene PDF-URL.
+// Wir fetchen das PDF, packen es in einen lokalen Blob und klicken ein
+// verstecktes <a download>-Element. Das umgeht jeden Pop-up-Blocker und
+// erzwingt den "Save As..."-Dialog, unabhängig davon, ob der Server
+// Content-Disposition korrekt sendet. Funktioniert in Safari (auch iOS),
+// Chrome, Firefox, Edge.
+//
+// Returnt true bei Erfolg, false bei Fehler — wir lassen den Fehler im
+// Hintergrund schlucken, damit der "Erneut herunterladen"-Button den User
+// trotzdem nicht blockt; ein zweiter Klick versucht es einfach nochmal.
+async function triggerBlobDownload(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { credentials: "omit" });
+    if (!res.ok) {
+      // Fallback: window.open — falls fetch wegen CORS blockiert wäre.
+      window.open(url, "_blank", "noopener,noreferrer");
+      return true;
+    }
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = extractFilenameFromUrl(url);
+    a.rel = "noopener noreferrer";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Blob-URL revoken nach kurzer Verzögerung, damit der Browser Zeit
+    // hat, den Download wirklich zu starten.
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
+    return true;
+  } catch {
+    // Letzter Fallback: neuer Tab. Lieber irgendein Verhalten als gar nichts.
+    try {
+      window.open(url, "_blank", "noopener,noreferrer");
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+// Holt den Dateinamen aus dem ?download=...-Query-Parameter (Supabase
+// setzt den beim getPublicUrl-Aufruf), oder fällt auf den Pfad-Letzten
+// zurück. Niemals leer — sonst nutzt der Browser eine generische ID.
+function extractFilenameFromUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const param = u.searchParams.get("download");
+    if (param) return decodeURIComponent(param);
+    const last = u.pathname.split("/").filter(Boolean).pop();
+    return last && last.endsWith(".pdf") ? last : "rezept.pdf";
+  } catch {
+    return "rezept.pdf";
+  }
 }
 
 function Spinner() {
