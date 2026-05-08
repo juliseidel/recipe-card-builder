@@ -194,7 +194,11 @@ export function PdfExportButton(props: Props) {
   const showProgress = isBusy && snap.progress > 0;
 
   return (
-    <div className={props.className}>
+    // `relative` hier ist der Anker für die beiden absolute-positionierten
+    // Sub-Elemente unten (Direkt-Link bei Erfolg, Fehler-Hint bei Fail).
+    // So bleibt der Container in jedem State exakt button-hoch und der
+    // nebenstehende "Löschen"-Button auf der gleichen vertikalen Achse.
+    <div className={`relative ${props.className ?? ""}`.trim()}>
       <button
         type="button"
         onClick={onClick}
@@ -239,14 +243,34 @@ export function PdfExportButton(props: Props) {
         </span>
       </button>
 
-      {/* Direkt-Link entfernt: dank des Blob-Download-Tricks startet der
-       * Browser den Save-Dialog jetzt zuverlässig automatisch — die manuelle
-       * Fallback-Zeile darunter ist damit überflüssig und würde das Layout
-       * verschieben (z. B. den nebenstehenden "Löschen"-Button asymmetrisch
-       * machen). Bei Fehler wird der Failed-Block weiter unten angezeigt. */}
+      {/* Direkt-Link als Backup: dank Blob-Download startet der Save-Dialog
+       * normalerweise automatisch. Falls der Browser das doch mal blockiert
+       * (extrem strenger Pop-up-Blocker, fetch-CORS-Fail, etc.), kann der
+       * User hier manuell auf den Link klicken.
+       *
+       * Wichtig: absolute positioniert mit top-full, damit der Container
+       * in seiner Höhe nicht wächst. Sonst würde der nebenstehende
+       * "Löschen"-Button im Parent-Flex visuell asymmetrisch zum
+       * "Erneut herunterladen"-Button stehen. */}
+      {isReady && snap.fileUrl ? (
+        <div
+          className="absolute left-0 right-0 top-full mt-1.5 flex items-center justify-end gap-2 text-[11px]"
+          style={{ color: tint.ink, opacity: 0.7 }}
+        >
+          <a
+            href={snap.fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="whitespace-nowrap underline underline-offset-2"
+            style={{ color: tint.ink }}
+          >
+            Direkt-Link zum PDF
+          </a>
+        </div>
+      ) : null}
       {isFailed ? (
         <div
-          className="mt-1.5 flex items-center justify-end gap-2 text-[11px]"
+          className="absolute left-0 right-0 top-full mt-1.5 flex items-center justify-end gap-2 text-[11px]"
           style={{ color: "#b91c1c" }}
         >
           {snap.error ?? "Fehler beim Rendern"}
