@@ -2,9 +2,11 @@ import { Document, Page, View, Text, Image } from "@react-pdf/renderer";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
 import type { Recipe } from "@/lib/recipes";
+import type { PackForewordContent } from "@/lib/ai/generate-foreword";
 import { packTheme, withAlpha, blendWithWhite, fontFamilyForPack } from "./theme";
 import { pad2, totalTime } from "./helpers";
 import { RecipeCardPdfPage } from "./recipe-card-pdf";
+import { ForewordPage } from "./foreword-page";
 
 export type PackPdfProps = {
   brand: Brand;
@@ -16,6 +18,14 @@ export type PackPdfProps = {
   // QR-code data URIs in the same order as `recipes`. Null entries skip
   // the QR strip in the footer (recipe has no sourceUrl).
   qrDataUris: Array<string | null>;
+  // Foreword section. All three pieces must be present for the foreword
+  // page to render — if any is missing (no cached text, image not on
+  // disk yet, avatar not loaded), the cover-to-index sequence stays
+  // exactly as it was before. This keeps the four packs we haven't
+  // generated forewords for yet identical to their pre-foreword PDFs.
+  forewordContent?: PackForewordContent | null;
+  forewordImageDataUri?: string | null;
+  avatarDataUri?: string | null;
 };
 
 export function PackPdfDocument({
@@ -25,7 +35,16 @@ export function PackPdfDocument({
   coverDataUri,
   heroDataUris,
   qrDataUris,
+  forewordContent,
+  forewordImageDataUri,
+  avatarDataUri,
 }: PackPdfProps) {
+  // Show foreword only when text is cached AND the still-life image
+  // loaded successfully. Anything less and we fall through to the legacy
+  // cover→index sequence.
+  const showForeword = Boolean(
+    forewordContent && forewordImageDataUri
+  );
   const t = packTheme(pack);
   const titleFont = fontFamilyForPack(pack);
 
@@ -47,7 +66,20 @@ export function PackPdfDocument({
         titleFont={titleFont}
       />
 
-      {/* PAGE 2 — INDEX */}
+      {/* PAGE 2 — FOREWORD (only when both text and still-life are
+          available; otherwise this page is omitted and the index slides
+          back into position 2 like in the original layout). */}
+      {showForeword && forewordContent ? (
+        <ForewordPage
+          brand={brand}
+          pack={pack}
+          content={forewordContent}
+          imageDataUri={forewordImageDataUri ?? null}
+          avatarDataUri={avatarDataUri ?? null}
+        />
+      ) : null}
+
+      {/* INDEX (page 2 without foreword, page 3 with foreword) */}
       <IndexPage brand={brand} pack={pack} recipes={recipes} />
 
       {/* PAGES 3..N+2 — RECIPES */}
