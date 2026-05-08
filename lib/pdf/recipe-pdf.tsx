@@ -10,6 +10,7 @@ export type RecipePdfProps = {
   recipe: Recipe;
   totalRecipes: number;
   heroDataUri: string | null;
+  qrDataUri: string | null;
 };
 
 // Single-recipe PDF wrapper. The recipe layout fills exactly one A4 page.

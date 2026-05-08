@@ -27,6 +27,9 @@ export type RecipeCardPdfProps = {
   recipe: Recipe;
   totalRecipes: number;
   heroDataUri: string | null;
+  // Pre-rendered QR code (PNG data URI) pointing to recipe.sourceUrl.
+  // Generated in lib/pdf/render.ts — null when the recipe has no source.
+  qrDataUri: string | null;
 };
 
 export function RecipeCardPdfPage(props: RecipeCardPdfProps) {
@@ -126,6 +129,7 @@ function EditorialPage({
   recipe,
   totalRecipes,
   heroDataUri,
+  qrDataUri,
 }: RecipeCardPdfProps) {
   const t = packTheme(pack);
   const grouped = groupIngredients(recipe.ingredients);
@@ -426,6 +430,7 @@ function EditorialPage({
         pack={pack}
         recipe={recipe}
         theme={t}
+        qrDataUri={qrDataUri}
         hideMicros
       />
     </Page>
@@ -554,6 +559,7 @@ function PatisseriePage({
   recipe,
   totalRecipes,
   heroDataUri,
+  qrDataUri,
 }: RecipeCardPdfProps) {
   const t = packTheme(pack);
   const time = totalTime(recipe);
@@ -783,6 +789,7 @@ function PatisseriePage({
         pack={pack}
         recipe={recipe}
         theme={t}
+        qrDataUri={qrDataUri}
         italic
         microsPadTop={d.microsPadTop}
         microsPadBottom={d.microsPadBottom}
@@ -877,6 +884,7 @@ function MinimalPage({
   recipe,
   totalRecipes,
   heroDataUri,
+  qrDataUri,
 }: RecipeCardPdfProps) {
   const t = packTheme(pack);
   const time = totalTime(recipe);
@@ -1089,6 +1097,7 @@ function MinimalPage({
         pack={pack}
         recipe={recipe}
         theme={t}
+        qrDataUri={qrDataUri}
         microsPadTop={d.microsPadTop}
         microsPadBottom={d.microsPadBottom}
       />
@@ -1296,6 +1305,7 @@ function SportPage({
   recipe,
   totalRecipes,
   heroDataUri,
+  qrDataUri,
 }: RecipeCardPdfProps) {
   const t = packTheme(pack);
   const time = totalTime(recipe);
@@ -1788,7 +1798,7 @@ function SportPage({
         </View>
       </View>
 
-      <CardFooter brand={brand} pack={pack} recipe={recipe} theme={t} />
+      <CardFooter brand={brand} pack={pack} recipe={recipe} theme={t} qrDataUri={qrDataUri} />
     </Page>
   );
 }
@@ -1939,6 +1949,7 @@ function DashboardPage({
   recipe,
   totalRecipes,
   heroDataUri,
+  qrDataUri,
 }: RecipeCardPdfProps) {
   const t = packTheme(pack);
   const time = totalTime(recipe);
@@ -2175,6 +2186,7 @@ function DashboardPage({
         pack={pack}
         recipe={recipe}
         theme={t}
+        qrDataUri={qrDataUri}
         microsPadTop={d.microsPadTop}
         microsPadBottom={d.microsPadBottom}
       />
@@ -2640,6 +2652,7 @@ function CardFooter({
   microsPadTop,
   microsPadBottom,
   hideMicros = false,
+  qrDataUri = null,
 }: {
   brand: Brand;
   pack: Pack;
@@ -2651,7 +2664,18 @@ function CardFooter({
   // Pack 5 (Editorial) renders the micros banner up top instead of in
   // the footer — set this to skip the default MicrosStrip rendering.
   hideMicros?: boolean;
+  // Pre-rendered QR code (PNG data URI) for recipe.sourceUrl. When set,
+  // the footer renders a 3-column layout with the QR on the right; when
+  // null, falls back to the legacy 2-column text-only layout. Same for
+  // every layout — patisserie/sport/dashboard/etc. all share this footer.
+  qrDataUri?: string | null;
 }) {
+  // Layout choice: a recipe with a sourceUrl gets the QR variant (taller,
+  // 3-column). A recipe without one keeps the original 2-column text band
+  // — keeps the 3 curated recipes that have no sourceUrl from getting a
+  // visual hole where the QR would sit. The MicrosStrip stays on top in
+  // both cases.
+  const hasQr = Boolean(qrDataUri);
   return (
     <>
       {hideMicros ? null : (
@@ -2671,32 +2695,100 @@ function CardFooter({
           borderTopColor: theme.divider,
           backgroundColor: "#ffffff",
           paddingHorizontal: 32,
-          paddingVertical: 10,
+          // Slightly taller when a QR is shown — 32 px QR + breathing
+          // padding. Without QR we keep the historic 10 pt to match the
+          // first 22 PDF builds shipped to the user.
+          paddingVertical: hasQr ? 8 : 10,
+          gap: 16,
         }}
         fixed
       >
-      <Text
-        style={{
-          fontFamily: "Fraunces",
-          fontSize: 13,
-          fontStyle: italic ? "italic" : "normal",
-          color: brand.tokens.ink,
-        }}
-      >
-        {brand.signature}
-      </Text>
-      <Text
-        style={{
-          fontSize: 7,
-          fontWeight: 500,
-          letterSpacing: 1.4,
-          color: brand.tokens.inkMuted,
-          textTransform: "uppercase",
-        }}
-      >
-        {brand.handle} · {pack.title}
-        {recipe?.sourceUrl ? `  ·  ${recipe.sourceLabel ?? "Original-Reel"}` : ""}
-      </Text>
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontSize: 13,
+            fontStyle: italic ? "italic" : "normal",
+            color: brand.tokens.ink,
+          }}
+        >
+          {brand.signature}
+        </Text>
+
+        <Text
+          style={{
+            flex: 1,
+            fontSize: 7,
+            fontWeight: 500,
+            letterSpacing: 1.4,
+            color: brand.tokens.inkMuted,
+            textTransform: "uppercase",
+            textAlign: hasQr ? "right" : "right",
+          }}
+        >
+          {brand.handle} · {pack.title}
+          {!hasQr && recipe?.sourceUrl
+            ? `  ·  ${recipe.sourceLabel ?? "Original-Reel"}`
+            : ""}
+        </Text>
+
+        {hasQr ? (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 7,
+            }}
+          >
+            <View
+              style={{
+                alignItems: "flex-end",
+                maxWidth: 70,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: "Fraunces",
+                  fontStyle: "italic",
+                  fontSize: 8.5,
+                  color: brand.tokens.ink,
+                  lineHeight: 1.15,
+                  textAlign: "right",
+                }}
+              >
+                {recipe?.sourceLabel ?? "Original-Reel"}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 6,
+                  fontWeight: 600,
+                  letterSpacing: 1.2,
+                  color: brand.tokens.inkMuted,
+                  textTransform: "uppercase",
+                  marginTop: 2,
+                  textAlign: "right",
+                }}
+              >
+                Scannen
+              </Text>
+            </View>
+            <View
+              style={{
+                width: 32,
+                height: 32,
+                padding: 1.5,
+                backgroundColor: "#ffffff",
+                borderWidth: 0.5,
+                borderColor: theme.divider,
+                borderRadius: 3,
+              }}
+            >
+              <Image
+                src={qrDataUri as string}
+                style={{ width: 29, height: 29 }}
+              />
+            </View>
+          </View>
+        ) : null}
       </View>
     </>
   );

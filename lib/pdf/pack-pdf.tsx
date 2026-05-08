@@ -13,6 +13,9 @@ export type PackPdfProps = {
   coverDataUri: string | null;
   // hero data URIs in the same order as `recipes`
   heroDataUris: Array<string | null>;
+  // QR-code data URIs in the same order as `recipes`. Null entries skip
+  // the QR strip in the footer (recipe has no sourceUrl).
+  qrDataUris: Array<string | null>;
 };
 
 export function PackPdfDocument({
@@ -21,6 +24,7 @@ export function PackPdfDocument({
   recipes,
   coverDataUri,
   heroDataUris,
+  qrDataUris,
 }: PackPdfProps) {
   const t = packTheme(pack);
   const titleFont = fontFamilyForPack(pack);
@@ -55,6 +59,7 @@ export function PackPdfDocument({
           recipe={recipe}
           totalRecipes={recipes.length}
           heroDataUri={heroDataUris[idx] ?? null}
+          qrDataUri={qrDataUris[idx] ?? null}
         />
       ))}
 
