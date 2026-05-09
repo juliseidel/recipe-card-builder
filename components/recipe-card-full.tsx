@@ -73,6 +73,14 @@ export function RecipeCardFull(props: RecipeCardFullProps) {
       return <SportLayout {...props} />;
     case "dashboard":
       return <DashboardLayout {...props} />;
+    case "vital":
+      // Web-Layout fuer "vital" wird in einem separaten Patch nachgereicht.
+      // Bis dahin: SportLayout-Fallback im Web — das PDF rendert bereits
+      // das echte Vital-Card-Stack-Layout, nur die Live-Detail-Page zeigt
+      // noch den alten Sport-Look. Custom-Packs die "vital" picken sehen
+      // im Web also Sport, im PDF Vital. Das ist unbeabsichtigt aber
+      // unschaedlich — wird im naechsten Patch konsistent.
+      return <SportLayout {...props} />;
   }
 }
 

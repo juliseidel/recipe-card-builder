@@ -496,6 +496,201 @@ export function LayoutThumbnail({
           />
         </>
       )}
+      {layout === "vital" && (
+        <>
+          {/* Drei gestapelte Premium-Cards mit subtle border in mood-accent.
+              Card 1 = Hero+Title+Avatar-Stempel, Card 2 = Donut-Ringe fuer
+              Macros + Mikro-Pearls, Card 3 = Body 2-Spalten. */}
+          {/* Card 1 — Hero */}
+          <rect
+            x="2"
+            y="2"
+            width="44"
+            height="9"
+            rx="1.2"
+            fill="white"
+            stroke={fill}
+            strokeWidth="0.35"
+            opacity="0.95"
+          />
+          <rect x="3" y="3" width="6" height="7" rx="0.5" fill={stroke} opacity="0.55" />
+          <rect x="10.5" y="4" width="13" height="1.6" rx="0.3" fill={stroke} />
+          <rect
+            x="10.5"
+            y="6.5"
+            width="9"
+            height="1"
+            rx="0.3"
+            fill={stroke}
+            opacity="0.5"
+          />
+          <circle cx="42" cy="5.5" r="1.7" fill={fill} />
+          {/* Card 2 — Donuts + Mikros */}
+          <rect
+            x="2"
+            y="13"
+            width="44"
+            height="9"
+            rx="1.2"
+            fill="white"
+            stroke={fill}
+            strokeWidth="0.35"
+            opacity="0.95"
+          />
+          <circle cx="9" cy="17.5" r="2.5" stroke={fill} strokeWidth="0.5" fill="none" opacity="0.4" />
+          <path
+            d="M9,15 A2.5,2.5 0 0,1 11.4,17.7"
+            stroke={fill}
+            strokeWidth="0.9"
+            fill="none"
+          />
+          <circle cx="17" cy="17.5" r="2.5" stroke={fill} strokeWidth="0.5" fill="none" opacity="0.4" />
+          <path
+            d="M17,15 A2.5,2.5 0 1,1 14.6,18.5"
+            stroke={fill}
+            strokeWidth="0.9"
+            fill="none"
+            opacity="0.75"
+          />
+          <circle cx="25" cy="17.5" r="2.5" stroke={fill} strokeWidth="0.5" fill="none" opacity="0.4" />
+          <path
+            d="M25,15 A2.5,2.5 0 0,1 26.5,16.5"
+            stroke={fill}
+            strokeWidth="0.9"
+            fill="none"
+            opacity="0.55"
+          />
+          <rect
+            x="31"
+            y="14.5"
+            width="13"
+            height="1"
+            rx="0.3"
+            fill={stroke}
+            opacity="0.45"
+          />
+          <rect
+            x="31"
+            y="16.5"
+            width="11"
+            height="1"
+            rx="0.3"
+            fill={stroke}
+            opacity="0.45"
+          />
+          <rect
+            x="31"
+            y="18.5"
+            width="13"
+            height="1"
+            rx="0.3"
+            fill={stroke}
+            opacity="0.45"
+          />
+          <rect
+            x="31"
+            y="20.5"
+            width="9"
+            height="1"
+            rx="0.3"
+            fill={stroke}
+            opacity="0.45"
+          />
+          {/* Card 3 — Body 2-Spalten */}
+          <rect
+            x="2"
+            y="24"
+            width="44"
+            height="10"
+            rx="1.2"
+            fill="white"
+            stroke={fill}
+            strokeWidth="0.35"
+            opacity="0.95"
+          />
+          <rect
+            x="3"
+            y="25.5"
+            width="14"
+            height="0.9"
+            rx="0.2"
+            fill={stroke}
+            opacity="0.55"
+          />
+          <rect
+            x="3"
+            y="27.2"
+            width="12"
+            height="0.9"
+            rx="0.2"
+            fill={stroke}
+            opacity="0.4"
+          />
+          <rect
+            x="3"
+            y="28.9"
+            width="14"
+            height="0.9"
+            rx="0.2"
+            fill={stroke}
+            opacity="0.4"
+          />
+          <rect
+            x="3"
+            y="30.6"
+            width="11"
+            height="0.9"
+            rx="0.2"
+            fill={stroke}
+            opacity="0.4"
+          />
+          <rect
+            x="3"
+            y="32.3"
+            width="13"
+            height="0.9"
+            rx="0.2"
+            fill={stroke}
+            opacity="0.4"
+          />
+          <rect
+            x="22"
+            y="25.5"
+            width="22"
+            height="0.9"
+            rx="0.2"
+            fill={stroke}
+            opacity="0.55"
+          />
+          <rect
+            x="22"
+            y="27.2"
+            width="20"
+            height="0.9"
+            rx="0.2"
+            fill={stroke}
+            opacity="0.4"
+          />
+          <rect
+            x="22"
+            y="28.9"
+            width="22"
+            height="0.9"
+            rx="0.2"
+            fill={stroke}
+            opacity="0.4"
+          />
+          <rect
+            x="22"
+            y="30.6"
+            width="18"
+            height="0.9"
+            rx="0.2"
+            fill={stroke}
+            opacity="0.4"
+          />
+        </>
+      )}
       {layout === "dashboard" && (
         <>
           <rect

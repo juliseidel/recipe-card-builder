@@ -34,11 +34,11 @@ export const layoutPresets: LayoutPreset[] = [
     bestFor: "Snacks, Showpiece-Rezepte, Karten mit starkem Hero-Bild",
   },
   {
-    id: "sport",
-    title: "Sport",
+    id: "vital",
+    title: "Vital-Stack",
     description:
-      "Macro-Bars mit Emojis 💪🌾🥑, Zutaten-Cart mit Checkboxen, Schritt-Timeline mit Verbindungslinien.",
-    bestFor: "High-Protein, Volumen, Fitness-Mahlzeiten",
+      "Drei gestapelte Premium-Cards: Hero-Card mit Avatar-Stempel, Nährstoff-Card mit Donut-Ringen für Macros + horizontaler Mikro-Pearl-Strip, Zubereitungs-Card mit Dot-Leader-Zutaten und Time-Marker-Steps. Apple-Health-meets-Cookbook.",
+    bestFor: "Volumen, High-Protein, Diet-Fokus, frische Premium-Mahlzeiten",
   },
   {
     id: "dashboard",
@@ -46,6 +46,13 @@ export const layoutPresets: LayoutPreset[] = [
     description:
       "Notion-Style: Wochentag-Tag, Data-Rows mit Icons (🍴🔥💪⏱📊), 'Mealprep-Ready'-Marker. Strukturiert wie ein Wochenplaner.",
     bestFor: "Mealprep, Wochenplanung, operative Karten",
+  },
+  {
+    id: "sport",
+    title: "Sport",
+    description:
+      "Macro-Bars mit Emojis 💪🌾🥑, Zutaten-Cart mit Checkboxen, Schritt-Timeline mit Verbindungslinien.",
+    bestFor: "Aelteres Fitness-Layout — wir empfehlen Vital-Stack stattdessen",
   },
 ];
 

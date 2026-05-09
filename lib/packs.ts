@@ -12,7 +12,8 @@ export type CardLayout =
   | "patisserie"
   | "minimal"
   | "sport"
-  | "dashboard";
+  | "dashboard"
+  | "vital";
 
 export type Pack = {
   slug: string;
@@ -82,7 +83,7 @@ export const packs: Pack[] = [
       inkSoft: "#3f5b22",
     },
     displayFont: "inter-tight",
-    cardLayout: "sport",
+    cardLayout: "vital",
   },
   {
     slug: "blitz-snacks",

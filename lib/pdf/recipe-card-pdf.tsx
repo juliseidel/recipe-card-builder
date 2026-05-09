@@ -8,6 +8,8 @@ import {
   LinearGradient,
   Stop,
   Rect,
+  Circle,
+  Path,
 } from "@react-pdf/renderer";
 import type { Brand } from "@/lib/brands";
 import type { Pack, CardLayout } from "@/lib/packs";
@@ -59,6 +61,7 @@ const LAYOUTS: Record<CardLayout, (p: RecipeCardPdfProps) => React.JSX.Element> 
   minimal: MinimalPage,
   sport: SportPage,
   dashboard: DashboardPage,
+  vital: VitalPage,
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -2893,6 +2896,880 @@ function DashboardPage({
         microsPadBottom={d.microsPadBottom}
       />
     </Page>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// LAYOUT 6: VITAL — Pack 2 (Volumen-Wunder, Sage Green) — NEW
+// ═════════════════════════════════════════════════════════════════════════════
+// Premium-Stack-Layout. Drei gestapelte Cards (Hero, Nutrition, Recipe)
+// mit subtiler Sage-Green-Border und White-Background — hebt sich vom
+// Pack-Mood-Hintergrund ab und gibt dem Layout einen "Apple-Health-meets-
+// Cookbook"-Look.
+//
+// Differentiators vs. den anderen 5 Layouts:
+//   - Donut-Ringe fuer Macros (SVG arc-paths) statt Bars/Pills/Tiles
+//   - Card-Stack-Architektur mit subtle Drop-Frame statt Single-Page
+//   - Avatar als Stempel oben-rechts auf der Hero-Card (anders als Pack 3
+//     wo der Avatar unten-rechts auf dem Hero-Bild sitzt)
+//   - Mikronaehrstoffe als horizontaler Pearl-Strip in der Nutrition-Card,
+//     nicht im Footer (anders als alle anderen)
+//   - Zutaten als Menu-Card-Style mit Dot-Leader-Pattern
+//   - Steps mit Time-Marker prominent davor
+// ═════════════════════════════════════════════════════════════════════════════
+
+// SVG arc-path generator. Beginnt am 12-Uhr-Punkt (cx, cy-r) und sweept
+// im Uhrzeigersinn um sweepDeg Grad. largeArc-Flag wechselt bei > 180°.
+// Returns leeren String bei sweepDeg <= 0 (kein Arc rendern).
+function vitalArcPath(
+  cx: number,
+  cy: number,
+  r: number,
+  sweepDeg: number
+): string {
+  if (sweepDeg <= 0) return "";
+  const clamped = Math.min(360, sweepDeg);
+  if (clamped >= 359.9) {
+    // Fast-full ring — split in two halves to avoid arc-degenerate path.
+    return `M ${cx},${cy - r} A ${r},${r} 0 1,1 ${cx - 0.001},${cy - r}`;
+  }
+  const sweepRad = (clamped * Math.PI) / 180;
+  const endX = cx + r * Math.sin(sweepRad);
+  const endY = cy - r * Math.cos(sweepRad);
+  const largeArc = clamped > 180 ? 1 : 0;
+  return `M ${cx},${cy - r} A ${r},${r} 0 ${largeArc},1 ${endX.toFixed(3)},${endY.toFixed(3)}`;
+}
+
+// Density-config — wie bei sport, drei Stufen je nach Recipe-Laenge.
+// Steuert Card-Padding, Font-Sizes und Listen-Spacing in der Body-Card,
+// damit 3-Zutaten-Eisbowl genauso gut aussieht wie die 16-Zutaten-Mexican-Bowl.
+const VITAL_DENSITY: Record<
+  Density,
+  {
+    cardGap: number;
+    heroCardPadding: number;
+    nutritionCardPadding: number;
+    bodyCardPadding: number;
+    titleFontSize: number;
+    subtitleFontSize: number;
+    donutRadius: number;
+    donutValueSize: number;
+    ingRowPadV: number;
+    ingFontSize: number;
+    ingNoteFontSize: number;
+    stepFontSize: number;
+    stepGap: number;
+  }
+> = {
+  compact: {
+    cardGap: 6,
+    heroCardPadding: 14,
+    nutritionCardPadding: 12,
+    bodyCardPadding: 14,
+    titleFontSize: 22,
+    subtitleFontSize: 9.5,
+    donutRadius: 19,
+    donutValueSize: 9.5,
+    ingRowPadV: 2.5,
+    ingFontSize: 8.5,
+    ingNoteFontSize: 6.5,
+    stepFontSize: 8.5,
+    stepGap: 5,
+  },
+  balanced: {
+    cardGap: 8,
+    heroCardPadding: 16,
+    nutritionCardPadding: 14,
+    bodyCardPadding: 16,
+    titleFontSize: 26,
+    subtitleFontSize: 10.5,
+    donutRadius: 22,
+    donutValueSize: 10.5,
+    ingRowPadV: 3.5,
+    ingFontSize: 9.5,
+    ingNoteFontSize: 7,
+    stepFontSize: 9.5,
+    stepGap: 7,
+  },
+  spacious: {
+    cardGap: 10,
+    heroCardPadding: 18,
+    nutritionCardPadding: 16,
+    bodyCardPadding: 18,
+    titleFontSize: 30,
+    subtitleFontSize: 11.5,
+    donutRadius: 24,
+    donutValueSize: 12,
+    ingRowPadV: 5,
+    ingFontSize: 10,
+    ingNoteFontSize: 7.5,
+    stepFontSize: 10,
+    stepGap: 9,
+  },
+};
+
+function VitalPage({
+  brand,
+  pack,
+  recipe,
+  totalRecipes,
+  heroDataUri,
+  qrDataUri,
+  avatarDataUri,
+}: RecipeCardPdfProps) {
+  const t = packTheme(pack);
+  const time = totalTime(recipe);
+  const portionsLbl = portionsLabel(recipe.servings);
+  const density = getDensity(recipe);
+  const d = VITAL_DENSITY[density];
+  const grouped = groupIngredients(recipe.ingredients);
+  const stepGroups = groupSteps(recipe.steps ?? []);
+
+  // Macro-Donut-Werte. Skala = sport-Layout fuer Konsistenz: 50/80/35 g
+  // ist Bienes typische Volumen-Mahlzeit. Werte ueber dem Skala-Max
+  // capped auf 100 % — sieht aufgeraeumt aus statt durchgesweept.
+  const macros = [
+    { label: "Eiweiß", value: recipe.nutrition.protein, max: 50, unit: "g" },
+    { label: "Kohlenh.", value: recipe.nutrition.carbs, max: 80, unit: "g" },
+    { label: "Fett", value: recipe.nutrition.fat, max: 35, unit: "g" },
+  ];
+
+  const micros = (recipe.nutrition.micros ?? []).slice(0, 8);
+
+  // Card-Style: weiss auf Pack-Mood-BG, Sage-Akzent als duenne Border,
+  // 2 px subtle outer Schatten via doppelter Border-Trick.
+  const cardStyle = {
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    borderWidth: 0.6,
+    borderColor: blendWithWhite(t.accent, 0.55),
+  } as const;
+
+  return (
+    <Page
+      size="A4"
+      style={{
+        backgroundColor: blendWithWhite(t.bg, 0.4),
+        fontFamily: "Inter",
+        color: t.ink,
+        paddingHorizontal: 22,
+        paddingTop: 18,
+        paddingBottom: 16,
+      }}
+    >
+      {/* TOP STRIP — Pack-Info + Recipe-Number */}
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          paddingHorizontal: 6,
+          paddingBottom: 8,
+        }}
+        wrap={false}
+      >
+        <Text
+          style={{
+            fontSize: 7.5,
+            fontWeight: 600,
+            letterSpacing: 1.6,
+            color: t.inkSoft,
+            textTransform: "uppercase",
+          }}
+        >
+          Pack {pad2(pack.number)} · {pack.title}
+        </Text>
+        <Text
+          style={{
+            fontSize: 7.5,
+            fontWeight: 600,
+            letterSpacing: 1.6,
+            color: t.inkSoft,
+          }}
+        >
+          {pad2(recipe.number)} / {pad2(totalRecipes)}
+        </Text>
+      </View>
+
+      {/* CARD 1 — HERO */}
+      <View
+        style={{
+          ...cardStyle,
+          padding: d.heroCardPadding,
+          flexDirection: "row",
+          gap: 14,
+          alignItems: "center",
+          marginBottom: d.cardGap,
+        }}
+        wrap={false}
+      >
+        {/* Hero-Foto links, square mit subtle Sage-Frame */}
+        {heroDataUri ? (
+          <View
+            style={{
+              width: 110,
+              height: 110,
+              borderRadius: 10,
+              overflow: "hidden",
+              borderWidth: 1,
+              borderColor: blendWithWhite(t.accent, 0.5),
+            }}
+          >
+            <Image
+              src={heroDataUri}
+              style={{ width: 110, height: 110, objectFit: "cover" }}
+            />
+          </View>
+        ) : (
+          <View
+            style={{
+              width: 110,
+              height: 110,
+              borderRadius: 10,
+              backgroundColor: blendWithWhite(t.accent, 0.85),
+            }}
+          />
+        )}
+
+        {/* Title-Block in der Mitte */}
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              fontSize: 7,
+              fontWeight: 700,
+              letterSpacing: 1.6,
+              color: t.accent,
+              textTransform: "uppercase",
+              marginBottom: 4,
+            }}
+          >
+            High Protein · Volumen
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontStyle: "italic",
+              fontSize: d.titleFontSize,
+              lineHeight: 1.02,
+              letterSpacing: -0.3,
+              color: t.ink,
+            }}
+          >
+            {recipe.title}
+          </Text>
+          {recipe.subtitle ? (
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontStyle: "italic",
+                fontSize: d.subtitleFontSize,
+                lineHeight: 1.3,
+                color: t.inkSoft,
+                marginTop: 4,
+              }}
+            >
+              «&nbsp;{recipe.subtitle}&nbsp;»
+            </Text>
+          ) : null}
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 6,
+              marginTop: 8,
+              flexWrap: "wrap",
+            }}
+          >
+            <VitalMetaPill label={`${time} Min`} theme={t} />
+            <VitalMetaPill label={recipe.difficulty} theme={t} />
+            <VitalMetaPill
+              label={`${recipe.servings}× ${portionsLbl}`}
+              theme={t}
+            />
+          </View>
+        </View>
+
+        {/* Avatar-Stempel rechts */}
+        {avatarDataUri ? (
+          <View
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 28,
+              borderWidth: 2,
+              borderColor: t.accent,
+              padding: 2,
+              backgroundColor: "#ffffff",
+            }}
+          >
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                overflow: "hidden",
+              }}
+            >
+              <Image
+                src={avatarDataUri}
+                style={{ width: 48, height: 48, objectFit: "cover" }}
+              />
+            </View>
+          </View>
+        ) : null}
+      </View>
+
+      {/* CARD 2 — NUTRITION (Donuts + Mikros) */}
+      <View
+        style={{
+          ...cardStyle,
+          padding: d.nutritionCardPadding,
+          marginBottom: d.cardGap,
+        }}
+        wrap={false}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 10,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 8,
+              fontWeight: 700,
+              letterSpacing: 1.6,
+              color: t.inkSoft,
+              textTransform: "uppercase",
+            }}
+          >
+            Nährstoff-Profil ·{" "}
+            {nutritionBasisInline(recipe.nutritionBasis)}
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}>
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: 22,
+                color: t.ink,
+                lineHeight: 1,
+              }}
+            >
+              {recipe.nutrition.kcal}
+            </Text>
+            <Text
+              style={{
+                fontSize: 8,
+                fontWeight: 700,
+                letterSpacing: 1.4,
+                color: t.inkSoft,
+                textTransform: "uppercase",
+              }}
+            >
+              kcal
+            </Text>
+          </View>
+        </View>
+
+        <View style={{ flexDirection: "row", gap: 16 }}>
+          {/* Drei Donut-Ringe links */}
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 14,
+              alignItems: "flex-start",
+            }}
+          >
+            {macros.map((m) => (
+              <VitalMacroDonut
+                key={m.label}
+                label={m.label}
+                value={m.value}
+                max={m.max}
+                unit={m.unit}
+                radius={d.donutRadius}
+                valueFontSize={d.donutValueSize}
+                theme={t}
+              />
+            ))}
+          </View>
+
+          {/* Mikros als horizontaler Pearl-Strip rechts */}
+          {micros.length > 0 ? (
+            <View
+              style={{
+                flex: 1,
+                paddingLeft: 16,
+                borderLeftWidth: 0.5,
+                borderLeftColor: blendWithWhite(t.accent, 0.45),
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 7,
+                  fontWeight: 700,
+                  letterSpacing: 1.4,
+                  color: t.inkSoft,
+                  textTransform: "uppercase",
+                  marginBottom: 6,
+                }}
+              >
+                Reich an · % Tagesbedarf
+              </Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: 5,
+                }}
+              >
+                {micros.map((m) => (
+                  <VitalMicroPearl key={m.name} micro={m} theme={t} />
+                ))}
+              </View>
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      {/* CARD 3 — RECIPE BODY (Zutaten + Steps) */}
+      <View
+        style={{
+          ...cardStyle,
+          padding: d.bodyCardPadding,
+          flexDirection: "row",
+          gap: 16,
+          flex: 1,
+          marginBottom: d.cardGap,
+        }}
+      >
+        {/* ZUTATEN — Menu-Card mit Dot-Leader */}
+        <View
+          style={{
+            width: "44%",
+            paddingRight: 14,
+            borderRightWidth: 0.5,
+            borderRightColor: blendWithWhite(t.accent, 0.45),
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 8,
+              fontWeight: 700,
+              letterSpacing: 1.6,
+              color: t.accent,
+              textTransform: "uppercase",
+              marginBottom: 8,
+            }}
+          >
+            Zutaten · {recipe.ingredients.length} Items
+          </Text>
+          {grouped.map((group, gi) => (
+            <View key={gi} style={{ marginBottom: gi < grouped.length - 1 ? 9 : 0 }}>
+              {group.name ? (
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontStyle: "italic",
+                    fontSize: 9.5,
+                    color: t.inkSoft,
+                    marginBottom: 4,
+                  }}
+                >
+                  {group.name}
+                </Text>
+              ) : null}
+              {group.items.map((ing, ii) => (
+                <View
+                  key={ii}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "baseline",
+                    paddingVertical: d.ingRowPadV,
+                    gap: 10,
+                    borderBottomWidth: 0.4,
+                    borderBottomColor: blendWithWhite(t.accent, 0.55),
+                  }}
+                  wrap={false}
+                >
+                  <Text
+                    style={{
+                      width: 48,
+                      fontSize: d.ingFontSize,
+                      fontWeight: 600,
+                      color: t.accent,
+                      letterSpacing: 0.2,
+                    }}
+                  >
+                    {ing.amount || "n. A."}
+                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: d.ingFontSize,
+                        color: t.ink,
+                        lineHeight: 1.25,
+                      }}
+                    >
+                      {ing.name}
+                    </Text>
+                    {ing.note ? (
+                      <Text
+                        style={{
+                          fontSize: d.ingNoteFontSize,
+                          fontStyle: "italic",
+                          color: t.inkSoft,
+                          lineHeight: 1.3,
+                          marginTop: 1,
+                        }}
+                      >
+                        {ing.note}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+
+        {/* ANWEISUNGEN — Numbered with Time-Marker */}
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              fontSize: 8,
+              fontWeight: 700,
+              letterSpacing: 1.6,
+              color: t.accent,
+              textTransform: "uppercase",
+              marginBottom: 8,
+            }}
+          >
+            Anweisungen · {(recipe.steps ?? []).length} Schritte · {time} Min
+          </Text>
+          {stepGroups.map((group, gi) => (
+            <View key={gi} style={{ marginBottom: gi < stepGroups.length - 1 ? 9 : 0 }}>
+              {group.name ? (
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontStyle: "italic",
+                    fontSize: 9.5,
+                    color: t.inkSoft,
+                    marginBottom: 4,
+                  }}
+                >
+                  {group.name}
+                </Text>
+              ) : null}
+              {group.items.map((step, si) => (
+                <View
+                  key={si}
+                  style={{
+                    flexDirection: "row",
+                    gap: 8,
+                    marginBottom: d.stepGap,
+                  }}
+                  wrap={false}
+                >
+                  <View
+                    style={{
+                      width: 22,
+                      paddingTop: 1,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: "Fraunces",
+                        fontSize: d.stepFontSize + 4,
+                        color: t.accent,
+                        lineHeight: 1,
+                      }}
+                    >
+                      {pad2(si + 1)}
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontSize: d.stepFontSize,
+                      lineHeight: 1.45,
+                      color: t.ink,
+                    }}
+                  >
+                    {typeof step === "string" ? step : step.text}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* FOOTER — Brand-Signatur + QR-Stempel-Card */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: 6,
+          paddingTop: 4,
+        }}
+        wrap={false}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontStyle: "italic",
+              fontSize: 13,
+              color: t.ink,
+            }}
+          >
+            {brand.signature}
+          </Text>
+          <Text
+            style={{
+              fontSize: 7,
+              fontWeight: 700,
+              letterSpacing: 1.4,
+              color: t.inkSoft,
+              textTransform: "uppercase",
+            }}
+          >
+            {brand.handle} · {pack.title}
+          </Text>
+        </View>
+
+        {qrDataUri ? (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              paddingHorizontal: 9,
+              paddingVertical: 6,
+              backgroundColor: blendWithWhite(t.accent, 0.78),
+              borderRadius: 5,
+              borderWidth: 0.5,
+              borderColor: blendWithWhite(t.accent, 0.45),
+            }}
+          >
+            <View style={{ alignItems: "flex-end", maxWidth: 80 }}>
+              <Text
+                style={{
+                  fontFamily: "Fraunces",
+                  fontStyle: "italic",
+                  fontSize: 9.5,
+                  color: t.ink,
+                  lineHeight: 1.15,
+                  textAlign: "right",
+                }}
+              >
+                {recipe.sourceLabel ?? "Original-Reel"}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 6,
+                  fontWeight: 700,
+                  letterSpacing: 1.4,
+                  color: t.inkSoft,
+                  textTransform: "uppercase",
+                  marginTop: 2,
+                }}
+              >
+                Smartphone scannen
+              </Text>
+            </View>
+            <View
+              style={{
+                width: 34,
+                height: 34,
+                padding: 2,
+                backgroundColor: "#ffffff",
+                borderRadius: 3,
+              }}
+            >
+              <Image
+                src={qrDataUri}
+                style={{ width: 30, height: 30 }}
+              />
+            </View>
+          </View>
+        ) : null}
+      </View>
+    </Page>
+  );
+}
+
+// Vital-Layout helper components ──────────────────────────────────────────
+
+function VitalMetaPill({
+  label,
+  theme,
+}: {
+  label: string;
+  theme: ReturnType<typeof packTheme>;
+}) {
+  return (
+    <View
+      style={{
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 10,
+        backgroundColor: blendWithWhite(theme.accent, 0.82),
+        borderWidth: 0.5,
+        borderColor: blendWithWhite(theme.accent, 0.55),
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 7.5,
+          fontWeight: 600,
+          letterSpacing: 0.6,
+          color: theme.ink,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function VitalMacroDonut({
+  label,
+  value,
+  max,
+  unit,
+  radius,
+  valueFontSize,
+  theme,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  unit: string;
+  radius: number;
+  valueFontSize: number;
+  theme: ReturnType<typeof packTheme>;
+}) {
+  const stroke = 4.5;
+  const size = radius * 2 + stroke * 2 + 4;
+  const cx = size / 2;
+  const cy = size / 2;
+  const sweepDeg = Math.min(360, (value / max) * 360);
+  const path = vitalArcPath(cx, cy, radius, sweepDeg);
+  const ringBg = blendWithWhite(theme.accent, 0.82);
+  return (
+    <View style={{ alignItems: "center", gap: 5 }}>
+      <View style={{ width: size, height: size, position: "relative" }}>
+        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          <Circle
+            cx={cx}
+            cy={cy}
+            r={radius}
+            stroke={ringBg}
+            strokeWidth={stroke}
+            fill="none"
+          />
+          {path ? (
+            <Path
+              d={path}
+              stroke={theme.accent}
+              strokeWidth={stroke}
+              fill="none"
+              strokeLinecap="round"
+            />
+          ) : null}
+        </Svg>
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: valueFontSize + 1,
+              fontWeight: 600,
+              color: theme.ink,
+              lineHeight: 1,
+            }}
+          >
+            {value}
+            {unit}
+          </Text>
+        </View>
+      </View>
+      <Text
+        style={{
+          fontSize: 7,
+          fontWeight: 700,
+          letterSpacing: 1.2,
+          color: theme.inkSoft,
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function VitalMicroPearl({
+  micro,
+  theme,
+}: {
+  micro: { name: string; amount: string; pctDaily?: number };
+  theme: ReturnType<typeof packTheme>;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        borderWidth: 0.5,
+        borderColor: blendWithWhite(theme.accent, 0.45),
+        backgroundColor: blendWithWhite(theme.accent, 0.88),
+        borderRadius: 999,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+      }}
+    >
+      <View
+        style={{
+          width: 4,
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: theme.accent,
+        }}
+      />
+      <Text style={{ fontSize: 7.5, fontWeight: 600, color: theme.ink }}>
+        {micro.name}
+      </Text>
+      <Text style={{ fontSize: 6.5, color: theme.inkSoft }}>
+        {micro.amount}
+      </Text>
+      {micro.pctDaily ? (
+        <Text
+          style={{
+            fontSize: 6.5,
+            fontWeight: 700,
+            color: theme.accent,
+          }}
+        >
+          {micro.pctDaily}%
+        </Text>
+      ) : null}
+    </View>
   );
 }
 

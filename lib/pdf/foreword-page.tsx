@@ -27,6 +27,10 @@ const VARIANTS: Record<
 > = {
   patisserie: PatisserieForewordPage,
   sport: SportForewordPage,
+  // Vital ist das neue Pack-2-Layout (Card-Stack mit Donut-Ringen). Foreword
+  // teilt den Sport-Style — Sage-Green-Accent + Bold-Sans-Greeting + Stillleben
+  // mit Akzent-Border passt visuell zur Vital-Recipe-Card.
+  vital: SportForewordPage,
   minimal: MinimalForewordPage,
   dashboard: DashboardForewordPage,
   editorial: EditorialForewordPage,
