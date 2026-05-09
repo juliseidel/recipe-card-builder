@@ -27,51 +27,58 @@ Backwerk-Lavender-Bereich zu gehen.
 
 Akzent `#b07a2a`, Ink `#2b1f10`, Ink-Soft `#5e4720`.
 
-## Layout — `editorial`
+## Layout — `amber` (Sunset-Editorial Premium)
 
 | Element | Was es macht |
 |---|---|
-| **Mikronährstoff-Banner** | **Vor** dem Body (statt im Footer wie in den anderen Packs), animierte Bars für die Top-6-Mikros nach % EU-Tagesbedarf |
-| **4-Tile-Stat-Block** | Kalorien · Protein · Zeit · Schwierigkeit als 4 große Kacheln — sofort lesbar |
-| **Bienes-Story als Pull-Quote** | Italic-Block, der die Geschichte hinter dem Rezept erzählt — "Das hier ist mein Go-To, wenn ich nach dem Training schnell was Sattes brauche" |
-| **2-Spalten-Body** | Zutaten links, Schritte rechts — Magazin-Layout, nicht Kochbuch |
+| **Hero zentriert mit Honey-Halo** | Hero-Foto in Page-Mitte, eingebettet in subtile Honey-getönte Padding-Schicht — wirkt wie ein "Glow" um das Bild. Anders als alle 6 Layouts (links/rechts/full-bleed/in Sidebar) |
+| **Avatar-Stempel oben rechts auf Hero** | Bienes Foto als runder Stempel mit Honey-Ring, sitzt auf dem Hero-Bild oben rechts — analog zu Pack 1 (Patisserie) und Pack 3 (Cookbook), aber mit Honey statt Lavender/Mint |
+| **Title zentriert** | Display-Italic in groß, mit "HAUPTGERICHTE"-Eyebrow oben und «Subtitle italic» darunter — Magazin-Spread-Stil |
+| **Stat-Ribbon (typografisch)** | Big Display-Numbers + small uppercase Labels in einer Zeile: `313 KCAL · 15g EIWEISS · 34g KOHLENH. · 12g FETT`. Ohne Tiles, ohne Donuts, ohne Bars, ohne Pills — pure Typografie. Anders als alle 6 |
+| **Body 2-spaltig** | Zutaten links mit Honey-Akzent in den Mengen, Schritte rechts mit Roman-Style-Numbering (01, 02, 03) — sauber und ruhig |
+| **Mikronährstoff-Bar-List** | Vertikal gestapelte Mikros mit Name links, Wert mitte, horizontaler Honey-%-Bar und %-Indikator rechts. Anders als Pills/Pearls/Banner aus den anderen Packs |
+| **Footer mit Avatar + QR-Stempel-Card** | Brand-Signatur "Deine Biene 🐝" mit kleinem Avatar links + Honey-getönte QR-Stempel-Card rechts (analog Pack 1, 3, Vital) |
 
 ## Warum diese Layout-Wahl
 
-Hauptgerichte mit 30–55g Protein pro Portion sind das, womit Biene ihren
-**ernährungswissenschaftlichen Anspruch** beweist. Die Mikros sind hier
-nicht nur "Bonus-Info" — sie sind das **Beweismittel**.
+Pack 05 ist Bienes **ernährungsphysiologisches Zugpferd**. Hauptgerichte
+mit 30–55g Protein pro Portion sind das, womit sie ihren Anspruch als
+WPF-Co-Autorin und Bikini-Athletin beweist. Das Layout muss das spiegeln —
+ohne in "Sport-Tracker-App"-Aesthetik abzudriften.
 
-Die anderen 4 Layouts haben Mikros im Footer. Pack 05 macht eine bewusste
-Inversion: **Mikros oben, prominent, mit animierten Bars und %-EU-NRV-
-Werten**. Das ist ein klares "look at this"-Statement.
+**Sunset-Editorial-Premium** trifft genau das: Wie eine Doppelseite aus
+Bon Appétit oder Saveur Magazine. Das Hero ist groß und zentral mit
+Honey-Glow drumherum — wirkt wie ein Foto-Editorial. Der typografische
+Stat-Ribbon ist anders als alle anderen Packs: keine Boxen, keine
+Diagramme, nur reine Display-Numbers — fühlt sich teurer an als Tiles.
 
-Plus: Editorial-Layout fühlt sich wie ein Kochbuch an, das man **liest**,
-nicht nur konsultiert. Die Story als Pull-Quote macht aus jedem Rezept
-einen kleinen Bienes-Monolog, der zur Brand-Tonalität ("warm, persönlich,
-deine Freundin") passt. Das hier ist das einzige Pack, das man in einem
-Café mit Kaffee daneben durchblättert — nicht in der Küche unter Zeitdruck.
+Die Mikronährstoff-Bar-List unten ist die zweite Signatur-Move: jeder
+Mikro mit eigenem horizontalen %-Bar in Honey, gestapelt wie ein
+Diagnostik-Report. Anders als Pills (Sport/Minimal/Dashboard), Pearls
+(Vital), oder Banner-with-stats (alt-Editorial). Es **liest sich wie
+ein Befund**, ist aber visuell warm dank Honey.
 
-## Edge-Case-Trick: Mikros vor Body, nicht danach
+Plus: Avatar prominent oben auf dem Hero + QR-Stempel-Card im Footer
+schließen das Pack-Universum visuell zu Pack 1 und 3 — der Reader
+erkennt Biene auf jedem Pack-Cover sofort.
 
-Das hier ist die wichtigste Designentscheidung des ganzen Tools. In den
-Pack 1–4 sitzen die Mikros im Footer (Standard-Position). In Pack 05
-**ziehen wir sie nach oben**, prominent, vor den eigentlichen Rezept-Body.
+## Anti-Pattern, das wir bewusst vermeiden
 
-Warum: Der Brief sagt, dass Nährwerte "klar und ansprechend dargestellt
-werden müssen — bei einem Tool wie diesem ist das ein zentraler Mehrwert".
-Pack 05 macht das **explizit zum Statement**. Es zeigt, dass das Tool
-flexibel genug ist, die Hierarchie pro Pack umzukehren — nicht "ein
-Layout für alle".
+Pack 05 hatte vorher das `editorial`-Layout mit Mikronährstoff-Banner
+*vor* dem Body, 4-Tile-Stat-Block, Pull-Quote für Bienes-Story. Das
+**funktionierte technisch**, sah aber **nicht premium genug** aus —
+zu viele Boxes, zu strukturiert, zu wenig Atemraum um das Hero-Foto.
+Das neue `amber`-Layout dreht das um: Hero ist der Star, Inhalte
+fließen darunter ruhig und magazin-artig.
 
 ## Brand-Match-Check
 
 | Anti-Pattern (was wir NICHT tun) | Was Pack 05 stattdessen macht |
 |---|---|
-| ❌ "PROTEIN BOMB!"-Schreierei | ✅ Editorial-Magazin-Layout, ruhig, autoritativ |
-| ❌ Bunte Macro-Pie-Charts | ✅ Animierte Mikro-Bars, sortiert nach % EU-NRV |
+| ❌ "PROTEIN BOMB!"-Schreierei | ✅ Sunset-Editorial-Layout, ruhig, autoritativ |
+| ❌ Bunte Macro-Pie-Charts | ✅ Typografischer Stat-Ribbon + Mikro-Bar-List |
 | ❌ Pinterest-Kuppeltorten-Foto | ✅ Honest Foodfoto, nah dran, Bienes-Style |
-| ❌ "FOR HER" / "ABNEHM-WUNDER" | ✅ Sachliche Bienes-Story als Pull-Quote |
+| ❌ "FOR HER" / "ABNEHM-WUNDER" | ✅ Hero-zentrale Komposition, Honey-Glow, Magazin-Aesthetik |
 
 ## Beispiel-Rezepte aus diesem Pack
 

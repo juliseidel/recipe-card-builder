@@ -75,6 +75,8 @@ export function RecipeCardFull(props: RecipeCardFullProps) {
       return <DashboardLayout {...props} />;
     case "vital":
       return <VitalLayout {...props} />;
+    case "amber":
+      return <AmberLayout {...props} />;
   }
 }
 
@@ -2360,6 +2362,404 @@ function VitalMacroDonut({
         style={{ color: inkSoft }}
       >
         {label}
+      </span>
+    </div>
+  );
+}
+
+
+// ════════════════════════════════════════════════
+// LAYOUT 7: AMBER (Sunset-Editorial Premium) — Pack 5 (Feierabend, Honey)
+// Hero zentriert mit Honey-Glow-Halo, Avatar-Stempel oben rechts,
+// typografischer Macro-Stat-Ribbon, Mikronaehrstoffe als vertikale
+// Bar-List, QR-Stempel-Card im Footer.
+//
+// Mirrors AmberPage in lib/pdf/recipe-card-pdf.tsx — gleicher Look,
+// gleiches Halo-Pattern, gleiche Mikro-Bar-Visualisierung.
+// ════════════════════════════════════════════════
+function AmberLayout({
+  brand,
+  pack,
+  recipe,
+  totalRecipes,
+  enriching,
+}: RecipeCardFullProps) {
+  const totalTime = recipe.prepTime + (recipe.cookTime ?? 0);
+  const portionsLbl = recipe.servings === 1 ? "Portion" : "Portionen";
+  const grouped = groupIngredients(recipe.ingredients);
+  const stepsArr = recipe.steps ?? [];
+  const normSteps = stepsArr.map((s) =>
+    typeof s === "string" ? { text: s, group: undefined as string | undefined } : s
+  );
+  const micros = (recipe.nutrition.micros ?? []).slice(0, 6);
+  const stats = [
+    { value: String(recipe.nutrition.kcal), label: "kcal" },
+    { value: `${recipe.nutrition.protein}g`, label: "Eiweiß" },
+    { value: `${recipe.nutrition.carbs}g`, label: "Kohlenh." },
+    { value: `${recipe.nutrition.fat}g`, label: "Fett" },
+  ];
+
+  return (
+    <div className="mx-auto w-full max-w-[940px]">
+      {/* TOP STRIP */}
+      <div
+        className="flex items-center justify-between px-2 pb-3 text-[10.5px] font-semibold uppercase tracking-[0.22em]"
+        style={{ color: pack.mood.inkSoft }}
+      >
+        <span>
+          Pack {String(pack.number).padStart(2, "0")} · {pack.title}
+        </span>
+        <span>
+          {String(recipe.number).padStart(2, "0")} /{" "}
+          {String(totalRecipes).padStart(2, "0")}
+        </span>
+      </div>
+
+      {/* HERO mit HONEY-HALO + AVATAR-STEMPEL */}
+      <div className="relative flex flex-col items-center pb-5 pt-6">
+        {/* Halo */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 mx-auto"
+          style={{
+            background: `radial-gradient(ellipse 60% 70% at 50% 45%, ${pack.mood.accent}38, transparent 65%)`,
+          }}
+        />
+
+        {/* Hero centered */}
+        <div
+          className="relative aspect-[16/10] w-full max-w-[480px] overflow-hidden rounded-3xl border"
+          style={{
+            borderColor: pack.mood.accent + "55",
+            boxShadow: `0 20px 50px -25px ${pack.mood.accent}66, 0 1px 0 ${pack.mood.accent}33`,
+          }}
+        >
+          {enriching?.hero ? (
+            <HeroSkeleton pack={pack} />
+          ) : (
+            <Image
+              src={recipe.hero ?? pack.coverImage}
+              alt={recipe.title}
+              fill
+              sizes="(min-width: 1024px) 480px, 100vw"
+              className="object-cover content-fade-in"
+              priority
+            />
+          )}
+
+          {/* Avatar-Stempel oben rechts auf dem Hero */}
+          <div
+            className="absolute right-4 top-4 size-[64px] overflow-hidden rounded-full border-[3px] p-[3px]"
+            style={{
+              borderColor: pack.mood.accent,
+              background: "white",
+              boxShadow: `0 6px 14px -4px ${pack.mood.ink}55`,
+            }}
+          >
+            <div className="size-full overflow-hidden rounded-full">
+              <Image
+                src={brand.avatar}
+                alt={brand.name}
+                width={56}
+                height={56}
+                className="size-full object-cover"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* TITLE-BLOCK */}
+      <div className="flex flex-col items-center px-4 pb-6 text-center">
+        <span
+          className="mb-2 text-[10.5px] font-bold uppercase tracking-[0.26em]"
+          style={{ color: pack.mood.accent }}
+        >
+          {pack.category}
+        </span>
+        <h1
+          className="font-display text-[40px] italic leading-[0.96] tracking-[-0.01em] sm:text-[54px]"
+          style={{ color: pack.mood.ink }}
+        >
+          {recipe.title}
+        </h1>
+        {recipe.subtitle ? (
+          <p
+            className="mt-2 font-display text-[16px] italic leading-snug"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            «&nbsp;{recipe.subtitle}&nbsp;»
+          </p>
+        ) : null}
+        <p
+          className="mt-2 text-[12.5px]"
+          style={{ color: pack.mood.inkSoft, letterSpacing: "0.04em" }}
+        >
+          {totalTime} Min · {recipe.difficulty} · {recipe.servings}× {portionsLbl}
+        </p>
+      </div>
+
+      {/* STAT-RIBBON — typografisch, ohne Boxes */}
+      <div
+        className="flex flex-wrap items-baseline justify-center gap-x-6 gap-y-2 border-y py-4"
+        style={{
+          borderColor: pack.mood.accent + "55",
+        }}
+      >
+        {stats.map((s, i) => (
+          <div key={s.label} className="flex items-baseline gap-1.5">
+            <span
+              className="font-display text-[28px] leading-none sm:text-[34px]"
+              style={{ color: pack.mood.ink }}
+            >
+              {enriching?.micros && s.label === "kcal" ? "—" : s.value}
+            </span>
+            <span
+              className="text-[10px] font-bold uppercase tracking-[0.2em]"
+              style={{ color: pack.mood.inkSoft }}
+            >
+              {s.label}
+            </span>
+            {i < stats.length - 1 ? (
+              <span
+                aria-hidden
+                className="ml-3 text-[14px]"
+                style={{ color: pack.mood.accent }}
+              >
+                ·
+              </span>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      {/* BODY — 2-Spalten */}
+      <div className="grid grid-cols-1 gap-7 px-2 py-7 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)]">
+        {/* ZUTATEN */}
+        <div
+          className="lg:border-r lg:pr-7"
+          style={{ borderColor: pack.mood.accent + "33" }}
+        >
+          <div
+            className="mb-4 text-[10.5px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: pack.mood.accent }}
+          >
+            Zutaten · {recipe.ingredients.length} Items
+          </div>
+          <div className="flex flex-col">
+            {grouped.map((group, gi) => (
+              <div key={gi} className={gi < grouped.length - 1 ? "mb-4" : ""}>
+                {group.name ? (
+                  <div
+                    className="mb-1.5 font-display text-[14px] italic"
+                    style={{ color: pack.mood.inkSoft }}
+                  >
+                    {group.name}
+                  </div>
+                ) : null}
+                {group.items.map((ing, ii) => (
+                  <div
+                    key={ii}
+                    className="flex gap-3 border-b py-2 last:border-b-0"
+                    style={{ borderColor: pack.mood.accent + "26" }}
+                  >
+                    <span
+                      className="w-14 shrink-0 text-[12.5px] font-semibold"
+                      style={{ color: pack.mood.accent }}
+                    >
+                      {ing.amount || "n. A."}
+                    </span>
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span
+                        className="text-[13px] leading-snug"
+                        style={{ color: pack.mood.ink }}
+                      >
+                        {ing.name}
+                      </span>
+                      {ing.note ? (
+                        <span
+                          className="mt-0.5 text-[11px] italic leading-snug"
+                          style={{ color: pack.mood.inkSoft }}
+                        >
+                          {ing.note}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ZUBEREITUNG */}
+        <div>
+          <div
+            className="mb-4 text-[10.5px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: pack.mood.accent }}
+          >
+            Zubereitung · {normSteps.length} Schritte · {totalTime} Min
+          </div>
+          <ol className="flex flex-col gap-3.5">
+            {normSteps.map((step, si) => (
+              <li key={si} className="flex gap-3">
+                <span
+                  className="w-7 shrink-0 pt-0.5 font-display text-[20px] leading-none"
+                  style={{ color: pack.mood.accent }}
+                >
+                  {String(si + 1).padStart(2, "0")}
+                </span>
+                <span
+                  className="flex-1 text-[13px] leading-relaxed"
+                  style={{ color: pack.mood.ink }}
+                >
+                  {step.text}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+
+      {/* MIKROS — vertikale Bar-List */}
+      {micros.length > 0 || enriching?.micros ? (
+        <div
+          className="border-t px-2 py-5"
+          style={{ borderColor: pack.mood.accent + "55" }}
+        >
+          <div
+            className="mb-3 text-[10.5px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: pack.mood.accent }}
+          >
+            Nährstoff-Profil ·{" "}
+            {recipe.nutritionBasis === "piece"
+              ? "pro Stück"
+              : recipe.nutritionBasis === "per100g"
+                ? "pro 100 g"
+                : recipe.nutritionBasis === "total"
+                  ? "gesamt"
+                  : "pro Portion"}
+          </div>
+          {enriching?.micros ? (
+            <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-6 animate-pulse rounded"
+                  style={{
+                    background: pack.mood.accent + "20",
+                    animationDelay: `${i * 80}ms`,
+                  }}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-x-7 gap-y-1.5 lg:grid-cols-2">
+              {micros.map((m) => (
+                <AmberMicroBarWeb key={m.name} micro={m} pack={pack} />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {/* FOOTER — Brand-Signatur + QR-Stempel-Card */}
+      <div
+        className="flex flex-wrap items-center justify-between gap-3 border-t px-2 pt-5"
+        style={{ borderColor: pack.mood.accent + "33" }}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="size-9 overflow-hidden rounded-full border-2 p-[2px]"
+            style={{ borderColor: pack.mood.accent, background: "white" }}
+          >
+            <div className="size-full overflow-hidden rounded-full">
+              <Image
+                src={brand.avatar}
+                alt={brand.name}
+                width={32}
+                height={32}
+                className="size-full object-cover"
+              />
+            </div>
+          </div>
+          <div className="flex flex-col leading-tight">
+            <span
+              className="font-display text-[16px] italic"
+              style={{ color: pack.mood.ink }}
+            >
+              {brand.signature}
+            </span>
+            <span
+              className="text-[10px] font-bold uppercase tracking-[0.18em]"
+              style={{ color: pack.mood.inkSoft }}
+            >
+              {brand.handle} · {pack.title}
+            </span>
+          </div>
+        </div>
+        {recipe.sourceUrl ? (
+          <a
+            href={recipe.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-80"
+            style={{
+              borderColor: pack.mood.accent + "55",
+              background: pack.mood.accent + "18",
+              color: pack.mood.ink,
+            }}
+          >
+            <span>Original-Reel</span>
+            <span aria-hidden style={{ color: pack.mood.accent }}>
+              →
+            </span>
+          </a>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function AmberMicroBarWeb({
+  micro,
+  pack,
+}: {
+  micro: { name: string; amount: string; pctDaily?: number };
+  pack: Pack;
+}) {
+  const pct = Math.max(0, Math.min(100, micro.pctDaily ?? 0));
+  return (
+    <div className="flex items-center gap-2.5 py-1">
+      <span
+        className="w-20 shrink-0 truncate text-[11.5px] font-semibold"
+        style={{ color: pack.mood.ink }}
+      >
+        {micro.name}
+      </span>
+      <span
+        className="w-14 shrink-0 text-[10.5px]"
+        style={{ color: pack.mood.inkSoft }}
+      >
+        {micro.amount}
+      </span>
+      <div
+        className="relative h-1.5 flex-1 overflow-hidden rounded-full"
+        style={{ background: pack.mood.accent + "26" }}
+      >
+        <div
+          className="absolute inset-y-0 left-0 rounded-full"
+          style={{
+            width: `${pct}%`,
+            background: pack.mood.accent,
+          }}
+        />
+      </div>
+      <span
+        className="w-10 shrink-0 text-right text-[11px] font-bold tabular-nums"
+        style={{ color: pack.mood.accent }}
+      >
+        {pct}%
       </span>
     </div>
   );

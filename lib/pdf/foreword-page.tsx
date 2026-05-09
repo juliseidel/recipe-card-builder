@@ -34,6 +34,10 @@ const VARIANTS: Record<
   minimal: MinimalForewordPage,
   dashboard: DashboardForewordPage,
   editorial: EditorialForewordPage,
+  // Amber ist das neue Pack-5-Layout (Sunset-Editorial mit Honey-Halo).
+  // Editorial-Foreword passt visuell — Honey-Mood, Stillleben in Frame,
+  // Editorial-Magazine-Tonalitaet.
+  amber: EditorialForewordPage,
 };
 
 export function ForewordPage(props: ForewordPageProps) {

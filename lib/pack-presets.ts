@@ -13,11 +13,18 @@ export type LayoutPreset = {
 
 export const layoutPresets: LayoutPreset[] = [
   {
+    id: "amber",
+    title: "Amber",
+    description:
+      "Sunset-Editorial Premium: Hero zentriert mit Honey-Glow-Halo, Avatar-Stempel mit Honey-Ring, typografischer Macro-Stat-Ribbon (Big-Numbers in einer Zeile), Mikronährstoffe als vertikale Bar-Liste mit %-Indikator. Wie eine Doppelseite aus Bon Appétit / Saveur.",
+    bestFor: "Hauptmahlzeiten, Sattmacher, Feierabend-Klassiker",
+  },
+  {
     id: "editorial",
-    title: "Editorial",
+    title: "Editorial (Klassisch)",
     description:
       "Magazine-Look mit großem Hero-Bild und Mikronährstoff-Banner oben. Title-Section überschneidet das Foto, Stats in 4 Tiles, Pull-Quote für Bienes Story.",
-    bestFor: "Hauptmahlzeiten, Mealprep, hohe Protein-Werte",
+    bestFor: "Älteres Hauptmahlzeiten-Layout — wir empfehlen Amber stattdessen",
   },
   {
     id: "patisserie",

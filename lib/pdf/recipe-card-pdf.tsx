@@ -62,6 +62,7 @@ const LAYOUTS: Record<CardLayout, (p: RecipeCardPdfProps) => React.JSX.Element> 
   sport: SportPage,
   dashboard: DashboardPage,
   vital: VitalPage,
+  amber: AmberPage,
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -3769,6 +3770,790 @@ function VitalMicroPearl({
           {micro.pctDaily}%
         </Text>
       ) : null}
+    </View>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// LAYOUT 7: AMBER — Pack 5 (Feierabend-Klassiker, Honey) — NEW
+// ═════════════════════════════════════════════════════════════════════════════
+// Sunset-Editorial Premium-Spread. Wie eine Doppelseite aus Bon Appétit /
+// Saveur Magazine. Differenziert sich von allen 6 anderen Layouts durch:
+//   - Hero ZENTRIERT mit Honey-Glow-Halo (SVG radial gradient) — gibt es
+//     nirgends sonst, alle anderen haben Hero links/rechts/full-bleed
+//   - Avatar als runder Stempel mit Honey-Ring oben rechts auf dem Hero
+//     (analog zu Pack 3 Cookbook-Cover, aber mit Honey statt Mint)
+//   - Macros als TYPOGRAFISCHER Stat-Ribbon — Big Display-Numbers in einer
+//     Zeile, OHNE Tiles/Donuts/Bars/Pills, nur reine Typografie
+//   - Mikronaehrstoffe als VERTIKALE BAR-LIST — jeder Mikro mit
+//     horizontalem %-Bar rechts daneben, gestapelt wie ein Diagnostik-
+//     Report. Anders als alle Pills/Pearls/Banner-Loesungen
+//   - QR-Stempel-Card mit Honey-getoenter BG (analog Pack 1+3+Vital)
+// ═════════════════════════════════════════════════════════════════════════════
+
+const AMBER_DENSITY: Record<
+  Density,
+  {
+    heroHeight: number;
+    heroPadding: number;
+    titleFontSize: number;
+    subtitleFontSize: number;
+    titleBlockPadding: number;
+    statRibbonPadV: number;
+    statBigSize: number;
+    statRibbonGap: number;
+    bodyGap: number;
+    ingRowPadV: number;
+    ingFontSize: number;
+    ingNoteFontSize: number;
+    stepFontSize: number;
+    stepGap: number;
+    microRowPadV: number;
+    microFontSize: number;
+  }
+> = {
+  compact: {
+    heroHeight: 110,
+    heroPadding: 6,
+    titleFontSize: 22,
+    subtitleFontSize: 10.5,
+    titleBlockPadding: 6,
+    statRibbonPadV: 7,
+    statBigSize: 19,
+    statRibbonGap: 12,
+    bodyGap: 8,
+    ingRowPadV: 2,
+    ingFontSize: 8.5,
+    ingNoteFontSize: 6.5,
+    stepFontSize: 8.5,
+    stepGap: 4,
+    microRowPadV: 1.5,
+    microFontSize: 8,
+  },
+  balanced: {
+    heroHeight: 134,
+    heroPadding: 7,
+    titleFontSize: 28,
+    subtitleFontSize: 11.5,
+    titleBlockPadding: 8,
+    statRibbonPadV: 8,
+    statBigSize: 23,
+    statRibbonGap: 16,
+    bodyGap: 11,
+    ingRowPadV: 2.5,
+    ingFontSize: 9,
+    ingNoteFontSize: 7,
+    stepFontSize: 9,
+    stepGap: 6,
+    microRowPadV: 2,
+    microFontSize: 8.5,
+  },
+  spacious: {
+    heroHeight: 162,
+    heroPadding: 8,
+    titleFontSize: 34,
+    subtitleFontSize: 12.5,
+    titleBlockPadding: 12,
+    statRibbonPadV: 10,
+    statBigSize: 27,
+    statRibbonGap: 20,
+    bodyGap: 14,
+    ingRowPadV: 3.5,
+    ingFontSize: 9.5,
+    ingNoteFontSize: 7.5,
+    stepFontSize: 9.5,
+    stepGap: 8,
+    microRowPadV: 2.5,
+    microFontSize: 9,
+  },
+};
+
+function AmberPage({
+  brand,
+  pack,
+  recipe,
+  totalRecipes,
+  heroDataUri,
+  qrDataUri,
+  avatarDataUri,
+}: RecipeCardPdfProps) {
+  const t = packTheme(pack);
+  const time = totalTime(recipe);
+  const portionsLbl = portionsLabel(recipe.servings);
+  const density = getDensity(recipe);
+  const d = AMBER_DENSITY[density];
+  const grouped = groupIngredients(recipe.ingredients);
+  const stepGroups = groupSteps(recipe.steps ?? []);
+  const micros = (recipe.nutrition.micros ?? []).slice(0, 6);
+
+  // Stat-Ribbon-Werte. Nur kcal + 3 Macros, alles inline.
+  const stats = [
+    { value: String(recipe.nutrition.kcal), label: "kcal" },
+    { value: `${recipe.nutrition.protein}g`, label: "Eiweiß" },
+    { value: `${recipe.nutrition.carbs}g`, label: "Kohlenh." },
+    { value: `${recipe.nutrition.fat}g`, label: "Fett" },
+  ];
+
+  // Honey-Halo via tinted wrapper-View (statt SVG-Gradient als absolute
+  // child) — react-pdf macht den page-break-flow stabiler, wenn alles
+  // im natural-flow liegt. Die Honey-Tönung als padding rund ums Hero
+  // gibt visuell das gleiche "Glow"-Gefühl wie ein radial gradient.
+  const heroWidth = 290;
+  const heroHeight = d.heroHeight;
+
+  return (
+    <Page
+      size="A4"
+      style={{
+        backgroundColor: blendWithWhite(t.bg, 0.55),
+        fontFamily: "Inter",
+        color: t.ink,
+        paddingHorizontal: 36,
+        paddingTop: 16,
+        paddingBottom: 14,
+      }}
+    >
+      {/* TOP STRIP */}
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          paddingBottom: 4,
+        }}
+        wrap={false}
+      >
+        <Text
+          style={{
+            fontSize: 7.5,
+            fontWeight: 600,
+            letterSpacing: 1.6,
+            color: t.inkSoft,
+            textTransform: "uppercase",
+          }}
+        >
+          Pack {pad2(pack.number)} · {pack.title}
+        </Text>
+        <Text
+          style={{
+            fontSize: 7.5,
+            fontWeight: 600,
+            letterSpacing: 1.6,
+            color: t.inkSoft,
+          }}
+        >
+          {pad2(recipe.number)} / {pad2(totalRecipes)}
+        </Text>
+      </View>
+
+      {/* HERO mit HONEY-HALO + AVATAR-STEMPEL */}
+      <View
+        style={{
+          alignItems: "center",
+          paddingTop: 6,
+          paddingBottom: 6,
+        }}
+        wrap={false}
+      >
+        {/* Halo-Wrapper: Honey-tinted padding ums Hero. Avatar absolute
+            relativ zum Wrapper, damit overlap auf der Hero-Ecke sitzt. */}
+        <View
+          style={{
+            position: "relative",
+            padding: d.heroPadding,
+            backgroundColor: blendWithWhite(t.accent, 0.86),
+            borderRadius: 14,
+          }}
+        >
+          <View
+            style={{
+              width: heroWidth,
+              height: heroHeight,
+              borderRadius: 9,
+              overflow: "hidden",
+              borderWidth: 0.5,
+              borderColor: blendWithWhite(t.accent, 0.4),
+            }}
+          >
+            {heroDataUri ? (
+              <Image
+                src={heroDataUri}
+                style={{ width: heroWidth, height: heroHeight, objectFit: "cover" }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: heroWidth,
+                  height: heroHeight,
+                  backgroundColor: blendWithWhite(t.accent, 0.7),
+                }}
+              />
+            )}
+          </View>
+
+          {/* Avatar-Stempel oben rechts auf dem Hero */}
+          {avatarDataUri ? (
+            <View
+              style={{
+                position: "absolute",
+                top: -8,
+                right: -8,
+                width: 50,
+                height: 50,
+                borderRadius: 25,
+                borderWidth: 2.2,
+                borderColor: t.accent,
+                padding: 1.8,
+                backgroundColor: "#ffffff",
+              }}
+            >
+              <View
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 21,
+                  overflow: "hidden",
+                }}
+              >
+                <Image
+                  src={avatarDataUri}
+                  style={{ width: 42, height: 42, objectFit: "cover" }}
+                />
+              </View>
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      {/* TITLE-BLOCK — zentriert */}
+      <View
+        style={{ alignItems: "center", paddingTop: 4, paddingBottom: d.titleBlockPadding }}
+        wrap={false}
+      >
+        <Text
+          style={{
+            fontSize: 7.5,
+            fontWeight: 700,
+            letterSpacing: 1.8,
+            color: t.accent,
+            textTransform: "uppercase",
+            marginBottom: 4,
+          }}
+        >
+          {pack.category}
+        </Text>
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontStyle: "italic",
+            fontSize: d.titleFontSize,
+            lineHeight: 1.04,
+            letterSpacing: -0.4,
+            color: t.ink,
+            textAlign: "center",
+          }}
+        >
+          {recipe.title}
+        </Text>
+        {recipe.subtitle ? (
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontStyle: "italic",
+              fontSize: d.subtitleFontSize,
+              lineHeight: 1.35,
+              color: t.inkSoft,
+              marginTop: 3,
+              textAlign: "center",
+            }}
+          >
+            «&nbsp;{recipe.subtitle}&nbsp;»
+          </Text>
+        ) : null}
+        <Text
+          style={{
+            fontSize: 8.5,
+            color: t.inkSoft,
+            marginTop: 4,
+            letterSpacing: 0.4,
+          }}
+        >
+          {time} Min · {recipe.difficulty} · {recipe.servings}× {portionsLbl}
+        </Text>
+      </View>
+
+      {/* STAT-RIBBON — typografisch, ohne Boxes */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "baseline",
+          justifyContent: "center",
+          gap: d.statRibbonGap,
+          paddingTop: d.statRibbonPadV,
+          paddingBottom: d.statRibbonPadV,
+          borderTopWidth: 0.7,
+          borderBottomWidth: 0.7,
+          borderTopColor: blendWithWhite(t.accent, 0.45),
+          borderBottomColor: blendWithWhite(t.accent, 0.45),
+          marginBottom: d.bodyGap,
+        }}
+        wrap={false}
+      >
+        {stats.map((s, i) => (
+          <View
+            key={s.label}
+            style={{
+              flexDirection: "row",
+              alignItems: "baseline",
+              gap: 4,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: d.statBigSize,
+                color: t.ink,
+                lineHeight: 1,
+              }}
+            >
+              {s.value}
+            </Text>
+            <Text
+              style={{
+                fontSize: 8,
+                fontWeight: 700,
+                letterSpacing: 1.4,
+                color: t.inkSoft,
+                textTransform: "uppercase",
+              }}
+            >
+              {s.label}
+            </Text>
+            {i < stats.length - 1 ? (
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: t.accent,
+                  marginLeft: 6,
+                  marginRight: -8,
+                }}
+              >
+                ·
+              </Text>
+            ) : null}
+          </View>
+        ))}
+      </View>
+
+      {/* BODY — 2-Spalten */}
+      <View
+        style={{
+          flexDirection: "row",
+          gap: 22,
+          flex: 1,
+          paddingBottom: d.bodyGap,
+        }}
+      >
+        {/* ZUTATEN */}
+        <View
+          style={{
+            width: "44%",
+            paddingRight: 14,
+            borderRightWidth: 0.5,
+            borderRightColor: blendWithWhite(t.accent, 0.4),
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 8,
+              fontWeight: 700,
+              letterSpacing: 1.6,
+              color: t.accent,
+              textTransform: "uppercase",
+              marginBottom: 8,
+            }}
+          >
+            Zutaten · {recipe.ingredients.length} Items
+          </Text>
+          {grouped.map((group, gi) => (
+            <View key={gi} style={{ marginBottom: gi < grouped.length - 1 ? 9 : 0 }}>
+              {group.name ? (
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontStyle: "italic",
+                    fontSize: 9.5,
+                    color: t.inkSoft,
+                    marginBottom: 4,
+                  }}
+                >
+                  {group.name}
+                </Text>
+              ) : null}
+              {group.items.map((ing, ii) => (
+                <View
+                  key={ii}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "baseline",
+                    paddingVertical: d.ingRowPadV,
+                    gap: 10,
+                    borderBottomWidth: 0.4,
+                    borderBottomColor: blendWithWhite(t.accent, 0.4),
+                  }}
+                  wrap={false}
+                >
+                  <Text
+                    style={{
+                      width: 48,
+                      fontSize: d.ingFontSize,
+                      fontWeight: 600,
+                      color: t.accent,
+                      letterSpacing: 0.2,
+                    }}
+                  >
+                    {ing.amount || "n. A."}
+                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: d.ingFontSize,
+                        color: t.ink,
+                        lineHeight: 1.25,
+                      }}
+                    >
+                      {ing.name}
+                    </Text>
+                    {ing.note ? (
+                      <Text
+                        style={{
+                          fontSize: d.ingNoteFontSize,
+                          fontStyle: "italic",
+                          color: t.inkSoft,
+                          lineHeight: 1.3,
+                          marginTop: 1,
+                        }}
+                      >
+                        {ing.note}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+
+        {/* ZUBEREITUNG */}
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              fontSize: 8,
+              fontWeight: 700,
+              letterSpacing: 1.6,
+              color: t.accent,
+              textTransform: "uppercase",
+              marginBottom: 8,
+            }}
+          >
+            Zubereitung · {(recipe.steps ?? []).length} Schritte · {time} Min
+          </Text>
+          {stepGroups.map((group, gi) => (
+            <View key={gi} style={{ marginBottom: gi < stepGroups.length - 1 ? 9 : 0 }}>
+              {group.name ? (
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontStyle: "italic",
+                    fontSize: 9.5,
+                    color: t.inkSoft,
+                    marginBottom: 4,
+                  }}
+                >
+                  {group.name}
+                </Text>
+              ) : null}
+              {group.items.map((step, si) => (
+                <View
+                  key={si}
+                  style={{
+                    flexDirection: "row",
+                    gap: 8,
+                    marginBottom: d.stepGap,
+                  }}
+                  wrap={false}
+                >
+                  <View style={{ width: 22, paddingTop: 1 }}>
+                    <Text
+                      style={{
+                        fontFamily: "Fraunces",
+                        fontSize: d.stepFontSize + 4,
+                        color: t.accent,
+                        lineHeight: 1,
+                      }}
+                    >
+                      {pad2(si + 1)}
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontSize: d.stepFontSize,
+                      lineHeight: 1.45,
+                      color: t.ink,
+                    }}
+                  >
+                    {typeof step === "string" ? step : step.text}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* MIKROS als VERTIKALE BAR-LIST */}
+      {micros.length > 0 ? (
+        <View
+          style={{
+            paddingTop: 7,
+            paddingBottom: 6,
+            borderTopWidth: 0.7,
+            borderTopColor: blendWithWhite(t.accent, 0.45),
+            marginBottom: 4,
+          }}
+          wrap={false}
+        >
+          <Text
+            style={{
+              fontSize: 8,
+              fontWeight: 700,
+              letterSpacing: 1.6,
+              color: t.accent,
+              textTransform: "uppercase",
+              marginBottom: 4,
+            }}
+          >
+            Nährstoff-Profil ·{" "}
+            {nutritionBasisInline(recipe.nutritionBasis)}
+          </Text>
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 18,
+            }}
+          >
+            {/* Zwei Spalten: erste 3 Mikros links, naechste 3 rechts */}
+            <View style={{ flex: 1, gap: 4 }}>
+              {micros.slice(0, 3).map((m) => (
+                <AmberMicroBar key={m.name} micro={m} theme={t} fontSize={d.microFontSize} padV={d.microRowPadV} />
+              ))}
+            </View>
+            <View style={{ flex: 1, gap: 4 }}>
+              {micros.slice(3, 6).map((m) => (
+                <AmberMicroBar key={m.name} micro={m} theme={t} fontSize={d.microFontSize} padV={d.microRowPadV} />
+              ))}
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      {/* FOOTER — Brand-Signatur + QR-Stempel-Card */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingTop: 4,
+        }}
+        wrap={false}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          {avatarDataUri ? (
+            <View
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: 13,
+                borderWidth: 1.2,
+                borderColor: t.accent,
+                padding: 1.5,
+                backgroundColor: "#ffffff",
+              }}
+            >
+              <View
+                style={{
+                  width: 21,
+                  height: 21,
+                  borderRadius: 10.5,
+                  overflow: "hidden",
+                }}
+              >
+                <Image
+                  src={avatarDataUri}
+                  style={{ width: 21, height: 21, objectFit: "cover" }}
+                />
+              </View>
+            </View>
+          ) : null}
+          <View>
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontStyle: "italic",
+                fontSize: 13,
+                color: t.ink,
+                lineHeight: 1.1,
+              }}
+            >
+              {brand.signature}
+            </Text>
+            <Text
+              style={{
+                fontSize: 7,
+                fontWeight: 700,
+                letterSpacing: 1.4,
+                color: t.inkSoft,
+                textTransform: "uppercase",
+                marginTop: 1,
+              }}
+            >
+              {brand.handle} · {pack.title}
+            </Text>
+          </View>
+        </View>
+
+        {qrDataUri ? (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              paddingHorizontal: 9,
+              paddingVertical: 6,
+              backgroundColor: blendWithWhite(t.accent, 0.78),
+              borderRadius: 5,
+              borderWidth: 0.5,
+              borderColor: blendWithWhite(t.accent, 0.45),
+            }}
+          >
+            <View style={{ alignItems: "flex-end", maxWidth: 84 }}>
+              <Text
+                style={{
+                  fontFamily: "Fraunces",
+                  fontStyle: "italic",
+                  fontSize: 10,
+                  color: t.ink,
+                  lineHeight: 1.15,
+                  textAlign: "right",
+                }}
+              >
+                {recipe.sourceLabel ?? "Original-Reel"}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 6,
+                  fontWeight: 700,
+                  letterSpacing: 1.4,
+                  color: t.inkSoft,
+                  textTransform: "uppercase",
+                  marginTop: 2,
+                }}
+              >
+                Smartphone scannen
+              </Text>
+            </View>
+            <View
+              style={{
+                width: 36,
+                height: 36,
+                padding: 2,
+                backgroundColor: "#ffffff",
+                borderRadius: 3,
+              }}
+            >
+              <Image
+                src={qrDataUri}
+                style={{ width: 32, height: 32 }}
+              />
+            </View>
+          </View>
+        ) : null}
+      </View>
+    </Page>
+  );
+}
+
+// Amber helper — vertikale Mikro-Bar-Row
+function AmberMicroBar({
+  micro,
+  theme,
+  fontSize,
+  padV,
+}: {
+  micro: { name: string; amount: string; pctDaily?: number };
+  theme: ReturnType<typeof packTheme>;
+  fontSize: number;
+  padV: number;
+}) {
+  const pct = Math.max(0, Math.min(100, micro.pctDaily ?? 0));
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        paddingVertical: padV,
+      }}
+    >
+      <Text
+        style={{
+          width: 64,
+          fontSize: fontSize,
+          fontWeight: 600,
+          color: theme.ink,
+        }}
+      >
+        {micro.name}
+      </Text>
+      <Text
+        style={{
+          fontSize: fontSize - 1,
+          color: theme.inkSoft,
+          minWidth: 42,
+        }}
+      >
+        {micro.amount}
+      </Text>
+      {/* Bar */}
+      <View
+        style={{
+          flex: 1,
+          height: 5,
+          borderRadius: 3,
+          backgroundColor: blendWithWhite(theme.accent, 0.82),
+          overflow: "hidden",
+        }}
+      >
+        <View
+          style={{
+            width: `${pct}%`,
+            height: 5,
+            backgroundColor: theme.accent,
+          }}
+        />
+      </View>
+      <Text
+        style={{
+          width: 30,
+          fontSize: fontSize - 1,
+          fontWeight: 700,
+          color: theme.accent,
+          textAlign: "right",
+        }}
+      >
+        {pct}%
+      </Text>
     </View>
   );
 }

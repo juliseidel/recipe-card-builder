@@ -496,6 +496,51 @@ export function LayoutThumbnail({
           />
         </>
       )}
+      {layout === "amber" && (
+        <>
+          {/* Hero zentriert mit Honey-Glow-Halo + Avatar oben rechts.
+              Macros als typografischer Stat-Ribbon, Mikros als vertikale
+              Bar-Liste, QR-Stempel im Footer. */}
+          {/* Subtle radial halo background hint */}
+          <circle cx="24" cy="11" r="11" fill={fill} opacity="0.18" />
+          {/* Avatar oben rechts */}
+          <circle cx="42" cy="3.5" r="2" fill={fill} />
+          {/* Hero zentriert */}
+          <rect x="14" y="3.5" width="20" height="11" rx="1.2" fill={stroke} opacity="0.7" />
+          {/* Title */}
+          <rect x="13" y="16" width="22" height="1.6" rx="0.3" fill={stroke} />
+          <rect x="15" y="18.4" width="18" height="0.9" rx="0.3" fill={stroke} opacity="0.55" />
+          {/* Stat-Ribbon — typografische Inline-Stats */}
+          <rect x="3" y="20.8" width="3" height="1.2" rx="0.2" fill={fill} />
+          <rect x="7" y="20.8" width="6" height="1.2" rx="0.2" fill={stroke} opacity="0.5" />
+          <rect x="14" y="20.8" width="3" height="1.2" rx="0.2" fill={fill} />
+          <rect x="18" y="20.8" width="6" height="1.2" rx="0.2" fill={stroke} opacity="0.5" />
+          <rect x="25" y="20.8" width="3" height="1.2" rx="0.2" fill={fill} />
+          <rect x="29" y="20.8" width="5" height="1.2" rx="0.2" fill={stroke} opacity="0.5" />
+          <rect x="35" y="20.8" width="3" height="1.2" rx="0.2" fill={fill} />
+          <rect x="39" y="20.8" width="5" height="1.2" rx="0.2" fill={stroke} opacity="0.5" />
+          <rect x="3" y="22.6" width="42" height="0.3" fill={stroke} opacity="0.25" />
+          {/* Body 2-Spalten */}
+          <rect x="3" y="24.5" width="3" height="0.8" rx="0.2" fill={fill} opacity="0.85" />
+          <rect x="3" y="26" width="13" height="0.8" rx="0.2" fill={stroke} opacity="0.5" />
+          <rect x="3" y="27.4" width="11" height="0.8" rx="0.2" fill={stroke} opacity="0.45" />
+          <rect x="3" y="28.8" width="13" height="0.8" rx="0.2" fill={stroke} opacity="0.45" />
+          <rect x="22" y="24.5" width="3" height="0.8" rx="0.2" fill={fill} opacity="0.85" />
+          <rect x="22" y="26" width="22" height="0.8" rx="0.2" fill={stroke} opacity="0.5" />
+          <rect x="22" y="27.4" width="20" height="0.8" rx="0.2" fill={stroke} opacity="0.45" />
+          <rect x="22" y="28.8" width="22" height="0.8" rx="0.2" fill={stroke} opacity="0.45" />
+          {/* Mikro-vertikal-Bars */}
+          <rect x="3" y="31" width="6" height="0.6" rx="0.2" fill={stroke} opacity="0.55" />
+          <rect x="9.5" y="31" width="6" height="0.6" rx="0.2" fill={fill} opacity="0.85" />
+          <rect x="3" y="32.2" width="5" height="0.6" rx="0.2" fill={stroke} opacity="0.55" />
+          <rect x="8.5" y="32.2" width="4" height="0.6" rx="0.2" fill={fill} opacity="0.7" />
+          <rect x="3" y="33.4" width="5" height="0.6" rx="0.2" fill={stroke} opacity="0.55" />
+          <rect x="8.5" y="33.4" width="3" height="0.6" rx="0.2" fill={fill} opacity="0.55" />
+          {/* Avatar links + QR rechts unten */}
+          <circle cx="22" cy="32.5" r="1.4" fill={stroke} opacity="0.6" />
+          <rect x="40" y="31" width="4" height="3.5" rx="0.4" fill={fill} opacity="0.75" />
+        </>
+      )}
       {layout === "vital" && (
         <>
           {/* Drei gestapelte Premium-Cards mit subtle border in mood-accent.

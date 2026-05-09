@@ -13,7 +13,8 @@ export type CardLayout =
   | "minimal"
   | "sport"
   | "dashboard"
-  | "vital";
+  | "vital"
+  | "amber";
 
 export type Pack = {
   slug: string;
@@ -147,7 +148,7 @@ export const packs: Pack[] = [
       inkSoft: "#5e4720",
     },
     displayFont: "fraunces",
-    cardLayout: "editorial",
+    cardLayout: "amber",
   },
 ];
 
