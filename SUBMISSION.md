@@ -143,7 +143,7 @@ und KI-Fluency, die beiden expliziten Bewertungskriterien:
 | Eine Design-Entscheidung pro Pack nachschlagen | [`docs/packs/`](docs/packs/) |
 | Die Brand-DNA-Recherche zu Biene sehen | [`docs/BRAND_BIENE.md`](docs/BRAND_BIENE.md) |
 | Die fünf druckfertigen PDFs runterladen | [`public/submission/`](public/submission/) — oder die Live-URL `/submission` |
-| Die 5 Card-Layouts im Code verstehen | [`lib/pdf/recipe-card-pdf.tsx`](lib/pdf/recipe-card-pdf.tsx) (PDF) + [`components/recipe-card-full.tsx`](components/recipe-card-full.tsx) (Web) |
+| Die 7 Card-Layouts im Code verstehen | [`lib/pdf/recipe-card-pdf.tsx`](lib/pdf/recipe-card-pdf.tsx) (PDF) + [`components/recipe-card-full.tsx`](components/recipe-card-full.tsx) (Web) |
 | Die CMYK-Pipeline verstehen | [`lib/pdf/cmyk-convert.ts`](lib/pdf/cmyk-convert.ts) + [README → Print-Pipeline](README.md#print-pipeline-cmyk) |
 | Die Job-Queue / Async-Logik verstehen | [`lib/pdf/job-runner.ts`](lib/pdf/job-runner.ts) + [`app/api/pdf/jobs/`](app/api/pdf/jobs/) |
 | Den Instagram-Import-Flow verstehen | [`lib/integrations/apify.ts`](lib/integrations/apify.ts) + [`lib/ai/parse-instagram.ts`](lib/ai/parse-instagram.ts) + [`components/instagram-import-card.tsx`](components/instagram-import-card.tsx) |
