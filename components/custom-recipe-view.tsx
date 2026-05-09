@@ -98,11 +98,25 @@ export function CustomRecipeView({
       if (!active) return;
       const hasMicros = (found?.nutrition?.micros?.length ?? 0) > 0;
       const hasHero = Boolean(found?.hero);
+      // Server-Marker: ein vorheriger Versuch ist schon mal gescheitert.
+      // Wir respektieren das wie einen Timeout — ohne 30 s zu warten —
+      // und zeigen direkt den Retry-Banner. Sonst wuerde jeder Re-Mount
+      // nochmal 30 s lang die Loading-Animation drehen, obwohl der
+      // Server "fertig versucht" markiert hat.
+      const failureMarkerSet = Boolean(
+        found?.nutrition?.microsAttemptedAt && !hasMicros
+      );
 
       // Mikros sind doch noch verspaetet angekommen — Failure-Flag zuruecksetzen.
       if (hasMicros && microsTimedOut) {
         microsTimedOut = false;
         setMicrosFailed(false);
+      }
+
+      // Wenn der Server-Marker gesetzt ist, sofort als Failure markieren.
+      if (failureMarkerSet && !microsTimedOut) {
+        microsTimedOut = true;
+        setMicrosFailed(true);
       }
 
       setPending({
@@ -150,11 +164,25 @@ export function CustomRecipeView({
   // ob noch etwas zu tun ist, und returnt sonst sofort. Schuetzt gegen
   // den Fall, dass der Editor-seitige fire-and-forget Fetch beim
   // router.push abgebrochen wurde und die Lambda nie ankam.
+  //
+  // ABER: wenn Mikros bereits einmal versucht wurden und gescheitert
+  // sind (microsAttemptedAt-Marker steht), und Hero schon da ist,
+  // gibt es nichts mehr automatisch zu tun — der Server wuerde den
+  // Mikros-Versuch ohnehin ueberspringen. Trigger nur, wenn etwas
+  // erfolgsversprechend nachzuholen ist (Hero fehlt, oder Mikros fehlen
+  // OHNE vorherigen Failure-Marker).
   useEffect(() => {
     if (!recipe?.id || enrichTriggeredRef.current) return;
     const hasMicros = (recipe.nutrition?.micros?.length ?? 0) > 0;
     const hasHero = Boolean(recipe.hero);
+    const microsAlreadyAttempted = Boolean(
+      recipe.nutrition?.microsAttemptedAt
+    );
     if (hasMicros && hasHero) return;
+    // Mikros wurden schon mal versucht (und sind leer geblieben) UND
+    // Hero ist auch schon da → kein Auto-Trigger. Wartet auf manuellen
+    // Retry-Klick im Banner.
+    if (!hasMicros && microsAlreadyAttempted && hasHero) return;
     enrichTriggeredRef.current = true;
     void fetch("/api/recipes/enrich", {
       method: "POST",
@@ -163,7 +191,12 @@ export function CustomRecipeView({
     }).catch(() => {
       /* swallow — wenn das auch failed, sehen wir das im Polling-Timeout */
     });
-  }, [recipe?.id, recipe?.nutrition?.micros?.length, recipe?.hero]);
+  }, [
+    recipe?.id,
+    recipe?.nutrition?.micros?.length,
+    recipe?.hero,
+    recipe?.nutrition?.microsAttemptedAt,
+  ]);
 
   if (!loaded) {
     return (
@@ -311,10 +344,14 @@ export function CustomRecipeView({
     setMicrosFailed(false);
     setPending((p) => ({ ...p, micros: true }));
     try {
+      // force=true sagt dem Server "ignoriere den microsAttemptedAt-
+      // Marker und versuche es nochmal". Ohne dieses Flag wuerde der
+      // Endpoint den vorherigen Failure-Marker respektieren und den
+      // Mikros-Call ueberspringen.
       await fetch("/api/recipes/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recipeId: recipe.id }),
+        body: JSON.stringify({ recipeId: recipe.id, force: true }),
       });
     } catch {
       // Network-Fehler hier ist OK — der Polling-Loop merkt nach 30 s

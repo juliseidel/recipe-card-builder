@@ -24,6 +24,13 @@ const HERO_BUCKET = "recipe-heroes";
 
 type Body = {
   recipeId: string;
+  /** Manueller Retry vom Client (Banner-Button). Setze `true`, um den
+   *  Server-seitigen "schon mal versucht und gescheitert"-Marker
+   *  (`nutrition.microsAttemptedAt`) zu uebergehen und einen neuen
+   *  Mikros-Versuch zu starten. Auto-Trigger lassen das Feld leer und
+   *  respektieren den Marker — verhindert dass jeder Page-Visit einer
+   *  fehlgeschlagenen Karte automatisch einen neuen Gemini-Call ausloest. */
+  force?: boolean;
 };
 
 export async function POST(req: Request) {
@@ -74,8 +81,17 @@ export async function POST(req: Request) {
     getPack(brandSlug, packSlug) ??
     (await getCustomPackServer(brandSlug, packSlug));
 
-  const needsMicros =
+  // Mikros-Marker: wenn ein vorheriger Versuch gescheitert ist
+  // (microsAttemptedAt gesetzt, micros aber leer), respektieren wir das
+  // beim Auto-Trigger und starten KEINEN neuen Versuch — sonst feuert
+  // jeder Page-Visit der Detail-Seite einen weiteren Gemini-Call und
+  // der User sieht jedes Mal die 30-s-Loading-Animation. Nur wenn der
+  // Banner-Button "Erneut versuchen" geklickt wurde (force=true), wird
+  // der Marker uebergangen und ein frischer Versuch gestartet.
+  const microsEmpty =
     !recipe.nutrition?.micros || recipe.nutrition.micros.length === 0;
+  const previousMicrosAttempt = Boolean(recipe.nutrition?.microsAttemptedAt);
+  const needsMicros = microsEmpty && (!previousMicrosAttempt || body.force);
   const needsHero = !recipe.hero;
   // Story is "needed" if the description is empty or still equals the
   // pack-level fallback we wrote at save time. Once the user types their
@@ -109,11 +125,36 @@ export async function POST(req: Request) {
     try {
       const micros = await generateMicros(recipe);
       await mergeRecipeData(row.id, (current) => ({
-        nutrition: { ...current.nutrition, micros },
+        nutrition: {
+          ...current.nutrition,
+          micros,
+          // Erfolg → Failure-Marker loeschen, damit folgende Re-Renders
+          // diesen Lauf als "endgueltig durch" sehen.
+          microsAttemptedAt: undefined,
+        },
       }));
     } catch (err) {
       console.error("[enrich] micros failed sync for", body.recipeId, err);
-      // Wir failen nicht hart — Hero + Story sollen trotzdem laufen.
+      // Failure-Marker setzen, damit:
+      //   1. spaetere Auto-Trigger (Page-Visit) wissen "schon versucht,
+      //      nicht nochmal" und uebersprungen werden.
+      //   2. der Client das Feld liest und sofort den Retry-Banner zeigt,
+      //      ohne erst 30 s auf den naechsten Polling-Timeout zu warten.
+      // Hero + Story laufen trotzdem weiter — Mikros sind nicht kritisch
+      // fuer die restliche Karte.
+      try {
+        await mergeRecipeData(row.id, (current) => ({
+          nutrition: {
+            ...current.nutrition,
+            microsAttemptedAt: Date.now(),
+          },
+        }));
+      } catch (markerErr) {
+        console.error(
+          "[enrich] could not persist micros failure marker",
+          markerErr
+        );
+      }
     }
   }
 

@@ -23,6 +23,13 @@ export type Nutrition = {
   fiber?: number;
   sugar?: number;
   micros?: Micronutrient[];
+  /** Unix-ms-Timestamp des letzten Mikronaehrstoff-Generierungs-Versuchs.
+   *  Nur gesetzt, wenn der Versuch fehlgeschlagen ist UND `micros` leer
+   *  geblieben ist. Server liest das Feld als "schon mal versucht, gib
+   *  auf" und ueberspringt den Auto-Retry; nur ein expliziter Retry
+   *  (force=true im Request-Body) startet einen neuen Versuch. Bei
+   *  erfolgreicher Generierung wird das Feld geloescht. */
+  microsAttemptedAt?: number;
 };
 
 // Steps support optional grouping ("Für den Teig:", "Für die Glasur:") via
