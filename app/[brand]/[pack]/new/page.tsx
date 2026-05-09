@@ -712,15 +712,31 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     >
       <SiteHeader />
 
-      {/* Editor top bar — sticky */}
+      {/* Editor top bar — sticky am Viewport-Top.
+       *
+       * Vorher war hier `top-[68px]` als Reservierung fuer einen full-width
+       * SiteHeader, der seit dem UI-Cleanup nicht mehr existiert (SiteHeader
+       * rendert jetzt nur einen Floating-Logout-Button rechts oben). Folge:
+       * der Header wirkte beim Scrollen "mit-scrollend", weil er erst 68 px
+       * unter dem Viewport-Top angedockt hat. Plus der bg-Wert + "ee" (~93 %
+       * Alpha) liess die Page-Inhalte beim Scrollen durchschimmern, was den
+       * Eindruck verstaerkte.
+       *
+       * Jetzt: top-0, fast vollstaendig opakes Surface (+ "f8" ≈ 97 %),
+       * subtler Shadow fuer visuelle Definition zur darunterliegenden Page,
+       * z-30 damit der Header ueber Page-Inhalten liegt aber unter dem
+       * Floating-Logout-Button (z-50) bleibt.
+       *
+       * pr-Reserve auf der rechten Innenseite, damit "Karte speichern" auch
+       * bei kleineren Viewports nicht unter den Logout-Button rutscht. */}
       <header
-        className="sticky top-[68px] z-20 border-b backdrop-blur-xl"
+        className="sticky top-0 z-30 border-b backdrop-blur-xl shadow-[0_4px_18px_-12px_rgba(43,31,25,0.18)]"
         style={{
-          background: brand.tokens.surface + "ee",
+          background: brand.tokens.surface + "f8",
           borderColor: brand.tokens.line,
         }}
       >
-        <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-6 py-4 lg:px-10">
+        <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-6 py-3.5 pr-[140px] lg:px-10 lg:pr-[160px]">
           <div className="flex items-center gap-3 min-w-0">
             <Link
               href={`/${brand.slug}/${pack.slug}`}
@@ -1626,7 +1642,12 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
           </div>
 
           {/* PREVIEW COLUMN */}
-          <aside className="lg:sticky lg:top-[148px] lg:self-start">
+          {/* Live-Vorschau dockt unter dem Editor-Header an. Versatz war
+           *  vorher 148 px (alter SiteHeader 68 + alter Editor-Header 80).
+           *  Editor-Header ist jetzt top-0 + py-3.5 + ~36 px Inhalt ≈ 64 px
+           *  hoch — 80 px gibt etwas Luft, damit die Aside nicht direkt am
+           *  Header klebt. */}
+          <aside className="lg:sticky lg:top-[80px] lg:self-start">
             <div className="mb-3 flex items-baseline justify-between gap-3">
               <span
                 className="text-[11px] font-semibold uppercase tracking-[0.18em]"
