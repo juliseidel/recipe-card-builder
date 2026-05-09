@@ -74,13 +74,7 @@ export function RecipeCardFull(props: RecipeCardFullProps) {
     case "dashboard":
       return <DashboardLayout {...props} />;
     case "vital":
-      // Web-Layout fuer "vital" wird in einem separaten Patch nachgereicht.
-      // Bis dahin: SportLayout-Fallback im Web — das PDF rendert bereits
-      // das echte Vital-Card-Stack-Layout, nur die Live-Detail-Page zeigt
-      // noch den alten Sport-Look. Custom-Packs die "vital" picken sehen
-      // im Web also Sport, im PDF Vital. Das ist unbeabsichtigt aber
-      // unschaedlich — wird im naechsten Patch konsistent.
-      return <SportLayout {...props} />;
+      return <VitalLayout {...props} />;
   }
 }
 
@@ -1875,6 +1869,495 @@ function VolumenStat({
       <span
         className="text-[10px] font-semibold uppercase tracking-[0.18em]"
         style={{ color: highlight ? pack.mood.accent : pack.mood.inkSoft }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+
+// ════════════════════════════════════════════════
+// LAYOUT 6: VITAL (Premium-Stack) — Pack 2 (Volumen-Wunder, Sage Green)
+// Drei gestapelte Premium-Cards mit Sage-Akzent-Borders.
+// Card 1: Hero + Title + Avatar-Stempel
+// Card 2: Donut-Ringe (Macros) + Mikronaehrstoff-Pearl-Strip
+// Card 3: Body 2-Spalten (Zutaten links, Anweisungen rechts)
+//
+// Mirrors VitalPage in lib/pdf/recipe-card-pdf.tsx — gleicher Look,
+// gleiche Density, gleiche Donut-Visualisierung.
+// ════════════════════════════════════════════════
+function VitalLayout({
+  brand,
+  pack,
+  recipe,
+  totalRecipes,
+  enriching,
+}: RecipeCardFullProps) {
+  const totalTime = recipe.prepTime + (recipe.cookTime ?? 0);
+  const portionsLbl = recipe.servings === 1 ? "Portion" : "Portionen";
+  const grouped = groupIngredients(recipe.ingredients);
+  const stepsArr = recipe.steps ?? [];
+  const macros = [
+    { label: "Eiweiß", value: recipe.nutrition.protein, max: 50, unit: "g" },
+    { label: "Kohlenh.", value: recipe.nutrition.carbs, max: 80, unit: "g" },
+    { label: "Fett", value: recipe.nutrition.fat, max: 35, unit: "g" },
+  ];
+  const micros = (recipe.nutrition.micros ?? []).slice(0, 8);
+
+  const cardClass =
+    "rounded-3xl border bg-white p-6 sm:p-7 shadow-[0_1px_0_rgba(43,31,25,0.04),0_22px_46px_-22px_rgba(43,31,25,0.18)]";
+  const cardBorder = pack.mood.accent + "55";
+
+  // Step-Items normalisieren (string | { text, group })
+  const normSteps = stepsArr.map((s) =>
+    typeof s === "string" ? { text: s, group: undefined as string | undefined } : s
+  );
+
+  return (
+    <div
+      className="mx-auto flex w-full max-w-[940px] flex-col gap-3"
+      style={{ background: "transparent" }}
+    >
+      {/* TOP STRIP — Pack-Info + Recipe-Number */}
+      <div
+        className="flex items-center justify-between px-2 text-[10.5px] font-semibold uppercase tracking-[0.22em]"
+        style={{ color: pack.mood.inkSoft }}
+      >
+        <span>
+          Pack {String(pack.number).padStart(2, "0")} · {pack.title}
+        </span>
+        <span>
+          {String(recipe.number).padStart(2, "0")} /{" "}
+          {String(totalRecipes).padStart(2, "0")}
+        </span>
+      </div>
+
+      {/* CARD 1 — HERO */}
+      <article
+        className={cardClass}
+        style={{ borderColor: cardBorder }}
+      >
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-7">
+          {/* Hero */}
+          <div
+            className="relative aspect-square w-full max-w-[180px] shrink-0 overflow-hidden rounded-2xl border sm:w-[180px]"
+            style={{ borderColor: pack.mood.accent + "70" }}
+          >
+            {enriching?.hero ? (
+              <HeroSkeleton pack={pack} />
+            ) : (
+              <Image
+                src={recipe.hero ?? pack.coverImage}
+                alt={recipe.title}
+                fill
+                sizes="(min-width: 640px) 180px, 100vw"
+                className="object-cover content-fade-in"
+                priority
+              />
+            )}
+          </div>
+
+          {/* Title-Block */}
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <span
+              className="text-[10.5px] font-bold uppercase tracking-[0.24em]"
+              style={{ color: pack.mood.accent }}
+            >
+              High Protein · Volumen
+            </span>
+            <h1
+              className="font-display text-[34px] italic leading-[0.96] tracking-[-0.01em] sm:text-[44px]"
+              style={{ color: pack.mood.ink }}
+            >
+              {recipe.title}
+            </h1>
+            {recipe.subtitle ? (
+              <p
+                className="font-display text-[15px] italic leading-snug"
+                style={{ color: pack.mood.inkSoft }}
+              >
+                «&nbsp;{recipe.subtitle}&nbsp;»
+              </p>
+            ) : null}
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <VitalMetaPill label={`${totalTime} Min`} pack={pack} />
+              <VitalMetaPill label={recipe.difficulty} pack={pack} />
+              <VitalMetaPill
+                label={`${recipe.servings}× ${portionsLbl}`}
+                pack={pack}
+              />
+            </div>
+          </div>
+
+          {/* Avatar-Stempel */}
+          <div
+            className="hidden size-[72px] shrink-0 overflow-hidden rounded-full border-2 p-[3px] sm:block"
+            style={{
+              borderColor: pack.mood.accent,
+              background: "white",
+            }}
+          >
+            <div className="size-full overflow-hidden rounded-full">
+              <Image
+                src={brand.avatar}
+                alt={brand.name}
+                width={66}
+                height={66}
+                className="size-full object-cover"
+              />
+            </div>
+          </div>
+        </div>
+      </article>
+
+      {/* CARD 2 — NUTRITION */}
+      <article
+        className={cardClass}
+        style={{ borderColor: cardBorder }}
+      >
+        <div className="mb-5 flex items-center justify-between">
+          <span
+            className="text-[10.5px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            Nährstoff-Profil ·{" "}
+            {recipe.nutritionBasis === "piece"
+              ? "pro Stück"
+              : recipe.nutritionBasis === "per100g"
+                ? "pro 100 g"
+                : recipe.nutritionBasis === "total"
+                  ? "gesamt"
+                  : "pro Portion"}
+          </span>
+          <div
+            className="flex items-baseline gap-1"
+            style={{ color: pack.mood.ink }}
+          >
+            {enriching?.micros ? (
+              <span
+                className="block h-7 w-14 animate-pulse rounded-md"
+                style={{ background: pack.mood.accent + "30" }}
+              />
+            ) : (
+              <span className="font-display text-[28px] leading-none">
+                {recipe.nutrition.kcal}
+              </span>
+            )}
+            <span
+              className="text-[10px] font-bold uppercase tracking-[0.18em]"
+              style={{ color: pack.mood.inkSoft }}
+            >
+              kcal
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-7">
+          {/* Donut-Ringe */}
+          <div className="flex items-start gap-5">
+            {macros.map((m) => (
+              <VitalMacroDonut
+                key={m.label}
+                label={m.label}
+                value={m.value}
+                max={m.max}
+                unit={m.unit}
+                accent={pack.mood.accent}
+                ringBg={pack.mood.accent + "33"}
+                ink={pack.mood.ink}
+                inkSoft={pack.mood.inkSoft}
+              />
+            ))}
+          </div>
+
+          {/* Mikros */}
+          <div
+            className="flex-1 lg:border-l lg:pl-6"
+            style={{ borderColor: pack.mood.accent + "33" }}
+          >
+            <div
+              className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em]"
+              style={{ color: pack.mood.inkSoft }}
+            >
+              Reich an · % Tagesbedarf
+            </div>
+            {enriching?.micros ? (
+              <div className="flex flex-wrap gap-1.5">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <span
+                    key={i}
+                    className="block h-6 w-24 animate-pulse rounded-full"
+                    style={{
+                      background: pack.mood.accent + "20",
+                      animationDelay: `${i * 80}ms`,
+                    }}
+                  />
+                ))}
+              </div>
+            ) : micros.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {micros.map((m) => (
+                  <span
+                    key={m.name}
+                    className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px]"
+                    style={{
+                      borderColor: pack.mood.accent + "55",
+                      background: pack.mood.accent + "12",
+                    }}
+                  >
+                    <span
+                      className="size-1.5 rounded-full"
+                      style={{ background: pack.mood.accent }}
+                    />
+                    <span
+                      className="font-semibold"
+                      style={{ color: pack.mood.ink }}
+                    >
+                      {m.name}
+                    </span>
+                    <span style={{ color: pack.mood.inkSoft }}>
+                      {m.amount}
+                    </span>
+                    {m.pctDaily ? (
+                      <span
+                        className="font-bold"
+                        style={{ color: pack.mood.accent }}
+                      >
+                        {m.pctDaily}%
+                      </span>
+                    ) : null}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </article>
+
+      {/* CARD 3 — BODY */}
+      <article
+        className={cardClass}
+        style={{ borderColor: cardBorder }}
+      >
+        <div className="grid grid-cols-1 gap-7 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)]">
+          {/* ZUTATEN */}
+          <div
+            className="lg:border-r lg:pr-7"
+            style={{ borderColor: pack.mood.accent + "30" }}
+          >
+            <div
+              className="mb-4 text-[10.5px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: pack.mood.accent }}
+            >
+              Zutaten · {recipe.ingredients.length} Items
+            </div>
+            <div className="flex flex-col">
+              {grouped.map((group, gi) => (
+                <div
+                  key={gi}
+                  className={gi < grouped.length - 1 ? "mb-4" : ""}
+                >
+                  {group.name ? (
+                    <div
+                      className="mb-1.5 font-display text-[14px] italic"
+                      style={{ color: pack.mood.inkSoft }}
+                    >
+                      {group.name}
+                    </div>
+                  ) : null}
+                  {group.items.map((ing, ii) => (
+                    <div
+                      key={ii}
+                      className="flex gap-3 border-b py-2 last:border-b-0"
+                      style={{ borderColor: pack.mood.accent + "26" }}
+                    >
+                      <span
+                        className="w-14 shrink-0 text-[12.5px] font-semibold"
+                        style={{ color: pack.mood.accent }}
+                      >
+                        {ing.amount || "n. A."}
+                      </span>
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span
+                          className="text-[13px] leading-snug"
+                          style={{ color: pack.mood.ink }}
+                        >
+                          {ing.name}
+                        </span>
+                        {ing.note ? (
+                          <span
+                            className="mt-0.5 text-[11px] italic leading-snug"
+                            style={{ color: pack.mood.inkSoft }}
+                          >
+                            {ing.note}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ANWEISUNGEN */}
+          <div>
+            <div
+              className="mb-4 text-[10.5px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: pack.mood.accent }}
+            >
+              Anweisungen · {normSteps.length} Schritte · {totalTime} Min
+            </div>
+            <ol className="flex flex-col gap-3.5">
+              {normSteps.map((step, si) => (
+                <li key={si} className="flex gap-3">
+                  <span
+                    className="w-7 shrink-0 pt-0.5 font-display text-[20px] leading-none"
+                    style={{ color: pack.mood.accent }}
+                  >
+                    {String(si + 1).padStart(2, "0")}
+                  </span>
+                  <span
+                    className="flex-1 text-[13px] leading-relaxed"
+                    style={{ color: pack.mood.ink }}
+                  >
+                    {step.text}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      </article>
+
+      {/* FOOTER — Brand-Signatur + QR */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-2 pt-2">
+        <div className="flex items-center gap-2.5">
+          <span
+            className="font-display text-[16px] italic"
+            style={{ color: pack.mood.ink }}
+          >
+            {brand.signature}
+          </span>
+          <span
+            className="text-[10px] font-bold uppercase tracking-[0.18em]"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            {brand.handle} · {pack.title}
+          </span>
+        </div>
+        {recipe.sourceUrl ? (
+          <a
+            href={recipe.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-80"
+            style={{
+              borderColor: pack.mood.accent + "55",
+              background: pack.mood.accent + "18",
+              color: pack.mood.ink,
+            }}
+          >
+            <span>Original-Reel</span>
+            <span aria-hidden style={{ color: pack.mood.accent }}>
+              →
+            </span>
+          </a>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function VitalMetaPill({ label, pack }: { label: string; pack: Pack }) {
+  return (
+    <span
+      className="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+      style={{
+        borderColor: pack.mood.accent + "55",
+        background: pack.mood.accent + "12",
+        color: pack.mood.ink,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function VitalMacroDonut({
+  label,
+  value,
+  max,
+  unit,
+  accent,
+  ringBg,
+  ink,
+  inkSoft,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  unit: string;
+  accent: string;
+  ringBg: string;
+  ink: string;
+  inkSoft: string;
+}) {
+  const r = 24;
+  const cx = 30;
+  const cy = 30;
+  const sweep = Math.min(360, (value / max) * 360);
+  const arcPath = (() => {
+    if (sweep <= 0) return "";
+    if (sweep >= 359.9) {
+      return `M ${cx},${cy - r} A ${r},${r} 0 1,1 ${cx - 0.001},${cy - r}`;
+    }
+    const rad = (sweep * Math.PI) / 180;
+    const ex = cx + r * Math.sin(rad);
+    const ey = cy - r * Math.cos(rad);
+    const large = sweep > 180 ? 1 : 0;
+    return `M ${cx},${cy - r} A ${r},${r} 0 ${large},1 ${ex.toFixed(3)},${ey.toFixed(3)}`;
+  })();
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <div className="relative size-[60px]">
+        <svg
+          viewBox="0 0 60 60"
+          className="absolute inset-0 size-full"
+          aria-hidden
+        >
+          <circle
+            cx={cx}
+            cy={cy}
+            r={r}
+            stroke={ringBg}
+            strokeWidth={4.5}
+            fill="none"
+          />
+          {arcPath ? (
+            <path
+              d={arcPath}
+              stroke={accent}
+              strokeWidth={4.5}
+              fill="none"
+              strokeLinecap="round"
+            />
+          ) : null}
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span
+            className="font-display text-[14px] leading-none"
+            style={{ color: ink }}
+          >
+            {value}
+            {unit}
+          </span>
+        </div>
+      </div>
+      <span
+        className="text-[9.5px] font-bold uppercase tracking-[0.16em]"
+        style={{ color: inkSoft }}
       >
         {label}
       </span>

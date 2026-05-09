@@ -24,38 +24,46 @@ ohne in den "Gym-Bro"-Bereich abzudriften, den Biene bewusst meidet.
 
 Akzent `#527a2c`, Ink `#1f2a14`, Ink-Soft `#3f5b22`.
 
-## Layout — `sport`
+## Layout — `vital` (Premium-Stack)
 
 | Element | Was es macht |
 |---|---|
-| **Macro-Bars** | Mit Emojis (💪 Eiweiß / 🌾 KH / 🥑 Fett), proportionale Bar-Längen je nach Anteil |
-| **Zutaten-Cart** | ☐-Checkbox-Liste — fühlt sich wie eine Einkaufsliste an, perfekt für Mealprep |
-| **Schritt-Timeline** | Nummerierte Schritte mit vertikalen Verbindungslinien, vor/nach jeder Action eine Zeit |
-| **Story-Block** | Bei sparsen Karten (≤6 Zutaten) ergänzend, damit die Karte nicht halbleer wirkt |
+| **Drei gestapelte Cards** | Hero, Nährstoff-Profil, Recipe-Body — jede mit eigener Sage-Border + Drop-Shadow. Apple-Health-meets-Cookbook |
+| **Avatar-Stempel** | Bienes Foto rechts auf der Hero-Card mit Sage-Brand-Ring (analog zu Pack 1 + 3) |
+| **Donut-Ringe** | Drei SVG-Donuts für Eiweiß / KH / Fett — Wert in der Mitte als Display-Number, gefüllter Arc zeigt Anteil an der Pack-typischen Volumen-Skala (50/80/35 g) |
+| **Mikronährstoff-Pearls** | Horizontaler Pearl-Strip mit Bullet + Name + Wert + %-Daily — anders als alle Pills/Bars in den anderen Packs |
+| **Big kcal-Display** | 308–435 kcal als Display-Serif rechts oben in der Nährstoff-Card |
+| **Zutaten 2-Spalten** | Menge in Sage-Akzent links, Name + optional Note italic rechts, subtile Trennlinie zwischen Items |
+| **Anweisungen** | Roman-Style-Numbering (01, 02, 03) in Fraunces, Sage-Akzent — präzise und ruhig |
+| **QR-Stempel-Card** | Footer mit Original-Reel-Link + QR (analog zu Pack 1 + 3, mit Sage-getöntem Background) |
 
 ## Warum diese Layout-Wahl
 
-Bienes Reels mit Volumen-Mahlzeiten enden typischerweise mit einem
-Stat-Block: "✅ 31 g Protein · ✅ 412 kcal · ✅ XL-Portion". Das ist die
-Sprache, die ihre Follower verstehen. Die Macro-Bars im sport-Layout
-**übersetzen genau das ins Visuelle** — der User sieht in 0,5 Sekunden,
-dass die Karte protein-dominant ist (langer 💪-Balken), und nicht
-fett-dominant (kurzer 🥑-Balken).
+Bienes Volumen-Wunder ist das Pack mit dem **deutlichsten Nährwert-
+Versprechen**: hohes Protein bei niedriger kcal. Das alte Sport-Layout
+hatte Macro-Bars ehrlich, sah aber visuell zu sehr nach Fitness-App
+aus — Ingo wünschte sich mehr Polish, eine "Premium-Wellness"-Sprache.
 
-Die Zutaten-Cart mit Checkboxen ist nicht Zufall: Mealprep-Affine drucken
-sich Karten aus und haken die Zutaten beim Einkaufen ab. Dafür ist das
-Format gemacht.
+Vital tut genau das: Donut-Ringe statt Bars (eleganter, Apple-Health-
+Vibe), Mikronährstoff-Pearls statt Pills (anders als alle Packs), und
+der ganze Inhalt liegt auf drei klar abgesetzten Cards mit subtilem
+Schatten — wirkt wie eine Doppelseite eines Premium-Lifestyle-Magazins,
+nicht wie eine Workout-Tracking-App.
+
+Avatar prominent + QR im Stempel-Stil schließen das Gefühl dass das
+hier "Bienes Pack" ist, nicht ein generisches Recipe-Template.
 
 ## Edge-Case-Trick: 3 vs. 16 Zutaten im selben Layout
 
 Das Pack hat bewusst zwei Extreme:
 
-- **Drei-Zutaten-Eisbowl** (3 Zutaten): Layout schaltet auf
-  *"Bienes Story"-Block* mit größeren Zutaten-Rows + mehr Whitespace.
-  Karte wirkt nicht halbleer, sondern **bewusst minimal**.
+- **Drei-Zutaten-Eisbowl** (3 Zutaten): Density-Mode `spacious` — Recipe-
+  Body-Card hat sichtbar mehr Atemraum unten, Donut-Ringe wirken großzügig,
+  Mikronährstoff-Pearls in einer Reihe. Karte wirkt **bewusst minimal**, nicht
+  halbleer.
 - **XL-Mexican-Bowl** (16 Zutaten): Density-Mode `compact`, dichteres
-  Spacing, Zutaten in zwei Spalten. Karte bleibt auf einer Seite, ohne
-  abgeschnitten zu wirken.
+  Spacing in der Body-Card, alle 16 Zutaten + Sub-Group "Topping"
+  + 6 Schritte passen mit balanced-Density auf eine A4-Seite.
 
 Das ist das **Edge-Case-Versprechen** des Briefs ("kurze 3-Zutaten und
 lange 15+ Rezepte") in einem einzigen Pack zusammengefasst — zwei extreme
