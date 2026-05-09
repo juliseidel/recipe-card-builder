@@ -41,6 +41,18 @@ export function CustomRecipeView({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const confirmTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // microsFailed: TRUE wenn das Mikros-Polling 30 s lang nichts geliefert
+  // hat. Triggert die kleine Retry-Notification unten und stoppt die
+  // Loading-Animation — sonst sah der User "Mikronaehrstoffe werden
+  // analysiert" gefuehlt minutenlang, ohne zu wissen ob er warten oder
+  // refreshen soll. Wird zurueckgesetzt sobald entweder ein Retry
+  // erfolgreich war oder die Mikros doch noch verspaetet ankamen.
+  const [microsFailed, setMicrosFailed] = useState(false);
+  // Bumpen wir nach einem Retry — der Polling-useEffect haengt am
+  // retryKey und startet so mit frischem attempts=0 neu, ohne dass wir
+  // die Polling-Logik duplizieren muessen.
+  const [retryKey, setRetryKey] = useState(0);
+  const [retryingMicros, setRetryingMicros] = useState(false);
   // Verhindert mehrfache Enrich-Trigger pro Mount. Der Editor sendet
   // bereits einen fire-and-forget Trigger nach Save, aber der wird vom
   // Browser manchmal beim router.push abgebrochen — in dem Fall springt
@@ -51,13 +63,18 @@ export function CustomRecipeView({
   useEffect(() => {
     let active = true;
     let pollTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+    // Closure-lokaler Flag, damit der gleiche Polling-Loop weiss ob die
+    // Mikros-Schiene schon "abgehakt" ist, ohne dass wir state im
+    // tick-Closure stale lesen muessen.
+    let microsTimedOut = false;
 
     const fetchOnce = async () => {
       const [found, customList] = await Promise.all([
         getCustomRecipe(pack.slug, recipeSlug),
         getCustomRecipesForPack(pack.slug),
       ]);
-      if (!active) return;
+      if (!active) return null;
       const merged = mergeAndRenumber(staticRecipes, customList);
       // Re-pull the current recipe from the merged list so its number/index
       // matches what nutrition table + pack PDF show. Falls back to the raw
@@ -73,27 +90,50 @@ export function CustomRecipeView({
       );
       setAllRecipes(merged);
       setLoaded(true);
-      // Poll until both Gemini micros AND the Flux hero are written back to
-      // the DB. Hero is the long pole (~15-25 s, occasionally 60-90 s under
-      // load), so we wait for both before stopping.
-      const hasMicros = (found?.nutrition?.micros?.length ?? 0) > 0;
-      const hasHero = Boolean(found?.hero);
-      setPending({ micros: !hasMicros, hero: !hasHero });
-      return hasMicros && hasHero;
+      return found;
     };
 
-    let attempts = 0;
     const tick = async () => {
-      const done = await fetchOnce();
-      if (!active || done) return;
-      // 50 attempts × 2.5 s ≈ 125 s — covers a slow Flux render.
-      if (attempts++ < 50) {
-        pollTimer = setTimeout(tick, 2500);
-      } else {
-        // Timeout: stop showing "is generating" to avoid lying to the user.
-        // The hero / micros may still arrive on a later refresh.
-        setPending({ micros: false, hero: false });
+      const found = await fetchOnce();
+      if (!active) return;
+      const hasMicros = (found?.nutrition?.micros?.length ?? 0) > 0;
+      const hasHero = Boolean(found?.hero);
+
+      // Mikros sind doch noch verspaetet angekommen — Failure-Flag zuruecksetzen.
+      if (hasMicros && microsTimedOut) {
+        microsTimedOut = false;
+        setMicrosFailed(false);
       }
+
+      setPending({
+        micros: !hasMicros && !microsTimedOut,
+        hero: !hasHero,
+      });
+
+      // Beide fertig → polling stoppt.
+      if (hasMicros && hasHero) return;
+
+      attempts++;
+
+      // Mikros-Timeout: 12 attempts × 2.5 s = 30 s. Genug Puffer fuer
+      // Geminis interne Retry-Kette (~16 s bei 5xx/429 + Netz-Latenz),
+      // aber wir hangen nicht 2 Minuten an einem Call der eh nie zurueck-
+      // kommt. Nach Timeout: Animation aus, Retry-Banner ein.
+      if (!hasMicros && !microsTimedOut && attempts >= 12) {
+        microsTimedOut = true;
+        setMicrosFailed(true);
+        setPending((p) => ({ ...p, micros: false }));
+      }
+
+      // Hero-Timeout: 50 attempts × 2.5 s = 125 s. Flux ist regulaer
+      // langsam (15–25 s, bei Load 60–90 s), daher der grosszuegige Puffer.
+      // Mikros-Failure stoppt das Polling NICHT — Hero koennte noch landen.
+      if (attempts >= 50) {
+        setPending({ micros: false, hero: false });
+        return;
+      }
+
+      pollTimer = setTimeout(tick, 2500);
     };
 
     void tick();
@@ -102,7 +142,7 @@ export function CustomRecipeView({
       active = false;
       if (pollTimer) clearTimeout(pollTimer);
     };
-  }, [pack.slug, recipeSlug, staticRecipes]);
+  }, [pack.slug, recipeSlug, staticRecipes, retryKey]);
 
   // Fallback-Enrich-Trigger: sobald wir das Recipe geladen haben und
   // erkennen, dass Mikros oder Hero fehlen, triggern wir den Enrich-
@@ -265,6 +305,29 @@ export function CustomRecipeView({
     </button>
   );
 
+  const handleRetryMicros = async () => {
+    if (!recipe?.id || retryingMicros) return;
+    setRetryingMicros(true);
+    setMicrosFailed(false);
+    setPending((p) => ({ ...p, micros: true }));
+    try {
+      await fetch("/api/recipes/enrich", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipeId: recipe.id }),
+      });
+    } catch {
+      // Network-Fehler hier ist OK — der Polling-Loop merkt nach 30 s
+      // wieder dass nichts ankam und setzt microsFailed erneut. Der User
+      // kann dann nochmal druecken.
+    }
+    // Polling-useEffect rerunnen, damit attempts wieder bei 0 startet
+    // und die Animation frisch laeuft. Cleanup→Re-Run macht React via
+    // Dependencies-Aenderung.
+    setRetryKey((k) => k + 1);
+    setRetryingMicros(false);
+  };
+
   return (
     <>
       <RecipeDetailLayout
@@ -279,7 +342,103 @@ export function CustomRecipeView({
         enriching={pending.hero || pending.micros ? pending : undefined}
       />
       <EnrichmentToast pending={pending} pack={pack} />
+      {microsFailed ? (
+        <MicrosFailedBanner
+          pack={pack}
+          onRetry={handleRetryMicros}
+          retrying={retryingMicros}
+        />
+      ) : null}
     </>
+  );
+}
+
+// ════════════════════════════════════════════════
+// MicrosFailedBanner — diskrete Notification rechts unten, wenn die
+// Mikros-Pipeline 30 s lang nichts geliefert hat. Statt den User mit
+// einer endlosen Loading-Animation hängen zu lassen, geben wir ihm hier
+// klare Information ("konnten nicht analysiert werden") und einen
+// Single-Klick-Retry. Der Rest der Karte bleibt funktional — Mikros
+// sind zwar visuell der Wow-Faktor von Bienes Karten, aber die Karte
+// ist auch ohne sie eine vollwertige Recipe-Card.
+//
+// Nicht modal, nicht sticky-toast: bewusst klein und unten, damit es
+// die Lese-Erfahrung der Karte nicht stört.
+// ════════════════════════════════════════════════
+function MicrosFailedBanner({
+  pack,
+  onRetry,
+  retrying,
+}: {
+  pack: Pack;
+  onRetry: () => void | Promise<void>;
+  retrying: boolean;
+}) {
+  return (
+    <div
+      className="fixed bottom-6 right-6 z-50 flex w-[min(94vw,360px)] flex-col gap-2 rounded-2xl border bg-white/95 px-4 py-3.5 shadow-[0_18px_48px_-16px_rgba(26,18,11,0.32)] backdrop-blur-xl toast-slide-down"
+      style={{ borderColor: pack.mood.ink + "1f" }}
+      role="status"
+      aria-live="polite"
+    >
+      <div className="flex items-start gap-2.5">
+        <span
+          className="mt-0.5 inline-flex size-4 items-center justify-center"
+          aria-hidden
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <circle
+              cx="7"
+              cy="7"
+              r="6"
+              stroke={pack.mood.accent}
+              strokeWidth="1.4"
+              fill="none"
+            />
+            <path
+              d="M7 4v3.5"
+              stroke={pack.mood.accent}
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+            <circle cx="7" cy="10" r="0.85" fill={pack.mood.accent} />
+          </svg>
+        </span>
+        <div className="flex-1">
+          <p
+            className="text-[12.5px] font-semibold leading-tight"
+            style={{ color: pack.mood.ink }}
+          >
+            Mikronährstoffe konnten nicht analysiert werden
+          </p>
+          <p
+            className="mt-1 text-[11.5px] leading-snug"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            Die Karte ist trotzdem komplett. Du kannst es nochmal versuchen.
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => void onRetry()}
+        disabled={retrying}
+        className="inline-flex items-center justify-center gap-1.5 self-end rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-opacity disabled:opacity-60"
+        style={{
+          background: pack.mood.ink,
+          color: pack.mood.background,
+        }}
+      >
+        {retrying ? (
+          <>
+            <span className="size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            Analysiere…
+          </>
+        ) : (
+          "Erneut versuchen"
+        )}
+      </button>
+    </div>
   );
 }
 
