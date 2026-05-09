@@ -20,6 +20,7 @@ import { packs } from "../lib/packs";
 import { getRecipesForPack } from "../lib/recipes";
 import { renderPackPdf } from "../lib/pdf/render";
 import { convertPdfToCmyk } from "../lib/pdf/cmyk-convert";
+import { getPackForeword } from "../lib/pack-forewords";
 
 const OUT_DIR = path.join(process.cwd(), "out", "print");
 const TMP_DIR = path.join(process.cwd(), "out", "tmp-rgb");
@@ -133,7 +134,12 @@ async function main() {
     // 3. Verify the result actually is CMYK — silently falling back to RGB
     //    would be the worst possible failure mode (looks fine, prints wrong)
     const verify = verifyCmyk(cmykPath);
-    const expectedPages = recipes.length + 4; // cover + index + N + nutrition + outro
+    // Page-Erwartung haengt davon ab, ob fuer diesen Pack ein Vorwort
+    // gecached ist. Mit Vorwort: Cover + Vorwort + Index + N + Nutrition + Outro
+    // = N + 5. Ohne: N + 4 (Pre-Vorwort-Layout). Alle 5 kuratierten Biene-Packs
+    // haben ein Vorwort; Custom-Packs koennen ohne laufen.
+    const hasForeword = getPackForeword(pack.slug) !== null;
+    const expectedPages = recipes.length + (hasForeword ? 5 : 4);
     const pagesOk = verify.pages === expectedPages;
     if (verify.cmyk && pagesOk) {
       console.log(
