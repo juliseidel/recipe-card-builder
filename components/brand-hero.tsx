@@ -3,9 +3,21 @@ import type { Brand } from "@/lib/brands";
 
 type BrandHeroProps = {
   brand: Brand;
+  /** Live-zaehlende Pack-Anzahl (curated + custom). Faellt auf den im
+   *  Brand hinterlegten Statisch-Wert zurueck, falls der Caller noch
+   *  keinen live count uebergibt. */
+  livePackCount?: number;
+  /** Live-zaehlende Rezept-Anzahl (alle sichtbaren Karten ueber alle
+   *  Packs der Brand: curated − hidden + custom). Faellt analog auf den
+   *  hinterlegten Statisch-Wert zurueck. */
+  liveRecipeCount?: number;
 };
 
-export function BrandHero({ brand }: BrandHeroProps) {
+export function BrandHero({
+  brand,
+  livePackCount,
+  liveRecipeCount,
+}: BrandHeroProps) {
   return (
     <section
       className="relative border-b"
@@ -87,13 +99,13 @@ export function BrandHero({ brand }: BrandHeroProps) {
             <Divider brand={brand} />
             <Stat
               label="Packs"
-              value={String(brand.packCount)}
+              value={String(livePackCount ?? brand.packCount)}
               brand={brand}
             />
             <Divider brand={brand} />
             <Stat
               label="Rezepte"
-              value={String(brand.recipeCount)}
+              value={String(liveRecipeCount ?? brand.recipeCount)}
               brand={brand}
             />
             <Divider brand={brand} />

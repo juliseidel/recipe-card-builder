@@ -36,9 +36,35 @@ export async function generateMetadata({ params }: BrandPageProps) {
     return { title: "Workspace nicht gefunden · Recipe Card Builder" };
   }
 
+  // Live counts for the SEO description so the meta tag never lies after
+  // a user adds/deletes packs or cards. Same merge formula the page body
+  // uses below.
+  const staticPacksMeta = getPacksForBrand(brand.slug);
+  const [customPacksMeta, customRecipeCountsMeta, hiddenRecipeCountsMeta] =
+    await Promise.all([
+      getCustomPacksWithIdsForBrandServer(brand.slug),
+      getCustomRecipeCountsForBrand(brand.slug),
+      getHiddenRecipeCountsForBrand(brand.slug),
+    ]);
+  const livePackCount = staticPacksMeta.length + customPacksMeta.length;
+  const liveRecipeCountMeta = mergeAndRenumberPacks(
+    staticPacksMeta,
+    customPacksMeta.map((c) => c.pack)
+  ).reduce(
+    (sum, p) =>
+      sum +
+      Math.max(
+        0,
+        p.recipeCount +
+          (customRecipeCountsMeta[p.slug] ?? 0) -
+          (hiddenRecipeCountsMeta[p.slug] ?? 0)
+      ),
+    0
+  );
+
   return {
     title: `${brand.name} · Workspace · Recipe Card Builder`,
-    description: `${brand.bio} — ${brand.packCount} Rezept-Packs, ${brand.recipeCount} Rezepte.`,
+    description: `${brand.bio} — ${livePackCount} Rezept-Packs, ${liveRecipeCountMeta} Rezepte.`,
   };
 }
 
@@ -94,7 +120,11 @@ export default async function BrandPage({ params }: BrandPageProps) {
       style={{ background: brand.tokens.background }}
     >
       <SiteHeader />
-      <BrandHero brand={brand} />
+      <BrandHero
+        brand={brand}
+        livePackCount={packs.length}
+        liveRecipeCount={totalRecipes}
+      />
 
       <main className="flex-1">
         <section className="mx-auto max-w-[1400px] px-6 pt-10 pb-24 lg:px-10 lg:pt-12 lg:pb-32">

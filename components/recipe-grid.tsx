@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
 import type { Recipe } from "@/lib/recipes";
@@ -25,6 +26,7 @@ type RecipeGridProps = {
 };
 
 export function RecipeGrid({ brand, pack, staticRecipes }: RecipeGridProps) {
+  const router = useRouter();
   const [customRecipes, setCustomRecipes] = useState<CustomRecipe[]>([]);
   const [hiddenKeys, setHiddenKeys] = useState<Set<HiddenKey>>(new Set());
   const [loaded, setLoaded] = useState(false);
@@ -81,9 +83,12 @@ export function RecipeGrid({ brand, pack, staticRecipes }: RecipeGridProps) {
               return;
             }
             // Drop the workspace cache so the pack-card recipe-count badge
-            // ticks down on back-navigation. Pack-detail is fine — this
-            // component already reflects the change in local state.
+            // ticks down on back-navigation, AND refresh the current
+            // server-rendered tree so the cover-hero "X Rezepte" + the
+            // "Alle Rezeptkarten · X Karten" header tick down in place
+            // (without that, both numbers would lie until the next reload).
             void revalidateWorkspace(brand.slug, pack.slug);
+            router.refresh();
           }}
         />
       ))}
@@ -107,9 +112,11 @@ export function RecipeGrid({ brand, pack, staticRecipes }: RecipeGridProps) {
               });
               return;
             }
-            // Same revalidate as above — keeps the workspace badge truthful
-            // when the user hides a curated card.
+            // Same revalidate + refresh as above — keeps the workspace badge
+            // and the in-page cover/header counts truthful when the user
+            // hides a curated card.
             void revalidateWorkspace(brand.slug, pack.slug);
+            router.refresh();
           }}
         />
       ))}

@@ -10,6 +10,8 @@ import {
   getCustomPackByIdServer,
   getCustomPackServer,
   getCustomPacksWithIdsForBrandServer,
+  getCustomRecipeCountsForBrand,
+  getHiddenRecipeCountsForBrand,
 } from "@/lib/custom-packs-server";
 import { getRecipesForPack } from "@/lib/recipes";
 import { SiteHeader } from "@/components/site-header";
@@ -46,9 +48,23 @@ export async function generateMetadata({ params }: PackPageProps) {
     return { title: "Pack nicht gefunden · Recipe Card Builder" };
   }
 
+  // Live count for SEO description: curated baseline + custom adds − hidden.
+  // Same formula the page body uses below — kept in sync so the meta tag
+  // never disagrees with what the visitor sees.
+  const [customCounts, hiddenCounts] = await Promise.all([
+    getCustomRecipeCountsForBrand(brandSlug),
+    getHiddenRecipeCountsForBrand(brandSlug),
+  ]);
+  const liveRecipeCount = Math.max(
+    0,
+    pack.recipeCount +
+      (customCounts[packSlug] ?? 0) -
+      (hiddenCounts[packSlug] ?? 0)
+  );
+
   return {
     title: `${pack.title} · ${brand.name} · Recipe Card Builder`,
-    description: `${pack.description} ${pack.recipeCount} Rezeptkarten — druckfertig.`,
+    description: `${pack.description} ${liveRecipeCount} Rezeptkarten — druckfertig.`,
   };
 }
 
@@ -81,13 +97,32 @@ export default async function PackPage({ params }: PackPageProps) {
 
   const recipes = await getRecipesForPack(pack.slug);
 
+  // Live recipe count for the cover hero + the "Alle Rezeptkarten" badge:
+  //   curated cards visible
+  // + custom cards the user dropped into THIS pack
+  // − curated cards the user hid from THIS pack
+  // Same formula the workspace pack-card uses, scoped to one pack. We use
+  // pack.recipeCount as the curated baseline (instead of recipes.length)
+  // so a custom pack — which has no curated rows — starts from 0 and the
+  // count then equals exactly the number of custom cards added.
+  const [customCountsForBrand, hiddenCountsForBrand] = await Promise.all([
+    getCustomRecipeCountsForBrand(brandSlug),
+    getHiddenRecipeCountsForBrand(brandSlug),
+  ]);
+  const liveRecipeCount = Math.max(
+    0,
+    pack.recipeCount +
+      (customCountsForBrand[pack.slug] ?? 0) -
+      (hiddenCountsForBrand[pack.slug] ?? 0)
+  );
+
   return (
     <div
       className="flex min-h-screen flex-col"
       style={{ background: brand.tokens.background }}
     >
       <SiteHeader />
-      <PackCover brand={brand} pack={pack} totalRecipes={recipes.length} />
+      <PackCover brand={brand} pack={pack} totalRecipes={liveRecipeCount} />
       <PackActions
         brand={brand}
         pack={pack}
@@ -110,7 +145,7 @@ export default async function PackPage({ params }: PackPageProps) {
               className="text-[13px]"
               style={{ color: brand.tokens.inkMuted }}
             >
-              {recipes.length} Karten · klick für die Vollansicht
+              {liveRecipeCount} {liveRecipeCount === 1 ? "Karte" : "Karten"} · klick für die Vollansicht
             </span>
           </div>
 
