@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Link from "next/link";
 import type { Brand } from "@/lib/brands";
 
 type BrandHeroProps = {
@@ -15,31 +14,8 @@ export function BrandHero({ brand }: BrandHeroProps) {
         borderColor: brand.tokens.line,
       }}
     >
-      <div className="mx-auto max-w-[1400px] px-6 pt-7 pb-8 lg:px-10">
-        <Link
-          href="/"
-          className="inline-flex w-fit items-center gap-1.5 text-[13px] font-medium transition-colors"
-          style={{ color: brand.tokens.inkMuted }}
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            aria-hidden
-          >
-            <path
-              d="M11 7H3m0 0L6.5 3.5M3 7l3.5 3.5"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          Alle Workspaces
-        </Link>
-
-        <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between lg:gap-10">
+      <div className="mx-auto max-w-[1400px] px-6 pt-10 pb-8 lg:px-10">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between lg:gap-10">
           <div className="flex items-center gap-5">
             <div
               className="relative size-[88px] shrink-0 overflow-hidden rounded-2xl ring-2"

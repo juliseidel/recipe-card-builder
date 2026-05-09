@@ -1,65 +1,50 @@
-import Link from "next/link";
-import { RecipeCardLogo } from "./logo";
 import { logoutAction } from "@/app/login/actions";
 
-// Header is intentionally minimal: a creator opening this should see a
-// tool for them, not a dev console. The logo is the Stacked-Cards mark
-// from components/logo.tsx (matches the favicon at app/icon.svg) — sets
-// the brand anchor consistently across browser-tab, header, footer.
+// Frueher: sticky Header-Bar mit Logo + Title + "Studio fuer Creator" +
+// "Workspaces"-Link. User-Feedback: zu praesent, das Logo gefaellt nicht,
+// "Workspaces"-Link funktioniert seit der Multi-Tenant-Umstellung
+// nicht mehr.
 //
-// Auth-aware: ein Logout-Button (form-Action) ersetzt den frueheren
-// "Workspaces"-Link. Der Logout ist eine Server Action und funktioniert
-// auch wenn der Header in Client Components eingebettet ist (Next.js
-// erlaubt Server Actions als form-action ueberall).
+// Jetzt: minimaler floating "Abmelden"-Button oben rechts. Kein Streifen,
+// keine Logo-Marke, kein Title — die App-Seiten haben ihren eigenen
+// visuellen Anker (Brand-Hero, Pack-Cover, Editor-Form). Der Abmelden-
+// Knopf ist subtle und nimmt nichts von der Page weg.
+//
+// Pattern: SiteHeader bleibt als Component-Name (alle Pages importieren
+// ihn schon), aber rendert nur noch den Floating-Knopf. Position fixed,
+// klickbar ueber dem Page-Content, mit einem subtle backdrop-blur
+// damit er auch ueber Hero-Bildern lesbar bleibt.
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-30 w-full border-b border-line/60 bg-canvas/85 backdrop-blur-xl">
-      <div className="mx-auto flex h-[68px] max-w-[1400px] items-center justify-between px-6 lg:px-10">
-        <Link
-          href="/"
-          className="group flex items-center gap-3 text-ink transition-all duration-200 hover:opacity-90"
+    <form
+      action={logoutAction}
+      className="fixed right-4 top-4 z-50 lg:right-6 lg:top-6"
+    >
+      <button
+        type="submit"
+        title="Abmelden"
+        aria-label="Abmelden"
+        className="group inline-flex items-center gap-1.5 rounded-full border border-line/60 bg-surface/85 px-3.5 py-1.5 text-[12px] font-medium text-ink-muted backdrop-blur-md transition-all duration-200 hover:border-line hover:bg-surface hover:text-ink hover:shadow-[0_4px_12px_-4px_rgba(43,31,25,0.15)]"
+      >
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 14 14"
+          fill="none"
+          aria-hidden
+          className="transition-transform duration-200 group-hover:translate-x-0.5"
         >
-          <span
-            className="inline-flex size-10 items-center justify-center transition-transform duration-300 ease-out group-hover:-translate-y-px group-hover:rotate-[-3deg]"
-            aria-hidden
-          >
-            <RecipeCardLogo size={36} />
-          </span>
-          <span className="flex flex-col leading-none">
-            <span className="font-display text-[19px] font-medium leading-none tracking-[-0.01em]">
-              Recipe Card Builder
-            </span>
-            <span className="mt-1.5 text-[10.5px] font-semibold uppercase tracking-[0.22em] text-ink-subtle">
-              Studio für Creator
-            </span>
-          </span>
-        </Link>
-
-        <form action={logoutAction}>
-          <button
-            type="submit"
-            className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12.5px] font-medium text-ink-muted transition-colors duration-200 hover:bg-surface hover:text-ink"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 14 14"
-              fill="none"
-              aria-hidden
-            >
-              <path
-                d="M5.5 2H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h2.5M9 4.5L11.5 7M11.5 7L9 9.5M11.5 7H6"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Abmelden
-          </button>
-        </form>
-      </div>
-    </header>
+          <path
+            d="M5.5 2H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h2.5M9 4.5L11.5 7M11.5 7L9 9.5M11.5 7H6"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        Abmelden
+      </button>
+    </form>
   );
 }

@@ -2,12 +2,16 @@
 
 import { useActionState } from "react";
 import { loginAction, type LoginState } from "./actions";
-import { RecipeCardLogo } from "@/components/logo";
 
 // Login-Form Client Component. Email + Password — ein Tool, das mit
 // Creator-Credentials uebergeben wird, kein Magic-Link-Flow noetig.
 // useActionState bringt Server-Errors direkt zurueck ins Form, ohne
 // Client-Fetch.
+//
+// Visuelle Sprache: typografisch (Display-Serif Wortmarke "Recipe Card
+// Builder"), kein Logo-Icon — das Logo gefiel dem User nicht, und ohne
+// es atmet die Page deutlich besser. Cream-Hintergrund, ein Card mit
+// Form, alles sehr ruhig. Der Wow-Moment ist post-login auf /welcome.
 
 const initialState: LoginState = { error: null };
 
@@ -23,19 +27,18 @@ export function LoginForm({ redirectTo }: Props) {
 
   return (
     <main className="bg-canvas flex min-h-screen items-center justify-center px-6 py-12">
-      <div className="w-full max-w-[420px]">
-        <div className="mb-8 flex flex-col items-center gap-3">
-          <span className="inline-flex size-14 items-center justify-center">
-            <RecipeCardLogo size={48} />
+      <div className="w-full max-w-[440px]">
+        <div className="mb-9 flex flex-col items-center gap-2.5 text-center">
+          <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.28em] text-ink-subtle">
+            Studio · für Creator
           </span>
-          <div className="flex flex-col items-center gap-1">
-            <h1 className="font-display text-[28px] leading-none tracking-[-0.01em] text-ink">
-              Recipe Card Builder
-            </h1>
-            <p className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-ink-subtle">
-              Studio für Creator
-            </p>
-          </div>
+          <h1 className="font-display text-[44px] leading-[1.0] tracking-[-0.02em] text-ink sm:text-[52px]">
+            Recipe Card Builder
+          </h1>
+          <p className="mt-1 max-w-[340px] text-[13.5px] leading-relaxed text-ink-muted">
+            Druckfertige Rezeptkarten für deine Marke — in deinem
+            persönlichen Workspace.
+          </p>
         </div>
 
         <form
@@ -43,12 +46,12 @@ export function LoginForm({ redirectTo }: Props) {
           className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-line bg-surface p-7 shadow-[var(--shadow-card)]"
         >
           <div className="flex flex-col gap-1.5">
-            <h2 className="font-display text-[20px] leading-tight text-ink">
+            <h2 className="font-display text-[22px] leading-tight text-ink">
               Anmelden
             </h2>
             <p className="text-[13px] leading-relaxed text-ink-muted">
-              Mit deinen Creator-Zugangsdaten anmelden, um deinen Workspace
-              zu öffnen.
+              Mit deinen Creator-Zugangsdaten anmelden, um dein Studio zu
+              öffnen.
             </p>
           </div>
 
