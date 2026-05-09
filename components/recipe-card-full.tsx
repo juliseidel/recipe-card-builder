@@ -660,22 +660,15 @@ function PatisserieLayout({
           style={{ background: pack.mood.background, color: pack.mood.ink }}
         >
           <div className="flex flex-col gap-5">
-            {/* Pack caption + recipe number */}
-            <div className="flex items-baseline justify-between gap-3">
-              <span
-                className="font-mono text-[11px] font-semibold uppercase tracking-[0.22em]"
-                style={{ color: pack.mood.inkSoft }}
-              >
-                {pack.title}
-              </span>
-              <span
-                className="font-display text-[14px] italic"
-                style={{ color: pack.mood.inkSoft }}
-              >
-                {String(recipe.number).padStart(2, "0")} /{" "}
-                {String(totalRecipes).padStart(2, "0")}
-              </span>
-            </div>
+            {/* Pack caption — Recipe-Index-Anzeige bewusst weggelassen,
+                weil Web-Detail-Pages immer eine einzelne Karte zeigen
+                (siehe lib/pdf/recipe-pdf.tsx hideRecipeIndex). */}
+            <span
+              className="font-mono text-[11px] font-semibold uppercase tracking-[0.22em]"
+              style={{ color: pack.mood.inkSoft }}
+            >
+              {pack.title}
+            </span>
 
             {/* Title — dynamische Schriftgroesse + break-words +
                 hyphens:auto, damit zusammengesetzte Substantive wie
@@ -1112,13 +1105,9 @@ function MinimalLayout({
         />
 
         {/* Top strip — Pack-Caption + Recipe-Number, weiss */}
-        <div className="absolute inset-x-0 top-0 flex items-center justify-between px-7 pt-7 sm:px-10 sm:pt-9">
+        <div className="absolute inset-x-0 top-0 flex items-center px-7 pt-7 sm:px-10 sm:pt-9">
           <span className="text-[10px] font-bold uppercase tracking-[0.28em] text-white">
             {pack.title}
-          </span>
-          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/95">
-            Rezept {String(recipe.number).padStart(2, "0")} /{" "}
-            {String(totalRecipes).padStart(2, "0")}
           </span>
         </div>
 
@@ -1921,17 +1910,14 @@ function VitalLayout({
       className="mx-auto flex w-full max-w-[940px] flex-col gap-3"
       style={{ background: "transparent" }}
     >
-      {/* TOP STRIP — Pack-Info + Recipe-Number */}
+      {/* TOP STRIP — nur Pack-Info, kein Recipe-Index (siehe
+          lib/pdf/recipe-pdf.tsx hideRecipeIndex) */}
       <div
-        className="flex items-center justify-between px-2 text-[10.5px] font-semibold uppercase tracking-[0.22em]"
+        className="flex items-center px-2 text-[10.5px] font-semibold uppercase tracking-[0.22em]"
         style={{ color: pack.mood.inkSoft }}
       >
         <span>
           Pack {String(pack.number).padStart(2, "0")} · {pack.title}
-        </span>
-        <span>
-          {String(recipe.number).padStart(2, "0")} /{" "}
-          {String(totalRecipes).padStart(2, "0")}
         </span>
       </div>
 
@@ -2401,17 +2387,14 @@ function AmberLayout({
 
   return (
     <div className="mx-auto w-full max-w-[940px]">
-      {/* TOP STRIP */}
+      {/* TOP STRIP — nur Pack-Info, kein Recipe-Index (Single-Detail-Page,
+          siehe lib/pdf/recipe-pdf.tsx hideRecipeIndex) */}
       <div
-        className="flex items-center justify-between px-2 pb-3 text-[10.5px] font-semibold uppercase tracking-[0.22em]"
+        className="flex items-center px-2 pb-3 text-[10.5px] font-semibold uppercase tracking-[0.22em]"
         style={{ color: pack.mood.inkSoft }}
       >
         <span>
           Pack {String(pack.number).padStart(2, "0")} · {pack.title}
-        </span>
-        <span>
-          {String(recipe.number).padStart(2, "0")} /{" "}
-          {String(totalRecipes).padStart(2, "0")}
         </span>
       </div>
 

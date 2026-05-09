@@ -17,6 +17,10 @@ export type RecipePdfProps = {
 };
 
 // Single-recipe PDF wrapper. The recipe layout fills exactly one A4 page.
+// hideRecipeIndex=true: bei einem Single-Recipe-PDF ist die "01 / 07"-Anzeige
+// kontextlos (die anderen 6 Karten sind nicht im File), wir blenden sie aus.
+// Pack-PDFs (PackPdfDocument) zeigen sie weiter, weil dort durch den Pack
+// geblaettert wird.
 export function RecipePdfDocument(props: RecipePdfProps) {
   return (
     <Document
@@ -27,7 +31,7 @@ export function RecipePdfDocument(props: RecipePdfProps) {
       creator="Recipe Card Builder"
       producer="Recipe Card Builder · Wolf Family Office Test Week"
     >
-      <RecipeCardPdfPage {...props} />
+      <RecipeCardPdfPage {...props} hideRecipeIndex />
     </Document>
   );
 }

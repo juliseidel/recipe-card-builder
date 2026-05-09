@@ -46,6 +46,12 @@ export type RecipeCardPdfProps = {
   // in the footer; other layouts ignore it. Optional so layouts that don't
   // need it stay byte-identical to before.
   avatarDataUri?: string | null;
+  // Wenn true, wird die "01/07"-Recipe-Index-Anzeige unterdrueckt. Use-Case:
+  // Single-Recipe-PDF-Export (renderRecipePdf) und Web-Detail-Page — dort
+  // ist der Pack-Index-Kontext nicht hilfreich, sondern verwirrend. Bei der
+  // Pack-Komplett-PDF (Cover + Index + N Karten + Outro) bleibt es sichtbar,
+  // weil der Reader durch den Pack blaettert.
+  hideRecipeIndex?: boolean;
 };
 
 export function RecipeCardPdfPage(props: RecipeCardPdfProps) {
@@ -603,6 +609,7 @@ function PatisseriePage({
   heroDataUri,
   qrDataUri,
   avatarDataUri,
+  hideRecipeIndex,
 }: RecipeCardPdfProps) {
   const t = packTheme(pack);
   const time = totalTime(recipe);
@@ -703,16 +710,18 @@ function PatisseriePage({
               >
                 {pack.title}
               </Text>
-              <Text
-                style={{
-                  fontFamily: "Fraunces",
-                  fontSize: 11,
-                  color: t.inkSoft,
-                  fontStyle: "italic",
-                }}
-              >
-                {pad2(recipe.number)} / {pad2(totalRecipes)}
-              </Text>
+              {hideRecipeIndex ? null : (
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontSize: 11,
+                    color: t.inkSoft,
+                    fontStyle: "italic",
+                  }}
+                >
+                  {pad2(recipe.number)} / {pad2(totalRecipes)}
+                </Text>
+              )}
             </View>
 
             {/* Recipe title — the visual anchor. Italic Fraunces, large
@@ -1253,6 +1262,7 @@ function MinimalPage({
   heroDataUri,
   qrDataUri,
   avatarDataUri,
+  hideRecipeIndex,
 }: RecipeCardPdfProps) {
   const t = packTheme(pack);
   const time = totalTime(recipe);
@@ -1384,17 +1394,19 @@ function MinimalPage({
             >
               {pack.title}
             </Text>
-            <Text
-              style={{
-                fontSize: 9,
-                fontWeight: 600,
-                letterSpacing: 1.4,
-                color: "#ffffff",
-                textTransform: "uppercase",
-              }}
-            >
-              Rezept {pad2(recipe.number)} / {pad2(totalRecipes)}
-            </Text>
+            {hideRecipeIndex ? null : (
+              <Text
+                style={{
+                  fontSize: 9,
+                  fontWeight: 600,
+                  letterSpacing: 1.4,
+                  color: "#ffffff",
+                  textTransform: "uppercase",
+                }}
+              >
+                Rezept {pad2(recipe.number)} / {pad2(totalRecipes)}
+              </Text>
+            )}
           </View>
 
           {/* Avatar Stempel rechts unten auf dem Hero — Mint-Border, der
@@ -3017,6 +3029,7 @@ function VitalPage({
   heroDataUri,
   qrDataUri,
   avatarDataUri,
+  hideRecipeIndex,
 }: RecipeCardPdfProps) {
   const t = packTheme(pack);
   const time = totalTime(recipe);
@@ -3080,16 +3093,18 @@ function VitalPage({
         >
           Pack {pad2(pack.number)} · {pack.title}
         </Text>
-        <Text
-          style={{
-            fontSize: 7.5,
-            fontWeight: 600,
-            letterSpacing: 1.6,
-            color: t.inkSoft,
-          }}
-        >
-          {pad2(recipe.number)} / {pad2(totalRecipes)}
-        </Text>
+        {hideRecipeIndex ? null : (
+          <Text
+            style={{
+              fontSize: 7.5,
+              fontWeight: 600,
+              letterSpacing: 1.6,
+              color: t.inkSoft,
+            }}
+          >
+            {pad2(recipe.number)} / {pad2(totalRecipes)}
+          </Text>
+        )}
       </View>
 
       {/* CARD 1 — HERO */}
@@ -3876,6 +3891,7 @@ function AmberPage({
   heroDataUri,
   qrDataUri,
   avatarDataUri,
+  hideRecipeIndex,
 }: RecipeCardPdfProps) {
   const t = packTheme(pack);
   const time = totalTime(recipe);
@@ -3934,16 +3950,18 @@ function AmberPage({
         >
           Pack {pad2(pack.number)} · {pack.title}
         </Text>
-        <Text
-          style={{
-            fontSize: 7.5,
-            fontWeight: 600,
-            letterSpacing: 1.6,
-            color: t.inkSoft,
-          }}
-        >
-          {pad2(recipe.number)} / {pad2(totalRecipes)}
-        </Text>
+        {hideRecipeIndex ? null : (
+          <Text
+            style={{
+              fontSize: 7.5,
+              fontWeight: 600,
+              letterSpacing: 1.6,
+              color: t.inkSoft,
+            }}
+          >
+            {pad2(recipe.number)} / {pad2(totalRecipes)}
+          </Text>
+        )}
       </View>
 
       {/* HERO mit HONEY-HALO + AVATAR-STEMPEL */}
