@@ -3234,6 +3234,46 @@ function VitalPage({
         ) : null}
       </View>
 
+      {/* CARD 1.5 — BIENES STORY (sparse-only). Eigene Card im Stack-
+          Rhythmus, nur bei kurzen Volumen-Wundern (≤10 Zutaten via
+          shouldShowStory). Sage-Akzent + italic Fraunces, matche das
+          Web-Vital. Sonst wuerde die Karte zwischen XL-Hero und 3-Zutaten-
+          Liste optisch durchhaengen. */}
+      {shouldShowStory(recipe) ? (
+        <View
+          style={{
+            ...cardStyle,
+            padding: 18,
+            marginBottom: d.cardGap,
+          }}
+          wrap={false}
+        >
+          <Text
+            style={{
+              fontSize: 7.5,
+              fontWeight: 700,
+              letterSpacing: 1.6,
+              color: t.accent,
+              textTransform: "uppercase",
+              marginBottom: 5,
+            }}
+          >
+            Bienes Story
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontStyle: "italic",
+              fontSize: 12,
+              lineHeight: 1.5,
+              color: t.ink,
+            }}
+          >
+            {recipe.description}
+          </Text>
+        </View>
+      ) : null}
+
       {/* CARD 2 — NUTRITION (Donuts + Mikros) */}
       <View
         style={{
@@ -4162,6 +4202,53 @@ function AmberPage({
           </View>
         ))}
       </View>
+
+      {/* BIENES STORY (sparse-only) — Honey-tinted Pull-Quote zwischen
+          Stat-Ribbon und Body. Bei kurzen Feierabend-Klassikern (≤10
+          Zutaten via shouldShowStory) sonst wirkt der Body unter dem
+          grosszuegigen Hero halbleer. Matche das Web-Amber-Pattern. */}
+      {shouldShowStory(recipe) ? (
+        <View
+          style={{
+            paddingHorizontal: 14,
+            paddingTop: 12,
+            paddingBottom: 14,
+            marginBottom: 8,
+            backgroundColor: blendWithWhite(t.accent, 0.88),
+            borderTopWidth: 0.6,
+            borderBottomWidth: 0.6,
+            borderColor: blendWithWhite(t.accent, 0.55),
+            alignItems: "center",
+          }}
+          wrap={false}
+        >
+          <Text
+            style={{
+              fontSize: 7.5,
+              fontWeight: 700,
+              letterSpacing: 1.8,
+              color: t.accent,
+              textTransform: "uppercase",
+              marginBottom: 5,
+            }}
+          >
+            Bienes Story
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontStyle: "italic",
+              fontSize: 12,
+              lineHeight: 1.5,
+              color: t.ink,
+              textAlign: "center",
+              maxWidth: 460,
+            }}
+          >
+            {recipe.description}
+          </Text>
+        </View>
+      ) : null}
 
       {/* BODY — 2-Spalten */}
       <View

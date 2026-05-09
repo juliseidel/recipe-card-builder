@@ -58,6 +58,70 @@ type RecipeCardFullProps = {
   enriching?: EnrichingState;
 };
 
+// Sparse-Detection für den "Bienes Story"-Pull-Quote-Block. Spiegel der
+// PDF-Helfer in lib/pdf/recipe-card-pdf.tsx#shouldShowStory: ein Rezept
+// gilt als kurz genug, dass die Karte ohne zusätzlichen Erzähl-Block
+// halbleer wirken würde, wenn es ≤10 Zutaten hat. Editorial ist davon
+// ausgenommen — dort ist die Story strukturelles Element und wird immer
+// gezeigt, wenn `recipe.description` vorhanden ist.
+//
+// Der Block ist gedacht für: 3-Zutaten-Eisbowl, Kaiserschmarrn, Marzipan-
+// Kugeln, schnelle Snacks, kurze Hauptgerichte. Lange Volumen-Bowls
+// (16 Zutaten) lassen ihn weg — die füllen die Karte aus eigener Kraft.
+export function webShouldShowStory(recipe: Recipe): boolean {
+  return (
+    recipe.ingredients.length <= 10 &&
+    Boolean(recipe.description?.trim())
+  );
+}
+
+// Reusable Story-Pull-Quote-Block. Pack-Mood-eingefärbt, italic Fraunces.
+// Kommt visuell in jedem Layout an leicht anderer Stelle (siehe Caller),
+// aber das Innenleben bleibt identisch — kein per-Layout-Drift mehr.
+//
+// Caller-Verantwortung: rufe webShouldShowStory(recipe) als Wrapper-
+// Bedingung auf. Diese Komponente prüft nur noch defensiv ob description
+// überhaupt etwas enthält (für den seltenen Race wo description erst nach
+// Hydration generiert wird).
+export function WebStoryBlock({
+  recipe,
+  pack,
+  className,
+}: {
+  recipe: Recipe;
+  pack: Pack;
+  /** Optional Override für äußere Spacings/Borders pro Layout. Default
+   *  ist border-b + padded für Inline-Use zwischen Header und Body. */
+  className?: string;
+}) {
+  if (!recipe.description?.trim()) return null;
+  return (
+    <div
+      className={
+        className ??
+        "border-b px-8 py-6 sm:px-12"
+      }
+      style={{
+        borderColor: pack.mood.ink + "1a",
+        background: pack.mood.background + "20",
+      }}
+    >
+      <div
+        className="mb-2 text-[10px] font-semibold uppercase tracking-[0.22em]"
+        style={{ color: pack.mood.accent }}
+      >
+        Bienes Story
+      </div>
+      <p
+        className="max-w-[60ch] font-display text-[17px] italic leading-relaxed"
+        style={{ color: pack.mood.ink }}
+      >
+        {recipe.description}
+      </p>
+    </div>
+  );
+}
+
 export function RecipeCardFull(props: RecipeCardFullProps) {
   // Per-recipe layout override wins over pack.cardLayout. Lets users pick
   // a layout per card in the editor independent of the pack default.
@@ -1192,6 +1256,17 @@ function MinimalLayout({
         ))}
       </div>
 
+      {/* ─── BIENES STORY — bei kurzen Snacks (3-Zutaten-Frozen-Cup,
+          5-Min-Marzipankartoffeln) sonst wirkt das 2-Spalten-Body
+          halbleer auf dem grosszuegigen Minimal-Hero. ────────── */}
+      {webShouldShowStory(recipe) ? (
+        <WebStoryBlock
+          recipe={recipe}
+          pack={pack}
+          className="border-b px-7 py-6 sm:px-10 sm:py-7"
+        />
+      ) : null}
+
       {/* ─── BODY: 2-Spalten ────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-10 px-7 pt-9 pb-8 sm:px-10 lg:grid-cols-[260px_1fr] lg:gap-14 lg:pt-12 lg:pb-10">
         <div className="flex flex-col gap-3">
@@ -1562,29 +1637,14 @@ function SportLayout({
         </div>
       </header>
 
-      {/* BIENES STORY — only shown when ingredients are sparse, fills the
-          empty space short recipes would otherwise leave below. */}
-      {isSparse && recipe.description ? (
-        <div
-          className="border-b px-8 py-6 sm:px-12"
-          style={{
-            borderColor: pack.mood.ink + "1a",
-            background: pack.mood.background + "20",
-          }}
-        >
-          <div
-            className="mb-2 text-[10px] font-semibold uppercase tracking-[0.22em]"
-            style={{ color: pack.mood.accent }}
-          >
-            Bienes Story
-          </div>
-          <p
-            className="max-w-[60ch] font-display text-[17px] italic leading-relaxed"
-            style={{ color: pack.mood.ink }}
-          >
-            {recipe.description}
-          </p>
-        </div>
+      {/* BIENES STORY — wird angezeigt sobald das Rezept kurz genug ist,
+          dass die Karte ohne Erzähl-Block halbleer wirken würde (≤10
+          Zutaten). Vorher war die Schwelle hier nur ≤6 (isSparse), das
+          war strenger als das PDF und führte dazu dass Web und PDF bei
+          7-10-Zutaten-Karten unterschiedlich aussahen. webShouldShowStory
+          ist jetzt der gemeinsame Helper für alle Web-Layouts. */}
+      {webShouldShowStory(recipe) ? (
+        <WebStoryBlock recipe={recipe} pack={pack} />
       ) : null}
 
       {/* VOLUMEN-STATS — 3 prominent tiles with emojis */}
@@ -1998,6 +2058,30 @@ function VitalLayout({
           </div>
         </div>
       </article>
+
+      {/* CARD 1.5 — BIENES STORY (sparse-only). Eigene Card im Stack-
+          Rhythmus, damit der Premium-Card-Look erhalten bleibt. Nur
+          gerendert wenn das Rezept kurz genug ist (≤10 Zutaten via
+          webShouldShowStory) — sonst wuerde es den Stack ueberladen. */}
+      {webShouldShowStory(recipe) ? (
+        <article
+          className={cardClass}
+          style={{ borderColor: cardBorder }}
+        >
+          <span
+            className="mb-2 block text-[10.5px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: pack.mood.accent }}
+          >
+            Bienes Story
+          </span>
+          <p
+            className="max-w-[60ch] font-display text-[17px] italic leading-relaxed"
+            style={{ color: pack.mood.ink }}
+          >
+            {recipe.description}
+          </p>
+        </article>
+      ) : null}
 
       {/* CARD 2 — NUTRITION */}
       <article
@@ -2516,6 +2600,34 @@ function AmberLayout({
         ))}
       </div>
 
+      {/* BIENES STORY — Honey-tinted Pull-Quote, sitzt zwischen Stat-
+          Ribbon und Body. Bei kurzen Feierabend-Klassikern (z. B. der
+          Cloud-Wrap-Variante) waere die Karte sonst unter dem grosszuegigen
+          Hero halbleer. Schwelle und Look matchen das gemeinsame Web-
+          Helper-Pattern (≤10 Zutaten). */}
+      {webShouldShowStory(recipe) ? (
+        <div
+          className="border-y px-2 py-6 text-center"
+          style={{
+            borderColor: pack.mood.accent + "55",
+            background: pack.mood.accent + "12",
+          }}
+        >
+          <span
+            className="mb-2 block text-[10.5px] font-bold uppercase tracking-[0.26em]"
+            style={{ color: pack.mood.accent }}
+          >
+            Bienes Story
+          </span>
+          <p
+            className="mx-auto max-w-[60ch] font-display text-[17px] italic leading-relaxed"
+            style={{ color: pack.mood.ink }}
+          >
+            {recipe.description}
+          </p>
+        </div>
+      ) : null}
+
       {/* BODY — 2-Spalten */}
       <div className="grid grid-cols-1 gap-7 px-2 py-7 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)]">
         {/* ZUTATEN */}
@@ -2864,6 +2976,18 @@ function DashboardLayout({
           )}
         </div>
       </div>
+
+      {/* BIENES STORY — sage-tinted Pull-Quote zwischen Header-Tile und
+          Checklist-Body, matche das Dashboard-PDF (recipe-card-pdf.tsx
+          Zeile 2828). Bei kurzen Mealprep-Karten (Eisbowl-Stil) sonst
+          fühlt sich der Rest der Page leer an. */}
+      {webShouldShowStory(recipe) ? (
+        <WebStoryBlock
+          recipe={recipe}
+          pack={pack}
+          className="border-t px-8 py-6"
+        />
+      ) : null}
 
       {/* Body as checklist */}
       <div
