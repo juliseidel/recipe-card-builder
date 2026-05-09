@@ -5,6 +5,7 @@ import { generateStory } from "@/lib/ai/generate-story";
 import { generateImageSpec } from "@/lib/ai/recipe-image-spec";
 import { buildPrompt } from "@/lib/ai/image-prompts";
 import { generateImage, downloadImage } from "@/lib/ai/bfl-flux";
+import { GeminiError } from "@/lib/ai/gemini";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 import { getBrand } from "@/lib/brands";
 import { getPack } from "@/lib/packs";
@@ -134,7 +135,30 @@ export async function POST(req: Request) {
         },
       }));
     } catch (err) {
-      console.error("[enrich] micros failed sync for", body.recipeId, err);
+      // Strukturiertes Logging fuer Vercel-Logs. Wir schreiben pro
+      // Failure einen einzeiligen JSON-aehnlichen Block — so sehen wir
+      // beim Scrollen durch die Logs auf einen Blick:
+      //   - welches Rezept und wie kurz es war (3-Zutaten-Eisbowl
+      //     scheitert anders als 16-Zutaten-Mexican-Bowl)
+      //   - ob Gemini einen HTTP-Status zurueckgegeben hat (429/5xx
+      //     deutet auf Overload, andere auf Schema-/JSON-Probleme)
+      //   - ein Snippet der echten Antwort, wenn vorhanden — meist
+      //     reicht das um zu erkennen, ob Gemini wirklich nichts
+      //     liefern konnte oder ob die JSON-Validation failed ist.
+      const isGeminiErr = err instanceof GeminiError;
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error("[enrich] micros failed sync", {
+        recipeId: body.recipeId,
+        recipeTitle: recipe.title,
+        ingredientCount: recipe.ingredients.length,
+        nutritionBasis: recipe.nutritionBasis,
+        errorName: err instanceof Error ? err.name : "unknown",
+        errorMessage,
+        geminiStatus: isGeminiErr ? err.status : undefined,
+        geminiDetailSnippet: isGeminiErr
+          ? String(err.detail).slice(0, 500)
+          : undefined,
+      });
       // Failure-Marker setzen, damit:
       //   1. spaetere Auto-Trigger (Page-Visit) wissen "schon versucht,
       //      nicht nochmal" und uebersprungen werden.

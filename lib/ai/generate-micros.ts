@@ -2,15 +2,24 @@ import type { Recipe, Micronutrient } from "@/lib/recipes";
 import { callGemini } from "./gemini";
 
 // Schema mirrors `Micronutrient` from lib/recipes.ts. Gemini fills it freely:
-// no fixed micro list — it picks whichever 5–10 micros are nutritionally
-// relevant for the given recipe and ranks them by % EU-NRV.
+// no fixed micro list — it picks whichever micros are nutritionally relevant
+// for the given recipe and ranks them by % EU-NRV.
+//
+// Range absichtlich weit (1–12): bei einer 3-Zutaten-Eisbowl gibt es
+// ehrlich vielleicht nur 3 nennenswerte Mikros (Vitamin C aus dem Obst,
+// Calcium + B12 aus dem Quark/Sahne Protein) — das vorherige "5–10"
+// zwang Gemini entweder zur Halluzination oder zu Empty-Array, beides
+// hat den Mikros-Block fuer das ganze Rezept zerstoert. Mit "1–12"
+// kann Gemini ehrlich antworten und die Karte zeigt das echte Profil.
 const RESPONSE_SCHEMA = {
   type: "object",
   properties: {
     micros: {
       type: "array",
       description:
-        "Die 5–10 ernährungsphysiologisch relevantesten Mikronährstoffe (Vitamine, Mineralien) pro Portion, sortiert absteigend nach %TBD",
+        "Die ernährungsphysiologisch relevantesten Mikronährstoffe (Vitamine, Mineralien) pro Portion, sortiert absteigend nach %TBD. Liefere so viele wie das Rezept ehrlich hergibt — typisch 3–10, mindestens 1 wenn überhaupt etwas relevant ist, maximal 12. Erfinde nichts hinzu, nur um eine Mindestanzahl zu erreichen.",
+      minItems: 1,
+      maxItems: 12,
       items: {
         type: "object",
         properties: {
@@ -42,7 +51,7 @@ const SYSTEM_INSTRUCTION = `Du bist promovierter Ernährungswissenschaftler mit 
 Wichtig:
 • Gehe von der Zutatenliste aus und schätze die enthaltenen Mikronährstoffe pro Portion. Nutze typische Nährwerttabellen (BLS, USDA) als Referenz.
 • Identifiziere für jedes Rezept individuell, welche Mikronährstoffe ernährungsphysiologisch relevant sind — nicht jedes Rezept ist reich an Vitamin C, manche sind reich an Eisen, andere an Magnesium oder Calcium.
-• Liefere 5 bis 10 Mikronährstoffe — nur diejenigen, bei denen das Rezept relevante Mengen liefert (mindestens 8% der EU-Tagesbedarf-Empfehlung).
+• Liefere die wirklich nennenswerten Mikronährstoffe (mindestens 8% der EU-Tagesbedarf-Empfehlung pro Portion). Typisch sind 3–10 Mikros pro Rezept; bei sehr kurzen Rezepten (3–4 Zutaten) können es auch nur 1–3 sein, bei sehr reichhaltigen Bowls bis zu 12. LIEBER 3 ehrliche als 5 erzwungene — fülle NIE mit Mikros auf, die das Rezept gar nicht nennenswert liefert.
 • Sei realistisch: Wenn ein Rezept ein süßes Snack-Gebäck ist, dominiert vielleicht nur Calcium und ein bisschen Vitamin B2. Wenn es ein Hauptgericht mit Gemüse ist, werden mehr relevant.
 • Ranking: absteigend nach % Tagesbedarf, der wertvollste Mikronährstoff zuerst.
 • Beachte: MORE Sahne Protein liefert oft Calcium + Vitamin B12, Eier liefern Vitamin A/D/B12, grünes Gemüse liefert Folat + Eisen, Hülsenfrüchte liefern Eisen + Magnesium etc.
@@ -102,10 +111,11 @@ export async function generateMicros(recipe: Recipe): Promise<Micronutrient[]> {
     schema: RESPONSE_SCHEMA,
     systemInstruction: SYSTEM_INSTRUCTION,
     temperature: 0.3,
-    // Sanity cap to prevent the rare "infinite \b" Gemini bug from looping
-    // past the model's internal limit (we observed ~134KB of garbage on one
-    // recipe). 4096 tokens is plenty for a 5–10 micros JSON list.
-    maxOutputTokens: 4096,
+    // maxOutputTokens absichtlich NICHT gesetzt: bei kurzen Rezepten
+    // hat ein 4096er-Cap Gemini vermutlich nicht direkt limitiert, aber
+    // bei strukturiert-validiertem JSON-Output ist es sauberer, das
+    // Modell selbst entscheiden zu lassen — wir wollen ja eher mehr
+    // Detail-Notes als weniger. Keine bekannte Regression dadurch.
     // Thinking off: this is pure structured extraction, not reasoning.
     thinkingBudget: 0,
     retries: 3,
@@ -130,7 +140,10 @@ export async function generateMicros(recipe: Recipe): Promise<Micronutrient[]> {
       return true;
     })
     .sort((a, b) => (b.pctDaily ?? 0) - (a.pctDaily ?? 0))
-    .slice(0, 10);
+    // Schema erlaubt jetzt bis zu 12 — Cap matched. Bei kurzen Rezepten
+    // kommt sowieso weniger zurueck (1–4); slice schneidet nur dann
+    // wenn Gemini ueberzeugt war es gibt 10+ relevante.
+    .slice(0, 12);
 
   return cleaned;
 }
