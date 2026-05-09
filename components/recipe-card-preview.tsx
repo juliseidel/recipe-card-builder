@@ -66,7 +66,8 @@ export function RecipeCardPreview({
   return (
     <Link
       href={`/${brand.slug}/${pack.slug}/${recipe.slug}`}
-      className="group relative flex aspect-[3/4] flex-col justify-between overflow-hidden rounded-[var(--radius-card)] text-white transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[var(--shadow-card-hover)]"
+      prefetch
+      className="group relative flex aspect-[3/4] flex-col justify-between overflow-hidden rounded-[var(--radius-card)] text-white transition-all duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-1.5 hover:shadow-[var(--shadow-card-hover)] active:translate-y-0 active:scale-[0.985] active:duration-150"
       style={{ boxShadow: "var(--shadow-card)" }}
     >
       <Image
@@ -74,7 +75,7 @@ export function RecipeCardPreview({
         alt={recipe.title}
         fill
         sizes="(min-width: 1280px) 420px, (min-width: 768px) 50vw, 100vw"
-        className={`${positionClass} object-cover transition-transform duration-300 group-hover:scale-[1.06]`}
+        className={`${positionClass} object-cover transition-transform duration-[520ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.06] group-active:scale-[1.02]`}
       />
 
       {/* Pack-mood color overlay — gives every pack its own atmosphere */}

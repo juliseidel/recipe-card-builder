@@ -96,7 +96,10 @@ export function RecipeDetailLayout({
       </section>
 
       <main className="flex-1">
-        <div className="mx-auto max-w-[1200px] px-6 py-12 lg:px-10 lg:py-16">
+        <div
+          className="content-fade-in mx-auto max-w-[1200px] px-6 py-12 lg:px-10 lg:py-16"
+          style={{ animationDuration: "0.55s" }}
+        >
           <RecipeCardFull
             brand={brand}
             pack={pack}
@@ -105,7 +108,10 @@ export function RecipeDetailLayout({
             enriching={enriching}
           />
 
-          <nav className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <nav
+            className="content-fade-in mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2"
+            style={{ animationDelay: "180ms", animationDuration: "0.5s" }}
+          >
             {previous ? (
               <NavLink
                 direction="prev"
