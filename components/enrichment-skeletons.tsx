@@ -112,7 +112,7 @@ export function MicrosSkeletonStrip({ pack }: { pack: Pack }) {
           className="font-mono text-[10px] uppercase tracking-[0.14em]"
           style={{ color: pack.mood.inkSoft }}
         >
-          Gemini · ~5 Sek
+          Wird analysiert · ~5 Sek
         </span>
       </div>
 

@@ -460,8 +460,8 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
                     className="text-[12px] leading-snug"
                     style={{ color: "var(--color-ink-muted)" }}
                   >
-                    Flux 2 Pro generiert nach dem Speichern automatisch ein
-                    Cookbook-Cover passend zu Pack-Titel, Kategorie und Farben
+                    Nach dem Speichern wird automatisch ein Cookbook-Cover
+                    passend zu Pack-Titel, Kategorie und Farben generiert
                     (~30 Sek).
                   </p>
                 </button>

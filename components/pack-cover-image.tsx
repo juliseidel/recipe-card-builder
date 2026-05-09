@@ -112,7 +112,7 @@ function PackCoverSkeleton({ pack }: { pack: Pack }) {
           className="font-mono text-[10px] uppercase tracking-[0.2em]"
           style={{ color: pack.mood.inkSoft, opacity: 0.7 }}
         >
-          Flux 2 Pro · ~30 Sek
+          Wird gerendert · ~30 Sek
         </span>
       </div>
     </div>
