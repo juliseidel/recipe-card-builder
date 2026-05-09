@@ -1,3 +1,5 @@
+import type { PackForewordContent } from "./ai/generate-foreword";
+
 export type PackMood = {
   background: string;
   accent: string;
@@ -27,6 +29,16 @@ export type Pack = {
   mood: PackMood;
   displayFont: "fraunces" | "dm-serif" | "inter-tight";
   cardLayout: CardLayout;
+  /** Custom-Pack-Vorwort. Bei kuratierten Bienen-Packs leer — die lesen
+   *  ihren Vorwort-Text aus dem statischen Cache `lib/pack-forewords.ts`.
+   *  Bei Custom-Packs wird dieses Feld beim Anlegen automatisch via
+   *  Gemini gefuellt (siehe app/api/packs/enrich/route.ts). */
+  foreword?: PackForewordContent;
+  /** URL zum Vorwort-Stillleben (Supabase Storage `pack-forewords`-Bucket).
+   *  Bei kuratierten Bienen-Packs leer — die liegen unter
+   *  `public/brands/<brand>/forewords/<slug>.jpg` auf der Disk. Bei
+   *  Custom-Packs wird dieses Feld beim Anlegen via Flux 2 Pro gefuellt. */
+  forewordImage?: string;
 };
 
 export const packs: Pack[] = [

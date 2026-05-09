@@ -54,14 +54,24 @@ export async function renderPackPdf(args: {
   args.onProgress?.("loading-cover", 8);
   const coverDataUri = await loadImageAsDataUri(args.pack.coverImage);
 
-  // Foreword text is pulled per pack from the static cache. The image
-  // path is only attempted when text exists — packs without a cached
-  // foreword fall through to the legacy cover→index sequence and don't
-  // pay an extra image fetch.
-  const forewordContent = getPackForeword(args.pack.slug);
-  const forewordImagePath = forewordContent
+  // Foreword sources, in priority order:
+  //   1. Statischer Cache (lib/pack-forewords.ts) — die 5 kuratierten
+  //      Bienen-Packs, hand-poliert + Stillleben auf der Disk unter
+  //      public/brands/<brand>/forewords/<slug>.jpg
+  //   2. Custom-Packs — pack.foreword (Gemini-generiert beim
+  //      Anlegen) + pack.forewordImage (Flux 2 Pro, in Supabase
+  //      Storage). Faellt zurueck wenn der statische Cache nichts hat.
+  //
+  // Wenn beides leer ist (z. B. enrich noch am Laufen), bleibt die
+  // Legacy Cover→Index-Sequenz erhalten — die Vorwort-Seite wird
+  // einfach uebersprungen, alles andere rendert normal.
+  const cachedForeword = getPackForeword(args.pack.slug);
+  const forewordContent = cachedForeword ?? args.pack.foreword ?? null;
+  const forewordImagePath: string | null = cachedForeword
     ? `/brands/${args.brand.slug}/forewords/${args.pack.slug}.jpg`
-    : null;
+    : forewordContent && args.pack.forewordImage
+      ? args.pack.forewordImage
+      : null;
 
   args.onProgress?.("loading-recipe-images", 20);
   // Hero images, QR codes, foreword image (optional), and brand avatar
