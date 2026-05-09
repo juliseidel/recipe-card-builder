@@ -145,10 +145,20 @@ export async function processJob(jobId: string): Promise<void> {
         await markFailed(supabase, jobId, "Recipe not found");
         return;
       }
-      const staticRecipes = await getRecipesForPack(job.pack_slug);
-      const totalRecipes =
-        staticRecipes.length +
-        (await countCustomRecipes(supabase, job.pack_slug));
+      // totalRecipes drives the "01 / 07" index label on the single-card
+      // export. It must reflect what the user sees in the pack grid:
+      //   curated baseline − hidden curated cards + custom cards
+      // Without the hidden subtraction, a freshly-deleted curated card
+      // would still inflate the denominator on every other card's footer.
+      const [staticRecipes, customCount, hiddenCount] = await Promise.all([
+        getRecipesForPack(job.pack_slug),
+        countCustomRecipes(supabase, job.pack_slug),
+        countHiddenRecipes(supabase, job.brand_slug, job.pack_slug),
+      ]);
+      const totalRecipes = Math.max(
+        1,
+        staticRecipes.length - hiddenCount + customCount
+      );
       buffer = await renderRecipePdf({
         brand,
         pack,
@@ -160,13 +170,21 @@ export async function processJob(jobId: string): Promise<void> {
       downloadName = `${safeFilename(recipe.title)}.pdf`;
     } else {
       // Pack PDF includes curated recipes + any custom cards saved into this
-      // pack. mergeAndRenumber places newest custom first and rewrites
-      // sequential 01..N numbers, matching what the web app shows.
-      const [staticRecipes, customRecipes] = await Promise.all([
+      // pack, MINUS any curated cards the user hid from the web grid. Without
+      // the hidden filter the PDF would re-introduce deleted-feeling cards
+      // (the user already removed them from the web view but the export
+      // would silently bring them back). mergeAndRenumber then puts newest
+      // custom first and rewrites sequential 01..N numbers so the index,
+      // foreword counter, nutrition table and filename all stay in sync.
+      const [staticRecipes, customRecipes, hiddenSlugs] = await Promise.all([
         getRecipesForPack(job.pack_slug),
         loadCustomRecipesForPack(supabase, job.pack_slug),
+        loadHiddenSlugsForPack(supabase, job.brand_slug, job.pack_slug),
       ]);
-      const recipes = mergeAndRenumber(staticRecipes, customRecipes);
+      const visibleStatic = staticRecipes.filter(
+        (r) => !hiddenSlugs.has(r.slug)
+      );
+      const recipes = mergeAndRenumber(visibleStatic, customRecipes);
       if (recipes.length === 0) {
         await markFailed(supabase, jobId, "Pack has no recipes");
         return;
@@ -267,6 +285,46 @@ async function countCustomRecipes(
     .eq("is_custom", true);
   if (error) return 0;
   return count ?? 0;
+}
+
+// Counts how many curated cards the user has hidden from this pack — the
+// single-recipe export uses this to keep its "01 / N" denominator honest.
+async function countHiddenRecipes(
+  supabase: SupabaseClient,
+  brandSlug: string,
+  packSlug: string
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("hidden_recipes")
+    .select("*", { count: "exact", head: true })
+    .eq("brand_slug", brandSlug)
+    .eq("pack_slug", packSlug);
+  if (error) return 0;
+  return count ?? 0;
+}
+
+// Loads the slugs of curated cards the user has hidden from this pack. The
+// pack-PDF render uses this set to drop those cards before rendering, so a
+// freshly-deleted curated card never silently re-appears in the export.
+async function loadHiddenSlugsForPack(
+  supabase: SupabaseClient,
+  brandSlug: string,
+  packSlug: string
+): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("hidden_recipes")
+    .select("recipe_slug")
+    .eq("brand_slug", brandSlug)
+    .eq("pack_slug", packSlug);
+  if (error) {
+    console.warn("[pdf-jobs] loadHiddenSlugsForPack failed", error);
+    return new Set();
+  }
+  return new Set(
+    (data ?? [])
+      .map((row) => row.recipe_slug as string | undefined)
+      .filter((slug): slug is string => Boolean(slug))
+  );
 }
 
 // Reads custom recipes for a pack from Supabase server-side. Mirrors the
