@@ -24,6 +24,11 @@ export default function SubmissionPage() {
     (sum, p) => sum + (recipes.filter((r) => r.packSlug === p.slug).length + 4),
     0
   );
+  // Layout-Anzahl dynamisch aus den tatsaechlich genutzten Pack-Layouts.
+  // Vorher war "5" hardcoded — wenn jemand spaeter ein Pack umflaggt
+  // (oder ein neues kuratiertes Pack dazukommt), zieht der Counter
+  // automatisch nach.
+  const totalLayouts = new Set(packs.map((p) => p.cardLayout)).size;
 
   return (
     <div className="bg-paper flex min-h-screen flex-col">
@@ -75,7 +80,7 @@ export default function SubmissionPage() {
               </span>
               <span className="inline-flex items-center gap-2">
                 <span className="font-display text-[24px] leading-none text-ink">
-                  5
+                  {totalLayouts}
                 </span>
                 Layouts
               </span>
