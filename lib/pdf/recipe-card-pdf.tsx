@@ -626,17 +626,31 @@ function PatisseriePage({
   // Title-Size dynamisch nach Laenge des Recipe-Titels. Die Sidebar ist
   // nur 186 pt breit (innen), und @react-pdf/renderer macht keinen
   // automatischen Word-Break an Bindestrichen — dadurch wurden Titel wie
-  // "Virale KI-Suesskartoffel-Muffins" am Rand abgeschnitten. Die
-  // Skala bringt den Titel selbst bei 32+ Zeichen sicher in 2-3 Zeilen.
+  // "Erdbeer-Kuppeltorte" oder "Virale KI-Suesskartoffel-Muffins" am
+  // Rand abgeschnitten ("Erdbeer-Kuppeltor", "Virale KI-Suesskartoffe").
+  //
+  // Loesung in zwei Stufen:
+  //   1. softWrapTitle (unten): fuegt einen Zero-Width-Space nach
+  //      jedem Bindestrich ein, damit react-pdf an dieser Stelle
+  //      sauber umbrechen kann — sichtbar bleibt nur der Bindestrich.
+  //   2. Granulare Skala mit feineren Stufen (alle 6 Zeichen statt
+  //      6/12/12+) und niedrigerem Minimum, damit selbst lange
+  //      Pack-1-Titel auf 2-3 Zeilen passen, ohne dass kurze Titel
+  //      proportional zu klein werden.
   const titleLen = recipe.title.length;
   const titleFontSize =
-    titleLen <= 18
+    titleLen <= 14
       ? d.titleFontSize
-      : titleLen <= 24
-        ? Math.max(d.titleFontSize - 4, 18)
-        : titleLen <= 30
-          ? Math.max(d.titleFontSize - 8, 16)
-          : Math.max(d.titleFontSize - 12, 14);
+      : titleLen <= 20
+        ? Math.max(d.titleFontSize - 3, 18)
+        : titleLen <= 26
+          ? Math.max(d.titleFontSize - 6, 16)
+          : titleLen <= 32
+            ? Math.max(d.titleFontSize - 9, 15)
+            : titleLen <= 40
+              ? Math.max(d.titleFontSize - 12, 14)
+              : Math.max(d.titleFontSize - 14, 13);
+  const titleDisplay = softWrapTitle(recipe.title);
 
   // Mikros-Anzahl an Recipe-Density koppeln. Lange Recipes (16+ Zutaten,
   // 9+ Steps) brauchen die ganze Body-Spalte; entsprechend bekommt die
@@ -736,7 +750,7 @@ function PatisseriePage({
                 color: t.ink,
               }}
             >
-              {recipe.title}
+              {titleDisplay}
             </Text>
             <Text
               style={{
@@ -1844,6 +1858,24 @@ function MinimalPage({
 // pack-specific. New custom recipes pick up the right mode automatically
 // based on ingredient count — no manual configuration needed.
 export type Density = "compact" | "balanced" | "spacious";
+
+// react-pdf bricht Text nur an Whitespace, nicht an Bindestrichen. Lange
+// zusammengesetzte Substantive ("Erdbeer-Kuppeltorte", "Süßkartoffel-
+// Muffins", "Cheeseburger-Auflauf") werden dadurch in der schmalen
+// Patisserie-Sidebar (186 pt innen) am Rand abgeschnitten — der User
+// sieht "Erdbeer-Kuppeltor..." statt "Erdbeer-\nKuppeltorte".
+//
+// Trick: nach jedem Bindestrich einen Zero-Width-Space (​). Der ist
+// visuell unsichtbar, react-pdf erkennt ihn aber als optionale Bruch-
+// stelle. Wenn das Wort zu breit ist, bricht die Engine sauber nach dem
+// Bindestrich um, sonst verhält es sich wie ein normales Wort.
+//
+// Wir lassen Bindestriche, die am Wortrand stehen ("- Spekulatius") in
+// Ruhe — die haben sowieso schon ein Whitespace-Anker. Nur Inline-
+// Bindestriche zwischen zwei Buchstaben bekommen den Zero-Width-Space.
+export function softWrapTitle(title: string): string {
+  return title.replace(/(\p{L})-(\p{L})/gu, "$1-​$2");
+}
 
 // Score weighs steps slightly higher than ingredients because each step is
 // usually 2–3 lines of body copy, while an ingredient is 1–2 short lines.

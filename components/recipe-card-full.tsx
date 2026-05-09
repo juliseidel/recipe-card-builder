@@ -719,8 +719,15 @@ function PatisserieLayout({
     >
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr]">
         {/* ─── LEFT: LAVENDER SIDEBAR ───────────────────────── */}
+        {/* `min-w-0` auf das aside ist wichtig: Grid-Items haben default
+            min-width=auto und wuerden sich vom laengsten enthaltenen Wort
+            ausdehnen lassen. Bei Pack 1 (Patisserie) sind Titel wie
+            "Erdbeer-Kuppeltorte" zusammengesetzte Substantive — ohne
+            min-w-0 schiebt der Title die Sidebar breiter als 2fr und
+            verschiebt die Body-Spalte nach rechts ueber den article-
+            Rand hinaus, wo overflow-hidden den Text dann clipped. */}
         <aside
-          className="flex flex-col gap-7 px-8 pt-10 pb-8 lg:px-9 lg:pt-12 lg:pb-10"
+          className="flex min-w-0 flex-col gap-7 px-8 pt-10 pb-8 lg:px-9 lg:pt-12 lg:pb-10"
           style={{ background: pack.mood.background, color: pack.mood.ink }}
         >
           <div className="flex flex-col gap-5">
@@ -734,21 +741,29 @@ function PatisserieLayout({
               {pack.title}
             </span>
 
-            {/* Title — dynamische Schriftgroesse + break-words +
-                hyphens:auto, damit zusammengesetzte Substantive wie
-                "KI-Süsskartoffel-Muffins" in der schmalen Sidebar nicht
-                am Rand abgeschnitten werden. Mirror der PDF-Logic. */}
+            {/* Title — dynamische Schriftgroesse + aggressives Word-
+                Wrapping. Stufen sind dieselben wie im PDF-Patisserie
+                (lib/pdf/recipe-card-pdf.tsx#PatisseriePage), damit Web
+                und PDF konsistent rendern. `[overflow-wrap:anywhere]`
+                fuegt sich zu break-words + hyphens:auto dazu, weil
+                manche Browser bei zusammengesetzten deutschen
+                Substantiven mit Bindestrich (Erdbeer-Kuppeltorte,
+                KI-Süsskartoffel-Muffins) sonst doch nicht umbrechen. */}
             <h1
               className={[
                 "font-display italic tracking-[-0.015em]",
-                "leading-[1.02] break-words [hyphens:auto]",
-                recipe.title.length <= 18
+                "leading-[1.02] break-words [hyphens:auto] [overflow-wrap:anywhere]",
+                recipe.title.length <= 14
                   ? "text-[44px] sm:text-[52px]"
-                  : recipe.title.length <= 24
-                    ? "text-[36px] sm:text-[44px]"
-                    : recipe.title.length <= 30
-                      ? "text-[30px] sm:text-[36px]"
-                      : "text-[24px] sm:text-[28px]",
+                  : recipe.title.length <= 20
+                    ? "text-[38px] sm:text-[46px]"
+                    : recipe.title.length <= 26
+                      ? "text-[32px] sm:text-[38px]"
+                      : recipe.title.length <= 32
+                        ? "text-[26px] sm:text-[32px]"
+                        : recipe.title.length <= 40
+                          ? "text-[22px] sm:text-[26px]"
+                          : "text-[20px] sm:text-[24px]",
               ].join(" ")}
               style={{ color: pack.mood.ink }}
             >
