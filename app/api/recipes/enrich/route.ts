@@ -1,10 +1,7 @@
 import { NextResponse, after } from "next/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateMicros } from "@/lib/ai/generate-micros";
 import { generateStory } from "@/lib/ai/generate-story";
-import { generateImageSpec } from "@/lib/ai/recipe-image-spec";
-import { buildPrompt } from "@/lib/ai/image-prompts";
-import { generateImage, downloadImage } from "@/lib/ai/bfl-flux";
+import { generateHeroForRecipe } from "@/lib/ai/generate-hero";
 import { GeminiError } from "@/lib/ai/gemini";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 import { getBrand } from "@/lib/brands";
@@ -17,11 +14,11 @@ import type { Recipe } from "@/lib/recipes";
 // editor after a save. Both run in parallel in the background, single DB
 // update at the end.
 export const runtime = "nodejs";
-// Hero generation is the long pole — Flux 2 Pro takes 15-25s, occasionally
-// up to 90s under load. 90s gives us margin.
-export const maxDuration = 90;
-
-const HERO_BUCKET = "recipe-heroes";
+// Hero generation: Apify (~10s) + Video-Download (~5s) + ffmpeg
+// Frame-Extract (~5s) + Gemini Vision (~5s) + Flux Kontext Pro (~20-40s)
+// + Storage-Upload = realistisch 50-90 s. Wir setzen 120 s als Ceiling
+// fuer den seltenen worst-case (Apify cold-start + BFL load-spike).
+export const maxDuration = 120;
 
 type Body = {
   recipeId: string;
@@ -211,14 +208,14 @@ export async function POST(req: Request) {
   if (needsHero) {
     after(async () => {
       try {
-        const heroUrl = await generateHeroForRecipe({
+        const result = await generateHeroForRecipe({
           recipe,
           recipeId: row.id,
           brandSlug,
           forceFlux: Boolean(body.forceFlux),
         });
-        if (heroUrl) {
-          await mergeRecipeData(row.id, () => ({ hero: heroUrl }));
+        if (result?.heroUrl) {
+          await mergeRecipeData(row.id, () => ({ hero: result.heroUrl }));
         }
       } catch (err) {
         console.error("[enrich] hero failed for", body.recipeId, err);
@@ -258,127 +255,6 @@ export async function POST(req: Request) {
     },
     { status: 202 }
   );
-}
-
-// Hero-Selector: Reel-Cover bevorzugt, Flux als Fallback / Re-Roll.
-// Returnt die public-URL des hochgeladenen JPEGs oder null, wenn nichts
-// klappt (Buckets nicht erreichbar, Apify aus, BFL aus, etc.).
-async function generateHeroForRecipe(opts: {
-  recipe: Recipe;
-  recipeId: string;
-  brandSlug: string;
-  forceFlux: boolean;
-}): Promise<string | null> {
-  const { recipe, recipeId, brandSlug, forceFlux } = opts;
-
-  // Path A: Reel-Cover (Default fuer Recipe mit sourceUrl)
-  if (!forceFlux && recipe.sourceUrl) {
-    try {
-      const reelHero = await uploadReelCoverHero(recipe.sourceUrl, recipeId);
-      if (reelHero) return reelHero;
-    } catch (err) {
-      console.warn(
-        "[enrich] reel-cover hero failed, falling back to Flux:",
-        err instanceof Error ? err.message : err
-      );
-    }
-  }
-
-  // Path B: Flux 2 Pro (Re-Roll oder Reel-Cover-Failure-Fallback)
-  return await generateAndUploadHero(recipe, recipeId, brandSlug);
-}
-
-// Reel-Cover als Hero: Apify-Scrape → sharp smart-crop → Storage-Upload.
-// Returnt null, wenn der Reel kein displayUrl liefert (z. B. privat).
-async function uploadReelCoverHero(
-  sourceUrl: string,
-  recipeId: string
-): Promise<string | null> {
-  const { extractReelHeroFromInstagram } = await import(
-    "@/lib/ai/extract-reel-hero"
-  );
-  const reel = await extractReelHeroFromInstagram(sourceUrl);
-  if (!reel) return null;
-
-  const supabase = getServerSupabase();
-  await ensureHeroBucket(supabase);
-
-  const filePath = `${recipeId}.jpg`;
-  const upload = await supabase.storage
-    .from(HERO_BUCKET)
-    .upload(filePath, reel.buffer, {
-      contentType: "image/jpeg",
-      upsert: true,
-      cacheControl: "31536000",
-    });
-  if (upload.error) {
-    console.error(
-      "[enrich] reel-cover upload failed:",
-      upload.error.message
-    );
-    return null;
-  }
-  const { data } = supabase.storage.from(HERO_BUCKET).getPublicUrl(filePath);
-  return data.publicUrl ?? null;
-}
-
-// Generate the recipe hero via the same pipeline used for the static 37
-// recipes (Gemini Stage 2 → Brand-DNA override → Flux 2 Pro), then upload to
-// Supabase Storage and return the public URL. Returns null if BFL is not
-// configured (graceful skip — micros still run).
-async function generateAndUploadHero(
-  recipe: Recipe,
-  recipeId: string,
-  brandSlug: string
-): Promise<string | null> {
-  if (!process.env.BFL_API_KEY) {
-    console.warn("[enrich] BFL_API_KEY missing — skipping hero generation");
-    return null;
-  }
-
-  const spec = await generateImageSpec(recipe, brandSlug);
-  const { prompt, negative } = buildPrompt("hero", recipe, spec, brandSlug);
-  const result = await generateImage({
-    prompt,
-    negativePrompt: negative,
-    model: "flux-2-pro",
-    aspectRatio: "1:1",
-    outputFormat: "jpeg",
-    safetyTolerance: 2,
-  });
-  const buf = await downloadImage(result.imageUrl);
-
-  const supabase = getServerSupabase();
-  await ensureHeroBucket(supabase);
-
-  const filePath = `${recipeId}.jpg`;
-  const upload = await supabase.storage
-    .from(HERO_BUCKET)
-    .upload(filePath, buf, {
-      contentType: "image/jpeg",
-      upsert: true,
-      cacheControl: "31536000", // 1 year — file path is recipeId-keyed, never reused
-    });
-  if (upload.error) {
-    console.error("[enrich] hero upload failed:", upload.error.message);
-    return null;
-  }
-
-  const { data } = supabase.storage.from(HERO_BUCKET).getPublicUrl(filePath);
-  return data.publicUrl ?? null;
-}
-
-// First-call: create the public bucket. Subsequent calls hit the
-// "already exists" branch and no-op. Idempotent — safe to call every time.
-async function ensureHeroBucket(supabase: SupabaseClient): Promise<void> {
-  const { error } = await supabase.storage.createBucket(HERO_BUCKET, {
-    public: true,
-    fileSizeLimit: 5 * 1024 * 1024,
-    allowedMimeTypes: ["image/jpeg"],
-  });
-  if (error && !/already exists/i.test(error.message)) {
-    console.warn("[enrich] bucket create warning:", error.message);
-  }
 }
 
 // Read-modify-write merge into recipes.data. Used when independent

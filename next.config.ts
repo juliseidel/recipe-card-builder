@@ -5,6 +5,11 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  // @ffmpeg-installer/ffmpeg macht dynamische require()-Calls zu plattform-
+  // spezifischen Binaries (darwin-arm64, linux-x64, …) — Webpack/Turbopack
+  // koennen das nicht statisch resolven. serverExternalPackages laesst die
+  // Module zur Runtime im node_modules-Layer, statt sie zu bundlen.
+  serverExternalPackages: ["@ffmpeg-installer/ffmpeg"],
   images: {
     qualities: [75, 90, 95],
     // Hero images for custom recipes are uploaded to Supabase Storage by
@@ -31,6 +36,17 @@ const nextConfig: NextConfig = {
     "/api/pdf/jobs/[id]": [
       "./public/fonts/**/*",
       "./public/brands/**/*",
+    ],
+    // Hero-Pipeline (Phase-3-Rebuild) braucht das ffmpeg-binary in der
+    // Lambda-Bundle. @ffmpeg-installer/ffmpeg liefert plattform-spezifische
+    // Binaries als optional deps; auf Vercel-Build (linux-x64) muss
+    // explizit das richtige Binary-Folder eingeschlossen werden, sonst
+    // findet ffmpegInstaller.path zur Runtime nichts.
+    "/api/recipes/enrich": [
+      "./node_modules/@ffmpeg-installer/**/*",
+    ],
+    "/api/admin/reseed-heroes": [
+      "./node_modules/@ffmpeg-installer/**/*",
     ],
   },
 };

@@ -20,6 +20,14 @@ export type InstagramPost = {
   caption: string;
   /** Hauptbild-URL (CDN, public). Bei Reels: Cover-Frame. */
   displayUrl: string | null;
+  /** Direkt-Download-URL fuer das Reel-Video (MP4). Wird von der Hero-
+   *  Pipeline gebraucht, um per ffmpeg Keyframes aus dem Video zu ziehen,
+   *  statt das Cover-Thumbnail (= das vom Creator designte Click-Bait-
+   *  Bild mit Werbe-Overlays) als Hero zu nutzen.
+   *  null fuer Image-Posts ohne Video. */
+  videoUrl: string | null;
+  /** Laenge des Videos in Sekunden, fuer ffmpeg-Frame-Timing. */
+  videoDuration: number | null;
   /** URL des Posts selbst — für Source-Attribution. */
   postUrl: string;
   /** @username des Erstellers (z. B. "bienesfitlife"). */
@@ -167,6 +175,8 @@ export async function scrapeInstagramPost(
   const items = (await res.json()) as Array<{
     caption?: string;
     displayUrl?: string;
+    videoUrl?: string;
+    videoDuration?: number;
     url?: string;
     ownerUsername?: string;
     hashtags?: string[];
@@ -200,6 +210,9 @@ export async function scrapeInstagramPost(
   return {
     caption: item.caption.trim(),
     displayUrl: item.displayUrl ?? null,
+    videoUrl: item.videoUrl ?? null,
+    videoDuration:
+      typeof item.videoDuration === "number" ? item.videoDuration : null,
     postUrl: item.url ?? normalized,
     ownerUsername: item.ownerUsername ?? null,
     hashtags: item.hashtags ?? [],

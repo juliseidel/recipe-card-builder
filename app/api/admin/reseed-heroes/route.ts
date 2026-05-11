@@ -1,33 +1,30 @@
 import { NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabase-server";
-import { extractReelHeroFromInstagram } from "@/lib/ai/extract-reel-hero";
+import { generateHeroForRecipe } from "@/lib/ai/generate-hero";
+import { getBrand } from "@/lib/brands";
+import type { Recipe } from "@/lib/recipes";
 
-// Admin-Endpoint: Reseed Hero Images aus Instagram-Reel-Coverframes statt
-// Flux-generierter Bilder. Wird einmalig nach dem Phase-3-Switch aufgerufen,
-// damit die 37 bereits geseedeten Bienes-Rezepte (data.hero zeigt aktuell
-// auf Flux-Bilder) neue Reel-Cover-Heroes bekommen.
+// Admin-Endpoint: Reseed Hero Images mit der neuen Phase-3-Pipeline
+// (Apify video → ffmpeg frames → Gemini Vision pick → Flux Kontext Pro
+// mit Keyframe-Reference). Wird einmalig nach dem Pipeline-Rebuild
+// aufgerufen, damit die bereits geseedeten Bienes-Rezepte neue Heroes
+// bekommen — diesmal saubere Brand-Style-Bilder, die das echte Reel-
+// Gericht matchen statt das Cover-Thumbnail mit Werbe-Overlays.
 //
-// Auth: Bearer-Token mit ADMIN_RESEED_TOKEN (dedicated, kann nach dem
-// einmaligen Reseed-Lauf wieder geloescht werden — geringerer Blast-
-// Radius als der Service-Role-Key, der DB-Superuser-Privilegien hat).
-// Middleware ist via PUBLIC_PATHS-Erweiterung freigeschaltet ("/api/admin").
+// Auth: Bearer-Token mit ADMIN_RESEED_TOKEN. Middleware via PUBLIC_PATHS
+// erweitert um "/api/admin".
 //
 // Body (optional):
 //   { packSlug?: string, slug?: string, limit?: number }
 // — leerer Body iteriert ueber alle statischen Rezepte mit sourceUrl.
-//
-// Response: Streaming-NDJSON pro Recipe-Processing-Result. Letzte Zeile
-// ist ein Summary-Object.
 
 export const runtime = "nodejs";
-// Apify-Synchron-Call (~10 s) × 34 Rezepte = ~6 Min. Vercel Free-Tier
-// max 60 s, Pro 300 s. Wir nutzen kleine Batches: max 6 pro Call (=60 s).
+// Pro Rezept ~60-90 s (Apify + ffmpeg + Vision + Flux Kontext Pro).
+// Vercel Pro maxDuration = 300 s → batches von max 3-4 Rezepten.
 export const maxDuration = 300;
 
-const HERO_BUCKET = "recipe-heroes";
-
 export async function POST(req: Request) {
-  // Auth via dedicated ADMIN_RESEED_TOKEN — siehe Header-Kommentar.
+  // Auth via dedicated ADMIN_RESEED_TOKEN
   const auth = req.headers.get("authorization") ?? "";
   const token = process.env.ADMIN_RESEED_TOKEN;
   if (!token || auth !== `Bearer ${token}`) {
@@ -63,6 +60,7 @@ export async function POST(req: Request) {
   const candidates = rows
     .map((r) => ({
       ...r,
+      recipeData: r.data as Recipe,
       sourceUrl: (r.data as { sourceUrl?: string }).sourceUrl,
     }))
     .filter((r) => r.sourceUrl && r.sourceUrl.length > 10);
@@ -74,6 +72,9 @@ export async function POST(req: Request) {
     recipeSlug: string;
     status: "ok" | "skipped" | "failed";
     heroUrl?: string;
+    source?: "keyframe" | "flux-text-only";
+    keyframeReasoning?: string;
+    keyframeTimestamp?: number;
     error?: string;
   }> = [];
   let done = 0;
@@ -82,34 +83,35 @@ export async function POST(req: Request) {
 
   for (const r of batch) {
     try {
-      const reel = await extractReelHeroFromInstagram(r.sourceUrl!);
-      if (!reel) {
-        items.push({ recipeSlug: r.recipe_slug, status: "skipped" });
-        skipped += 1;
-        continue;
-      }
-      const filePath = `${r.id}.jpg`;
-      const upload = await supabase.storage
-        .from(HERO_BUCKET)
-        .upload(filePath, reel.buffer, {
-          contentType: "image/jpeg",
-          upsert: true,
-          cacheControl: "31536000",
-        });
-      if (upload.error) {
+      const brand = getBrand(r.brand_slug);
+      if (!brand) {
         items.push({
           recipeSlug: r.recipe_slug,
           status: "failed",
-          error: upload.error.message,
+          error: `Unknown brand: ${r.brand_slug}`,
         });
         failed += 1;
         continue;
       }
-      const { data: pub } = supabase.storage
-        .from(HERO_BUCKET)
-        .getPublicUrl(filePath);
-      const heroUrl = pub.publicUrl;
-      const updated = { ...(r.data as Record<string, unknown>), hero: heroUrl };
+
+      const result = await generateHeroForRecipe({
+        recipe: r.recipeData,
+        recipeId: r.id,
+        brandSlug: r.brand_slug,
+        forceFlux: false, // wir wollen den Keyframe-Pfad
+      });
+
+      if (!result?.heroUrl) {
+        items.push({ recipeSlug: r.recipe_slug, status: "skipped" });
+        skipped += 1;
+        continue;
+      }
+
+      // DB-Row aktualisieren: data.hero auf neue URL setzen
+      const updated = {
+        ...(r.data as Record<string, unknown>),
+        hero: result.heroUrl,
+      };
       const { error: updErr } = await supabase
         .from("recipes")
         .update({ data: updated })
@@ -123,10 +125,16 @@ export async function POST(req: Request) {
         failed += 1;
         continue;
       }
-      items.push({ recipeSlug: r.recipe_slug, status: "ok", heroUrl });
+
+      items.push({
+        recipeSlug: r.recipe_slug,
+        status: "ok",
+        heroUrl: result.heroUrl,
+        source: result.source,
+        keyframeReasoning: result.keyframeReasoning,
+        keyframeTimestamp: result.keyframeTimestamp,
+      });
       done += 1;
-      // Rate-Limit-Schutz fuer Apify
-      await new Promise((r) => setTimeout(r, 600));
     } catch (err) {
       items.push({
         recipeSlug: r.recipe_slug,

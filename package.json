@@ -11,6 +11,7 @@
     "print:upscale": "tsx --tsconfig ./tsconfig.json scripts/upscale-brand-assets.ts"
   },
   "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@fontsource/fraunces": "^5.2.9",
     "@fontsource/inter": "^5.2.8",
     "@react-pdf/renderer": "^4.5.1",
