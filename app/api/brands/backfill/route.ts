@@ -53,11 +53,20 @@ export async function POST(req: Request) {
   }
 
   // 1. Scrape-Row anlegen, damit wir eine ID haben fuer Failure-Marker.
+  // Wenn das null returnt, ist mit hoher Wahrscheinlichkeit die SQL-
+  // Migration (sql/creator-reels-table.sql) nicht ausgefuehrt worden.
+  // Wir geben dem Frontend einen klar erkennbaren `needsSetup`-Marker,
+  // damit der Banner eine konkrete Anweisung zeigen kann statt stumm
+  // zu failen.
   const scrapeId = await createScrape(body.brandSlug);
   if (!scrapeId) {
     return NextResponse.json(
-      { error: "Konnte Scrape-Row nicht anlegen." },
-      { status: 500 }
+      {
+        error:
+          "Reel-Library-Tabellen fehlen in Supabase. Bitte sql/creator-reels-table.sql einmal im Supabase-SQL-Editor ausfuehren.",
+        needsSetup: true,
+      },
+      { status: 503 }
     );
   }
 

@@ -255,23 +255,44 @@ export default function NewBrandPage() {
       /* non-blocking — Cache ticked sich von selbst nach 30s neu */
     });
 
-    // 2-Jahres-Reel-Backfill triggern. Fire-and-forget: der Apify-Run
-    // dauert mehrere Minuten, der User landet schon im Workspace und
-    // sieht den Library-Banner mit Fortschritt. Nur ausloesen, wenn der
-    // Handle nicht der Default-Placeholder ist — sonst weiss Apify nicht,
-    // wen es scrapen soll.
+    // 2-Jahres-Reel-Backfill triggern. AWAIT statt fire-and-forget:
+    // sonst kann der Browser den Request beim router.push abbrechen,
+    // bevor er bei Vercel angekommen ist — Folge: Banner taucht im
+    // Workspace nie auf, weil keine creator_scrapes-Row existiert.
+    // Plus: wir koennen jetzt klare Setup-Errors abfangen (503 +
+    // needsSetup=true bei fehlender SQL-Migration).
     const cleanedUsername = normalizeHandle(handle).replace(/^@+/, "").trim();
     if (cleanedUsername && cleanedUsername !== "creator") {
-      void fetch("/api/brands/backfill", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          brandSlug: saved.slug,
-          username: cleanedUsername,
-        }),
-      }).catch(() => {
-        /* non-blocking — Banner wird im Workspace die "no scrape"-Phase als none zeigen */
-      });
+      try {
+        const backfillRes = await fetch("/api/brands/backfill", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            brandSlug: saved.slug,
+            username: cleanedUsername,
+          }),
+        });
+        if (!backfillRes.ok) {
+          const errJson = await backfillRes.json().catch(() => ({}));
+          if (errJson.needsSetup) {
+            setSaving(false);
+            setError(
+              "Workspace wurde angelegt, aber Reel-Library kann nicht starten: "
+              + (errJson.error ?? "Setup unvollstaendig.")
+              + " Bitte sql/creator-reels-table.sql in Supabase ausfuehren und dann den Workspace nochmal aufrufen."
+            );
+            // Workspace existiert schon — User kann jederzeit hin
+            // navigieren. Wir blockieren nicht weiter.
+            return;
+          }
+          console.warn("[new-brand] backfill failed:", errJson.error);
+          // Sonstiger Fehler: Workspace funktioniert trotzdem, nur ohne
+          // Reel-Library. Stiller Fortschritt, kein Block.
+        }
+      } catch (err) {
+        // Netzwerk-Fehler — Workspace funktioniert trotzdem.
+        console.warn("[new-brand] backfill request failed:", err);
+      }
     }
 
     // Cinematic Entry: Welcome-Animation des neuen Creators laeuft, dann

@@ -55,6 +55,12 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Quick-Scrape-State: User klickt "Frisch von Instagram laden" wenn die
+  // Library leer ist oder er aktuelle Daten will. Synchroner Apify-Run
+  // (~30s) + Klassifikation, danach reloaden wir den Filter.
+  const [scraping, setScraping] = useState(false);
+  const [scrapeError, setScrapeError] = useState<string | null>(null);
+  const [scrapeSuccess, setScrapeSuccess] = useState<string | null>(null);
 
   // Aktive Filter-URL fuer das Reel-Preview-Endpoint. useMemo damit der
   // useEffect nur bei echten Aenderungen re-laed't.
@@ -115,6 +121,46 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
     setMealTypes((prev) =>
       prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]
     );
+  };
+
+  // Quick-Scrape: triggert /api/brands/[slug]/quick-scrape mit dem
+  // aktuellen Timeframe. Server scrapt Apify synchron, klassifiziert,
+  // returnt. Danach refreshen wir die Reel-Preview.
+  const handleQuickScrape = async () => {
+    setScraping(true);
+    setScrapeError(null);
+    setScrapeSuccess(null);
+    try {
+      const tf = TIMEFRAME_PRESETS.find((t) => t.id === timeframe);
+      const days = tf && tf.days > 0 ? tf.days : 90;
+      const res = await fetch(
+        `/api/brands/${encodeURIComponent(brand.slug)}/quick-scrape`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ days, limit: 30 }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(
+          json.needsSetup
+            ? "Reel-Library-Tabellen fehlen in Supabase. Bitte sql/creator-reels-table.sql ausfuehren."
+            : json.error ?? "Scrape fehlgeschlagen."
+        );
+      }
+      setScrapeSuccess(
+        `${json.scraped} Posts gescrapt, ${json.classified} klassifiziert.`
+      );
+      // Reels-Preview re-laden mit dem aktuellen Filter
+      await loadReels();
+    } catch (err) {
+      setScrapeError(
+        err instanceof Error ? err.message : "Scrape fehlgeschlagen."
+      );
+    } finally {
+      setScraping(false);
+    }
   };
 
   const handleGenerate = async () => {
@@ -325,7 +371,7 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
 
       {/* Live-Preview */}
       <section className="editor-section editor-card flex flex-col gap-5">
-        <div className="flex items-baseline justify-between gap-3">
+        <div className="flex items-start justify-between gap-3">
           <SectionHeader
             num="04"
             title="Live-Vorschau"
@@ -334,19 +380,82 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
                 ? "Lade Reels…"
                 : reels && reels.length > 0
                   ? `Das werden die ${reels.length} ${reelWord} im Pack.`
-                  : "Keine Reels mit diesen Filtern. Lockere die Filter."
+                  : "Keine Reels in der Library — frisch von Instagram laden:"
             }
             brand={brand}
           />
-          {reels && reels.length > 0 ? (
-            <span
-              className="font-mono text-[10.5px] uppercase tracking-[0.16em]"
-              style={{ color: brand.tokens.inkMuted }}
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            {reels && reels.length > 0 ? (
+              <span
+                className="font-mono text-[10.5px] uppercase tracking-[0.16em]"
+                style={{ color: brand.tokens.inkMuted }}
+              >
+                {reels.length} {reelWord}
+              </span>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void handleQuickScrape()}
+              disabled={scraping || loading}
+              className="flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[11.5px] font-semibold transition-all hover:opacity-80 disabled:cursor-wait disabled:opacity-50"
+              style={{
+                borderColor: brand.tokens.line,
+                color: scraping ? brand.tokens.inkMuted : brand.tokens.accent,
+                background: brand.tokens.surface,
+              }}
+              title="Holt SOFORT die letzten ~30 Posts und klassifiziert sie"
             >
-              {reels.length} {reelWord}
-            </span>
-          ) : null}
+              {scraping ? (
+                <>
+                  <span
+                    className="size-3 animate-spin rounded-full border-[1.5px] border-current border-t-transparent"
+                    style={{ borderTopColor: "transparent" }}
+                  />
+                  Lade Instagram…
+                </>
+              ) : (
+                <>
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
+                    <path
+                      d="M10.5 4.5A4.5 4.5 0 1 0 11 6m-.5-1.5V2m0 2.5h-2.5"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Frisch von Instagram laden
+                </>
+              )}
+            </button>
+          </div>
         </div>
+
+        {scrapeError ? (
+          <div
+            className="rounded-xl border px-4 py-2.5 text-[12px]"
+            style={{
+              borderColor: "rgba(197, 48, 48, 0.3)",
+              background: "rgba(254, 226, 226, 0.6)",
+              color: "#9b2c2c",
+            }}
+          >
+            {scrapeError}
+          </div>
+        ) : null}
+        {scrapeSuccess ? (
+          <div
+            className="rounded-xl border px-4 py-2.5 text-[12px]"
+            style={{
+              borderColor: brand.tokens.accent + "55",
+              background: brand.tokens.accent + "10",
+              color: brand.tokens.ink,
+            }}
+          >
+            ✓ {scrapeSuccess}
+          </div>
+        ) : null}
+
         {loading && !reels ? (
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -417,17 +526,74 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
             ))}
           </div>
         ) : (
-          <p
-            className="rounded-xl border border-dashed px-4 py-6 text-center text-[13px]"
+          <div
+            className="flex flex-col items-center gap-3 rounded-2xl border border-dashed px-6 py-8 text-center"
             style={{
               borderColor: brand.tokens.line,
-              color: brand.tokens.inkMuted,
               background: brand.tokens.surface,
             }}
           >
-            Keine Reels matchen die Filter. Erweitere den Zeitraum oder
-            entferne Mahlzeit-Filter.
-          </p>
+            <span
+              className="grid size-10 place-items-center rounded-full"
+              style={{ background: brand.tokens.accent + "15" }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <rect
+                  x="3"
+                  y="3"
+                  width="18"
+                  height="18"
+                  rx="5"
+                  stroke={brand.tokens.accent}
+                  strokeWidth="1.6"
+                />
+                <circle cx="12" cy="12" r="4" stroke={brand.tokens.accent} strokeWidth="1.6" />
+                <circle cx="17" cy="7" r="0.8" fill={brand.tokens.accent} />
+              </svg>
+            </span>
+            <p
+              className="max-w-[50ch] text-[13px] leading-relaxed"
+              style={{ color: brand.tokens.ink }}
+            >
+              <span className="font-semibold">Noch keine Reels in der Library.</span>{" "}
+              Lass mich die letzten {TIMEFRAME_PRESETS.find((t) => t.id === timeframe)?.days ?? 90} Tage von{" "}
+              <span className="font-mono">{brand.handle}</span> jetzt frisch scrapen — dauert ~20–30 Sek.
+            </p>
+            <button
+              type="button"
+              onClick={() => void handleQuickScrape()}
+              disabled={scraping}
+              className="flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-semibold text-white transition-all hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+              style={{ background: brand.tokens.accent }}
+            >
+              {scraping ? (
+                <>
+                  <span className="size-3 animate-spin rounded-full border-[2px] border-white/40 border-t-white" />
+                  Scrape laeuft…
+                </>
+              ) : (
+                <>
+                  Jetzt von Instagram laden
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+                    <path
+                      d="M3 6h6m0 0L6.5 3.5M9 6L6.5 8.5"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </>
+              )}
+            </button>
+            <p
+              className="text-[11px]"
+              style={{ color: brand.tokens.inkMuted }}
+            >
+              Alternativ: erweitere den Zeitraum oben oder entferne Mahlzeit-Filter,
+              falls die Library schon gefuellt ist.
+            </p>
+          </div>
         )}
       </section>
 

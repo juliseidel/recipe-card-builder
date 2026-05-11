@@ -593,6 +593,115 @@ export async function fetchApifyDataset(
     }));
 }
 
+// Quick-Scrape (synchron). Wird vom Auto-Pack-Tab genutzt, wenn der User
+// JETZT frisch scrapen will statt auf den Backfill zu warten. Ein Apify
+// run-sync mit kleinem resultsLimit (~30 Posts, ~20-30s) reicht fuer
+// einen 2-Wochen-Filter. Vergleichbar mit scrapeInstagramProfile, aber
+// liefert structured BackfillReel-Items direkt.
+export async function quickScrapeReels(opts: {
+  username: string;
+  /** Max Posts. Default 30 — fuer 2 Wochen aktiver Creator ueppig. */
+  resultsLimit?: number;
+  /** Wie weit zurueck? Default 30 Tage (Apify-Server-Filter). */
+  onlyPostsNewerThanDays?: number;
+}): Promise<BackfillReel[]> {
+  const apiToken = process.env.APIFY_TOKEN;
+  if (!apiToken) {
+    throw new ApifyError("APIFY_TOKEN ist nicht gesetzt");
+  }
+  const username = opts.username.replace(/^@+/, "").trim();
+  if (!username || !/^[A-Za-z0-9._]+$/.test(username)) {
+    throw new ApifyError("Kein gueltiger Instagram-Handle.");
+  }
+
+  const profileUrl = `https://www.instagram.com/${username}/`;
+  const endpoint = `${APIFY_BASE}/acts/${ACTOR_ID}/run-sync-get-dataset-items?token=${apiToken}&format=json`;
+
+  const body = {
+    directUrls: [profileUrl],
+    resultsType: "posts",
+    resultsLimit: opts.resultsLimit ?? 30,
+    onlyPostsNewerThan: `${opts.onlyPostsNewerThanDays ?? 30} days`,
+  };
+
+  const controller = new AbortController();
+  // 55s Client-Timeout (Vercel-Lambda hat 60s Spielraum default, wir
+  // setzen die Route selber auf 60s+). Wenn Apify nicht schneller ist,
+  // hilft auch laenger warten nicht — User klickt nochmal.
+  const timeout = setTimeout(() => controller.abort(), 55_000);
+
+  let res: Response;
+  try {
+    res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeout);
+    const isAbort = (err as Error).name === "AbortError";
+    throw new ApifyError(
+      isAbort
+        ? "Apify-Quick-Scrape hat zu lange gebraucht. Bitte erneut versuchen — der zweite Lauf ist meist deutlich schneller (Cold-Start vorbei)."
+        : `Netzwerk-Fehler: ${(err as Error).message}`
+    );
+  }
+  clearTimeout(timeout);
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new ApifyError(
+      `Apify-Fehler ${res.status}: ${errText.slice(0, 300)}`,
+      res.status,
+      errText
+    );
+  }
+
+  const items = (await res.json()) as Array<{
+    shortCode?: string;
+    url?: string;
+    type?: string;
+    caption?: string;
+    displayUrl?: string;
+    videoUrl?: string;
+    timestamp?: string;
+    likesCount?: number;
+    videoViewCount?: number;
+    videoPlayCount?: number;
+    commentsCount?: number;
+    hashtags?: string[];
+    [k: string]: unknown;
+  }>;
+
+  if (!Array.isArray(items)) {
+    throw new ApifyError("Apify lieferte kein Array.");
+  }
+
+  return items
+    .filter((item) => item.shortCode && item.url)
+    .map((item) => ({
+      igId: item.shortCode as string,
+      postUrl: item.url as string,
+      type: item.type ?? "Image",
+      caption: (item.caption ?? "").trim(),
+      displayUrl: item.displayUrl ?? null,
+      videoUrl: item.videoUrl ?? null,
+      postedAt: item.timestamp ?? null,
+      likeCount: typeof item.likesCount === "number" ? item.likesCount : null,
+      viewCount:
+        typeof item.videoViewCount === "number"
+          ? item.videoViewCount
+          : typeof item.videoPlayCount === "number"
+            ? item.videoPlayCount
+            : null,
+      commentCount:
+        typeof item.commentsCount === "number" ? item.commentsCount : null,
+      hashtags: Array.isArray(item.hashtags) ? item.hashtags : [],
+      raw: item,
+    }));
+}
+
 // Holt den Status eines Apify-Runs direkt — Fallback falls der Webhook
 // nicht ankommt (z.B. Vercel-Cold-Start hat den Webhook-Request gemissed).
 // Wird vom Library-Status-Endpoint als Recovery-Pfad genutzt.
