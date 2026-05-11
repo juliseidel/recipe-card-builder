@@ -1,3 +1,5 @@
+import { unstable_cache } from "next/cache";
+
 export type Ingredient = {
   amount: string;
   name: string;
@@ -1825,48 +1827,83 @@ function withHeroCacheBust(url: string): string {
   return `${url}?v=v9.4`;
 }
 
+// Server-Cache fuer komplette DB-Pack-Daten. Ohne Cache wuerde jede Pack-
+// Page einen Supabase-Roundtrip machen (~100-300ms inkl. Cold-Start) und
+// die Navigation ist nicht fluessig. Mit Cache: erster Page-Load eines
+// Pack hat den Query, naechste Loads in 30s holen aus Memory.
+//
+// Wir caches RAW DB rows (recipe_slug, hero + full custom data). Die
+// Listen-Page extrahiert die hero-map, die Detail-Page filtert per slug.
+// Re-Roll-Button + Bulk-Reseed invalidieren via revalidatePath() im
+// enrich-Endpoint, damit neue Bilder sofort sichtbar werden.
+type CachedPackRow = {
+  recipe_slug: string;
+  hero: string | null;
+  data: Recipe | null; // null for non-custom (slim-load); set for custom
+};
+
+const getPackDbRows = unstable_cache(
+  async (packSlug: string): Promise<CachedPackRow[]> => {
+    try {
+      const { getServerSupabase, hasServerSupabase } = await import(
+        "./supabase-server"
+      );
+      if (!hasServerSupabase()) return [];
+      const supabase = getServerSupabase();
+      // Holt fuer ALLE Rezepte eines Pack:
+      //   - recipe_slug + hero (slim) — fuer Static-Override
+      //   - data (full) — nur fuer is_custom=true (User-erstellt)
+      // Static-Rezepte brauchen kein full data (kommt aus lib/recipes.ts).
+      const { data, error } = await supabase
+        .from("recipes")
+        .select("recipe_slug, is_custom, hero:data->>hero, data")
+        .eq("pack_slug", packSlug);
+      if (error || !data) return [];
+      return (
+        data as Array<{
+          recipe_slug: string;
+          is_custom: boolean;
+          hero: string | null;
+          data: Recipe | null;
+        }>
+      ).map((row) => ({
+        recipe_slug: row.recipe_slug,
+        hero: row.hero,
+        data: row.is_custom ? row.data : null,
+      }));
+    } catch {
+      return [];
+    }
+  },
+  ["pack-db-rows"],
+  { revalidate: 30 }
+);
+
 export async function getRecipesForPack(
   packSlug: string
 ): Promise<Recipe[]> {
   const fromCode = staticRecipesForPack(packSlug);
   const codeSlugs = new Set(fromCode.map((r) => r.slug));
 
-  try {
-    const { getServerSupabase, hasServerSupabase } = await import(
-      "./supabase-server"
-    );
-    if (!hasServerSupabase()) return fromCode;
-    const supabase = getServerSupabase();
-    const { data, error } = await supabase
-      .from("recipes")
-      .select("recipe_slug, data")
-      .eq("pack_slug", packSlug)
-      .eq("is_custom", false);
-    if (error || !data) return fromCode;
+  // Single gecachter DB-Roundtrip (30s TTL). Pack-Page navigation ist
+  // wieder fluessig — wiederholte Visits in 30s gehen aus Memory.
+  const dbRows = await getPackDbRows(packSlug);
 
-    // Build slug→hero map from DB. Bulk-Reseed + KI-Alternative schreiben
-    // beide in data.hero — die App soll diese Werte sehen, sonst zeigt die
-    // Pack-Uebersicht weiter die alten Bilder aus lib/recipe-heroes.ts.
-    const dbHeroes: Record<string, string> = {};
-    for (const row of data as Array<{ recipe_slug: string; data: Recipe }>) {
-      if (row.data?.hero)
-        dbHeroes[row.recipe_slug] = withHeroCacheBust(row.data.hero);
-    }
-    const staticWithDbHero = fromCode.map((r) =>
-      dbHeroes[r.slug] ? { ...r, hero: dbHeroes[r.slug] } : r
-    );
+  // Hero-Override fuer static recipes
+  const staticWithDbHero = fromCode.map((r) => {
+    const row = dbRows.find((x) => x.recipe_slug === r.slug);
+    return row?.hero ? { ...r, hero: withHeroCacheBust(row.hero) } : r;
+  });
 
-    const dbOnly = (data as Array<{ data: Recipe }>)
-      .map((row) => row.data)
-      .filter((r) => !codeSlugs.has(r.slug));
-    if (dbOnly.length === 0) return staticWithDbHero;
-    return [...staticWithDbHero, ...dbOnly].sort(
-      (a, b) => a.number - b.number
-    );
-  } catch (err) {
-    console.warn("[recipes] DB load failed, using code only", err);
-    return fromCode;
-  }
+  // Custom recipes (is_custom=true), die nicht in der static-Liste sind
+  const dbOnly = dbRows
+    .filter((row) => row.data && !codeSlugs.has(row.recipe_slug))
+    .map((row) => row.data as Recipe);
+
+  if (dbOnly.length === 0) return staticWithDbHero;
+  return [...staticWithDbHero, ...dbOnly].sort(
+    (a, b) => a.number - b.number
+  );
 }
 
 export async function getRecipe(
@@ -1883,8 +1920,12 @@ export async function getRecipe(
   // ist, ueberschreiben.
   const fromCode = staticRecipe(packSlug, recipeSlug);
   if (fromCode) {
-    const dbHero = await fetchDbHero(packSlug, recipeSlug);
-    if (dbHero) return { ...fromCode, hero: withHeroCacheBust(dbHero) };
+    // Re-Use des gecachten Pack-DB-Reads (shared mit Listen-View).
+    // Kein zweiter Roundtrip wenn die Pack-Page schon besucht wurde.
+    const dbRows = await getPackDbRows(packSlug);
+    const row = dbRows.find((x) => x.recipe_slug === recipeSlug);
+    if (row?.hero)
+      return { ...fromCode, hero: withHeroCacheBust(row.hero) };
     return fromCode;
   }
 
@@ -1906,35 +1947,6 @@ export async function getRecipe(
   } catch (err) {
     console.warn("[recipes] DB load failed", err);
     return undefined;
-  }
-}
-
-// Liest NUR data.hero aus der DB-Row eines statischen Rezepts. Wird vom
-// getRecipe()-Pfad genutzt, damit ein per "KI-Alternative" neu generiertes
-// Hero die Map ueberschreiben kann. Returnt null wenn keine Row, keine DB
-// oder kein hero-Feld gesetzt — dann fallt der Code-Pfad auf die Map zurueck.
-async function fetchDbHero(
-  packSlug: string,
-  recipeSlug: string
-): Promise<string | null> {
-  try {
-    const { getServerSupabase, hasServerSupabase } = await import(
-      "./supabase-server"
-    );
-    if (!hasServerSupabase()) return null;
-    const supabase = getServerSupabase();
-    const { data, error } = await supabase
-      .from("recipes")
-      .select("data")
-      .eq("pack_slug", packSlug)
-      .eq("recipe_slug", recipeSlug)
-      .eq("is_custom", false)
-      .maybeSingle();
-    if (error || !data) return null;
-    const recipe = (data as { data: Recipe }).data;
-    return recipe?.hero ?? null;
-  } catch {
-    return null;
   }
 }
 
