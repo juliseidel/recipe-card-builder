@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { brands, getBrand } from "@/lib/brands";
+import { brands } from "@/lib/brands";
+import { loadBrand } from "@/lib/custom-brands-server";
 import { getPacksForBrand, mergeAndRenumberPacks } from "@/lib/packs";
 import {
   getCustomPacksWithIdsForBrandServer,
@@ -11,9 +12,10 @@ import { BrandHero } from "@/components/brand-hero";
 import { PackCard } from "@/components/pack-card";
 import { NewPackCard } from "@/components/new-pack-card";
 
-// Pre-render every brand at build time. The brand+pack catalogue is fully
-// static (lib/brands.ts, lib/packs.ts) so we can hand Vercel a finished HTML
-// page instead of running the renderer on every request.
+// Pre-render the Code-Brands at build time (currently only Biene). Custom
+// brands aus der Supabase `brands`-Tabelle werden on-demand gerendert —
+// `dynamicParams = true` ist Next.js Default, also funktioniert das ohne
+// expliziten Opt-In. `loadBrand(slug)` deckt beide Quellen ab.
 export async function generateStaticParams() {
   return brands.map((b) => ({ brand: b.slug }));
 }
@@ -30,7 +32,7 @@ type BrandPageProps = {
 
 export async function generateMetadata({ params }: BrandPageProps) {
   const { brand: brandSlug } = await params;
-  const brand = getBrand(brandSlug);
+  const brand = await loadBrand(brandSlug);
 
   if (!brand) {
     return { title: "Workspace nicht gefunden · Recipe Card Builder" };
@@ -70,7 +72,7 @@ export async function generateMetadata({ params }: BrandPageProps) {
 
 export default async function BrandPage({ params }: BrandPageProps) {
   const { brand: brandSlug } = await params;
-  const brand = getBrand(brandSlug);
+  const brand = await loadBrand(brandSlug);
 
   if (!brand) {
     notFound();

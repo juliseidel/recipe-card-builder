@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { generatePackCover } from "@/lib/ai/generate-pack-cover";
 import { generatePackForeword } from "@/lib/ai/generate-foreword";
 import { generateForewordImage } from "@/lib/ai/generate-foreword-image";
-import { getBrand } from "@/lib/brands";
+import { loadBrand } from "@/lib/custom-brands-server";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 import type { Pack } from "@/lib/packs";
 
@@ -78,7 +78,7 @@ export async function POST(req: Request) {
   }
 
   const pack = row.data as Pack;
-  const brand = getBrand(row.brand_slug);
+  const brand = await loadBrand(row.brand_slug);
   if (!brand) {
     return NextResponse.json(
       { error: `Brand '${row.brand_slug}' not found` },

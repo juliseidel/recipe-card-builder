@@ -5,12 +5,15 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/auth/server";
 
 // Server Actions for the login page. Email+Password is the simpler login
-// flow for a tool that's handed to a creator with credentials — no email
-// roundtrip, works offline-ish.
+// flow for an internal team tool — no email roundtrip, works offline-ish.
 //
-// On success, we redirect to /welcome so the creator sees the branded
-// transition animation before landing in their workspace. /welcome reads
-// the user's metadata to pick the right brand-slug to bounce to.
+// Multi-Tenant-Update: nach erfolgreichem Login redirected die Action
+// zum Workspace-Hub (`/`) statt zur Welcome-Animation. Der Team-Member
+// soll sich seinen Creator-Workspace aus der Uebersicht aussuchen — die
+// cinematische Welcome-Animation laeuft dann pro Card-Klick im Hub
+// (`/welcome?brand=<slug>`). Wer eine Deep-Link wie
+// `/biene/feierabend-klassiker/blech-pasta` direkt anfaehrt, kommt nach
+// Login direkt dahin (`redirect`-Param wird durchgereicht).
 
 export type LoginState = {
   error: string | null;
@@ -44,12 +47,16 @@ export async function loginAction(
   }
 
   revalidatePath("/", "layout");
-  // Pass the original redirect target through to /welcome so it can land
-  // the user where they were trying to go. Empty → /welcome decides
-  // (default = creator's brand workspace).
-  const target = redirectTo
-    ? `/welcome?redirect=${encodeURIComponent(redirectTo)}`
-    : "/welcome";
+  // Wer eine Deep-Link aufgerufen hat (Middleware setzt ?redirect=...
+  // wenn der User auf /biene/... ohne Login klickt), landet direkt dort.
+  // Sonst: Workspace-Hub. Welcome-Animation laeuft nicht mehr direkt
+  // nach Login — die kommt erst beim Card-Klick im Hub.
+  const target =
+    redirectTo &&
+    redirectTo.startsWith("/") &&
+    !redirectTo.startsWith("/login")
+      ? redirectTo
+      : "/";
   redirect(target);
 }
 

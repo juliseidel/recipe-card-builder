@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabase-server";
 import { generateHeroForRecipe } from "@/lib/ai/generate-hero";
-import { getBrand } from "@/lib/brands";
+import { loadBrand } from "@/lib/custom-brands-server";
 import type { Recipe } from "@/lib/recipes";
 
 // Admin-Endpoint: Reseed Hero Images mit der neuen Phase-3-Pipeline
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
 
   for (const r of batch) {
     try {
-      const brand = getBrand(r.brand_slug);
+      const brand = await loadBrand(r.brand_slug);
       if (!brand) {
         items.push({
           recipeSlug: r.recipe_slug,
