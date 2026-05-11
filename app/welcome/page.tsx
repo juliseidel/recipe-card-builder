@@ -1,28 +1,28 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/auth/server";
-import { getBrand } from "@/lib/brands";
+import { loadBrand } from "@/lib/custom-brands-server";
 import { WelcomeAnimation } from "./welcome-animation";
 
-// Welcome-Screen — der Wow-Moment direkt nach dem Login. Zeigt eine
-// cinematische Brand-Animation mit dem Creator-Foto und seinem Namen,
-// dann redirected in den Brand-Workspace.
+// Welcome-Screen — der cinematische Brand-Moment beim Eintritt in einen
+// Workspace. Frueher (Single-Tenant) wurde die Page direkt nach dem Login
+// aufgerufen und las den Brand aus `user.metadata.brand_slug`. Im neuen
+// Multi-Tenant-Flow stoesst der Hub die Animation an: Card-Klick →
+// `/welcome?brand=<slug>` → Animation → `/[brand]`.
 //
-// Architektur:
-//   - Server Component liest auth.getUser() und ermittelt das Ziel
-//   - Client-Component WelcomeAnimation spielt die Animation und ruft
-//     router.push() nach Ablauf
-//   - Brand-Daten (Avatar, Name, Handle, Tagline, Tokens) kommen aus
-//     lib/brands.ts via brand_slug aus user.metadata
-//   - Wenn user.metadata.brand_slug fehlt, fallen wir auf /biene zurück
+// Quelle der Brand-Daten ist `loadBrand(slug)` — checked beide Quellen
+// (Code wie Biene + DB wie spaeter onboardete Creator). Display-Name fuer
+// die Eyebrow-Anrede ist der Brand-Name, nicht mehr der eingeloggte User
+// (es ist ja ein Team-Tool — der Eintritt in "Bienes Workspace" soll
+// sich nach Bienes Brand anfuehlen, nicht nach Julian).
 
 export const dynamic = "force-dynamic";
 
 type WelcomePageProps = {
-  searchParams: Promise<{ redirect?: string }>;
+  searchParams: Promise<{ brand?: string; redirect?: string }>;
 };
 
 export default async function WelcomePage({ searchParams }: WelcomePageProps) {
-  const { redirect: redirectParam } = await searchParams;
+  const { brand: brandSlug, redirect: redirectParam } = await searchParams;
 
   const supabase = await createSupabaseServerClient();
   const {
@@ -33,27 +33,40 @@ export default async function WelcomePage({ searchParams }: WelcomePageProps) {
     redirect("/login");
   }
 
-  const brandSlug = (user.user_metadata?.brand_slug as string) || "biene";
-  const brand = getBrand(brandSlug);
-  const displayName =
-    (user.user_metadata?.display_name as string) ||
-    brand?.name ||
-    "Creator";
+  // Kein Brand-Param? Direkt zum Hub — z. B. wenn jemand /welcome ohne
+  // Query von einer alten Lesezeichen-URL aufruft, oder wenn das Onboarding
+  // den Param vergessen hat.
+  if (!brandSlug) {
+    redirect("/");
+  }
 
+  const brand = await loadBrand(brandSlug);
+  // Brand-Slug existiert nicht (geloescht, vertippt)? Zurueck zum Hub mit
+  // dem urspruenglichen Redirect-Target falls vorhanden — der Hub zeigt
+  // dann alle realen Workspaces.
+  if (!brand) {
+    redirect("/");
+  }
+
+  // Sichere Redirect-Target-Auflösung: explizit gesetzter `redirect`-Param
+  // (z. B. wenn der User vor dem Login eine Deep-Link wie
+  // `/biene/feierabend-klassiker/blech-pasta` aufgerufen hat) hat Vorrang.
+  // Sonst landet die Animation am Workspace-Root des gewaehlten Brands.
   const finalTarget =
     redirectParam &&
     redirectParam.startsWith("/") &&
-    !redirectParam.startsWith("/login")
+    !redirectParam.startsWith("/login") &&
+    !redirectParam.startsWith("/welcome")
       ? redirectParam
-      : `/${brandSlug}`;
+      : `/${brand.slug}`;
 
   return (
     <WelcomeAnimation
-      displayName={displayName}
-      handle={brand?.handle ?? ""}
-      tagline={brand?.tagline ?? ""}
-      avatarUrl={brand?.avatar ?? null}
-      brandTokens={brand?.tokens ?? null}
+      displayName={brand.name}
+      handle={brand.handle}
+      tagline={brand.tagline}
+      avatarUrl={brand.avatar}
+      brandTokens={brand.tokens}
       finalTarget={finalTarget}
     />
   );

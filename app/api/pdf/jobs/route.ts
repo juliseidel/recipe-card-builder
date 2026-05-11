@@ -1,6 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { createJob, processJob, type CreateJobInput } from "@/lib/pdf/job-runner";
-import { getBrand } from "@/lib/brands";
+import { loadBrand } from "@/lib/custom-brands-server";
 import { getPack } from "@/lib/packs";
 import { getCustomPackServer } from "@/lib/custom-packs-server";
 import { hasServerSupabase } from "@/lib/supabase-server";
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
   // Falls through to the user-created custom pack table if the slug
   // isn't in the curated set, otherwise PDFs for new packs would 404
   // before they even hit the job runner.
-  const brand = getBrand(body.brandSlug);
+  const brand = await loadBrand(body.brandSlug);
   const pack =
     getPack(body.brandSlug, body.packSlug) ??
     (await getCustomPackServer(body.brandSlug, body.packSlug));

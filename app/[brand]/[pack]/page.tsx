@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getBrand } from "@/lib/brands";
+import { loadBrand } from "@/lib/custom-brands-server";
 import {
   getPack,
   getPacksForBrand,
@@ -39,7 +39,7 @@ type PackPageProps = {
 
 export async function generateMetadata({ params }: PackPageProps) {
   const { brand: brandSlug, pack: packSlug } = await params;
-  const brand = getBrand(brandSlug);
+  const brand = await loadBrand(brandSlug);
   const pack =
     getPack(brandSlug, packSlug) ??
     (await getCustomPackServer(brandSlug, packSlug));
@@ -70,7 +70,7 @@ export async function generateMetadata({ params }: PackPageProps) {
 
 export default async function PackPage({ params }: PackPageProps) {
   const { brand: brandSlug, pack: packSlug } = await params;
-  const brand = getBrand(brandSlug);
+  const brand = await loadBrand(brandSlug);
   // Try curated packs first, fall back to user-created custom packs in
   // Supabase. We track whether the pack came from the custom table so we
   // can wire up its delete button on the actions bar.

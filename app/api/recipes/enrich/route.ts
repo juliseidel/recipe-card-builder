@@ -4,7 +4,7 @@ import { generateStory } from "@/lib/ai/generate-story";
 import { generateHeroForRecipe } from "@/lib/ai/generate-hero";
 import { GeminiError } from "@/lib/ai/gemini";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
-import { getBrand } from "@/lib/brands";
+import { loadBrand } from "@/lib/custom-brands-server";
 import { getPack } from "@/lib/packs";
 import { getCustomPackServer } from "@/lib/custom-packs-server";
 import type { Recipe } from "@/lib/recipes";
@@ -85,7 +85,7 @@ export async function POST(req: Request) {
   const recipe = row.data as Recipe;
   const brandSlug = (row.brand_slug as string) || "biene";
   const packSlug = (row.pack_slug as string) || recipe.packSlug;
-  const brand = getBrand(brandSlug);
+  const brand = await loadBrand(brandSlug);
   const pack =
     getPack(brandSlug, packSlug) ??
     (await getCustomPackServer(brandSlug, packSlug));

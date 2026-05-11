@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getBrand } from "@/lib/brands";
+import { loadBrand } from "@/lib/custom-brands-server";
 import { getPack } from "@/lib/packs";
 import { getCustomPackServer } from "@/lib/custom-packs-server";
 import {
@@ -17,7 +17,7 @@ type RecipePageProps = {
 
 export async function generateMetadata({ params }: RecipePageProps) {
   const { brand: brandSlug, pack: packSlug, recipe: recipeSlug } = await params;
-  const brand = getBrand(brandSlug);
+  const brand = await loadBrand(brandSlug);
   const pack =
     getPack(brandSlug, packSlug) ??
     (await getCustomPackServer(brandSlug, packSlug));
@@ -42,7 +42,7 @@ export async function generateMetadata({ params }: RecipePageProps) {
 
 export default async function RecipePage({ params }: RecipePageProps) {
   const { brand: brandSlug, pack: packSlug, recipe: recipeSlug } = await params;
-  const brand = getBrand(brandSlug);
+  const brand = await loadBrand(brandSlug);
   const pack =
     getPack(brandSlug, packSlug) ??
     (await getCustomPackServer(brandSlug, packSlug));
