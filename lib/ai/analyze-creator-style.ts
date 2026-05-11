@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import { callGeminiMultimodal } from "./gemini";
 import { extractVideoFrames } from "./extract-video-frames";
 import type { BrandImageStyleOverride } from "@/lib/brands";
@@ -18,60 +19,66 @@ import type { InstagramProfilePost } from "@/lib/integrations/apify";
 // uns die ~3x Latenz von Pro leisten — die DNA wird nur einmal pro
 // Creator generiert.
 
+// Gemini API ist beim responseSchema strikt — minItems/maxItems +
+// nested objects ohne required-Feld haben fuer 400 INVALID_ARGUMENT
+// gesorgt. Schema vereinfacht: keine min/max-Constraints (wir slicen
+// post-process), defaultAngles als FLACHES Feld-Set mit ALLEN required
+// (Gemini will alle nested properties als required-Liste).
 const RESPONSE_SCHEMA = {
   type: "object",
   properties: {
     lightingOptions: {
       type: "array",
       items: { type: "string" },
-      minItems: 5,
-      maxItems: 5,
       description:
-        "EXAKT 5 englische Lighting-Strings, die als Gemini-Enum fuer Stage 2 dienen. Format: 'warm morning light streaming from the left with soft shadows' oder 'cool diffused daylight with even illumination'. Jeder String beschreibt EINEN spezifischen Lighting-Mood, den der Creator in seinen Bildern verwendet. Variiere zwischen direction (left/right/above), intensity (soft/bright), color temperature (warm amber / neutral / cool). NIE generisch 'natural light' — immer Detail.",
+        "Bis zu 5 englische Lighting-Strings (Gemini-Enum fuer Stage 2). Format: 'warm morning light streaming from the left with soft shadows' oder 'cool diffused daylight with even illumination'. Variiere direction/intensity/color-temperature. NIE generisch 'natural light' — immer Detail.",
     },
     sceneOptions: {
       type: "array",
       items: { type: "string" },
-      minItems: 5,
-      maxItems: 5,
       description:
-        "EXAKT 5 englische Scene-Strings — beschreiben jeweils die Surface, auf der das Essen steht. Format: 'a smooth pale-grey concrete kitchen counter' oder 'a warm walnut wooden cutting board'. Wenn der Creator mehrere Surfaces nutzt, decken die 5 Strings die Range ab. Wenn nur eine Surface erkennbar ist, 5 leichte Varianten davon (smooth/lightly-textured/near-window/etc).",
+        "Bis zu 5 englische Scene-Strings — Surface, auf der das Essen steht. Format: 'a smooth pale-grey concrete kitchen counter' oder 'a warm walnut wooden cutting board'. 5 Varianten desselben Materials wenn der Creator nur eine Surface nutzt.",
     },
     styleSuffix: {
       type: "string",
       description:
-        "Optionaler English Suffix, der an jeden Hero-Prompt angehaengt wird. Ein oder zwei Saetze, die den Overall-Look festnageln. Leerer String wenn nicht noetig.",
+        "Optionaler English Suffix der an jeden Hero-Prompt angehaengt wird. Ein oder zwei Saetze. Leerer String wenn nicht noetig.",
     },
     negativeAddition: {
       type: "string",
       description:
-        "Comma-separated englische Negative-Items, spezifisch fuer diesen Creator. Was sieht man in seinen Reels NIE? z.B. 'no parsley or scattered herbs around the dish, no cast-iron pan as vessel'. Maximal 5 Items. Leerer String wenn keine spezifischen Anti-Patterns auffallen.",
+        "Comma-separated englische Negative-Items spezifisch fuer diesen Creator. Was sieht man NIE in seinen Bildern? z.B. 'no parsley, no cast-iron pan'. Max 5 Items, leer wenn keine.",
     },
     cameraAesthetic: {
       type: "string",
       description:
-        "Ein English Satz zum Camera-/Photographer-Setup. Beschreibt das Gesamtgefuehl der Bilder. Bienes-Stil: 'natural unstaged food photograph, homemade-feeling, no studio look'. Cookbook-Stil: 'Shot on Leica SL2 50mm lens at f/5.6, cookbook-style instagram food photograph, homemade imperfect character'. Pick den passenden Vibe basierend auf den Bildern.",
+        "Ein English Satz zum Camera-Setup. Pick je nach Look: 'natural unstaged food photograph, modern minimal styling, homemade-feeling' vs. 'Shot on Leica SL2 50mm at f/5.6, cookbook-style with intentional styling'.",
     },
     heroElementGuidance: {
       type: "string",
       description:
-        "English Beschreibung wo + wie der Creator typischerweise eine Hero-Zutat oder Garnish im Bild platziert. Bienes-Format: 'A complete English phrase describing the scene: a small wooden cutting board with a small ceramic bowl of [main recipe ingredient] sits softly in the background, behind the dish.' Wenn kein konsistentes Pattern erkennbar: leerer String.",
+        "English Beschreibung wo+wie der Creator Hero-Zutat/Garnish platziert. Wenn kein konsistentes Pattern: leerer String.",
     },
-    defaultAngles: {
-      type: "object",
-      properties: {
-        flat: {
-          type: "string",
-          description:
-            "Camera-Angle-Anweisung fuer flache Dishes (pizza, pancake, cookie). z.B. 'from a high overhead angle looking down (about 75 degrees)' wenn der Creator top-down bevorzugt. Leer wenn unklar.",
-        },
-        layered: { type: "string" },
-        tall: { type: "string" },
-        liquid: { type: "string" },
-        mixed: { type: "string" },
-      },
+    angleFlat: {
+      type: "string",
       description:
-        "Per-DishShape Camera-Angles. Bienes Pattern: flat/mixed bei 75° tilted (nicht strict 90), layered/liquid bei 30° three-quarter, tall bei 45° eye-level. Wenn der Creator durchgehend einen Angle nutzt, gib den fuer alle Shapes. Wenn unklar: leer lassen (Pipeline nimmt Defaults).",
+        "Camera-Angle fuer flat dishes (pizza, pancake). z.B. 'from a high overhead angle looking down (about 75 degrees)'. Leer wenn unklar.",
+    },
+    angleLayered: {
+      type: "string",
+      description: "Camera-Angle fuer layered dishes (lasagna, layer cake).",
+    },
+    angleTall: {
+      type: "string",
+      description: "Camera-Angle fuer tall dishes (burger, muffin).",
+    },
+    angleLiquid: {
+      type: "string",
+      description: "Camera-Angle fuer liquid (soup, smoothie).",
+    },
+    angleMixed: {
+      type: "string",
+      description: "Camera-Angle fuer mixed (bowl, salad).",
     },
   },
   required: [
@@ -81,8 +88,25 @@ const RESPONSE_SCHEMA = {
     "negativeAddition",
     "cameraAesthetic",
     "heroElementGuidance",
-    "defaultAngles",
+    "angleFlat",
+    "angleLayered",
+    "angleTall",
+    "angleLiquid",
+    "angleMixed",
   ],
+};
+
+// Gemini-Response hat flache angle-Felder; wir bauen das original
+// defaultAngles-Objekt im normalisierten Output wieder zusammen.
+type RawStyleResponse = Omit<
+  BrandImageStyleOverride,
+  "defaultAngles"
+> & {
+  angleFlat?: string;
+  angleLayered?: string;
+  angleTall?: string;
+  angleLiquid?: string;
+  angleMixed?: string;
 };
 
 const SYSTEM_INSTRUCTION = `Du analysierst Food-Photography-Reel-Covers eines Instagram-Creators und leitest daraus die Image-Pipeline-DNA ab. Ziel: ein KI-Bild-Generierungs-System (Flux 2 Pro) soll den visuellen Stil dieses Creators reproduzieren koennen.
@@ -122,9 +146,23 @@ REGELN:
 
 Antworte AUSSCHLIESSLICH im JSON-Schema.`;
 
+// Komprimiert ein Bild-Buffer auf max 768 px long-edge JPEG q=75. Bei
+// Instagram-CDN-Bildern (typisch 1080p, ~250 KB) reduziert das die
+// Base64-Payload um Faktor ~6-8. Wichtig fuer Gemini Pro Multimodal-
+// Calls — 14+ Bilder bei voller Aufloesung knacken sonst das 20 MB
+// inline-Payload-Limit und der Call kommt als 400 INVALID_ARGUMENT
+// zurueck.
+async function compressForVision(buf: Buffer): Promise<Buffer> {
+  return sharp(buf)
+    .resize(768, 768, { fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 75, mozjpeg: true })
+    .toBuffer();
+}
+
 // Fetched die displayUrls (Instagram-CDN-Links) als Buffer und konvertiert
 // zu base64 fuer den multimodal Gemini-Call. Parallel mit Promise.all —
-// auch 8 Fetches sind in ~3-5s durch.
+// auch 8 Fetches sind in ~3-5s durch. PR 9: nach Fetch durch sharp
+// komprimieren bevor base64 — sonst Gemini-400.
 async function fetchImagesAsBase64(
   urls: string[]
 ): Promise<Array<{ base64: string; mime: string }>> {
@@ -139,12 +177,11 @@ async function fetchImagesAsBase64(
       if (!res.ok) {
         throw new Error(`Image fetch failed: ${res.status}`);
       }
-      const buf = await res.arrayBuffer();
-      const mime =
-        res.headers.get("content-type")?.split(";")[0]?.trim() ?? "image/jpeg";
+      const raw = Buffer.from(await res.arrayBuffer());
+      const compressed = await compressForVision(raw);
       return {
-        base64: Buffer.from(buf).toString("base64"),
-        mime,
+        base64: compressed.toString("base64"),
+        mime: "image/jpeg",
       };
     })
   );
@@ -178,11 +215,19 @@ async function mineReelFrames(
           maxFrames: 3,
         });
         // Frames sind als data-URIs ("data:image/jpeg;base64,...") —
-        // splitten und re-formatten fuer den gemeinsamen Pool.
-        return frames.map((f) => {
-          const [, base64 = ""] = f.dataUri.split(",");
-          return { base64, mime: "image/jpeg" };
-        });
+        // splitten, base64-decoden, mit sharp auf 768px komprimieren,
+        // dann wieder base64-encoden fuer Gemini.
+        return await Promise.all(
+          frames.map(async (f) => {
+            const [, base64Raw = ""] = f.dataUri.split(",");
+            const raw = Buffer.from(base64Raw, "base64");
+            const compressed = await compressForVision(raw);
+            return {
+              base64: compressed.toString("base64"),
+              mime: "image/jpeg",
+            };
+          })
+        );
       } catch (err) {
         console.warn(
           "[analyze-style] reel-frame extraction failed:",
@@ -258,16 +303,24 @@ export async function analyzeCreatorVisualStyle(
     `[analyze-style] image-pool ready in ${Date.now() - t0}ms: ${coverImages.length} covers + ${reelFrames.length} reel-frames = ${coverImages.length + reelFrames.length} total`
   );
 
-  // Cap auf 16 (Gemini-Multimodal-Limit fuer inline images). Reel-Frames
-  // zuerst — die zeigen meist das fertige Dish, das ist das wichtigste
-  // Style-Signal. Cover als Backup.
-  const images = [...reelFrames, ...coverImages].slice(0, 16);
+  // Cap auf 10 (PR 9: vorher 16, aber selbst nach Sharp-Komprimierung
+  // konservativ — Gemini Pro hat zwar grossere Bild-Limits, aber bei
+  // 10 Bildern à ~30-50 KB base64 ist die Payload klar unter dem
+  // 20 MB inline-Limit). Reel-Frames zuerst — die zeigen meist das
+  // fertige Dish, das ist das wichtigste Style-Signal.
+  const images = [...reelFrames, ...coverImages].slice(0, 10);
   if (images.length < 2) {
     console.warn(
       `[analyze-style] zu wenige Bilder im Pool (${images.length}), ueberspringe Vision-Analyse`
     );
     return null;
   }
+  const totalKb = Math.round(
+    images.reduce((sum, i) => sum + i.base64.length, 0) / 1024
+  );
+  console.log(
+    `[analyze-style] sending ${images.length} compressed images to Gemini Pro (~${totalKb}KB base64 total)`
+  );
 
   const parts: Array<
     { text: string } | { inlineData: { mimeType: string; data: string } }
@@ -283,9 +336,9 @@ export async function analyzeCreatorVisualStyle(
   }
 
   const tVision = Date.now();
-  let raw: BrandImageStyleOverride;
+  let raw: RawStyleResponse;
   try {
-    raw = await callGeminiMultimodal<BrandImageStyleOverride>({
+    raw = await callGeminiMultimodal<RawStyleResponse>({
       parts,
       schema: RESPONSE_SCHEMA,
       systemInstruction: SYSTEM_INSTRUCTION,
@@ -310,7 +363,22 @@ export async function analyzeCreatorVisualStyle(
     return null;
   }
 
-  // Defensive normalization — Schema-Limits enforcen + Whitespace cleanen
+  // Defensive normalization — Schema-Limits enforcen + Whitespace cleanen.
+  // Wir bauen das nested defaultAngles-Objekt aus den flachen angle*-
+  // Feldern zusammen (Gemini-Schema hatte mit nested objects Probleme,
+  // siehe PR 9-Kommentar oben).
+  const angleEntries: Array<[string, string]> = [
+    ["flat", (raw.angleFlat ?? "").trim()],
+    ["layered", (raw.angleLayered ?? "").trim()],
+    ["tall", (raw.angleTall ?? "").trim()],
+    ["liquid", (raw.angleLiquid ?? "").trim()],
+    ["mixed", (raw.angleMixed ?? "").trim()],
+  ].filter(([, v]) => v.length > 0) as Array<[string, string]>;
+  const defaultAngles =
+    angleEntries.length > 0
+      ? (Object.fromEntries(angleEntries) as BrandImageStyleOverride["defaultAngles"])
+      : undefined;
+
   return {
     lightingOptions: (raw.lightingOptions ?? [])
       .filter((s) => s && s.trim())
@@ -322,15 +390,6 @@ export async function analyzeCreatorVisualStyle(
     negativeAddition: (raw.negativeAddition ?? "").trim(),
     cameraAesthetic: (raw.cameraAesthetic ?? "").trim(),
     heroElementGuidance: (raw.heroElementGuidance ?? "").trim(),
-    defaultAngles: raw.defaultAngles
-      ? Object.fromEntries(
-          Object.entries(raw.defaultAngles).filter(
-            ([k, v]) =>
-              ["flat", "layered", "tall", "liquid", "mixed"].includes(k) &&
-              typeof v === "string" &&
-              v.trim()
-          )
-        )
-      : undefined,
+    defaultAngles,
   };
 }
