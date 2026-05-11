@@ -76,7 +76,7 @@ export function RecipeCardPreview({
         fill
         sizes="(min-width: 1280px) 420px, (min-width: 768px) 50vw, 100vw"
         className={`${positionClass} object-cover transition-transform duration-[520ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.06] group-active:scale-[1.02]`}
-        quality={90}
+        quality={95}
 />
 
       {/* Pack-mood color overlay — gives every pack its own atmosphere */}

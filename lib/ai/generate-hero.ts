@@ -1,9 +1,27 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import sharp from "sharp";
 import { generateImage, downloadImage } from "./bfl-flux";
 import { generateImageSpec } from "./recipe-image-spec";
 import { buildPrompt } from "./image-prompts";
 import { getServerSupabase } from "@/lib/supabase-server";
 import type { Recipe } from "@/lib/recipes";
+
+// Render-Aufloesung: Flux 2 Pro rendert nativ bei 2048x2048 (statt 1440x1440
+// wie in PR #57). Detail-View braucht auf Retina 1840 Display-px — mit
+// 1440er-Source musste der Browser ~28% hochskalieren, was leicht "billig"
+// wirkte. 2048 ist Flux-2-Pro's solide Upper-Bound und liefert das Bild
+// nativ scharf fuer Retina ohne Upscale.
+const FLUX_RENDER_WIDTH = 2048;
+const FLUX_RENDER_HEIGHT = 2048;
+
+// Storage-Aufloesung: Sharp upscaled das Flux-Bild von 2048 auf 3072 mit
+// Lanczos3 + modesty Sharpening. Lanczos3 ist Industry-Standard fuer Photo-
+// Upscaling und packt das ~1.5x mit minimalen Artefakten. Bei 3072er-Source
+// hat Vercel Image Optimization 60% Downscale-Headroom fuer die Detail-View
+// (1840 Display-px) statt 28% Upscale wie vorher — sichtbar schaerfer.
+// Gleichzeitig genug Reserve fuer PDF-Print (300 dpi @ ~26cm).
+const STORAGE_LONG_EDGE = 3072;
+const STORAGE_JPEG_QUALITY = 95;
 
 // Hero-Pipeline v9 — zurueck zu Jan's Original-Workflow:
 //   1) Apify scraped Caption + videoUrl + displayUrl
@@ -236,6 +254,8 @@ async function uploadReferenceHero(opts: {
     // dank Doppel-Set in bfl-flux.ts.
     model: "flux-2-pro",
     aspectRatio: "1:1",
+    width: FLUX_RENDER_WIDTH,
+    height: FLUX_RENDER_HEIGHT,
     outputFormat: "jpeg",
     safetyTolerance: 2,
     referenceImage,
@@ -302,6 +322,8 @@ async function uploadTextOnlyFluxHero(
     negativePrompt: negative,
     model: "flux-2-pro",
     aspectRatio: "1:1",
+    width: FLUX_RENDER_WIDTH,
+    height: FLUX_RENDER_HEIGHT,
     outputFormat: "jpeg",
     safetyTolerance: 2,
   });
@@ -319,9 +341,29 @@ async function uploadJpeg(
   buf: Buffer
 ): Promise<string | null> {
   const filePath = `${recipeId}.jpg`;
+
+  // Sharp-Pass: 2048 → 3072 Lanczos3-Upscale + modestes Sharpening
+  // (sigma=0.5 holt feine Details zurueck, die der Resampler weichzeichnet,
+  // ohne Halo-Ringe). JPEG q=95 mit mozjpeg + progressive — Web-Render
+  // startet frueher, Print-Workflow hat genug Kompressions-Reserve.
+  // Pattern aus scripts/upscale-brand-assets.ts uebernommen, der das fuer
+  // statische Pack-Cover schon erprobt hat.
+  const processed = await sharp(buf)
+    .resize(STORAGE_LONG_EDGE, STORAGE_LONG_EDGE, {
+      kernel: sharp.kernel.lanczos3,
+      fit: "fill",
+    })
+    .sharpen({ sigma: 0.5, m1: 0.6, m2: 0.4 })
+    .jpeg({
+      quality: STORAGE_JPEG_QUALITY,
+      mozjpeg: true,
+      progressive: true,
+    })
+    .toBuffer();
+
   const upload = await supabase.storage
     .from(HERO_BUCKET)
-    .upload(filePath, buf, {
+    .upload(filePath, processed, {
       contentType: "image/jpeg",
       upsert: true,
       cacheControl: "31536000",
