@@ -1,4 +1,5 @@
 import { callGeminiMultimodal } from "./gemini";
+import { extractVideoFrames } from "./extract-video-frames";
 import type { BrandImageStyleOverride } from "@/lib/brands";
 import type { InstagramProfilePost } from "@/lib/integrations/apify";
 
@@ -155,39 +156,115 @@ async function fetchImagesAsBase64(
     .map((r) => r.value);
 }
 
+// Reel-Frame-Mining (PR 7): Apify-displayUrls sind bei Reel-fokussierten
+// Creators (wie Jule) oft Talking-Head-Cover mit Werbe-Overlays — keine
+// brauchbaren Style-Signale. Die ECHTEN Hero-Bilder stecken im Video.
+// Wir laden bis zu 4 Reel-Videos parallel, ffmpeg extrahiert 3 Frames im
+// letzten Drittel (wo das fertige Dish meist gezeigt wird) und gibt sie
+// als data:image/jpeg;base64-URIs zurueck — gleiches Format wie
+// fetchImagesAsBase64. So bekommt der Pool an Gemini Pro neben den
+// statischen Covers auch echte Dish-Shots aus den Reels.
+//
+// Cost-Faktor: ffmpeg ist gratis im Lambda, Video-Download ~1-3 MB
+// pro Reel. Latenz: ~10-20s pro Reel, parallel ~15-25s total.
+async function mineReelFrames(
+  reelUrls: string[]
+): Promise<Array<{ base64: string; mime: string }>> {
+  const results = await Promise.allSettled(
+    reelUrls.map(async (videoUrl) => {
+      try {
+        const frames = await extractVideoFrames(videoUrl, {
+          intervalSeconds: 3,
+          maxFrames: 3,
+        });
+        // Frames sind als data-URIs ("data:image/jpeg;base64,...") —
+        // splitten und re-formatten fuer den gemeinsamen Pool.
+        return frames.map((f) => {
+          const [, base64 = ""] = f.dataUri.split(",");
+          return { base64, mime: "image/jpeg" };
+        });
+      } catch (err) {
+        console.warn(
+          "[analyze-style] reel-frame extraction failed:",
+          err instanceof Error ? err.message : err
+        );
+        return [];
+      }
+    })
+  );
+  return results
+    .filter(
+      (r): r is PromiseFulfilledResult<Array<{ base64: string; mime: string }>> =>
+        r.status === "fulfilled"
+    )
+    .flatMap((r) => r.value);
+}
+
 export async function analyzeCreatorVisualStyle(
   posts: InstagramProfilePost[]
 ): Promise<BrandImageStyleOverride | null> {
-  // Filter auf Posts mit displayUrl — Video-only-Posts werden uebersprungen
-  // (wir koennten Reel-Cover-Frames machen, aber das ist Frame-Extraction
-  // mit ffmpeg, das brauchen wir hier nicht — die Cover-displayUrl reicht).
-  const candidateUrls = posts
-    .filter((p) => p.displayUrl)
-    .slice(0, 8)
+  // Zwei-Quellen-Strategie (PR 7):
+  //   A) statische displayUrls (Cover-Frames) — schnell aber oft Talking-
+  //      Head/Werbe-Overlay bei Reels-fokussierten Creators
+  //   B) ffmpeg-Frames aus den letzten Reels (videoUrl) — die ECHTEN
+  //      Hero-Bilder im letzten Drittel des Videos
+  //
+  // Wir machen BEIDES parallel und mergen die Bilder in einem Pool. Gemini
+  // Pro Vision pickt sich dann die saubersten Dish-Shots raus.
+
+  // A) Cover-displayUrls — bis zu 6 verschiedene Posts (am liebsten
+  //    Image/Sidecar-Typen, weil die meist saubere Dishes statt Reel-
+  //    Covers sind)
+  const imagePosts = posts.filter(
+    (p) => p.displayUrl && (p.type === "Image" || p.type === "Sidecar")
+  );
+  const reelPosts = posts.filter(
+    (p) => p.displayUrl && p.type === "Video"
+  );
+  // Image-Posts priorisieren, dann Reel-Cover als Fueller
+  const coverUrls = [...imagePosts, ...reelPosts]
+    .slice(0, 6)
     .map((p) => p.displayUrl as string);
 
+  // B) Reel-videoUrls — bis zu 4 fuer ffmpeg-Frame-Mining (3 Frames each
+  //    = max 12 echte Hero-Frames)
+  const videoUrls = posts
+    .filter((p) => p.videoUrl)
+    .slice(0, 4)
+    .map((p) => p.videoUrl as string);
+
   console.log(
-    `[analyze-style] posts=${posts.length} with-displayUrl=${candidateUrls.length}`
+    `[analyze-style] posts=${posts.length} | covers=${coverUrls.length} (img=${imagePosts.length} reel=${reelPosts.length}) | reel-videos=${videoUrls.length}`
   );
 
-  // Minimum 2 Bilder (vorher 3): bei Creators, die hauptsaechlich Talking-
-  // Head-Reel-Covers haben (Werbe-Overlays etc.), sind oft nur 2-3 saubere
-  // Dish-Shots dabei. Lieber mit 2 Bildern analysieren als auf den
-  // generischen Fallback fallen.
-  if (candidateUrls.length < 2) {
+  if (coverUrls.length === 0 && videoUrls.length === 0) {
     console.warn(
-      "[analyze-style] zu wenige Posts mit displayUrl, ueberspringe Vision-Analyse"
+      "[analyze-style] weder displayUrls noch videoUrls — ueberspringe Vision-Analyse"
     );
     return null;
   }
 
-  const images = await fetchImagesAsBase64(candidateUrls);
+  // Parallel laden: Cover + Reel-Frames
+  const t0 = Date.now();
+  const [coverImages, reelFrames] = await Promise.all([
+    coverUrls.length > 0
+      ? fetchImagesAsBase64(coverUrls)
+      : Promise.resolve([]),
+    videoUrls.length > 0
+      ? mineReelFrames(videoUrls)
+      : Promise.resolve([]),
+  ]);
   console.log(
-    `[analyze-style] image-fetch: ${images.length}/${candidateUrls.length} erfolgreich`
+    `[analyze-style] image-pool ready in ${Date.now() - t0}ms: ${coverImages.length} covers + ${reelFrames.length} reel-frames = ${coverImages.length + reelFrames.length} total`
   );
+
+  // Cap auf 16 (Gemini-Multimodal-Limit fuer inline images). Reel-Frames
+  // zuerst — die zeigen meist das fertige Dish, das ist das wichtigste
+  // Style-Signal. Cover als Backup.
+  const images = [...reelFrames, ...coverImages].slice(0, 16);
   if (images.length < 2) {
     console.warn(
-      "[analyze-style] zu wenige Bilder erfolgreich runtergeladen, ueberspringe Vision-Analyse"
+      `[analyze-style] zu wenige Bilder im Pool (${images.length}), ueberspringe Vision-Analyse`
     );
     return null;
   }

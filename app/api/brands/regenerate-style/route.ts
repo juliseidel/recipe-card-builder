@@ -31,7 +31,10 @@ import type { Brand } from "@/lib/brands";
 //   5. revalidate Workspace + Hub
 
 export const runtime = "nodejs";
-export const maxDuration = 90;
+// PR 7: Reel-Frame-Mining via ffmpeg (4 Reels parallel ~20-25s) + Gemini
+// Pro Vision (~20-30s) + Apify (~15s) = ~60-75s typisch. 120s gibt
+// Headroom fuer Cold-Starts + Vercel-Lambda-Limits.
+export const maxDuration = 120;
 
 export async function POST(req: Request) {
   if (!process.env.APIFY_TOKEN) {
