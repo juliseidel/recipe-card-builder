@@ -87,15 +87,16 @@ export const BIENE_STYLE: BrandImageStyle = {
   // negate it aggressively here. "no parsley" alone wasn't enough in
   // testing — it kept rendering loose green leaves which look like parsley
   // even if Flux semantically classed them as something else.
-  // Brand-spezifische Negatives. User-Feedback-Iteration v9.1 zeigte: vier
-  // Anti-Fabric-Items waren zu viel — vor allem "no extra props on the
-  // cutting board" und "no fabric or napkin under or beside the dish"
-  // pushen Flux Richtung steriles Studio-Setup, was den authentischen
-  // homemade-Reel-Look kaputtmacht. Zurueckgekuerzt auf die zwei minimalen
-  // Items, die das Cheesecake-Leinentuch-Problem fixen ohne den Look zu
-  // sterilisieren.
+  // Brand-spezifische Negatives. v9.1/9.2/9.3 haben mehr Constraints
+  // dazugepackt (Anti-Fabric, blondes Holz, weisse Keramik) und damit den
+  // authentischen homemade-Reel-Look kaputtgemacht — jede zusaetzliche
+  // Anti-X-Klausel sagt Flux indirekt "render cleaner", die Bilder wurden
+  // poliert/KI-mae3sig. v9.4 ist der komplette Revert auf v9-Stand, der
+  // beim ersten Test "sensationell" war (Frozen Cups, Kaiserschmarren,
+  // Cheesecake). Trade-off: das Cheesecake-Tuch kann zurueckkommen, falls
+  // es im Reel-Keyframe sichtbar war — akzeptabel weil Reel-Treue gewuenscht.
   negativeAddition:
-    "no parsley or scattered herbs around the dish, no cast-iron pan as vessel, no recipe title text overlay, no linen cloth, no kitchen towel",
+    "no parsley or scattered herbs around the dish, no cast-iron pan as vessel, no recipe title text overlay",
   // No "smartphone reel" or "phone" — both trigger Flux 2 Pro's reel-frame
   // mode, which renders headline overlays. "Natural unstaged" gets the
   // same look without the trigger word.
@@ -115,7 +116,7 @@ export const BIENE_STYLE: BrandImageStyle = {
   // klar funktioniert besser; die "main ingredient"-Auswahl ueberlassen
   // wir Gemini's Intuition.
   heroElementGuidance:
-    "A complete English phrase describing the scene: 'a small light beige natural blond-wood cutting board with a small white ceramic bowl of [main recipe ingredient in its most photogenic natural form] sits softly in the background, behind the dish'. The cutting board is a separate prop in the background, never under the dish itself. The wood is pale and natural, not dark walnut or warm-stained; the bowl is plain white ceramic, small and unfussy.",
+    "A complete English phrase describing the scene: 'a small wooden cutting board with a small ceramic bowl of [main recipe ingredient in its most photogenic natural form] sits softly in the background, behind the dish'. The cutting board is a separate prop in the background, never under the dish itself.",
   // Per-shape angle overrides. Calibrated against Bienes real reels:
   // pasta-bowls and plated mains shoot top-down (most of her content),
   // layered desserts (cheesecake, tiramisu) shoot 30° three-quarter so
