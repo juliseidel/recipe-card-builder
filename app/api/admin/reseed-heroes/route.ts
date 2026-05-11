@@ -72,7 +72,7 @@ export async function POST(req: Request) {
     recipeSlug: string;
     status: "ok" | "skipped" | "failed";
     heroUrl?: string;
-    source?: "keyframe" | "flux-text-only";
+    source?: "keyframe" | "cover" | "flux-text-only";
     keyframeReasoning?: string;
     keyframeTimestamp?: number;
     error?: string;

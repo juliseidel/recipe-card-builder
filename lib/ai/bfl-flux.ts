@@ -74,7 +74,14 @@ export async function generateImage(req: FluxRequest): Promise<FluxResult> {
   };
   if (req.negativePrompt) body.negative_prompt = req.negativePrompt;
   if (req.seed !== undefined) body.seed = req.seed;
-  if (req.referenceImage) body.image_prompt = req.referenceImage;
+  // BFL hat den Parameter-Namen geaendert: frueher "image_prompt" (Kontext-
+  // Legacy-API), heute "input_image" (Flux 2 + neue Kontext-Calls). Wir
+  // setzen beide, damit der Aufruf model-uebergreifend durchschlaegt — alte
+  // Kontext-Endpoints lesen image_prompt, Flux 2 Pro liest input_image.
+  if (req.referenceImage) {
+    body.input_image = req.referenceImage;
+    body.image_prompt = req.referenceImage;
+  }
 
   // Ultra model uses aspect_ratio; standard pro uses width+height.
   if (model === "flux-pro-1.1-ultra") {
