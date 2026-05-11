@@ -3,7 +3,8 @@
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getBrand, type Brand } from "@/lib/brands";
+import { type Brand } from "@/lib/brands";
+import { getBrandClient } from "@/lib/custom-brands";
 import { getPack, type CardLayout, type Pack } from "@/lib/packs";
 import { getCustomPack, updateCustomPackLayout } from "@/lib/custom-packs";
 import type { CustomPack } from "@/lib/custom-packs";
@@ -60,7 +61,20 @@ type NewRecipePageProps = {
 
 export default function NewRecipePage({ params }: NewRecipePageProps) {
   const { brand: brandSlug, pack: packSlug } = use(params);
-  const brand = getBrand(brandSlug);
+  // Brand wird async geladen — Code-Brand (Biene) zuerst, dann DB-Brand-
+  // Lookup. Drei-Zustand-State (undefined = Loading, null = nicht
+  // gefunden, Brand = ready) damit DB-Brand-Workspaces den Recipe-Editor
+  // auch oeffnen koennen statt "Workspace nicht gefunden" zu zeigen.
+  const [brand, setBrand] = useState<Brand | null | undefined>(undefined);
+  useEffect(() => {
+    let active = true;
+    void getBrandClient(brandSlug).then((b) => {
+      if (active) setBrand(b ?? null);
+    });
+    return () => {
+      active = false;
+    };
+  }, [brandSlug]);
   const staticPack = getPack(brandSlug, packSlug);
   const router = useRouter();
 
@@ -419,6 +433,16 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     setImportedReconciliation(null);
   };
 
+  if (brand === undefined) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <SiteHeader />
+        <main className="flex flex-1 items-center justify-center text-ink-muted">
+          Workspace wird geladen…
+        </main>
+      </div>
+    );
+  }
   if (!brand) {
     return (
       <div className="flex min-h-screen flex-col">
