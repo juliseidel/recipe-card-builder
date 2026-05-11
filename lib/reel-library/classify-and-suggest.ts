@@ -1,0 +1,119 @@
+import {
+  getUnclassifiedReels,
+  updateReelClassification,
+  getRecipeReelsForBrand,
+  countRecipeReelsForBrand,
+  countReelsForBrand,
+  insertSuggestions,
+  clearPendingSuggestions,
+  updateScrapeStatus,
+  type NewSuggestion,
+} from "@/lib/creator-reels-server";
+import { loadBrand } from "@/lib/custom-brands-server";
+import { classifyReels } from "@/lib/ai/classify-reels";
+import { suggestPacks } from "@/lib/ai/suggest-packs";
+
+// Orchestrierung der Phase-2 + Phase-3 Pipeline. Wird vom Apify-Webhook
+// im after()-Hook ausgefuehrt, nachdem das Dataset persistiert wurde.
+//
+// Schritte:
+//   1. Alle unklassifizierten Reels des Brands in Batches durch Gemini
+//      Flash klassifizieren, einzeln in die DB persistieren
+//   2. Alle Rezept-Reels einsammeln, Gemini Pro generiert 10-20 Pack-
+//      Vorschlaege, alle als 'pending' in pack_suggestions schreiben
+//   3. scrape.status = 'done' + counts aktualisieren
+//
+// Bei einem Step-Fail: scrape.status = 'failed' + Error-Message. UI zeigt
+// dann den Hinweis "Reel-Library teilweise geladen, Vorschlaege fehlen —
+// nochmal versuchen".
+//
+// Idempotent: lauft eine zweite Mal mit denselben Inputs durch, ohne
+// Doppel-Klassifikation (filter auf classified_at = null) und ohne
+// Doppel-Suggestions (clearPendingSuggestions vor Insert).
+
+export async function runClassificationAndSuggestions(opts: {
+  scrapeId: string;
+  brandSlug: string;
+}): Promise<void> {
+  const { scrapeId, brandSlug } = opts;
+
+  // ─── Schritt 1: Klassifikation ──────────────────────────────────────
+  // Loop bis nichts mehr unklassifiziert ist. Jeder getUnclassifiedReels-
+  // Call holt max 50 Stueck, eine 500er Library braucht also ~10 Loops.
+  // Pro Loop ~10s (5 Batches a 10 Reels * 2s), total ~100s.
+  let classifiedTotal = 0;
+  while (true) {
+    const batch = await getUnclassifiedReels(brandSlug, 50);
+    if (batch.length === 0) break;
+    const results = await classifyReels(batch);
+    // Persist parallel (alle 50 Updates gehen gleichzeitig raus).
+    await Promise.all(
+      batch.map((reel) => {
+        const c = results.get(reel.id);
+        if (!c) return Promise.resolve();
+        return updateReelClassification(reel.id, c);
+      })
+    );
+    classifiedTotal += batch.length;
+    console.log(
+      `[classify-and-suggest] brand=${brandSlug} classified=${classifiedTotal}`
+    );
+  }
+
+  const totalReels = await countReelsForBrand(brandSlug);
+  const recipeCount = await countRecipeReelsForBrand(brandSlug);
+  console.log(
+    `[classify-and-suggest] brand=${brandSlug} totalReels=${totalReels} recipeCount=${recipeCount}`
+  );
+
+  // ─── Schritt 2: Pack-Vorschlaege ────────────────────────────────────
+  // Bei <5 Rezepten ueberspringen (nichts sinnvolles zu clustern).
+  let suggestionCount = 0;
+  if (recipeCount >= 5) {
+    const brand = await loadBrand(brandSlug);
+    const recipeReels = await getRecipeReelsForBrand(brandSlug);
+    try {
+      const suggestions = await suggestPacks({
+        brandName: brand?.name ?? brandSlug,
+        recipeReels,
+      });
+      if (suggestions.length > 0) {
+        // Vor neuer Generierung: vorhandene pending-Vorschlaege loeschen,
+        // damit das Team keine Doppel-Anzeige sieht. Accepted/dismissed
+        // bleiben als History stehen.
+        await clearPendingSuggestions(brandSlug);
+        const rows: NewSuggestion[] = suggestions.map((s) => ({
+          brandSlug,
+          title: s.title,
+          subtitle: s.subtitle,
+          tagline: s.tagline,
+          description: s.description,
+          category: s.category,
+          reelIds: s.reelIds,
+          reasoning: s.reasoning,
+          score: s.score,
+        }));
+        suggestionCount = await insertSuggestions(rows);
+        console.log(
+          `[classify-and-suggest] brand=${brandSlug} suggestions=${suggestionCount}`
+        );
+      }
+    } catch (err) {
+      // Suggestions sind nicht kritisch — Klassifikation ist persistiert,
+      // User kann Vorschlaege spaeter manuell re-triggern. Wir loggen
+      // den Fehler aber laufen mit status='done' weiter, damit der
+      // Banner schliesst.
+      console.error(
+        "[classify-and-suggest] suggestPacks failed (non-fatal):",
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+
+  // ─── Schritt 3: Final-Status ────────────────────────────────────────
+  await updateScrapeStatus(scrapeId, "done", {
+    reelCount: totalReels,
+    recipeCount,
+    suggestionCount,
+  });
+}

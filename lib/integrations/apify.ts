@@ -395,3 +395,229 @@ export async function scrapeInstagramPost(
     type: item.type ?? null,
   };
 }
+
+// ─── 2-Jahres-Backfill: asynchroner Apify-Run + Webhook ────────────────────
+// Beim Onboarding holen wir die KOMPLETTE Reel-Library eines Creators
+// (resultsLimit ~500). Das dauert 3-10 Min, deutlich mehr als Vercel-
+// Lambda-Limits zulassen. Loesung:
+//   1. Apify-Run async starten (POST /acts/.../runs, NICHT run-sync)
+//   2. Apify ruft per Webhook unseren Endpoint auf, wenn der Run fertig ist
+//   3. Wir laden das Dataset (separater API-Call) + persistieren in DB
+//
+// Webhook-Authentifizierung: der Webhook bekommt nichts schlimmes mit, falls
+// jemand drauf draufpostet — wir matchen den apify_run_id gegen unsere
+// creator_scrapes-Tabelle. Wer eine echte Run-ID raet, hat das Apify-System
+// schon kompromittiert. Defense-in-depth: optionaler APIFY_WEBHOOK_SECRET
+// als Query-Param.
+
+export type BackfillReel = {
+  /** IG-Shortcode aus der Post-URL — Stable Identifier fuer Dedup. */
+  igId: string;
+  postUrl: string;
+  /** 'Video' (Reel) / 'Image' / 'Sidecar' (Carousel). */
+  type: string;
+  caption: string;
+  displayUrl: string | null;
+  videoUrl: string | null;
+  postedAt: string | null;          // ISO-8601 oder null
+  likeCount: number | null;
+  viewCount: number | null;         // nur bei Reels
+  commentCount: number | null;
+  hashtags: string[];
+  /** Raw Apify-Item — fuer Replay/Debug behalten. */
+  raw: unknown;
+};
+
+// Startet einen asynchronen Apify-Run fuer den 2-Jahres-Backfill und gibt
+// die Run-ID zurueck. Apify rufen unseren Webhook auf, sobald der Run
+// fertig ist (succeeded / failed / timed-out).
+export async function startReelBackfill(opts: {
+  username: string;
+  /** Vollstaendige HTTPS-URL des Webhook-Endpoints. */
+  webhookUrl: string;
+  /** Wie viele Posts max? Standard: 500 (~2 Jahre bei aktiven Creators).
+   *  Fuer Daily-Refresh setzt der Cron-Job das auf 30-50 runter. */
+  resultsLimit?: number;
+  /** Wie weit zurueck scrapen? Standard 730 (2 Jahre). Cron-Refresh setzt
+   *  das auf 30 — wir brauchen nur neue Posts seit dem letzten Lauf. */
+  onlyPostsNewerThanDays?: number;
+}): Promise<{ runId: string; datasetId: string }> {
+  const apiToken = process.env.APIFY_TOKEN;
+  if (!apiToken) {
+    throw new ApifyError("APIFY_TOKEN ist nicht gesetzt");
+  }
+
+  const username = opts.username.replace(/^@+/, "").trim();
+  if (!username || !/^[A-Za-z0-9._]+$/.test(username)) {
+    throw new ApifyError(
+      "Kein gueltiger Instagram-Handle fuer den Backfill."
+    );
+  }
+
+  const profileUrl = `https://www.instagram.com/${username}/`;
+  const endpoint = `${APIFY_BASE}/acts/${ACTOR_ID}/runs?token=${apiToken}`;
+
+  // Apify-Webhook-Subscription. Bei SUCCEEDED haben wir das Dataset und
+  // koennen die Reels einlesen. FAILED/TIMED_OUT/ABORTED markieren wir den
+  // Scrape als 'failed' und zeigen dem User eine Hinweismeldung.
+  //
+  // payloadTemplate: Apify-Default-Payload mit allen Standard-Feldern. Wir
+  // erweitern eigentlich nichts, das default-Payload enthaelt schon
+  // resource.id (runId) + resource.defaultDatasetId — alles was wir
+  // brauchen.
+  const webhooks = [
+    {
+      eventTypes: [
+        "ACTOR.RUN.SUCCEEDED",
+        "ACTOR.RUN.FAILED",
+        "ACTOR.RUN.TIMED_OUT",
+        "ACTOR.RUN.ABORTED",
+      ],
+      requestUrl: opts.webhookUrl,
+    },
+  ];
+
+  // Base64-encode der Webhook-Konfiguration (Apify-Format fuer
+  // ?webhooks=... Query-Param bei runs-Endpoint).
+  const webhooksBase64 = Buffer.from(JSON.stringify(webhooks)).toString(
+    "base64"
+  );
+
+  const body = {
+    directUrls: [profileUrl],
+    // "posts" liefert alle Post-Typen (Reel, Image, Sidecar) inkl. der
+    // wichtigen `timestamp` + `videoUrl`-Felder. "details" wuerde nur
+    // Profil-Metadaten + ~30 latestPosts liefern.
+    resultsType: "posts",
+    resultsLimit: opts.resultsLimit ?? 500,
+    // onlyPostsNewerThan ist als String-Filter erlaubt ("2 years", "30 days"),
+    // limitiert serverseitig den Apify-Run.
+    onlyPostsNewerThan: `${opts.onlyPostsNewerThanDays ?? 730} days`,
+  };
+
+  const res = await fetch(`${endpoint}&webhooks=${webhooksBase64}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new ApifyError(
+      `Apify-Run konnte nicht gestartet werden (${res.status}): ${errText.slice(0, 300)}`,
+      res.status,
+      errText
+    );
+  }
+
+  const json = (await res.json()) as {
+    data?: { id?: string; defaultDatasetId?: string };
+  };
+  const runId = json.data?.id;
+  const datasetId = json.data?.defaultDatasetId;
+  if (!runId || !datasetId) {
+    throw new ApifyError(
+      "Apify-Run-Response unvollstaendig — keine runId/datasetId."
+    );
+  }
+  return { runId, datasetId };
+}
+
+// Holt das Dataset eines bereits-fertigen Apify-Runs. Wird vom Webhook-
+// Handler aufgerufen, nachdem Apify uns "SUCCEEDED" signalisiert hat.
+// limit=1000 ist ueppig (Apify selbst limitiert auf 500), reicht fuer
+// einen vollen Backfill in einem Request.
+export async function fetchApifyDataset(
+  datasetId: string
+): Promise<BackfillReel[]> {
+  const apiToken = process.env.APIFY_TOKEN;
+  if (!apiToken) {
+    throw new ApifyError("APIFY_TOKEN ist nicht gesetzt");
+  }
+
+  const endpoint = `${APIFY_BASE}/datasets/${datasetId}/items?token=${apiToken}&format=json&clean=true&limit=1000`;
+  const res = await fetch(endpoint);
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new ApifyError(
+      `Apify-Dataset konnte nicht geladen werden (${res.status}): ${errText.slice(0, 300)}`,
+      res.status,
+      errText
+    );
+  }
+
+  const items = (await res.json()) as Array<{
+    shortCode?: string;
+    url?: string;
+    type?: string;
+    caption?: string;
+    displayUrl?: string;
+    videoUrl?: string;
+    timestamp?: string;
+    likesCount?: number;
+    videoViewCount?: number;
+    videoPlayCount?: number;
+    commentsCount?: number;
+    hashtags?: string[];
+    [k: string]: unknown;
+  }>;
+
+  if (!Array.isArray(items)) {
+    throw new ApifyError(
+      "Apify-Dataset hat kein Array zurueckgeliefert."
+    );
+  }
+
+  return items
+    .filter((item) => item.shortCode && item.url)
+    .map((item) => ({
+      igId: item.shortCode as string,
+      postUrl: item.url as string,
+      type: item.type ?? "Image",
+      caption: (item.caption ?? "").trim(),
+      displayUrl: item.displayUrl ?? null,
+      videoUrl: item.videoUrl ?? null,
+      postedAt: item.timestamp ?? null,
+      likeCount: typeof item.likesCount === "number" ? item.likesCount : null,
+      // Reels haben videoViewCount; bei aelteren Reels videoPlayCount.
+      viewCount:
+        typeof item.videoViewCount === "number"
+          ? item.videoViewCount
+          : typeof item.videoPlayCount === "number"
+            ? item.videoPlayCount
+            : null,
+      commentCount:
+        typeof item.commentsCount === "number" ? item.commentsCount : null,
+      hashtags: Array.isArray(item.hashtags) ? item.hashtags : [],
+      raw: item,
+    }));
+}
+
+// Holt den Status eines Apify-Runs direkt — Fallback falls der Webhook
+// nicht ankommt (z.B. Vercel-Cold-Start hat den Webhook-Request gemissed).
+// Wird vom Library-Status-Endpoint als Recovery-Pfad genutzt.
+export async function getApifyRunStatus(
+  runId: string
+): Promise<{ status: string; defaultDatasetId: string | null }> {
+  const apiToken = process.env.APIFY_TOKEN;
+  if (!apiToken) {
+    throw new ApifyError("APIFY_TOKEN ist nicht gesetzt");
+  }
+  const endpoint = `${APIFY_BASE}/actor-runs/${runId}?token=${apiToken}`;
+  const res = await fetch(endpoint);
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new ApifyError(
+      `Apify-Run-Status nicht abrufbar (${res.status}): ${errText.slice(0, 200)}`,
+      res.status,
+      errText
+    );
+  }
+  const json = (await res.json()) as {
+    data?: { status?: string; defaultDatasetId?: string };
+  };
+  return {
+    status: json.data?.status ?? "UNKNOWN",
+    defaultDatasetId: json.data?.defaultDatasetId ?? null,
+  };
+}

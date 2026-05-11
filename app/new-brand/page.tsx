@@ -255,6 +255,25 @@ export default function NewBrandPage() {
       /* non-blocking — Cache ticked sich von selbst nach 30s neu */
     });
 
+    // 2-Jahres-Reel-Backfill triggern. Fire-and-forget: der Apify-Run
+    // dauert mehrere Minuten, der User landet schon im Workspace und
+    // sieht den Library-Banner mit Fortschritt. Nur ausloesen, wenn der
+    // Handle nicht der Default-Placeholder ist — sonst weiss Apify nicht,
+    // wen es scrapen soll.
+    const cleanedUsername = normalizeHandle(handle).replace(/^@+/, "").trim();
+    if (cleanedUsername && cleanedUsername !== "creator") {
+      void fetch("/api/brands/backfill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brandSlug: saved.slug,
+          username: cleanedUsername,
+        }),
+      }).catch(() => {
+        /* non-blocking — Banner wird im Workspace die "no scrape"-Phase als none zeigen */
+      });
+    }
+
     // Cinematic Entry: Welcome-Animation des neuen Creators laeuft, dann
     // landet der User im frischen Workspace. Genau der "neuer Creator
     // bekommt seine eigene Animation"-Moment aus dem Pflichtenheft.

@@ -3,13 +3,14 @@
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type Brand } from "@/lib/brands";
+import { isCodeBrand, type Brand } from "@/lib/brands";
 import { getBrandClient } from "@/lib/custom-brands";
 import { getPacksForBrand, type Pack } from "@/lib/packs";
 import { addCustomPack, slugifyPack } from "@/lib/custom-packs";
 import { moodPresets, displayFontOptions } from "@/lib/pack-presets";
 import { SiteHeader } from "@/components/site-header";
 import { PackCover } from "@/components/pack-cover";
+import { AutoPackForm } from "@/components/auto-pack-form";
 
 // Initial cover for custom packs is left empty — AI generation kicks in
 // fire-and-forget after save and writes the real URL back into the pack
@@ -40,6 +41,12 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
   }, [brandSlug]);
   const router = useRouter();
   const staticPacks = useMemo(() => getPacksForBrand(brandSlug), [brandSlug]);
+
+  // Mode-Tab: Individuell (Form fuer Custom-Pack) oder Auto-Generate
+  // (KI-Pack aus Reel-Library mit Filter-Selektoren). Auto-Tab nur fuer
+  // DB-Brands sinnvoll — Code-Brand Biene hat keine gescrapte Library.
+  const isCode = isCodeBrand(brandSlug);
+  const [mode, setMode] = useState<"individual" | "auto">("individual");
 
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
@@ -284,7 +291,102 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
       </section>
 
       <main className="flex-1">
-        <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-10 px-6 py-10 lg:grid-cols-[1.05fr_1fr] lg:gap-14 lg:px-10 lg:py-14">
+        {/* Tab-Switcher zwischen Individuell und Auto-Generate. Auto-Tab
+            nur fuer DB-Brands sinnvoll — Code-Brand Biene hat keine
+            gescrapte Reel-Library. */}
+        {!isCode ? (
+          <div
+            className="border-b"
+            style={{
+              borderColor: brand.tokens.line,
+              background: brand.tokens.background,
+            }}
+          >
+            <div className="mx-auto flex max-w-[1400px] gap-2 px-6 py-4 lg:px-10">
+              <button
+                type="button"
+                onClick={() => setMode("individual")}
+                className="flex items-center gap-2 rounded-full border-2 px-5 py-2.5 text-[13px] font-semibold transition-all"
+                style={{
+                  borderColor:
+                    mode === "individual"
+                      ? brand.tokens.accent
+                      : brand.tokens.line,
+                  background:
+                    mode === "individual"
+                      ? brand.tokens.surface
+                      : "transparent",
+                  color:
+                    mode === "individual"
+                      ? brand.tokens.accent
+                      : brand.tokens.inkMuted,
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                  <path
+                    d="M3 3.5h8M3 7h8M3 10.5h5"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                Individuell anlegen
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("auto")}
+                className="flex items-center gap-2 rounded-full border-2 px-5 py-2.5 text-[13px] font-semibold transition-all"
+                style={{
+                  borderColor:
+                    mode === "auto"
+                      ? brand.tokens.accent
+                      : brand.tokens.line,
+                  background:
+                    mode === "auto"
+                      ? brand.tokens.surface
+                      : "transparent",
+                  color:
+                    mode === "auto"
+                      ? brand.tokens.accent
+                      : brand.tokens.inkMuted,
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                  <path
+                    d="M7 2v3m0 4v3m-5-5h3m4 0h3M3.5 3.5l2 2m3 3l2 2M3.5 10.5l2-2m3-3l2-2"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                  />
+                  <circle cx="7" cy="7" r="1" fill="currentColor" />
+                </svg>
+                Auto aus Reel-Library
+                <span
+                  className="rounded-full px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-[0.14em]"
+                  style={{
+                    background:
+                      mode === "auto"
+                        ? brand.tokens.accent + "1a"
+                        : brand.tokens.line,
+                    color:
+                      mode === "auto"
+                        ? brand.tokens.accent
+                        : brand.tokens.inkMuted,
+                  }}
+                >
+                  KI
+                </span>
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {mode === "auto" && !isCode ? (
+          <div className="mx-auto max-w-[1100px] px-6 py-10 lg:px-10 lg:py-14">
+            <AutoPackForm brand={brand} />
+          </div>
+        ) : (
+          <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-10 px-6 py-10 lg:grid-cols-[1.05fr_1fr] lg:gap-14 lg:px-10 lg:py-14">
           {/* ─── FORM (left) ─── */}
           <div className="flex flex-col gap-8">
             {/* Section 1 — Identity */}
@@ -835,6 +937,7 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
             </p>
           </aside>
         </div>
+        )}
       </main>
     </div>
   );

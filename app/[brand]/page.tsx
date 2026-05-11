@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { brands } from "@/lib/brands";
+import { brands, isCodeBrand } from "@/lib/brands";
 import { loadBrand } from "@/lib/custom-brands-server";
 import { getPacksForBrand, mergeAndRenumberPacks } from "@/lib/packs";
 import {
@@ -11,6 +11,7 @@ import { SiteHeader } from "@/components/site-header";
 import { BrandHero } from "@/components/brand-hero";
 import { PackCard } from "@/components/pack-card";
 import { NewPackCard } from "@/components/new-pack-card";
+import { BrandLibraryHeader } from "@/components/brand-library-header";
 
 // Pre-render the Code-Brands at build time (currently only Biene). Custom
 // brands aus der Supabase `brands`-Tabelle werden on-demand gerendert —
@@ -122,6 +123,9 @@ export default async function BrandPage({ params }: BrandPageProps) {
       style={{ background: brand.tokens.background }}
     >
       <SiteHeader />
+      {/* Library-Banner + Pack-Vorschlaege fuer DB-Brands. Code-Brand Biene
+          hat keine gescrapte Reel-Library — die Pilot-Packs sind im Code. */}
+      {!isCodeBrand(brand.slug) ? <BrandLibraryHeader brand={brand} /> : null}
       <BrandHero
         brand={brand}
         livePackCount={packs.length}
