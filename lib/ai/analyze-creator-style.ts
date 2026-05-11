@@ -84,23 +84,42 @@ const RESPONSE_SCHEMA = {
   ],
 };
 
-const SYSTEM_INSTRUCTION = `Du analysierst Food-Photography-Reel-Covers/Posts eines Instagram-Creators und leitest daraus die Image-Pipeline-DNA ab. Ziel: ein zukuenftiges KI-Bild-Generierungs-System soll den visuellen Stil dieses Creators reproduzieren koennen.
+const SYSTEM_INSTRUCTION = `Du analysierst Food-Photography-Reel-Covers eines Instagram-Creators und leitest daraus die Image-Pipeline-DNA ab. Ziel: ein KI-Bild-Generierungs-System (Flux 2 Pro) soll den visuellen Stil dieses Creators reproduzieren koennen.
 
-Aus 6-12 Bildern erkennst du Muster:
-1. **Lighting**: Welche Richtungen, Intensitaeten, Farb-Temperaturen wiederholen sich? Morning/Afternoon/Diffused/Backlit/Amber?
-2. **Surface/Scene**: Worauf steht das Essen? Pale-grey concrete? Wooden cutting board? White marble? Linen? Beschreibe das genau — Material UND Farb-Ton.
-3. **Camera**: Eher cookbook-magazine-DSLR-Aesthetik oder homemade-natural-smartphone-Look? Welche Tiefen-Schaerfe?
-4. **Hero-Element**: Wo + wie platziert der Creator Garnish oder Hero-Zutat? Im Hintergrund? Daneben? Auf dem Gericht? Mit welchem Prop (Brett, Schale, Tuch)?
-5. **Angles**: Top-down oder Three-Quarter? Bei verschiedenen Dish-Shapes — flach/hoch/liquid — andere Angles?
-6. **Anti-Patterns**: Was sieht man NIE in seinen Bildern? (z.B. cast-iron, plastic, parsley, studio lighting)
+WICHTIG VORWEG: Manche Bilder sind Reel-Cover mit Werbe-Overlays, Talking-Head-Frames oder Branding-Sticker. IGNORIERE diese komplett. Konzentriere dich nur auf die Bilder, in denen das fertig angerichtete Gericht klar zu sehen ist (Bowl/Plate/Pan). Wenn nur 2-3 Bilder sauberes Gericht zeigen, reicht das — analysiere DIESE.
 
-Wichtig:
-- Schreibe alle Antwort-Strings auf ENGLISCH — sie gehen direkt in englische Flux-Prompts (Bild-Generierungs-System).
-- Sei spezifisch, nicht generisch. 'warm light' ist schlecht — 'warm morning light streaming from the left with soft shadows' ist gut.
-- Wenn ein Pattern nicht klar erkennbar ist: leere Werte zurueckgeben statt halluzinieren. Die Pipeline hat Fallbacks.
-- defaultAngles: Wenn der Creator durchgehend einen Angle nutzt (z.B. immer top-down), gib den fuer alle 5 Shape-Keys. Wenn shape-spezifisch variiert, entsprechend. Wenn unklar: leeres Objekt.
+Aus den sauberen Dish-Bildern erkennst du Muster:
 
-Antworte AUSSCHLIESSLICH im JSON-Schema, ohne Erklaerung.`;
+1. **Lighting** (5 Strings): Welche Richtungen, Intensitaeten, Farb-Temperaturen? Bevorzuge ENGLISCHE Praezisions-Phrasen wie:
+   - 'bright natural daylight from above with soft even illumination'
+   - 'warm morning light streaming from the left with soft shadows'
+   - 'cool clean daylight from a window, neutral white balance, modern feel'
+
+2. **Surface/Scene** (5 Strings): Was sieht der Counter aus? SEHR wichtig — das prägt den Look am staerksten. Erkenne klar:
+   - 'a clean pale-grey concrete kitchen counter' (Bienes Look)
+   - 'a smooth cream-colored matte countertop' (modern minimal — bei vielen FitFood-Creators)
+   - 'a white marble surface with subtle veining'
+   - 'a warm walnut wooden cutting board'
+   - 'a soft linen runner over a pale stone counter'
+   FRAGE DICH EXPLIZIT: ist es eher MODERN/MINIMAL (helle Counter, clean) oder RUSTIC/COOKBOOK (Holz, dunkel, props)? Beschreibe was du WIRKLICH siehst.
+
+3. **Camera-Aesthetic**: Pick eine der beiden Familien:
+   - 'natural unstaged food photograph, modern minimal styling, homemade-feeling, no studio look' (fuer clean modern Creator)
+   - 'cookbook-style food photograph with intentional styling and props' (fuer rustic Creator)
+
+4. **Hero-Element**: Wo + wie platziert der Creator Garnish oder Hero-Zutat? Im Hintergrund auf separatem Brett? Auf dem Gericht selbst? Daneben? Wenn KEIN konsistentes Hero-Element erkennbar: 'Keep styling minimal — the dish is the hero. Optionally a small neutral linen napkin or a single ingredient placed loosely beside the bowl/plate.'
+
+5. **Angles**: Pro DishShape entscheiden — top-down (80°) bei flat/mixed wenn Creator overhead-shoot't (haeufig bei modernen Food-Creators), three-quarter (30°) bei layered/liquid. Wenn der Creator GANZ KLAR alles top-down macht: gib top-down fuer alle 5 Shapes.
+
+6. **Anti-Patterns** (negativeAddition): Was sieht man NIE? z.B. 'no rustic wooden table, no dark vintage props, no heavy cookbook styling' wenn der Creator modern shoot't. Oder 'no parsley, no cast-iron pan' wenn klar erkennbar.
+
+REGELN:
+- Alle Strings auf ENGLISCH (Flux versteht nur Englisch).
+- Sei SPEZIFISCH: nicht 'warm light', sondern 'warm morning light from the upper left with soft long shadows on a pale surface'.
+- KEINE Halluzinationen: wenn unklar, lieber kuerzere/leere Werte als erfundene Details.
+- Bevorzuge MODERN-MINIMAL Deskriptionen ueber Cookbook-Rustic, wenn die Bilder helle Counter zeigen — das ist der Default fuer heute aktive Creators.
+
+Antworte AUSSCHLIESSLICH im JSON-Schema.`;
 
 // Fetched die displayUrls (Instagram-CDN-Links) als Buffer und konvertiert
 // zu base64 fuer den multimodal Gemini-Call. Parallel mit Promise.all —
@@ -147,14 +166,29 @@ export async function analyzeCreatorVisualStyle(
     .slice(0, 8)
     .map((p) => p.displayUrl as string);
 
-  if (candidateUrls.length < 3) {
-    // Bei <3 Bildern ist die Vision-Analyse nicht aussagekraeftig genug.
-    // Pipeline-Fallback uebernimmt dann generischen Style.
+  console.log(
+    `[analyze-style] posts=${posts.length} with-displayUrl=${candidateUrls.length}`
+  );
+
+  // Minimum 2 Bilder (vorher 3): bei Creators, die hauptsaechlich Talking-
+  // Head-Reel-Covers haben (Werbe-Overlays etc.), sind oft nur 2-3 saubere
+  // Dish-Shots dabei. Lieber mit 2 Bildern analysieren als auf den
+  // generischen Fallback fallen.
+  if (candidateUrls.length < 2) {
+    console.warn(
+      "[analyze-style] zu wenige Posts mit displayUrl, ueberspringe Vision-Analyse"
+    );
     return null;
   }
 
   const images = await fetchImagesAsBase64(candidateUrls);
-  if (images.length < 3) {
+  console.log(
+    `[analyze-style] image-fetch: ${images.length}/${candidateUrls.length} erfolgreich`
+  );
+  if (images.length < 2) {
+    console.warn(
+      "[analyze-style] zu wenige Bilder erfolgreich runtergeladen, ueberspringe Vision-Analyse"
+    );
     return null;
   }
 
@@ -171,20 +205,33 @@ export async function analyzeCreatorVisualStyle(
     });
   }
 
-  const raw = await callGeminiMultimodal<BrandImageStyleOverride>({
-    parts,
-    schema: RESPONSE_SCHEMA,
-    systemInstruction: SYSTEM_INSTRUCTION,
-    // Pro statt Flash — bessere Bild-Detail-Erkennung, die DNA wird nur
-    // einmal pro Creator generiert, also lohnt sich die hoehere Latenz +
-    // Kosten.
-    model: "pro",
-    // Mittlere Temp — Voice + Detail, aber nicht Halluzination
-    temperature: 0.5,
-    maxOutputTokens: 2048,
-    thinkingBudget: 0,
-    retries: 1,
-  });
+  const t0 = Date.now();
+  let raw: BrandImageStyleOverride;
+  try {
+    raw = await callGeminiMultimodal<BrandImageStyleOverride>({
+      parts,
+      schema: RESPONSE_SCHEMA,
+      systemInstruction: SYSTEM_INSTRUCTION,
+      // Pro statt Flash — bessere Bild-Detail-Erkennung, die DNA wird nur
+      // einmal pro Creator generiert, also lohnt sich die hoehere Latenz +
+      // Kosten.
+      model: "pro",
+      // Mittlere Temp — Voice + Detail, aber nicht Halluzination
+      temperature: 0.5,
+      maxOutputTokens: 2048,
+      thinkingBudget: 0,
+      retries: 1,
+    });
+    console.log(
+      `[analyze-style] gemini-pro durch in ${Date.now() - t0}ms`
+    );
+  } catch (err) {
+    console.error(
+      "[analyze-style] gemini-pro call failed",
+      err instanceof Error ? err.message : err
+    );
+    return null;
+  }
 
   // Defensive normalization — Schema-Limits enforcen + Whitespace cleanen
   return {

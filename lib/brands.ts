@@ -94,3 +94,11 @@ export const brands: Brand[] = [
 export function getBrand(slug: string): Brand | undefined {
   return brands.find((brand) => brand.slug === slug);
 }
+
+// Sagt: ist dieser Slug ein Code-Brand (z. B. Biene)? Wird vom UI
+// gebraucht, um Aktionen (z. B. "Brand-Style aktualisieren") auf DB-
+// Brands zu beschraenken — Code-Brand-Styles liegen im Code und duerfen
+// nicht ueber den Regenerate-Endpoint ueberschrieben werden.
+export function isCodeBrand(slug: string): boolean {
+  return brands.some((b) => b.slug === slug);
+}
