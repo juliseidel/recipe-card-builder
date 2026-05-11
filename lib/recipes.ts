@@ -1821,15 +1821,29 @@ export async function getRecipesForPack(
     const supabase = getServerSupabase();
     const { data, error } = await supabase
       .from("recipes")
-      .select("data")
+      .select("recipe_slug, data")
       .eq("pack_slug", packSlug)
       .eq("is_custom", false);
     if (error || !data) return fromCode;
+
+    // Build slug→hero map from DB. Bulk-Reseed + KI-Alternative schreiben
+    // beide in data.hero — die App soll diese Werte sehen, sonst zeigt die
+    // Pack-Uebersicht weiter die alten Bilder aus lib/recipe-heroes.ts.
+    const dbHeroes: Record<string, string> = {};
+    for (const row of data as Array<{ recipe_slug: string; data: Recipe }>) {
+      if (row.data?.hero) dbHeroes[row.recipe_slug] = row.data.hero;
+    }
+    const staticWithDbHero = fromCode.map((r) =>
+      dbHeroes[r.slug] ? { ...r, hero: dbHeroes[r.slug] } : r
+    );
+
     const dbOnly = (data as Array<{ data: Recipe }>)
       .map((row) => row.data)
       .filter((r) => !codeSlugs.has(r.slug));
-    if (dbOnly.length === 0) return fromCode;
-    return [...fromCode, ...dbOnly].sort((a, b) => a.number - b.number);
+    if (dbOnly.length === 0) return staticWithDbHero;
+    return [...staticWithDbHero, ...dbOnly].sort(
+      (a, b) => a.number - b.number
+    );
   } catch (err) {
     console.warn("[recipes] DB load failed, using code only", err);
     return fromCode;
