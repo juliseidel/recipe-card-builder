@@ -106,7 +106,7 @@ async function main() {
       // Stage 2 — Gemini cinematography spec
       const spec = await generateImageSpec(recipe, BRAND_SLUG);
       // Stage 4 — assemble hero prompt with brand-DNA overrides
-      const { prompt, negative } = buildPrompt(
+      const { prompt, negative } = await buildPrompt(
         "hero",
         recipe,
         spec,

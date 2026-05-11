@@ -67,7 +67,7 @@ async function main() {
   console.log(`      scene:          ${spec.sceneContext.slice(0, 60)}…\n`);
 
   // Stage 4: assemble the hero prompt
-  const { prompt, negative } = buildPrompt("hero", recipe, spec, brandSlug);
+  const { prompt, negative } = await buildPrompt("hero", recipe, spec, brandSlug);
   console.log(`[2/3] Prompt assembled (${prompt.length} chars)`);
   console.log(`──────────────────────────────────────────────────────────`);
   console.log(prompt);

@@ -35,8 +35,15 @@ function toneWord(spec: RecipeImageSpec): string {
 // Camera angle is dictated by dishShape — but each brand can override the
 // defaults (Biene leans top-down even for mixed and layered dishes because
 // that's the angle her smartphone reels actually use).
-function angle(spec: RecipeImageSpec, brandSlug: string): string {
-  const override = getBrandImageStyle(brandSlug).defaultAngles?.[spec.dishShape];
+//
+// Async seit PR 5: getBrandImageStyle macht DB-Lookup. Caller (heroPrompt,
+// lifestylePrompt, buildPrompt) sind alle async.
+async function angle(
+  spec: RecipeImageSpec,
+  brandSlug: string
+): Promise<string> {
+  const style = await getBrandImageStyle(brandSlug);
+  const override = style.defaultAngles?.[spec.dishShape];
   if (override) return override;
   switch (spec.dishShape) {
     case "flat":
@@ -85,7 +92,7 @@ function backgroundClause(spec: RecipeImageSpec): string {
 // - Brand-DNA (cameraAesthetic, heroElement, lightingOptions) sind keine
 //   Hard-Constraints sondern Identitaets-Slots in Jan's Template — bleiben
 //   drin, weil sie definieren WIE der Brand aussehen soll, nicht WAS.
-export function heroPrompt(
+export async function heroPrompt(
   recipe: Recipe,
   spec: RecipeImageSpec,
   brandSlug: string,
@@ -97,9 +104,11 @@ export function heroPrompt(
    *  Description NICHT in den Prompt eingebaut (Jan's Regel) und das
    *  "homemade imperfect ... matching the reference"-Wording aktiviert. */
   withReferenceImage: boolean = false
-): string {
-  const a = angle(spec, brandSlug);
-  const style = getBrandImageStyle(brandSlug);
+): Promise<string> {
+  const [a, style] = await Promise.all([
+    angle(spec, brandSlug),
+    getBrandImageStyle(brandSlug),
+  ]);
 
   // Vessel-Handling:
   // - Bei Reference-Path: Vessel kommt NICHT in den Prompt. Gemini extrahiert
@@ -161,21 +170,24 @@ export function heroPrompt(
 const HERO_BASE_NEGATIVE =
   "no text, no labels, no logos, no packaging, no cartons, no bottles, no jars with labels, no bags, no brand names, no watermark, no hands, no people, no faces, no rigid centering, no plastic-looking sauce, no unnatural gloss, no studio lighting, no white void background, no cool blue tones, no fluorescent lighting";
 
-export function heroNegative(brandSlug: string): string {
-  const add = getBrandImageStyle(brandSlug).negativeAddition;
+export async function heroNegative(brandSlug: string): Promise<string> {
+  const style = await getBrandImageStyle(brandSlug);
+  const add = style.negativeAddition;
   return add ? `${HERO_BASE_NEGATIVE}, ${add}` : HERO_BASE_NEGATIVE;
 }
 
 // LIFESTYLE — Stage 5. Plated portion on a ceramic plate with one utensil.
 // Useful as a secondary "served" image; we don't use it in the cover slot
 // because the vessel is generic (always a plate).
-export function lifestylePrompt(
+export async function lifestylePrompt(
   recipe: Recipe,
   spec: RecipeImageSpec,
   brandSlug: string
-): string {
-  const a = angle(spec, brandSlug);
-  const style = getBrandImageStyle(brandSlug);
+): Promise<string> {
+  const [a, style] = await Promise.all([
+    angle(spec, brandSlug),
+    getBrandImageStyle(brandSlug),
+  ]);
   const parts = [
     `A generous plated portion of ${recipe.title}, on a warm-cream ceramic plate, ${utensilClause(spec)}, ${a} view, ${backgroundClause(spec)}.`,
     `${spec.lightingMood}.`,
@@ -188,12 +200,15 @@ export function lifestylePrompt(
 const LIFESTYLE_BASE_NEGATIVE =
   "no text, no labels, no logos, no packaging, no hands, no people, no faces, no matched utensil pairs, no two forks, no two spoons, no two knives, no distorted cutlery, no plastic-looking sauce, no studio lighting, no white void background, no cool blue tones, no fluorescent lighting";
 
-export function lifestyleNegative(brandSlug: string): string {
-  const add = getBrandImageStyle(brandSlug).negativeAddition;
+export async function lifestyleNegative(
+  brandSlug: string
+): Promise<string> {
+  const style = await getBrandImageStyle(brandSlug);
+  const add = style.negativeAddition;
   return add ? `${LIFESTYLE_BASE_NEGATIVE}, ${add}` : LIFESTYLE_BASE_NEGATIVE;
 }
 
-export function buildPrompt(
+export async function buildPrompt(
   style: PromptStyle,
   recipe: Recipe,
   spec: RecipeImageSpec,
@@ -205,24 +220,28 @@ export function buildPrompt(
    *  und ignoriert dishDescription (Jan's Regel: do NOT describe the dish
    *  when a reference image is provided). */
   withReferenceImage: boolean = false
-): { prompt: string; negative: string } {
+): Promise<{ prompt: string; negative: string }> {
   switch (style) {
-    case "lifestyle":
-      return {
-        prompt: lifestylePrompt(recipe, spec, brandSlug),
-        negative: lifestyleNegative(brandSlug),
-      };
+    case "lifestyle": {
+      const [prompt, negative] = await Promise.all([
+        lifestylePrompt(recipe, spec, brandSlug),
+        lifestyleNegative(brandSlug),
+      ]);
+      return { prompt, negative };
+    }
     case "hero":
-    default:
-      return {
-        prompt: heroPrompt(
+    default: {
+      const [prompt, negative] = await Promise.all([
+        heroPrompt(
           recipe,
           spec,
           brandSlug,
           dishDescription,
           withReferenceImage
         ),
-        negative: heroNegative(brandSlug),
-      };
+        heroNegative(brandSlug),
+      ]);
+      return { prompt, negative };
+    }
   }
 }

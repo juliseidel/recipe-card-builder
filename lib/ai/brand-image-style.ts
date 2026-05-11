@@ -141,31 +141,62 @@ const STYLES: Record<string, BrandImageStyle> = {
   biene: BIENE_STYLE,
 };
 
-export function getBrandImageStyle(brandSlug: string): BrandImageStyle {
-  const style = STYLES[brandSlug];
-  if (style) return style;
-  // Sensible fallback that won't break for new brands. Mirrors Jan's original
-  // generic options verbatim so older callers still get a coherent prompt.
-  return {
-    brandSlug,
-    lightingOptions: [
-      "warm morning light streaming from the left with soft shadows",
-      "golden afternoon light from a side window with long gentle shadows",
-      "warm diffused daylight from above, honey-toned",
-      "warm backlight glowing through a kitchen window, amber",
-      "late afternoon amber light from the right with soft highlights",
-    ],
-    sceneOptions: [
-      "a warm rustic wooden table with kitchen shelves softly blurred behind",
-      "a pale oak countertop with a folded linen cloth and small ceramic out of focus nearby",
-      "a light wooden surface with a small leafy potted plant softly out of focus behind",
-      "a warm farmhouse table with a soft linen runner and stoneware suggested behind",
-      "a warm-toned kitchen counter near a window with bright natural daylight, wooden surfaces softly suggested behind",
-    ],
-    styleSuffix: "cookbook-style modern food photograph",
-    negativeAddition: "",
-    cameraAesthetic:
-      "Shot on Leica SL2 50mm lens at f/5.6, dish in sharp focus from edge to edge, background softly out of focus, cookbook-style instagram food photograph, homemade imperfect character",
-    heroElementGuidance: "",
-  };
+// Generic fallback: matched Jan's Original-Default. Wird genutzt, wenn ein
+// Brand weder im Code definiert ist noch ein DB-imageStyle hat — z. B.
+// Brand frisch onboarded ohne Vision-Analyse, oder Vision-Analyse lief
+// fehlerhaft. Sicheres Default fuer "ich weiss nichts ueber diesen
+// Creator, mach ein Cookbook-Foto".
+const FALLBACK_STYLE: Omit<BrandImageStyle, "brandSlug"> = {
+  lightingOptions: [
+    "warm morning light streaming from the left with soft shadows",
+    "golden afternoon light from a side window with long gentle shadows",
+    "warm diffused daylight from above, honey-toned",
+    "warm backlight glowing through a kitchen window, amber",
+    "late afternoon amber light from the right with soft highlights",
+  ],
+  sceneOptions: [
+    "a warm rustic wooden table with kitchen shelves softly blurred behind",
+    "a pale oak countertop with a folded linen cloth and small ceramic out of focus nearby",
+    "a light wooden surface with a small leafy potted plant softly out of focus behind",
+    "a warm farmhouse table with a soft linen runner and stoneware suggested behind",
+    "a warm-toned kitchen counter near a window with bright natural daylight, wooden surfaces softly suggested behind",
+  ],
+  styleSuffix: "cookbook-style modern food photograph",
+  negativeAddition: "",
+  cameraAesthetic:
+    "Shot on Leica SL2 50mm lens at f/5.6, dish in sharp focus from edge to edge, background softly out of focus, cookbook-style instagram food photograph, homemade imperfect character",
+  heroElementGuidance: "",
+};
+
+// Async-Loader fuer Brand-DNA. Drei Quellen, in dieser Reihenfolge:
+//   1. Code-Brand (STYLES Map) — Biene, hand-kalibriert
+//   2. DB-Brand mit imageStyle (von der Vision-Analyse beim Onboarding)
+//   3. FALLBACK_STYLE (generischer Cookbook-Look)
+//
+// Async, weil DB-Lookup. Caller in der Hero-Pipeline (image-prompts.ts +
+// recipe-image-spec.ts) sind eh schon in async-Kontexten (Server-Calls).
+export async function getBrandImageStyle(
+  brandSlug: string
+): Promise<BrandImageStyle> {
+  // Code-Brand zuerst — sync, kein DB-Roundtrip
+  const code = STYLES[brandSlug];
+  if (code) return code;
+
+  // DB-Brand: dynamic import damit dieses Modul auch aus Client-Code
+  // importiert werden kann ohne Supabase-Server-Bundle ins Browser-Bundle
+  // zu schleppen. (Aktuell zwar nur server-side genutzt, aber defensiv.)
+  try {
+    const { loadBrand } = await import("@/lib/custom-brands-server");
+    const brand = await loadBrand(brandSlug);
+    if (brand?.imageStyle) {
+      return {
+        brandSlug,
+        ...brand.imageStyle,
+      };
+    }
+  } catch (err) {
+    console.warn("[brand-image-style] DB-Style-Lookup failed:", err);
+  }
+
+  return { brandSlug, ...FALLBACK_STYLE };
 }

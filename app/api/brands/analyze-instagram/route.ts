@@ -4,6 +4,7 @@ import {
   scrapeInstagramProfile,
 } from "@/lib/integrations/apify";
 import { analyzeCreatorIdentity } from "@/lib/ai/analyze-creator-identity";
+import { analyzeCreatorVisualStyle } from "@/lib/ai/analyze-creator-style";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 
 // Onboarding-Helper-Endpoint. Frontend tippt nur den Instagram-Handle,
@@ -17,11 +18,12 @@ import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 //      die Form-Felder, latestPosts gehen in PR 5 weiter fuer die
 //      Brand-DNA-Vision-Analyse
 //
-// Vercel-Lambda: Apify (~10-20s) + Gemini (~3-5s) + Avatar-Upload (~2s) ≈
-// 15-30s typisch. Wir cappen auf 60s.
+// Vercel-Lambda: Apify (~10-20s) + Gemini-Identity (~3-5s) + Avatar (~2s)
+// + Gemini-Vision-Style (~15-25s) — parallel ergibt das ~30-40s typisch.
+// 120s Lambda-Cap gibt Headroom fuer Cold-Starts.
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const AVATAR_BUCKET = "brand-avatars";
 const ACCEPTED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -111,21 +113,27 @@ export async function POST(req: Request) {
     }
   }
 
-  // ─── 3. Gemini analysiert Identitaet ────────────────────────────────────
-  let identity;
-  try {
-    identity = await analyzeCreatorIdentity(profile);
-  } catch (err) {
+  // ─── 3. Identitaet + Visual-Style parallel ──────────────────────────────
+  // Identity-Analyse: Gemini Flash, Bio + Captions → Brand-Felder (~3-5s)
+  // Visual-Style-Analyse: Gemini Pro multimodal, 6-8 Reel-Covers →
+  //   BrandImageStyleOverride (Lighting, Scene, Camera, etc. ~15-25s)
+  // Beide unabhaengig — `Promise.allSettled` damit ein Fail im einen den
+  // anderen nicht abwuergt. Style-Failure ist tolerierbar (Pipeline-
+  // Fallback uebernimmt generischen Style); Identity-Failure ist hart
+  // (User landet mit halb-leerem Form, das ist die Quick-Start-Erwartung).
+  const [identitySettled, styleSettled] = await Promise.allSettled([
+    analyzeCreatorIdentity(profile),
+    analyzeCreatorVisualStyle(profile.latestPosts),
+  ]);
+
+  if (identitySettled.status === "rejected") {
     return NextResponse.json(
       {
         error:
-          err instanceof Error
-            ? err.message
+          identitySettled.reason instanceof Error
+            ? identitySettled.reason.message
             : "Konnte das Profil nicht analysieren.",
         stage: "analyze",
-        // Wir geben die rohen Profil-Daten + Avatar trotzdem zurueck, damit
-        // das UI dem User wenigstens Avatar + Handle anbieten kann statt
-        // komplett leer zu sein.
         profile: {
           username: profile.username,
           fullName: profile.fullName,
@@ -138,13 +146,26 @@ export async function POST(req: Request) {
     );
   }
 
+  const identity = identitySettled.value;
+  const imageStyle =
+    styleSettled.status === "fulfilled" ? styleSettled.value : null;
+  if (styleSettled.status === "rejected") {
+    console.warn(
+      "[analyze-instagram] visual-style analyse failed:",
+      styleSettled.reason instanceof Error
+        ? styleSettled.reason.message
+        : styleSettled.reason
+    );
+  }
+
   return NextResponse.json({
     ok: true,
     identity,
     avatarUrl,
-    // latestPosts gehen ans Frontend zurueck, damit PR 5 (Brand-DNA-Vision)
-    // direkt darauf aufbauen kann — bisheriger Apify-Call wird so doppelt
-    // genutzt (Profile + Posts in einem Roundtrip).
+    // imageStyle: optional — kann null sein wenn Vision-Analyse fehlschlug
+    // oder zu wenige Bilder verfuegbar waren (<3). Frontend speichert es
+    // wenn vorhanden in brand.imageStyle; Pipeline-Fallback fuer null.
+    imageStyle,
     latestPosts: profile.latestPosts,
     raw: {
       handle: profile.username,

@@ -22,8 +22,11 @@ export type RecipeImageSpec = {
 // Build the JSON schema dynamically — lightingMood + sceneContext use
 // brand-specific enum values so each creator's signature look gets baked into
 // the spec instead of forcing every dish into Jan's generic "farmhouse" world.
-function buildSchema(brandSlug: string) {
-  const style = getBrandImageStyle(brandSlug);
+//
+// Async seit PR 5: getBrandImageStyle macht DB-Lookup fuer non-Code-Brands.
+// Caller sind eh in async-Kontexten (generateImageSpec).
+async function buildSchema(brandSlug: string) {
+  const style = await getBrandImageStyle(brandSlug);
   const lightingList = style.lightingOptions
     .map((s) => `'${s}'`)
     .join(", ");
@@ -97,8 +100,8 @@ function buildSchema(brandSlug: string) {
 // Jan's rules for the 9 fields. heroElement guidance is brand-overridable —
 // some creators (Biene) finish their dishes with garnish on top of the food
 // itself, not styled alongside it.
-function buildSystemInstruction(brandSlug: string): string {
-  const style = getBrandImageStyle(brandSlug);
+async function buildSystemInstruction(brandSlug: string): Promise<string> {
+  const style = await getBrandImageStyle(brandSlug);
   const heroRule = style.heroElementGuidance
     ? `- heroElement: ${style.heroElementGuidance}`
     : `- heroElement: a single visually distinctive ingredient from this recipe, presented as a styling element alongside the finished dish. Choose the ingredient that is most recognizable and visually interesting — a colorful vegetable, a fresh herb bundle, a halved fruit, whole nuts, a bunch of greens, or for recipes whose main components are powders/grains/liquids, a small ceramic bowl or small glass of the ingredient. Never render packaging. Never pick items that only exist in packaging (milk carton, yogurt tub, flour bag) unless presented in a bowl or glass. Prefer whole, natural forms over prepared ones. The item must be visible or clearly implied in the finished dish.`;
@@ -166,8 +169,14 @@ export async function generateImageSpec(
   recipe: Recipe,
   brandSlug: string
 ): Promise<RecipeImageSpec> {
-  const style = getBrandImageStyle(brandSlug);
-  const schema = buildSchema(brandSlug);
+  // Style einmal laden — wird in schema (enum-Values) UND System-Instruction
+  // (heroRule) gebraucht. Parallel: buildSchema/buildSystemInstruction
+  // wuerden den Style sonst doppelt laden.
+  const [style, schema, systemInstruction] = await Promise.all([
+    getBrandImageStyle(brandSlug),
+    buildSchema(brandSlug),
+    buildSystemInstruction(brandSlug),
+  ]);
 
   const prompt = [
     `Analyse this German recipe and return the 9 cinematography fields as JSON.`,
@@ -181,7 +190,7 @@ export async function generateImageSpec(
   const result = await callGemini<RecipeImageSpec>({
     prompt,
     schema,
-    systemInstruction: buildSystemInstruction(brandSlug),
+    systemInstruction,
     temperature: 0.4,
     maxOutputTokens: 1024,
     thinkingBudget: 0,

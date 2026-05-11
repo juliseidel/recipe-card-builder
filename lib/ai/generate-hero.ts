@@ -236,7 +236,7 @@ async function uploadReferenceHero(opts: {
 }): Promise<string | null> {
   const { recipe, recipeId, brandSlug, referenceImage } = opts;
   const spec = await generateImageSpec(recipe, brandSlug);
-  const { prompt, negative } = buildPrompt(
+  const { prompt, negative } = await buildPrompt(
     "hero",
     recipe,
     spec,
@@ -309,7 +309,7 @@ async function uploadTextOnlyFluxHero(
   }
 
   const spec = await generateImageSpec(recipe, brandSlug);
-  const { prompt, negative } = buildPrompt(
+  const { prompt, negative } = await buildPrompt(
     "hero",
     recipe,
     spec,
