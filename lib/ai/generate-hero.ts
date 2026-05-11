@@ -39,30 +39,27 @@ export type GenerateHeroResult = {
 /**
  * Top-Level Entry-Point. Returnt die public-URL des hochgeladenen JPEGs
  * oder null, wenn nichts klappt.
+ *
+ * ROLLBACK 2026-05-11 nachmittags: die Keyframe-Pipeline (Apify videoUrl →
+ * ffmpeg → Gemini Vision → Flux Kontext Pro mit Reference) lieferte
+ * Bilder, die das Original-Reel nicht ausreichend matchten — Flux Kontext
+ * Pro interpretierte die Reference zu kreativ. Bis der Prompt-Bug gefixt
+ * ist (heroPrompt fehlt Jan's "dish shape and color and garnish placement
+ * matching the reference"-Wording), fallen wir auf die alte text-only
+ * Flux-2-Pro-Pipeline zurueck, die schon die 37 statischen Bienes-Heroes
+ * generiert hat — brand-style Bilder, die zum Rezept passen.
+ *
+ * Die uploadKeyframeBasedHero-Funktion bleibt im Code (s. u.), wird aber
+ * nicht aufgerufen, bis der Prompt-Fix verifiziert ist.
  */
 export async function generateHeroForRecipe(
   opts: GenerateHeroOpts
 ): Promise<GenerateHeroResult | null> {
-  const { recipe, recipeId, brandSlug, forceFlux } = opts;
-
-  if (!forceFlux && recipe.sourceUrl) {
-    try {
-      const result = await uploadKeyframeBasedHero({
-        sourceUrl: recipe.sourceUrl,
-        recipe,
-        recipeId,
-        brandSlug,
-      });
-      if (result) return result;
-    } catch (err) {
-      console.warn(
-        "[generate-hero] keyframe pipeline failed, falling back:",
-        err instanceof Error ? err.message : err
-      );
-    }
-  }
-
-  const heroUrl = await uploadTextOnlyFluxHero(recipe, recipeId, brandSlug);
+  const heroUrl = await uploadTextOnlyFluxHero(
+    opts.recipe,
+    opts.recipeId,
+    opts.brandSlug
+  );
   if (!heroUrl) return null;
   return { heroUrl, source: "flux-text-only" };
 }
