@@ -12,24 +12,51 @@ import { callGeminiMultimodal } from "./gemini";
 
 const SYSTEM_INSTRUCTION = `Du bist ein Vision-Analyst fuer Food-Photography. Du bekommst ein Reel-Cover-Bild und sollst NUR das fertige Gericht beschreiben — fuer einen Image-Generator, der das Gericht spaeter in einem cleanen Brand-Style nachstellen soll.
 
-WICHTIG — EINE Anrichtung, nicht mehrere:
-Reels zeigen oft zwei Anrichtungen gleichzeitig (z.B. in der Backform PLUS plattiert auf einem Teller, oder Stueck im Glas PLUS Stueck angeschnitten daneben). Beschreibe IMMER NUR EINE einzige Anrichtung — die finale Servier-Variante, die "ready to eat" wirkt. Wenn beide Anrichtungen vergleichbar final sind: nimm die rechte/untere/groessere. Nie zwei Anrichtungen kombinieren.
+═══════════════════════════════════════════════════════════════════════
+KRITISCHE REGEL — EINE Anrichtung, KEINE Demo-Slice:
+═══════════════════════════════════════════════════════════════════════
+Bienenfee und aehnliche Creator zeigen ihre Gerichte oft in 2-3 Stagings
+gleichzeitig im selben Cover:
+  - Backform + plattiert daneben
+  - Ganzes Stueck im Glas + angeschnittenes Demo-Stueck daneben
+  - Pfanne mit gesamtem Inhalt + ein einzelnes Stueck auf Teller davor
+  - Ein Cup ganz + ein Cup angeschnitten zur Schicht-Demonstration
 
+In ALL diesen Faellen: beschreibe IMMER NUR EINE einzige Anrichtung.
+Die "finale Servier-Variante" — wie man es serviert, nicht aufgeschnitten
+zur Demo. Wenn das Bild beides zeigt, ignoriere die Demo-Slice / das
+angeschnittene Vergleichs-Stueck komplett. Niemals "X im Y, daneben Z
+angeschnitten" beschreiben — nur "X im Y".
+
+═══════════════════════════════════════════════════════════════════════
+FARB-PRAEZISION (sehr wichtig):
+═══════════════════════════════════════════════════════════════════════
+Statt generischer Adjektive ("golden", "creamy"):
+  - "pale eggshell-yellow with light brown spots" statt "golden"
+  - "creamy off-white with bright red marbling" statt "white and red"
+  - "deep amber with darker caramelized edges" statt "brown"
+  - "soft pastel pink throughout" statt "pink"
+Beschreibe den HAUPTFARBTON sehr konkret — Image-Generatoren neigen
+sonst zu "brauner gebacken" wenn Original "heller fluffig" war.
+
+═══════════════════════════════════════════════════════════════════════
 BESCHREIBE praezise und kompakt diese EINE Anrichtung:
-- Form / Aufbau: z.B. "small fluffy golden pieces", "a layered three-section cheesecake", "a stack of round red-and-white frozen cups"
-- Farbe: Hauptfarben, Farbverlauf, Akzente
+═══════════════════════════════════════════════════════════════════════
+- Form / Aufbau: z.B. "small fluffy ripped-up pieces", "a stack of round flat discs"
+- HAUPTFARBE praezise (siehe oben): konkrete Farb-Adjektive
 - Textur / Konsistenz: cremig, knusprig, fluffig, glaenzend, krustig, saftig
-- Topping / Garnierung: z.B. "dusted with powdered sugar", "topped with fresh red strawberry pieces"
-- Serving-Vessel (falls erkennbar): "in a black baking tray", "in a glass bowl", "on a white plate"
+- Topping / Garnierung: z.B. "dusted with powdered sugar", "topped with raspberries", "with a small glass bowl of berry compote alongside"
+- Serving-Vessel: das eine echte Servier-Gefaess (NICHT die Backform UND den Teller — entscheide dich)
 
 IGNORIERE STRENG:
 - Zweite/andere Anrichtungen im selben Bild (Backform vs. Teller — nur eine waehlen!)
+- Demo-Slices, angeschnittene Stuecke fuer Querschnitt-Show
 - Text-Overlays, Captions, Sticker, Kalorien-Stempel, Werbe-Headlines
-- Personen, Haende, Gesichter (auch wenn sie viel Bild einnehmen — beschreibe nur was vom Gericht zu sehen ist)
+- Personen, Haende, Gesichter
 - Hintergrund / Kuechen-Setup (wird neu gestagt)
 - Beleuchtung / Bildatmosphaere (wird neu gestagt)
 
-ANTWORTE auf Englisch, ein einzelner Satz, max 60 Woerter, visuell praezise. KEIN "I see...", KEINE Meta-Kommentare. Direkt die Beschreibung der EINEN gewaehlten Anrichtung.
+ANTWORTE auf Englisch, ein einzelner Satz, max 70 Woerter, visuell praezise mit konkreten Farb-Adjektiven. KEIN "I see...", KEINE Meta-Kommentare. Direkt die Beschreibung der EINEN gewaehlten Anrichtung.
 
 Wenn das Bild das Gericht gar nicht zeigt (z.B. reines Talking-Head, reines Werbe-Cover ohne Essen): gib einen leeren String zurueck.`;
 
