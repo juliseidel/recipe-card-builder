@@ -141,31 +141,47 @@ const STYLES: Record<string, BrandImageStyle> = {
   biene: BIENE_STYLE,
 };
 
-// Generic fallback: matched Jan's Original-Default. Wird genutzt, wenn ein
-// Brand weder im Code definiert ist noch ein DB-imageStyle hat — z. B.
-// Brand frisch onboarded ohne Vision-Analyse, oder Vision-Analyse lief
-// fehlerhaft. Sicheres Default fuer "ich weiss nichts ueber diesen
-// Creator, mach ein Cookbook-Foto".
+// Generic fallback: clean modern minimal — wird genutzt, wenn ein Brand
+// weder im Code definiert ist noch ein DB-imageStyle hat (z. B. frisch
+// onboarded, Vision-Analyse hat keinen sauberen Style erkannt). Vorher
+// war das Jan's Original-Default (warm rustic wooden table), aber das hat
+// frischen Creators den "Vintage-Cookbook"-Look aufgezwungen, auch wenn
+// ihre Reels modern-minimal sind (wie Jule).
+//
+// Neue Default-Aesthetik: bright natural daylight, pale neutral surfaces,
+// overhead-leaning angles — passt zu 80% der modernen Food-Creator und ist
+// neutraler als Jan's farmhouse-Bias. Wenn ein Creator wirklich Rustic
+// shoot't, holt die Vision-Analyse das raus und ueberschreibt diesen
+// Fallback.
 const FALLBACK_STYLE: Omit<BrandImageStyle, "brandSlug"> = {
   lightingOptions: [
-    "warm morning light streaming from the left with soft shadows",
-    "golden afternoon light from a side window with long gentle shadows",
-    "warm diffused daylight from above, honey-toned",
-    "warm backlight glowing through a kitchen window, amber",
-    "late afternoon amber light from the right with soft highlights",
+    "bright natural daylight from above with soft even illumination",
+    "soft diffused morning light from a side window with gentle shadows",
+    "cool clean daylight from a window, neutral white balance, modern feel",
+    "bright overhead daylight with minimal shadows, clean editorial look",
+    "soft natural light with subtle warm highlights from a kitchen window",
   ],
   sceneOptions: [
-    "a warm rustic wooden table with kitchen shelves softly blurred behind",
-    "a pale oak countertop with a folded linen cloth and small ceramic out of focus nearby",
-    "a light wooden surface with a small leafy potted plant softly out of focus behind",
-    "a warm farmhouse table with a soft linen runner and stoneware suggested behind",
-    "a warm-toned kitchen counter near a window with bright natural daylight, wooden surfaces softly suggested behind",
+    "a clean pale neutral surface with minimal styling",
+    "a soft cream-colored matte countertop, modern and unfussy",
+    "a smooth light-grey surface with subtle natural texture",
+    "a pale warm-white countertop near a window with bright daylight",
+    "a clean modern kitchen surface, lightly textured, photographed close",
   ],
-  styleSuffix: "cookbook-style modern food photograph",
-  negativeAddition: "",
+  styleSuffix: "",
+  negativeAddition:
+    "no rustic wooden table, no farmhouse table, no dark vintage props, no heavy cookbook styling",
   cameraAesthetic:
-    "Shot on Leica SL2 50mm lens at f/5.6, dish in sharp focus from edge to edge, background softly out of focus, cookbook-style instagram food photograph, homemade imperfect character",
-  heroElementGuidance: "",
+    "natural unstaged food photograph, modern minimal styling, homemade-feeling, no studio look, no heavy props",
+  heroElementGuidance:
+    "Keep styling minimal — the dish is the hero. Optionally a small neutral linen napkin or a single ingredient placed loosely beside the bowl/plate.",
+  defaultAngles: {
+    flat: "from a high overhead angle looking down (about 80°, slightly tilted not strict 90°)",
+    mixed: "from a high overhead angle looking down (about 80°, slightly tilted)",
+    layered: "from a 30° three-quarter angle so the layers are visible",
+    tall: "from a 45° eye-level angle showing the full height",
+    liquid: "from a 30° three-quarter angle so the liquid surface shines",
+  },
 };
 
 // Async-Loader fuer Brand-DNA. Drei Quellen, in dieser Reihenfolge:
