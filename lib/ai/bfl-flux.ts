@@ -87,8 +87,14 @@ export async function generateImage(req: FluxRequest): Promise<FluxResult> {
   if (model === "flux-pro-1.1-ultra") {
     body.aspect_ratio = req.aspectRatio ?? "1:1";
   } else {
-    body.width = req.width ?? 1024;
-    body.height = req.height ?? 1024;
+    // 1440×1440 statt 1024×1024 — Detail-View rendert Hero-Bild bei
+    // 920px CSS-Width, auf Retina = 1840px Display-Pixel. 1024er-Source
+    // wirkte deshalb leicht unscharf. 1440 ist 40% groesser, kostet
+    // marginal mehr BFL-Credits aber liefert deutlich schaerfere Bilder
+    // sowohl in Pack-Uebersicht (420px CSS, 840px Retina) als auch im
+    // Detail-View. Flux 2 Pro unterstuetzt 1440 nativ.
+    body.width = req.width ?? 1440;
+    body.height = req.height ?? 1440;
   }
 
   // Step 1 — kick off the job
