@@ -51,6 +51,72 @@ export default function NewBrandPage() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Instagram-Auto-Fill state. User tippt Handle → Apify scraped Profil →
+  // Gemini analysiert Identity → Server uploaded Avatar. Wir bekommen
+  // alle Form-Felder gleichzeitig zurueck und befuellen den State.
+  // latestPosts halten wir transient — PR 5 wird sie fuer die Brand-DNA-
+  // Vision-Analyse weiternutzen, ohne dass wir Apify nochmal anrufen
+  // muessen.
+  const [igHandle, setIgHandle] = useState("");
+  const [igLoading, setIgLoading] = useState(false);
+  const [igError, setIgError] = useState<string | null>(null);
+  const [igSuccess, setIgSuccess] = useState<string | null>(null);
+
+  const handleAutoFill = async () => {
+    if (!igHandle.trim() || igLoading) return;
+    setIgLoading(true);
+    setIgError(null);
+    setIgSuccess(null);
+    try {
+      const res = await fetch("/api/brands/analyze-instagram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handle: igHandle.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(
+          data?.error ?? "Konnte das Instagram-Profil nicht analysieren."
+        );
+      }
+      // Identity-Felder uebernehmen — User kann jedes Feld trotzdem noch
+      // editieren, Auto-Fill ist nur ein Quick-Start.
+      const id = data.identity as {
+        name: string;
+        fullName: string;
+        bio: string;
+        tagline: string;
+        niche: string;
+        signature: string;
+      };
+      setName(id.name);
+      setFullName(id.fullName);
+      setBio(id.bio);
+      setTagline(id.tagline);
+      setNiche(id.niche);
+      // Handle ins Form-Feld zurueckspielen, falls User ihn ohne '@'
+      // eingegeben hat — normalizeHandle macht das beim Save auch nochmal,
+      // aber im Formular sieht es jetzt schon richtig aus.
+      const cleanedHandle = data.raw?.handle as string | undefined;
+      if (cleanedHandle) {
+        setHandle(`@${cleanedHandle}`);
+      }
+      // Avatar setzen, falls Server-Upload erfolgreich war.
+      if (data.avatarUrl) {
+        setAvatarUrl(data.avatarUrl as string);
+      }
+      setIgSuccess(
+        `Profil @${data.raw?.handle ?? igHandle} importiert — bitte ueberpruefe die Felder unten.`
+      );
+    } catch (err) {
+      setIgError(
+        err instanceof Error ? err.message : "Auto-Fill fehlgeschlagen."
+      );
+    } finally {
+      setIgLoading(false);
+    }
+  };
+
   const selectedMood = useMemo(() => {
     return (
       brandMoodPresets.find((m) => m.id === moodId)?.tokens ??
@@ -217,6 +283,101 @@ export default function NewBrandPage() {
                 mit Welcome-Animation in der frischen Identität.
               </p>
             </header>
+
+            {/* Instagram Auto-Fill — Schnellstart */}
+            <section
+              className="editor-section flex flex-col gap-4 rounded-3xl border-2 p-6"
+              style={{
+                borderColor: "var(--color-line-strong)",
+                background:
+                  "linear-gradient(135deg, var(--color-accent-soft) 0%, var(--color-canvas) 100%)",
+              }}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className="grid size-9 shrink-0 place-items-center rounded-full"
+                  style={{
+                    background: "var(--color-accent)",
+                    color: "white",
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M12 2L9 9l-7 .75 5.25 5L6 22l6-3.25L18 22l-1.25-7.25L22 9.75 15 9 12 2z"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <h2 className="font-display text-[20px] leading-tight text-ink">
+                    Schnellstart aus Instagram
+                  </h2>
+                  <p className="text-[12.5px] text-ink-muted">
+                    Tipp den Handle und lass die KI alles vorausfüllen — Bio,
+                    Tagline, Niche und Avatar.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-muted">
+                    Instagram-Handle
+                  </label>
+                  <input
+                    className="editor-input"
+                    type="text"
+                    placeholder="@bienesfitlife"
+                    value={igHandle}
+                    onChange={(e) => setIgHandle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void handleAutoFill();
+                      }
+                    }}
+                    maxLength={50}
+                    disabled={igLoading}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAutoFill}
+                  disabled={!igHandle.trim() || igLoading}
+                  className="rounded-full bg-ink px-5 py-2.5 text-[13px] font-semibold text-white transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {igLoading ? "Lade Profil…" : "Aus Instagram laden"}
+                </button>
+              </div>
+
+              {igLoading ? (
+                <p className="text-[12px] text-ink-muted">
+                  Apify scraped das Profil, Gemini analysiert Identität, Avatar
+                  wird hochgeladen — kann 15–30 Sekunden dauern.
+                </p>
+              ) : null}
+
+              {igError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-800">
+                  {igError}
+                </div>
+              ) : null}
+
+              {igSuccess ? (
+                <div
+                  className="rounded-xl border px-4 py-3 text-[13px]"
+                  style={{
+                    borderColor: "rgba(34, 139, 34, 0.3)",
+                    background: "rgba(220, 252, 231, 0.6)",
+                    color: "#166534",
+                  }}
+                >
+                  ✓ {igSuccess}
+                </div>
+              ) : null}
+            </section>
 
             {/* Section 1 — Identity */}
             <section className="editor-section editor-card flex flex-col gap-5">

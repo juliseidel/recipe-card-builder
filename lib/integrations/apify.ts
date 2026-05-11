@@ -92,6 +92,178 @@ export function normalizeInstagramUrl(raw: string): string | null {
   return `https://www.instagram.com/${type}/${code}/`;
 }
 
+// ─── Profile-Scraping fuer Creator-Onboarding ──────────────────────────────
+// Beim Hub-Onboarding tippt der Team-User den Instagram-Handle und alle
+// Profil-Felder + Avatar werden auto-befuellt. Apify's "instagram-scraper"
+// mit resultsType: "details" liefert Profile-Daten + die letzten N Posts
+// in einem Call — sparen einen zweiten Roundtrip fuer die Posts.
+//
+// Die latestPosts werden in PR 5 fuer die Vision-Analyse der Brand-DNA
+// gebraucht (Lighting, Scene, Camera-Style aus echten Reel-Covers
+// ableiten). In PR 4 reichen die Profil-Felder.
+
+export type InstagramProfilePost = {
+  caption: string;
+  displayUrl: string | null;
+  videoUrl: string | null;
+  type: string | null;
+  hashtags: string[];
+};
+
+export type InstagramProfile = {
+  username: string;
+  fullName: string | null;
+  biography: string;
+  followersCount: number | null;
+  followsCount: number | null;
+  postsCount: number | null;
+  profilePicUrl: string | null;
+  profilePicUrlHD: string | null;
+  externalUrl: string | null;
+  isPrivate: boolean;
+  isVerified: boolean;
+  /** Die letzten N Posts mit Caption + Bild-URL. Maximal so viele, wie der
+   *  Apify-Actor in dem details-Call mit liefert (typisch 12). */
+  latestPosts: InstagramProfilePost[];
+};
+
+export async function scrapeInstagramProfile(
+  rawHandle: string
+): Promise<InstagramProfile> {
+  const apiToken = process.env.APIFY_TOKEN;
+  if (!apiToken) {
+    throw new ApifyError("APIFY_TOKEN ist nicht gesetzt");
+  }
+
+  const username = rawHandle.replace(/^@+/, "").trim();
+  if (!username || !/^[A-Za-z0-9._]+$/.test(username)) {
+    throw new ApifyError(
+      "Das ist kein gueltiger Instagram-Handle. Erwartet: bienesfitlife oder @bienesfitlife (Buchstaben, Zahlen, Punkte, Unterstriche)."
+    );
+  }
+
+  const profileUrl = `https://www.instagram.com/${username}/`;
+  const endpoint = `${APIFY_BASE}/acts/${ACTOR_ID}/run-sync-get-dataset-items?token=${apiToken}&format=json`;
+
+  // Input-Schema mit resultsType: "details" — der Actor liefert dann
+  // Profil-Metadaten + ein latestPosts-Array. resultsLimit cappt die Posts
+  // (nicht das Profile selbst), 12 deckt PR-5-Vision-Analyse mit Headroom.
+  const body = {
+    directUrls: [profileUrl],
+    resultsType: "details",
+    resultsLimit: 12,
+  };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 55_000);
+
+  let res: Response;
+  try {
+    res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeout);
+    const isAbort = (err as Error).name === "AbortError";
+    throw new ApifyError(
+      isAbort
+        ? "Apify-Cold-Start dauert gerade laenger als ueblich. Klick nochmal auf 'Aus Instagram laden' — der zweite Versuch geht meist in 5-10 Sekunden durch."
+        : `Netzwerk-Fehler: ${(err as Error).message}`
+    );
+  }
+  clearTimeout(timeout);
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    if (res.status === 401) {
+      throw new ApifyError("Apify-Token ungueltig oder abgelaufen.", 401, errText);
+    }
+    if (res.status === 402) {
+      throw new ApifyError(
+        "Apify-Limit erreicht. Bitte spaeter erneut versuchen oder Free-Tier upgraden.",
+        402,
+        errText
+      );
+    }
+    throw new ApifyError(
+      `Apify-Fehler ${res.status}: ${errText.slice(0, 300)}`,
+      res.status,
+      errText
+    );
+  }
+
+  const items = (await res.json()) as Array<{
+    username?: string;
+    fullName?: string;
+    biography?: string;
+    followersCount?: number;
+    followsCount?: number;
+    postsCount?: number;
+    profilePicUrl?: string;
+    profilePicUrlHD?: string;
+    externalUrl?: string;
+    private?: boolean;
+    verified?: boolean;
+    latestPosts?: Array<{
+      caption?: string;
+      displayUrl?: string;
+      videoUrl?: string;
+      type?: string;
+      hashtags?: string[];
+    }>;
+    error?: string;
+    errorDescription?: string;
+  }>;
+
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new ApifyError(
+      "Apify hat keinen Profil-Datensatz zurueckgeliefert. Eventuell ist das Profil privat oder der Handle stimmt nicht."
+    );
+  }
+
+  const item = items[0];
+  if (item.error || item.errorDescription) {
+    throw new ApifyError(
+      item.errorDescription ?? item.error ?? "Profil nicht erreichbar."
+    );
+  }
+
+  if (!item.username) {
+    throw new ApifyError(
+      "Apify lieferte ein Item ohne Username — eventuell hat Instagram die Profil-Seite umstrukturiert."
+    );
+  }
+
+  return {
+    username: item.username,
+    fullName: item.fullName ?? null,
+    biography: (item.biography ?? "").trim(),
+    followersCount:
+      typeof item.followersCount === "number" ? item.followersCount : null,
+    followsCount:
+      typeof item.followsCount === "number" ? item.followsCount : null,
+    postsCount: typeof item.postsCount === "number" ? item.postsCount : null,
+    profilePicUrl: item.profilePicUrl ?? null,
+    profilePicUrlHD: item.profilePicUrlHD ?? item.profilePicUrl ?? null,
+    externalUrl: item.externalUrl ?? null,
+    isPrivate: Boolean(item.private),
+    isVerified: Boolean(item.verified),
+    latestPosts: (item.latestPosts ?? [])
+      .filter((p) => p && (p.caption || p.displayUrl))
+      .slice(0, 12)
+      .map((p) => ({
+        caption: (p.caption ?? "").trim(),
+        displayUrl: p.displayUrl ?? null,
+        videoUrl: p.videoUrl ?? null,
+        type: p.type ?? null,
+        hashtags: p.hashtags ?? [],
+      })),
+  };
+}
+
 export async function scrapeInstagramPost(
   url: string
 ): Promise<InstagramPost> {
