@@ -898,17 +898,26 @@ function PatisseriePage({
                 </View>
               ) : null}
               <View style={{ flex: 1 }}>
-                <Text
+                <View
                   style={{
-                    fontFamily: "Fraunces",
-                    fontStyle: "italic",
-                    fontSize: 14,
-                    color: t.ink,
-                    lineHeight: 1.05,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 5,
                   }}
                 >
-                  {brand.signature}
-                </Text>
+                  <Text
+                    style={{
+                      fontFamily: "Fraunces",
+                      fontStyle: "italic",
+                      fontSize: 14,
+                      color: t.ink,
+                      lineHeight: 1.05,
+                    }}
+                  >
+                    {brand.signature}
+                  </Text>
+                  <BeeIcon size={15} />
+                </View>
                 <Text
                   style={{
                     fontSize: 7.5,
@@ -1745,17 +1754,26 @@ function MinimalPage({
               </View>
             ) : null}
             <View>
-              <Text
+              <View
                 style={{
-                  fontFamily: "Fraunces",
-                  fontStyle: "italic",
-                  fontSize: 13,
-                  color: t.ink,
-                  lineHeight: 1.05,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 5,
                 }}
               >
-                {brand.signature}
-              </Text>
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontStyle: "italic",
+                    fontSize: 13,
+                    color: t.ink,
+                    lineHeight: 1.05,
+                  }}
+                >
+                  {brand.signature}
+                </Text>
+                <BeeIcon size={14} />
+              </View>
               <Text
                 style={{
                   fontSize: 7,
@@ -3618,6 +3636,7 @@ function VitalPage({
           >
             {brand.signature}
           </Text>
+          <BeeIcon size={14} />
           <Text
             style={{
               fontSize: 7,
@@ -4535,17 +4554,26 @@ function AmberPage({
             </View>
           ) : null}
           <View>
-            <Text
+            <View
               style={{
-                fontFamily: "Fraunces",
-                fontStyle: "italic",
-                fontSize: 13,
-                color: t.ink,
-                lineHeight: 1.1,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 5,
               }}
             >
-              {brand.signature}
-            </Text>
+              <Text
+                style={{
+                  fontFamily: "Fraunces",
+                  fontStyle: "italic",
+                  fontSize: 13,
+                  color: t.ink,
+                  lineHeight: 1.1,
+                }}
+              >
+                {brand.signature}
+              </Text>
+              <BeeIcon size={14} />
+            </View>
             <Text
               style={{
                 fontSize: 7,

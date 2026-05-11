@@ -978,7 +978,7 @@ export const recipes: Recipe[] = [
     title: "High Protein Kaiserschmarren",
     subtitle: "1 Portion · 431 kcal · 41 g Protein · 10 Min",
     description:
-      "Bienes Kaiserschmarren in 10 Min — schmeckt wie das Original, macht satt und glücklich. Am besten mit Marmelade, Pudererythrit oder Apfelmus.",
+      "Bienes Kaiserschmarren in 10 Min — schmeckt wie das Original, macht satt und glücklich. Am besten mit Marmelade, Erythrit-Puder oder Apfelmus.",
     prepTime: 5,
     cookTime: 5,
     difficulty: "Einfach",
@@ -1000,7 +1000,7 @@ export const recipes: Recipe[] = [
       "Eiklar vorsichtig unter den Teig heben, sodass er möglichst luftig flüssig bleibt.",
       "Pfanne auf mittlerer Hitze erwärmen, mit Ölspray besprühen. Teig hineingeben und mit Deckel ca. 2–3 Min anbraten.",
       "Teig wenden, nochmals kurz anbraten, dann mit einem Pfannenwender in die typischen Kaiserschmarren-Stücke rupfen.",
-      "Mit Marmelade, Pudererythrit oder Apfelmus servieren.",
+      "Heiß aus der Pfanne servieren — am besten mit Marmelade, Erythrit-Puder oder Apfelmus toppen.",
     ],
     nutrition: {
       kcal: 431,

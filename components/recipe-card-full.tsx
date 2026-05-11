@@ -879,10 +879,11 @@ function PatisserieLayout({
             </span>
             <div className="flex flex-1 flex-col leading-tight">
               <span
-                className="font-display text-[15px] italic"
+                className="inline-flex items-center gap-1.5 font-display text-[15px] italic"
                 style={{ color: pack.mood.ink }}
               >
                 {brand.signature}
+                <BeeIcon size={16} />
               </span>
               <span
                 className="text-[10px] font-semibold uppercase tracking-[0.18em]"
@@ -1416,10 +1417,11 @@ function MinimalLayout({
           </span>
           <div className="flex flex-col leading-tight">
             <span
-              className="font-display text-[15px] italic"
+              className="inline-flex items-center gap-1.5 font-display text-[15px] italic"
               style={{ color: pack.mood.ink }}
             >
               {brand.signature}
+              <BeeIcon size={16} />
             </span>
             <span
               className="text-[10px] font-semibold uppercase tracking-[0.18em]"
@@ -2323,10 +2325,11 @@ function VitalLayout({
       <div className="flex flex-wrap items-center justify-between gap-3 px-2 pt-2">
         <div className="flex items-center gap-2.5">
           <span
-            className="font-display text-[16px] italic"
+            className="inline-flex items-center gap-1.5 font-display text-[16px] italic"
             style={{ color: pack.mood.ink }}
           >
             {brand.signature}
+            <BeeIcon size={17} />
           </span>
           <span
             className="text-[10px] font-bold uppercase tracking-[0.18em]"
@@ -2796,10 +2799,11 @@ function AmberLayout({
           </div>
           <div className="flex flex-col leading-tight">
             <span
-              className="font-display text-[16px] italic"
+              className="inline-flex items-center gap-1.5 font-display text-[16px] italic"
               style={{ color: pack.mood.ink }}
             >
               {brand.signature}
+              <BeeIcon size={17} />
             </span>
             <span
               className="text-[10px] font-bold uppercase tracking-[0.18em]"
