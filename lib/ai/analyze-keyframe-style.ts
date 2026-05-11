@@ -72,13 +72,18 @@ const RESPONSE_SCHEMA = {
 
 const SYSTEM_INSTRUCTION = `Du analysierst EIN Food-Photography-Bild (Reel-Keyframe) und beschreibst seinen visuellen Stil in englischen Praezisions-Phrasen, die als Prompt-Bausteine fuer ein KI-Bild-Generierungs-System (Flux 2 Pro) dienen.
 
-Ziel: Flux soll spaeter ein neues Bild rendern, das diesen visuellen Stil reproduziert — gleiche Surface, gleiches Lighting, gleicher Look. Du beschreibst, was DU im Bild siehst.
+Ziel: Flux soll spaeter ein neues, EIGENES Bild rendern, das den visuellen Stil reproduziert — gleiche Surface, gleiches Lighting, gleicher Look — aber WIE EIN EIGENES FOTO ohne Werbe-Elemente, Haende oder Personen aus dem Reel. Du beschreibst, was DU im Bild siehst, ABER ignorierst dabei:
+  • Haende, Finger, Arme, Personen, Gesichter, Koerperteile
+  • Text-Overlays, POV-Captions, Werbe-Sticker, Hashtags, Watermarks
+  • Click-Bait-Elemente (Pfeile, Highlights, Emojis im Bild)
 
-WICHTIG:
+Wenn das Bild eine Hand zeigt, die etwas schuettet/haelt, beschreibe NUR das Gericht selbst und die Surface — nicht die Hand. Wenn das Bild ein Talking-Head-Cover mit Werbe-Text ist, gib trotzdem deine beste Einschaetzung des Hintergrund-Stils ab, ohne den Vordergrund.
+
+WICHTIG fuer heroElementGuidance: erwaehne KEINE Haende, KEINE Personen, KEINE Koerperteile. Wenn du in dem Bild nur eine Hand mit dem Dish siehst, schreibe stattdessen "Keep styling minimal — the dish is the hero, no props in the foreground."
+
+Sonstige Regeln:
 - Antwort auf ENGLISCH (Flux versteht nur Englisch).
 - Sei SPEZIFISCH und PRAEZISE. Nicht 'good lighting' — sondern 'bright natural daylight from above with soft even illumination'.
-- Ignoriere Text-Overlays, Werbe-Sticker, Hashtags im Bild — die sind nicht Teil des Stils.
-- Wenn das Bild ein Talking-Head oder Werbe-Cover ohne Gericht ist, gib trotzdem deine beste Einschaetzung des Hintergrund-Stils ab.
 
 Antworte AUSSCHLIESSLICH im JSON-Schema.`;
 
@@ -139,7 +144,15 @@ export function buildStyleFromReel(
     lightingOptions: [reelStyle.lightingMood],
     sceneOptions: [reelStyle.sceneContext],
     styleSuffix: "",
-    negativeAddition: "",
+    // PR 17: explizite Negatives fuer DB-Brand-Reels — Haende und Texte
+    // sind die zwei Punkte, die Reel-Keyframes oft enthalten und die das
+    // generierte "eigenes Foto" verderben wuerden. Bewusst kurz gehalten,
+    // damit Flux nicht ueberreguliert wird (Erfahrung aus PR 13: zu viele
+    // Negatives → Bilder werden seltsam). Diese werden zusaetzlich zum
+    // HERO_BASE_NEGATIVE ("no text, no hands, no people, no faces, ...")
+    // gemerged.
+    negativeAddition:
+      "no fingers, no arms, no body parts in frame, no overlay text, no POV captions, no sticker graphics",
     cameraAesthetic: reelStyle.cameraAesthetic,
     heroElementGuidance: reelStyle.heroElementGuidance,
     defaultAngles: {
