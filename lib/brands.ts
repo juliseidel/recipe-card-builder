@@ -43,7 +43,7 @@ export const brands: Brand[] = [
     handle: "@bienesfitlife",
     bio: "−20 kg abgenommen · einfache Abnehm-Rezepte ohne Verzicht · High-Protein, fluffig, cremig — und für jeden machbar.",
     tagline: "Abnehmen ohne Verzicht",
-    signature: "Deine Biene 🐝",
+    signature: "Deine Biene",
     avatar: "/brands/biene/avatar.jpg",
     stats: {
       followers: "819K",

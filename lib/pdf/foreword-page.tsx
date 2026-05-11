@@ -3,6 +3,7 @@ import type { Brand } from "@/lib/brands";
 import type { Pack, CardLayout } from "@/lib/packs";
 import type { PackForewordContent } from "@/lib/ai/generate-foreword";
 import { packTheme, fontFamilyForPack, blendWithWhite } from "./theme";
+import { BeeIcon } from "./bee-icon";
 
 // Foreword page sits between cover and index. The booklet moment — what
 // turns a recipe collection into a published-feeling mini-cookbook.
@@ -70,8 +71,8 @@ function AuthorStrip({
         flexDirection: "row",
         alignItems: "center",
         justifyContent,
-        gap: 16,
-        paddingTop: 18,
+        gap: 18,
+        paddingTop: 22,
         borderTopWidth: 0.5,
         borderTopColor: t.divider,
       }}
@@ -80,15 +81,15 @@ function AuthorStrip({
         style={{
           flexDirection: "row",
           alignItems: "center",
-          gap: 12,
+          gap: 14,
         }}
       >
         {avatarDataUri ? (
           <View
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
+              width: 46,
+              height: 46,
+              borderRadius: 23,
               overflow: "hidden",
               borderWidth: 1.5,
               borderColor: t.accent,
@@ -96,40 +97,49 @@ function AuthorStrip({
           >
             <Image
               src={avatarDataUri}
-              style={{ width: 41, height: 41, objectFit: "cover" }}
+              style={{ width: 43, height: 43, objectFit: "cover" }}
             />
           </View>
         ) : null}
         <View>
           <Text
             style={{
-              fontSize: 9,
+              fontSize: 11,
               fontWeight: 600,
-              letterSpacing: 1.4,
-              color: t.inkSoft,
+              letterSpacing: 1.6,
+              color: t.ink,
               textTransform: "uppercase",
             }}
           >
             {brand.name}
           </Text>
           <Text
-            style={{ fontSize: 8.5, color: t.inkSoft, marginTop: 1 }}
+            style={{ fontSize: 9.5, color: t.inkSoft, marginTop: 3 }}
           >
             {brand.handle}
           </Text>
         </View>
       </View>
       {align === "between" ? (
-        <Text
+        <View
           style={{
-            fontFamily: "Fraunces",
-            fontStyle: "italic",
-            fontSize: 18,
-            color: t.ink,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 7,
           }}
         >
-          {brand.signature}
-        </Text>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontStyle: "italic",
+              fontSize: 16,
+              color: t.ink,
+            }}
+          >
+            {brand.signature}
+          </Text>
+          <BeeIcon size={18} />
+        </View>
       ) : null}
     </View>
   );

@@ -34,7 +34,7 @@ export const packForewords: Record<string, PackForewordContent> = {
   "blitz-snacks": {
     greeting: "Hi du.",
     story:
-      "Wenn du Lust auf was Süßes hast, aber keine Stunde Zeit. Hier sind meine 5 liebsten viralen Snacks aus den Reels — fluffiger Kaiserschmarrn, cremige Frozen Cups, zuckerfreie Marzipan-Kugeln. Alle in maximal 15 Minuten machbar, alle perfekt nach dem Training oder als kleine Belohnung zwischendurch.",
+      "Diese fünf Snacks habe ich nicht für die Kamera erfunden — sie sind tatsächlich aus den Momenten entstanden, in denen ich um 16 Uhr Heißhunger auf was Süßes hatte und keine Lust, das halbe Kuchen-Setup aufzubauen. Fluffiger Kaiserschmarrn, der wirklich in zehn Minuten auf dem Teller liegt. Cremige Frozen Cups, die ich Sonntagabend vorbereite, bevor mir wieder einfällt, dass ich Mittwoch was Süßes brauche. Zuckerfreie Marzipan-Kugeln, die ich für die Hand-am-Schreibtisch-Naschmomente entwickelt habe. Alle WPF-tauglich, alle mit echtem Protein-Anteil, alle so simpel, dass du sie auch nach einem 12-Stunden-Tag noch fertigkriegst, ohne dass die Küche aussieht wie nach einer Backstunde.",
     signoff: "Drück dich, dein Kaiserschmarrn wartet schon.",
   },
   "meal-prep-heroes": {

@@ -28,6 +28,7 @@ import {
   type IngredientGroup,
 } from "./helpers";
 import { packTheme, withAlpha, blendWithWhite } from "./theme";
+import { BeeIcon } from "./bee-icon";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public entry — returns a single A4 page rendered in the matching layout.
@@ -5243,16 +5244,19 @@ function CardFooter({
         }}
         fixed
       >
-        <Text
-          style={{
-            fontFamily: "Fraunces",
-            fontSize: 13,
-            fontStyle: italic ? "italic" : "normal",
-            color: brand.tokens.ink,
-          }}
-        >
-          {brand.signature}
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: 13,
+              fontStyle: italic ? "italic" : "normal",
+              color: brand.tokens.ink,
+            }}
+          >
+            {brand.signature}
+          </Text>
+          <BeeIcon size={14} />
+        </View>
 
         <Text
           style={{

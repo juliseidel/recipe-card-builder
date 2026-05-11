@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { BeeIcon } from "./bee-icon";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
 import {
@@ -3470,10 +3471,11 @@ function CardFooter({
         }}
       >
         <span
-          className={`font-display text-[20px] ${italic ? "italic" : ""}`}
+          className={`inline-flex items-center gap-1.5 font-display text-[20px] ${italic ? "italic" : ""}`}
           style={{ color: brand.tokens.ink }}
         >
           {brand.signature}
+          <BeeIcon size={22} />
         </span>
 
       <div className="flex flex-wrap items-center gap-3">

@@ -7,6 +7,7 @@ import { packTheme, withAlpha, blendWithWhite, fontFamilyForPack } from "./theme
 import { pad2, totalTime } from "./helpers";
 import { RecipeCardPdfPage } from "./recipe-card-pdf";
 import { ForewordPage } from "./foreword-page";
+import { BeeIcon } from "./bee-icon";
 
 export type PackPdfProps = {
   brand: Brand;
@@ -226,15 +227,18 @@ function CoverPage({
               {recipes.length} Rezepte
             </Text>
             <Text style={{ fontSize: 10, color: t.inkSoft, opacity: 0.4 }}>·</Text>
-            <Text
-              style={{
-                fontFamily: "Fraunces",
-                fontSize: 12,
-                color: t.ink,
-              }}
-            >
-              {brand.signature}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+              <Text
+                style={{
+                  fontFamily: "Fraunces",
+                  fontSize: 12,
+                  color: t.ink,
+                }}
+              >
+                {brand.signature}
+              </Text>
+              <BeeIcon size={13} />
+            </View>
             <Text style={{ fontSize: 10, color: t.inkSoft, opacity: 0.4 }}>·</Text>
             <Text style={{ fontSize: 10, color: t.inkSoft }}>{brand.handle}</Text>
           </View>
@@ -590,19 +594,28 @@ function OutroPage({
       style={{ backgroundColor: t.bg, fontFamily: "Inter", color: t.ink }}
     >
       <View style={{ flex: 1, padding: 60, justifyContent: "center", alignItems: "center" }}>
-        <Text
+        <View
           style={{
-            fontFamily: "Fraunces",
-            fontStyle: "italic",
-            fontSize: 36,
-            color: t.ink,
-            textAlign: "center",
-            lineHeight: 1.15,
-            maxWidth: 380,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 14,
           }}
         >
-          {brand.signature}
-        </Text>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontStyle: "italic",
+              fontSize: 36,
+              color: t.ink,
+              textAlign: "center",
+              lineHeight: 1.15,
+            }}
+          >
+            {brand.signature}
+          </Text>
+          <BeeIcon size={38} />
+        </View>
         <Text
           style={{
             fontSize: 11,
@@ -663,15 +676,18 @@ function PageFooter({
       }}
       fixed
     >
-      <Text
-        style={{
-          fontFamily: "Fraunces",
-          fontSize: 12,
-          color: brand.tokens.ink,
-        }}
-      >
-        {brand.signature}
-      </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontSize: 12,
+            color: brand.tokens.ink,
+          }}
+        >
+          {brand.signature}
+        </Text>
+        <BeeIcon size={13} />
+      </View>
       <Text
         style={{
           fontSize: 7.5,
