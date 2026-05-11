@@ -1,5 +1,6 @@
 import { logoutAction } from "@/app/login/actions";
 import { BrandSwitcher } from "./brand-switcher";
+import { BrandStyleRefresh } from "./brand-style-refresh";
 
 // Floating Top-Right-Toolbar fuer die App-Shell. Frueher nur der
 // Abmelden-Button — mit der Multi-Tenant-Umstellung kam der Brand-
@@ -18,6 +19,7 @@ export function SiteHeader() {
   return (
     <div className="fixed right-4 top-4 z-50 flex items-center gap-2 lg:right-6 lg:top-6">
       <BrandSwitcher />
+      <BrandStyleRefresh />
       <form action={logoutAction}>
         <button
           type="submit"
