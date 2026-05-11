@@ -3,7 +3,15 @@ import sharp from "sharp";
 import { generateImage, downloadImage } from "./bfl-flux";
 import { generateImageSpec } from "./recipe-image-spec";
 import { buildPrompt } from "./image-prompts";
+import {
+  withBrandImageStyleOverride,
+} from "./brand-image-style";
+import {
+  analyzeKeyframeStyle,
+  buildStyleFromReel,
+} from "./analyze-keyframe-style";
 import { getServerSupabase } from "@/lib/supabase-server";
+import { isCodeBrand } from "@/lib/brands";
 import type { Recipe } from "@/lib/recipes";
 
 // Render-Aufloesung: Flux 2 Pro rendert nativ bei 2048x2048 (statt 1440x1440
@@ -208,13 +216,40 @@ async function uploadKeyframeHero(opts: {
     `[generate-hero] keyframe ${recipeId}: idx=${selection.index}, t=${selection.frame.timestampSeconds}s — ${selection.reasoning.slice(0, 120)}`
   );
 
-  // 3) Flux 2 Pro mit Keyframe als input_image
-  const heroUrl = await uploadReferenceHero({
-    recipe,
-    recipeId,
-    brandSlug,
-    referenceImage: selection.frame.dataUri,
-  });
+  // 3) Pro DB-Brand: aus dem GEWAEHLTEN Keyframe per Vision den visuellen
+  // Stil ableiten (Counter, Lighting, Camera). Diese Tokens werden als
+  // Per-Run-Override eingespeist — getBrandImageStyle picksauber den
+  // Override fuer diesen einen Hero-Run. Bienes Pfad bleibt davon
+  // unangetastet (isCodeBrand-Check).
+  const runReferenceHero = () =>
+    uploadReferenceHero({
+      recipe,
+      recipeId,
+      brandSlug,
+      referenceImage: selection.frame.dataUri,
+    });
+
+  let heroUrl: string | null;
+  if (!isCodeBrand(brandSlug)) {
+    const reelStyle = await analyzeKeyframeStyle(selection.frame.dataUri);
+    if (reelStyle) {
+      console.log(
+        `[generate-hero] reel-style ${recipeId}: scene=${reelStyle.sceneContext.slice(0, 60)}, lighting=${reelStyle.lightingMood.slice(0, 50)}`
+      );
+      const dynamicStyle = buildStyleFromReel(reelStyle, brandSlug);
+      heroUrl = await withBrandImageStyleOverride(
+        dynamicStyle,
+        runReferenceHero
+      );
+    } else {
+      // Vision-Fail → existing brand.imageStyle aus dem Onboarding nutzen
+      // (oder Fallback). Pipeline laeuft normal weiter.
+      heroUrl = await runReferenceHero();
+    }
+  } else {
+    // Code-Brand (Biene) — kein Override, der hardcoded BIENE_STYLE greift
+    heroUrl = await runReferenceHero();
+  }
   if (!heroUrl) return null;
 
   return {

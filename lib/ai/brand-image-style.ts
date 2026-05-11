@@ -141,6 +141,27 @@ const STYLES: Record<string, BrandImageStyle> = {
   biene: BIENE_STYLE,
 };
 
+// ─── Per-Run Style-Override (PR 16) ──────────────────────────────────────────
+// AsyncLocalStorage erlaubt es, fuer einen einzelnen Hero-Generation-Run
+// einen dynamisch aus dem Reel abgeleiteten Style einzuspeisen, ohne die
+// Pipeline-Funktionen umbauen zu muessen. generate-hero.ts wraps den
+// reference-Hero-Call in withBrandImageStyleOverride(reelStyle, ...) und
+// getBrandImageStyle picksauber den Override fuer alle nested Calls
+// (generateImageSpec, buildPrompt, heroPrompt etc.).
+//
+// Nur fuer DB-Brands genutzt — Code-Brands (Biene) gehen direkt durch
+// die STYLES Map ohne Override.
+import { AsyncLocalStorage } from "node:async_hooks";
+
+const styleOverrideStorage = new AsyncLocalStorage<BrandImageStyle>();
+
+export function withBrandImageStyleOverride<T>(
+  style: BrandImageStyle,
+  fn: () => Promise<T>
+): Promise<T> {
+  return styleOverrideStorage.run(style, fn);
+}
+
 // Generic fallback: clean modern minimal — wird genutzt, wenn ein Brand
 // weder im Code definiert ist noch ein DB-imageStyle hat (z. B. frisch
 // onboarded, Vision-Analyse hat keinen sauberen Style erkannt). Vorher
@@ -184,9 +205,11 @@ const FALLBACK_STYLE: Omit<BrandImageStyle, "brandSlug"> = {
   },
 };
 
-// Async-Loader fuer Brand-DNA. Drei Quellen, in dieser Reihenfolge:
+// Async-Loader fuer Brand-DNA. Vier Quellen, in dieser Reihenfolge:
+//   0. Per-Run Override (AsyncLocalStorage) — fuer dynamisch aus Reel
+//      abgeleitete Styles bei DB-Brands (PR 16)
 //   1. Code-Brand (STYLES Map) — Biene, hand-kalibriert
-//   2. DB-Brand mit imageStyle (von der Vision-Analyse beim Onboarding)
+//   2. DB-Brand mit imageStyle (Onboarding-Template aus PR 11)
 //   3. FALLBACK_STYLE (generischer Cookbook-Look)
 //
 // Async, weil DB-Lookup. Caller in der Hero-Pipeline (image-prompts.ts +
@@ -194,6 +217,12 @@ const FALLBACK_STYLE: Omit<BrandImageStyle, "brandSlug"> = {
 export async function getBrandImageStyle(
   brandSlug: string
 ): Promise<BrandImageStyle> {
+  // 0. Per-Run Override (PR 16) — bei DB-Brands wird hier der pro Reel
+  // dynamisch aus dem Keyframe abgeleitete Style eingespeist. Hat absolute
+  // Prioritaet, weil's auf das konkrete Reel zugeschnitten ist.
+  const override = styleOverrideStorage.getStore();
+  if (override) return override;
+
   // Code-Brand zuerst — sync, kein DB-Roundtrip
   const code = STYLES[brandSlug];
   if (code) return code;
