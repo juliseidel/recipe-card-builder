@@ -1,68 +1,562 @@
+"use client";
+
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import type { Brand } from "@/lib/brands";
+import {
+  addCustomBrand,
+  brandSlugTaken,
+  slugifyBrand,
+} from "@/lib/custom-brands";
+import {
+  brandMoodPresets,
+  DEFAULT_BRAND_MOOD_ID,
+  DEFAULT_BRAND_FONTS,
+  DEFAULT_BRAND_STATS,
+} from "@/lib/brand-presets";
 import { SiteHeader } from "@/components/site-header";
+import { BrandHubCard } from "@/components/brand-hub-card";
 
-// Stub fuer das Creator-Onboarding. Die Hub-Card "Neuer Workspace" linkt
-// hierhin — in PR 3 wird die Page zu einer richtigen Form (Avatar-Upload,
-// Bio, Tagline, Mood-Picker, Display-Font). Fuer jetzt zeigt sie nur den
-// Platzhalter, damit die Multi-Tenant-Architektur sichtbar ist, ohne die
-// Onboarding-Mechanik schon ausliefern zu muessen.
+// Creator-Onboarding-Form fuer das Multi-Tenant-Tool. Schritt 3/3 des
+// Hub-Umbaus: hier kommen neue Creator on-the-fly rein, mit Avatar-Upload,
+// Identity-Feldern und Mood-Picker. Live-Preview rechts spiegelt die
+// Hub-Card waehrend des Eingaberumms.
+//
+// Save-Flow:
+//   1. Slug aus dem Namen generieren (slugify, dedup-Counter bei Conflict)
+//   2. Brand-Object zusammenbauen — Tokens aus Mood-Preset, Fonts default
+//   3. addCustomBrand() → Insert in `brands`-Tabelle
+//   4. revalidate(/) → Hub re-rendert mit neuem Creator
+//   5. router.push(`/welcome?brand=<slug>`) → cinematische Welcome-
+//      Animation laeuft mit dem frischen Brand und landet im neuen
+//      Workspace. Genau der "neuer Creator → eigene Animation"-Moment
+//      aus Ingos Brief.
 
-export const dynamic = "force-dynamic";
+export default function NewBrandPage() {
+  const router = useRouter();
 
-export default function NewBrandStubPage() {
+  const [name, setName] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [handle, setHandle] = useState("");
+  const [bio, setBio] = useState("");
+  const [tagline, setTagline] = useState("");
+  const [niche, setNiche] = useState("");
+  const [moodId, setMoodId] = useState(DEFAULT_BRAND_MOOD_ID);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const selectedMood = useMemo(() => {
+    return (
+      brandMoodPresets.find((m) => m.id === moodId)?.tokens ??
+      brandMoodPresets[0].tokens
+    );
+  }, [moodId]);
+
+  // Live-Preview-Brand fuer den BrandHubCard. Slug ist transient — beim
+  // Save berechnen wir ihn nochmal frisch + checken auf Conflicts.
+  const previewBrand: Brand = useMemo(
+    () => ({
+      slug: slugifyBrand(name) || "neuer-creator",
+      name: name.trim() || "Neuer Creator",
+      fullName: fullName.trim() || name.trim() || "Neuer Creator",
+      handle: normalizeHandle(handle) || "@creator",
+      bio:
+        bio.trim() ||
+        "Kurze Beschreibung des Creators — taucht auf der Hub-Card und im Workspace-Hero auf.",
+      tagline: tagline.trim() || "Eigener Workspace im Recipe Card Builder",
+      signature: name.trim() ? `Deine ${name.trim()}` : "Dein Creator",
+      avatar: avatarUrl ?? "",
+      stats: {
+        followers: "",
+        niche: niche.trim() || DEFAULT_BRAND_STATS.niche,
+      },
+      tokens: selectedMood,
+      fonts: DEFAULT_BRAND_FONTS,
+      packCount: 0,
+      recipeCount: 0,
+    }),
+    [name, fullName, handle, bio, tagline, niche, avatarUrl, selectedMood]
+  );
+
+  const requirements = [
+    { label: "Name", ok: name.trim().length >= 2 },
+    { label: "Handle", ok: handle.trim().length >= 2 },
+    { label: "Bio", ok: bio.trim().length >= 10 },
+    { label: "Avatar", ok: Boolean(avatarUrl) },
+  ];
+  const isValid = requirements.every((r) => r.ok);
+
+  const handleAvatarUpload = async (file: File) => {
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("brandSlug", slugifyBrand(name) || "creator");
+      const res = await fetch("/api/brands/avatar-upload", {
+        method: "POST",
+        body: form,
+      });
+      const json = await res.json();
+      if (!res.ok || !json.url) {
+        throw new Error(json.error ?? "Upload fehlgeschlagen");
+      }
+      setAvatarUrl(json.url as string);
+    } catch (err) {
+      setUploadError(
+        err instanceof Error ? err.message : "Upload fehlgeschlagen"
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!isValid || saving) return;
+    setSaving(true);
+    setError(null);
+
+    // Slug-Conflict-Resolution: wenn der Wunsch-Slug bereits genutzt ist
+    // (Code oder DB), haengen wir einen kurzen Hash an. So bleibt der
+    // Slug menschenlesbar (`linas-kueche-x4f`) statt UUID-Suffix.
+    const baseSlug = slugifyBrand(name) || "creator";
+    let slug = baseSlug;
+    if (await brandSlugTaken(slug)) {
+      slug = `${baseSlug}-${Math.random().toString(36).slice(2, 5)}`;
+    }
+
+    const newBrand: Brand = {
+      slug,
+      name: name.trim(),
+      fullName: fullName.trim() || name.trim(),
+      handle: normalizeHandle(handle),
+      bio: bio.trim(),
+      tagline: tagline.trim() || `${name.trim()}s Workspace`,
+      signature: `Deine ${name.trim()}`,
+      avatar: avatarUrl ?? "",
+      stats: {
+        followers: "",
+        niche: niche.trim() || DEFAULT_BRAND_STATS.niche,
+      },
+      tokens: selectedMood,
+      fonts: DEFAULT_BRAND_FONTS,
+      packCount: 0,
+      recipeCount: 0,
+    };
+
+    const saved = await addCustomBrand(newBrand);
+    if (!saved) {
+      setSaving(false);
+      setError(
+        "Konnte den Workspace nicht speichern. Bitte erneut versuchen — eventuell ist die brands-Tabelle in Supabase noch nicht angelegt."
+      );
+      return;
+    }
+
+    // Hub-Cache invalidieren, damit der neue Workspace auf der Uebersicht
+    // sofort auftaucht statt erst nach Cache-TTL.
+    await fetch("/api/brands/revalidate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ brandSlug: saved.slug }),
+    }).catch(() => {
+      /* non-blocking — Cache ticked sich von selbst nach 30s neu */
+    });
+
+    // Cinematic Entry: Welcome-Animation des neuen Creators laeuft, dann
+    // landet der User im frischen Workspace. Genau der "neuer Creator
+    // bekommt seine eigene Animation"-Moment aus dem Pflichtenheft.
+    router.push(`/welcome?brand=${encodeURIComponent(saved.slug)}`);
+  };
+
   return (
-    <div className="flex min-h-screen flex-col bg-canvas text-ink">
+    <div className="flex min-h-screen flex-col bg-canvas">
       <SiteHeader />
-      <main className="flex flex-1 items-center justify-center px-6 py-16">
-        <div
-          className="w-full max-w-xl rounded-[28px] border bg-surface p-10 text-center shadow-sm"
-          style={{ borderColor: "rgba(43, 31, 25, 0.12)" }}
-        >
-          <div
-            className="mx-auto mb-6 flex size-16 items-center justify-center rounded-full"
-            style={{
-              background: "rgba(43, 31, 25, 0.06)",
-              color: "rgba(43, 31, 25, 0.8)",
-            }}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M12 5v14M5 12h14"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
-          <h1 className="font-display text-[32px] leading-tight tracking-[-0.01em]">
-            Neuen Creator anlegen
-          </h1>
-          <p className="mt-3 text-[14px] leading-relaxed text-ink-muted">
-            Das Onboarding-Modul ist auf dem Weg — Avatar-Upload, Bio,
-            Tagline, Mood-Picker, Display-Font. Bis dahin kannst du im
-            Hub mit den bestehenden Workspaces arbeiten.
-          </p>
+
+      <section
+        className="border-b bg-surface"
+        style={{ borderColor: "rgba(43, 31, 25, 0.08)" }}
+      >
+        <div className="mx-auto flex max-w-[1400px] flex-col gap-3 px-6 py-6 sm:flex-row sm:items-center sm:justify-between lg:px-10">
+          <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-ink-muted">
+            <Link href="/" className="opacity-75 hover:opacity-100">
+              Workspace-Hub
+            </Link>
+            <span className="opacity-50">›</span>
+            <span className="font-medium text-ink">Neuer Creator</span>
+          </nav>
           <Link
             href="/"
-            className="mt-8 inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-[13px] font-semibold transition-colors hover:bg-canvas"
-            style={{
-              borderColor: "rgba(43, 31, 25, 0.18)",
-              color: "rgba(43, 31, 25, 0.9)",
-            }}
+            className="self-start text-[12px] font-medium text-ink-muted underline-offset-4 hover:underline sm:self-auto"
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path
-                d="M11 7H3m0 0L6.5 3.5M3 7l3.5 3.5"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Zurueck zum Workspace-Hub
+            Abbrechen
           </Link>
+        </div>
+      </section>
+
+      <main className="flex-1">
+        <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-10 px-6 py-10 lg:grid-cols-[1.05fr_1fr] lg:gap-14 lg:px-10 lg:py-14">
+          {/* ─── FORM ─── */}
+          <div className="flex flex-col gap-8">
+            <header className="flex flex-col gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+                Schritt 3/3 — Hub-Onboarding
+              </span>
+              <h1 className="font-display text-[40px] leading-[1.05] tracking-[-0.015em] text-ink">
+                Neuen Creator anlegen
+              </h1>
+              <p className="text-[14px] leading-relaxed text-ink-muted">
+                Avatar, Name, Handle, ein paar Sätze Bio und ein Mood — und der
+                Workspace ist betriebsbereit. Du landest danach automatisch
+                mit Welcome-Animation in der frischen Identität.
+              </p>
+            </header>
+
+            {/* Section 1 — Identity */}
+            <section className="editor-section editor-card flex flex-col gap-5">
+              <SectionHeader
+                num="01"
+                title="Identität"
+                hint="Wie heißt der Creator, unter welchem Handle ist er auf Instagram?"
+              />
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label="Name" required>
+                  <input
+                    className="editor-input"
+                    type="text"
+                    placeholder='z. B. „Lina"'
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    maxLength={40}
+                  />
+                </Field>
+                <Field label="Voller Name (optional)">
+                  <input
+                    className="editor-input"
+                    type="text"
+                    placeholder='z. B. „Lina Müller"'
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    maxLength={60}
+                  />
+                </Field>
+              </div>
+
+              <Field label="Instagram-Handle" required>
+                <input
+                  className="editor-input"
+                  type="text"
+                  placeholder='z. B. „@linamueller"'
+                  value={handle}
+                  onChange={(e) => setHandle(e.target.value)}
+                  maxLength={40}
+                />
+              </Field>
+
+              <Field label="Niche / Tagline (optional)">
+                <input
+                  className="editor-input"
+                  type="text"
+                  placeholder='z. B. „Fitness · Food · 280K Instagram"'
+                  value={niche}
+                  onChange={(e) => setNiche(e.target.value)}
+                  maxLength={80}
+                />
+              </Field>
+
+              <Field
+                label="Bio"
+                required
+                hint="2–3 Sätze · taucht auf der Hub-Card und im Workspace-Hero auf"
+              >
+                <textarea
+                  className="editor-input min-h-[88px] resize-none"
+                  placeholder='z. B. „Healthy Food Creator, 280K auf Instagram, fokus auf Mealprep und High-Protein-Rezepte für Berufstätige."'
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  maxLength={240}
+                />
+              </Field>
+
+              <Field
+                label="Tagline (optional)"
+                hint="Ein Satz Headline für die Hub-Übersicht"
+              >
+                <input
+                  className="editor-input"
+                  type="text"
+                  placeholder='z. B. „Schnell, sättigend, alltagstauglich"'
+                  value={tagline}
+                  onChange={(e) => setTagline(e.target.value)}
+                  maxLength={80}
+                />
+              </Field>
+            </section>
+
+            {/* Section 2 — Avatar */}
+            <section className="editor-section editor-card flex flex-col gap-5">
+              <SectionHeader
+                num="02"
+                title="Avatar"
+                hint="Profilbild des Creators — landet in der Hub-Card und in der Welcome-Animation."
+              />
+              <div className="flex items-center gap-5">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="relative size-24 shrink-0 overflow-hidden rounded-full border-2 border-dashed transition-all hover:opacity-90"
+                  style={{
+                    borderColor: avatarUrl
+                      ? selectedMood.accent
+                      : "rgba(43, 31, 25, 0.18)",
+                    background: avatarUrl
+                      ? selectedMood.accent + "10"
+                      : "white",
+                  }}
+                >
+                  {avatarUrl ? (
+                    <Image
+                      src={avatarUrl}
+                      alt="Avatar Preview"
+                      fill
+                      sizes="96px"
+                      className="object-cover"
+                      quality={95}
+                    />
+                  ) : (
+                    <span className="grid h-full w-full place-items-center text-[24px] font-display text-ink-muted">
+                      ＋
+                    </span>
+                  )}
+                </button>
+
+                <div className="flex flex-1 flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="self-start rounded-full border border-line bg-canvas px-4 py-2 text-[12px] font-semibold transition-colors hover:bg-canvas-alt disabled:opacity-60"
+                  >
+                    {uploading
+                      ? "Lade hoch…"
+                      : avatarUrl
+                        ? "Anderes Bild wählen"
+                        : "Avatar hochladen"}
+                  </button>
+                  {uploadError ? (
+                    <span className="text-[12px] text-red-600">
+                      {uploadError}
+                    </span>
+                  ) : (
+                    <span className="text-[12px] text-ink-muted">
+                      JPEG / PNG / WebP · max. 8 MB
+                    </span>
+                  )}
+                </div>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void handleAvatarUpload(f);
+                  }}
+                />
+              </div>
+            </section>
+
+            {/* Section 3 — Mood */}
+            <section className="editor-section editor-card flex flex-col gap-5">
+              <SectionHeader
+                num="03"
+                title="Mood"
+                hint="Farbpalette des Workspaces — Background, Akzent und derived Tokens."
+              />
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {brandMoodPresets.map((preset) => {
+                  const isActive = preset.id === moodId;
+                  return (
+                    <button
+                      type="button"
+                      key={preset.id}
+                      onClick={() => setMoodId(preset.id)}
+                      className={`flex flex-col gap-2 rounded-2xl border-2 p-3 text-left transition-all ${
+                        isActive ? "shadow-md" : "hover:border-line"
+                      }`}
+                      style={{
+                        borderColor: isActive
+                          ? preset.tokens.accent
+                          : "rgba(43, 31, 25, 0.12)",
+                        background: preset.tokens.background,
+                      }}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className="size-5 rounded-full"
+                          style={{ background: preset.tokens.accent }}
+                        />
+                        <span
+                          className="size-3 rounded-full"
+                          style={{ background: preset.tokens.signature }}
+                        />
+                      </div>
+                      <span
+                        className="text-[13px] font-semibold"
+                        style={{ color: preset.tokens.ink }}
+                      >
+                        {preset.label}
+                      </span>
+                      <span
+                        className="text-[11px] leading-tight"
+                        style={{ color: preset.tokens.inkMuted }}
+                      >
+                        {preset.hint}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* Save */}
+            <section className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-center gap-3 text-[12px] text-ink-muted">
+                <span className="font-semibold uppercase tracking-[0.14em]">
+                  Pflichtfelder:
+                </span>
+                {requirements.map((req) => (
+                  <span
+                    key={req.label}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 ${
+                      req.ok
+                        ? "bg-green-100 text-green-800"
+                        : "bg-canvas-alt text-ink-subtle"
+                    }`}
+                  >
+                    {req.ok ? "✓" : "○"} {req.label}
+                  </span>
+                ))}
+              </div>
+
+              {error ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-800">
+                  {error}
+                </div>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={!isValid || saving}
+                className="self-start rounded-full px-7 py-3 text-[14px] font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                style={{
+                  background: isValid
+                    ? selectedMood.accent
+                    : "rgba(43, 31, 25, 0.3)",
+                  boxShadow: isValid
+                    ? `0 10px 30px -12px ${selectedMood.accent}`
+                    : "none",
+                }}
+              >
+                {saving
+                  ? "Workspace wird angelegt…"
+                  : "Workspace anlegen & eröffnen"}
+              </button>
+            </section>
+          </div>
+
+          {/* ─── LIVE PREVIEW ─── */}
+          <aside className="lg:sticky lg:top-24 lg:self-start">
+            <div className="flex flex-col gap-3">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
+                Live-Vorschau · Hub-Card
+              </span>
+              <div className="pointer-events-none">
+                <BrandHubCard
+                  brand={previewBrand}
+                  badge="Neu"
+                />
+              </div>
+              <p className="text-[12px] leading-relaxed text-ink-muted">
+                So sieht der Workspace im Hub aus. Nach „Workspace anlegen"
+                läuft automatisch die Welcome-Animation für den neuen
+                Creator — und du landest im frischen{" "}
+                <span className="font-mono">/{previewBrand.slug}</span>{" "}
+                Workspace.
+              </p>
+            </div>
+          </aside>
         </div>
       </main>
     </div>
   );
+}
+
+function SectionHeader({
+  num,
+  title,
+  hint,
+}: {
+  num: string;
+  title: string;
+  hint?: string;
+}) {
+  return (
+    <div className="flex items-baseline gap-3">
+      <span className="editor-section-number font-mono text-[11px] font-semibold tracking-[0.18em] text-ink-subtle">
+        {num}
+      </span>
+      <div className="flex flex-col gap-0.5">
+        <h2 className="font-display text-[22px] leading-tight tracking-[-0.01em] text-ink">
+          {title}
+        </h2>
+        {hint ? (
+          <p className="text-[12.5px] text-ink-muted">{hint}</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  hint,
+  required,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="flex items-center gap-1.5 text-[12px] font-semibold text-ink">
+        {label}
+        {required ? (
+          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-ink-subtle">
+            Pflicht
+          </span>
+        ) : null}
+      </span>
+      {hint ? <span className="text-[11px] text-ink-muted">{hint}</span> : null}
+      {children}
+    </label>
+  );
+}
+
+function normalizeHandle(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  return trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
 }
