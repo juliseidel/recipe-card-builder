@@ -8,7 +8,7 @@ import { getBrandImageStyle } from "./brand-image-style";
 // always frames the dish in its serving vessel with the hero ingredient
 // styled alongside.
 
-export type PromptStyle = "hero" | "lifestyle" | "macro";
+export type PromptStyle = "hero" | "lifestyle";
 
 // Steam suffix appended for hot dishes — Jan's prompts mention this
 // explicitly via "{steamSuffix}" placeholders.
@@ -73,77 +73,75 @@ function backgroundClause(spec: RecipeImageSpec): string {
   return `${spec.sceneContext}, softly out of focus`;
 }
 
-// HERO — Stage 4 in Jan's brief, simplified for the no-reference-image path.
+// HERO — Jan's Prompt #4, mit Brand-Overrides fuer cameraAesthetic +
+// heroElement-Wording.
 //
-// Jan's original closes with a Leica-cookbook body ("Leica SL2 50mm at f/5.6,
-// cookbook-style instagram food photograph, homemade imperfect character
-// preserved from the reference image"). That language assumes Stage 3 has
-// produced a real reel keyframe to anchor the dish's look — without one, it
-// pulls Flux toward magazine-shoot composition rather than the creator's
-// real reel scene. We strip the cookbook body and use the brand's own
-// cameraAesthetic line instead, which for Biene is unstaged-natural with
-// no "phone"/"reel" trigger words (those caused iter-8 to render a headline
-// overlay even with negative prompts).
+// v9-Logik (Jan's Original):
+// - WENN Reference-Image vorhanden (Keyframe oder Cover): NICHT das Gericht
+//   beschreiben. Jan's Prompt #2 sagt explizit "do NOT describe what the
+//   dish looks like". Die Reference uebernimmt die Dish-Beschreibung.
+// - WENN keine Reference (text-only Fallback): Vision-Description vom Cover
+//   einfuegen als Anker, sonst rendert Flux eine generische Version.
+// - Brand-DNA (cameraAesthetic, heroElement, lightingOptions) sind keine
+//   Hard-Constraints sondern Identitaets-Slots in Jan's Template — bleiben
+//   drin, weil sie definieren WIE der Brand aussehen soll, nicht WAS.
 export function heroPrompt(
   recipe: Recipe,
   spec: RecipeImageSpec,
   brandSlug: string,
-  /** Optional: Gemini-Vision-Beschreibung vom echten Reel-Bild
-   *  (lib/ai/describe-instagram-dish.ts). Holistic, ein Satz. */
+  /** Vision-Description vom Reel-Cover (lib/ai/describe-instagram-dish.ts).
+   *  NUR im text-only Fallback genutzt — bei Reference-Path ignoriert,
+   *  weil die Reference das Gericht visuell uebernimmt. */
   dishDescription?: string | null,
-  /** Wenn true, wird Jan's "preserve dish shape and color and garnish
-   *  placement matching the reference image" Wording aktiviert — gilt
-   *  fuer Flux Kontext Pro Calls mit Reference-Image. Sonst (text-only
-   *  Fallback) wird das Reel nicht erwaehnt. */
+  /** True wenn ein input_image an Flux geht. Bei true wird die Vision-
+   *  Description NICHT in den Prompt eingebaut (Jan's Regel) und das
+   *  "homemade imperfect ... matching the reference"-Wording aktiviert. */
   withReferenceImage: boolean = false
 ): string {
   const a = angle(spec, brandSlug);
   const style = getBrandImageStyle(brandSlug);
   const parts: string[] = [
-    `A still-life food photograph of ${recipe.title}, served in a ${spec.servingVessel}, photographed ${a}, on ${spec.sceneContext}.`,
-  ];
-  if (dishDescription && dishDescription.trim()) {
-    // Vision-Description als sekundaerer Anker — die spezifischen
-    // visuellen Details vom echten Reel-Bild.
-    parts.push(
-      `The dish itself: ${dishDescription.trim()}.`
-    );
-  } else if (!withReferenceImage) {
-    // Ohne Vision-Description UND ohne Reference: Backup-Anker, sonst
-    // rendert Flux eine generische Version des Gerichts.
-    parts.push(
-      `The finished dish has visible ${spec.textureFocus} character — true to the recipe.`
-    );
-  }
-  if (withReferenceImage) {
-    // Jan's "preserve reference"-Wording plus eine zusaetzliche Form-
-    // Treue-Anweisung. Flux Kontext interpretiert sonst gerne den
-    // Recipe-Titel ("Cups" → Cupcakes) statt der echten Form aus dem
-    // Reference-Bild zu folgen. Mit diesem expliziten Hinweis sollte
-    // die Form ehrlicher vom Reel uebernommen werden.
-    parts.push(
-      `Homemade imperfect character preserved from the reference image. Dish shape, form, color, and garnish placement must match the reference image exactly — follow the visual reference for the dish's form, do not interpret the recipe title. Environment and lighting re-staged for warmth.`,
-      `Single staging only — one main composition, no demo slice alongside.`
-    );
-  }
-  parts.push(
-    `${spec.heroElement}.`,
+    `${recipe.title}, shown in a ${spec.servingVessel}, ${a} view, placed on ${spec.sceneContext}.`,
+    `${spec.heroElement}, styled deliberately as part of the scene.`,
     `${spec.lightingMood}.`,
-    `${style.cameraAesthetic}, ${toneWord(spec)} tones${steamSuffix(spec)}.`
-  );
+  ];
+
+  if (withReferenceImage) {
+    // Jan's Original-Wording — keine zusaetzlichen Anti-Misinterpretation-
+    // Klauseln. Vertrauen auf die Reference.
+    parts.push(
+      `${style.cameraAesthetic}, ${toneWord(spec)} tones, homemade imperfect character preserved from the reference image, dish shape and color and garnish placement matching the reference, environment and lighting re-staged for warmth${steamSuffix(spec)}.`
+    );
+  } else if (dishDescription && dishDescription.trim()) {
+    // Text-Only-Pfad mit Cover-Beschreibung als Anker
+    parts.push(`The dish itself: ${dishDescription.trim()}.`);
+    parts.push(
+      `${style.cameraAesthetic}, ${toneWord(spec)} tones${steamSuffix(spec)}.`
+    );
+  } else {
+    // Text-Only-Pfad ohne irgendeinen visuellen Anker — Backup ueber
+    // textureFocus aus der Spec, sonst rendert Flux eine generische Version
+    parts.push(
+      `The finished dish has visible ${spec.textureFocus} character.`,
+      `${style.cameraAesthetic}, ${toneWord(spec)} tones${steamSuffix(spec)}.`
+    );
+  }
+
   if (style.styleSuffix) parts.push(`${style.styleSuffix}.`);
   return parts.join(" ");
 }
 
-// Negative covers Flux 2 Pro's typical failure modes for instagram-style
-// food prompts. The brand `negativeAddition` adds creator-specific
-// exclusions on top (for Biene: cast-iron pan, cream counter, title overlay).
-// Nur die wirklich essentiellen Negatives — User-Feedback: Massen-Negatives
-// machen Flux ueberregelmaessig (versucht jede einzeln zu erfuellen). Mit
-// einem Reference-Image braucht's keine Anti-Garnish/Symmetrie-Regeln —
-// das uebernimmt das Reference-Bild von alleine.
+// Negative — Jan's Original-Set mit "Anti-Studio-Look"-Items (no rigid
+// centering, no plastic-looking sauce, no unnatural gloss, no white void
+// background, no cool blue tones, no fluorescent lighting). Die Brand-
+// negativeAddition kommt obendrauf (fuer Biene: kein Petersilien-Garnish,
+// keine Gusspfanne).
+//
+// Memory-Lesson v8: 25+ Items machten Flux ueberregelmaessig. Jan's Set
+// hat ~17 Items — das ist der Sweet-Spot zwischen Studio-Schutz und nicht-
+// uebersteuert.
 const HERO_BASE_NEGATIVE =
-  "no text, no logos, no labels, no packaging, no brand names, no watermark, no hands, no people, no faces, no studio lighting";
+  "no text, no labels, no logos, no packaging, no cartons, no bottles, no jars with labels, no bags, no brand names, no watermark, no hands, no people, no faces, no rigid centering, no plastic-looking sauce, no unnatural gloss, no studio lighting, no white void background, no cool blue tones, no fluorescent lighting";
 
 export function heroNegative(brandSlug: string): string {
   const add = getBrandImageStyle(brandSlug).negativeAddition;
@@ -177,31 +175,17 @@ export function lifestyleNegative(brandSlug: string): string {
   return add ? `${LIFESTYLE_BASE_NEGATIVE}, ${add}` : LIFESTYLE_BASE_NEGATIVE;
 }
 
-// MACRO — Stage 6. Tight close-up. Useful for recipe-detail page accents.
-export function macroPrompt(recipe: Recipe, spec: RecipeImageSpec): string {
-  return [
-    `Tight close-up filling the frame of ${recipe.title}, emphasizing ${spec.textureFocus} textures in detail, soft warm backlight with rim glow and gentle fill from the front, shot on Sony A7IV 90mm macro lens at f/2.8, shallow depth of field, natural food photograph, warm natural color grading, dish matching the recipe.`,
-  ].join(" ");
-}
-
-const MACRO_BASE_NEGATIVE =
-  "no text, no logos, no hands, no people, no packaging, no plastic-looking sauce, no unnatural gloss";
-
-export function macroNegative(brandSlug: string): string {
-  const add = getBrandImageStyle(brandSlug).negativeAddition;
-  return add ? `${MACRO_BASE_NEGATIVE}, ${add}` : MACRO_BASE_NEGATIVE;
-}
-
 export function buildPrompt(
   style: PromptStyle,
   recipe: Recipe,
   spec: RecipeImageSpec,
   brandSlug: string,
-  /** Optionale Gemini-Vision-Beschreibung vom Reel-Bild. Nur hero nutzt
-   *  sie aktuell. */
+  /** Optionale Gemini-Vision-Beschreibung vom Reel-Bild. Nur hero (im
+   *  text-only Fallback) nutzt sie. */
   dishDescription?: string | null,
-  /** Wenn true: heroPrompt aktiviert Jan's "preserve reference"-Wording.
-   *  Gilt fuer Flux Kontext Pro Calls mit referenceImage. */
+  /** Wenn true: heroPrompt aktiviert Jan's "preserve reference"-Wording
+   *  und ignoriert dishDescription (Jan's Regel: do NOT describe the dish
+   *  when a reference image is provided). */
   withReferenceImage: boolean = false
 ): { prompt: string; negative: string } {
   switch (style) {
@@ -209,11 +193,6 @@ export function buildPrompt(
       return {
         prompt: lifestylePrompt(recipe, spec, brandSlug),
         negative: lifestyleNegative(brandSlug),
-      };
-    case "macro":
-      return {
-        prompt: macroPrompt(recipe, spec),
-        negative: macroNegative(brandSlug),
       };
     case "hero":
     default:

@@ -103,7 +103,9 @@ function buildSystemInstruction(brandSlug: string): string {
     ? `- heroElement: ${style.heroElementGuidance}`
     : `- heroElement: a single visually distinctive ingredient from this recipe, presented as a styling element alongside the finished dish. Choose the ingredient that is most recognizable and visually interesting — a colorful vegetable, a fresh herb bundle, a halved fruit, whole nuts, a bunch of greens, or for recipes whose main components are powders/grains/liquids, a small ceramic bowl or small glass of the ingredient. Never render packaging. Never pick items that only exist in packaging (milk carton, yogurt tub, flour bag) unless presented in a bowl or glass. Prefer whole, natural forms over prepared ones. The item must be visible or clearly implied in the finished dish.`;
 
-  return `You analyse a German recipe and return cinematography fields for a single hero food photograph. The values are consumed by a downstream Flux Pro image prompt — they must read as natural English phrases, never as labels or notes.
+  return `You analyse a German recipe and return cinematography fields for a single hero food photograph. The values are consumed by a downstream Flux 2 Pro image prompt — they must read as natural English phrases, never as labels or notes.
+
+IMPORTANT: A reference image of the actual finished dish is provided separately to the image generator. Your fields control the SERVING CONTEXT and SCENE SETUP only — do NOT try to describe what the dish itself looks like (shape, color, texture, garnish on the dish). The reference image handles that. Focus on: vessel, scene, lighting, hero element styled alongside, camera utensil.
 
 Rules:
 ${heroRule}
