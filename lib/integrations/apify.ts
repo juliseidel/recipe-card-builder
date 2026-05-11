@@ -146,12 +146,16 @@ export async function scrapeInstagramProfile(
   const endpoint = `${APIFY_BASE}/acts/${ACTOR_ID}/run-sync-get-dataset-items?token=${apiToken}&format=json`;
 
   // Input-Schema mit resultsType: "details" — der Actor liefert dann
-  // Profil-Metadaten + ein latestPosts-Array. resultsLimit cappt die Posts
-  // (nicht das Profile selbst), 12 deckt PR-5-Vision-Analyse mit Headroom.
+  // Profil-Metadaten + ein latestPosts-Array. resultsLimit auf 30 erweitert
+  // (PR 7): bei Reels-fokussierten Creators sind viele Cover-displayUrls
+  // Talking-Heads mit Werbe-Overlays. Mehr Posts erhoehen die Chance,
+  // dass mindestens ein paar saubere Dish-Shots dabei sind ODER dass
+  // genug Reels mit videoUrl da sind, aus denen ffmpeg saubere Hero-
+  // Frames extrahieren kann.
   const body = {
     directUrls: [profileUrl],
     resultsType: "details",
-    resultsLimit: 12,
+    resultsLimit: 30,
   };
 
   const controller = new AbortController();
@@ -253,7 +257,7 @@ export async function scrapeInstagramProfile(
     isVerified: Boolean(item.verified),
     latestPosts: (item.latestPosts ?? [])
       .filter((p) => p && (p.caption || p.displayUrl))
-      .slice(0, 12)
+      .slice(0, 30)
       .map((p) => ({
         caption: (p.caption ?? "").trim(),
         displayUrl: p.displayUrl ?? null,
