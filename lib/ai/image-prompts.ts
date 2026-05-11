@@ -100,17 +100,35 @@ export function heroPrompt(
 ): string {
   const a = angle(spec, brandSlug);
   const style = getBrandImageStyle(brandSlug);
-  const parts: string[] = [
-    `${recipe.title}, shown in a ${spec.servingVessel}, ${a} view, placed on ${spec.sceneContext}.`,
-    `${spec.heroElement}, styled deliberately as part of the scene.`,
-    `${spec.lightingMood}.`,
-  ];
+
+  // Vessel-Handling:
+  // - Bei Reference-Path: Vessel kommt NICHT in den Prompt. Gemini extrahiert
+  //   das Vessel aus den Preparation-Steps (z. B. "muffin tin" weil "In Form
+  //   einfuellen"), aber das ist oft das Vorbereitungs-Gefaess, nicht das
+  //   echte Serving-Gefaess (das im Reel zu sehen ist). Wenn beide nicht
+  //   matchen, kaempft der Prompt-Text gegen die Reference und Flux mischt
+  //   (z. B. Muffin-Form MIT Cups drauf). Loesung: Vessel weglassen, Reference
+  //   uebernimmt das automatisch — wir verstaerken das mit "vessel matching
+  //   the reference" weiter unten.
+  // - Bei Text-Only: Vessel BLEIBT im Prompt (Flux hat sonst keinen Anker).
+  const parts: string[] = withReferenceImage
+    ? [
+        `${recipe.title}, ${a} view, placed on ${spec.sceneContext}.`,
+        `${spec.heroElement}, styled deliberately as part of the scene.`,
+        `${spec.lightingMood}.`,
+      ]
+    : [
+        `${recipe.title}, shown in a ${spec.servingVessel}, ${a} view, placed on ${spec.sceneContext}.`,
+        `${spec.heroElement}, styled deliberately as part of the scene.`,
+        `${spec.lightingMood}.`,
+      ];
 
   if (withReferenceImage) {
-    // Jan's Original-Wording — keine zusaetzlichen Anti-Misinterpretation-
-    // Klauseln. Vertrauen auf die Reference.
+    // Vessel explizit in die "matching the reference" Klausel — sonst koennte
+    // Flux das Vessel kreativ interpretieren statt aus der Reference zu
+    // uebernehmen. Restliche Klausel ist Jan's Original-Wording.
     parts.push(
-      `${style.cameraAesthetic}, ${toneWord(spec)} tones, homemade imperfect character preserved from the reference image, dish shape and color and garnish placement matching the reference, environment and lighting re-staged for warmth${steamSuffix(spec)}.`
+      `${style.cameraAesthetic}, ${toneWord(spec)} tones, homemade imperfect character preserved from the reference image, dish shape, color, serving vessel and garnish placement matching the reference, environment and lighting re-staged for warmth${steamSuffix(spec)}.`
     );
   } else if (dishDescription && dishDescription.trim()) {
     // Text-Only-Pfad mit Cover-Beschreibung als Anker
