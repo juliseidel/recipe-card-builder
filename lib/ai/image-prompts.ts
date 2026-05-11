@@ -87,12 +87,30 @@ function backgroundClause(spec: RecipeImageSpec): string {
 export function heroPrompt(
   recipe: Recipe,
   spec: RecipeImageSpec,
-  brandSlug: string
+  brandSlug: string,
+  /** Optional: Gemini-Vision-Beschreibung vom echten Reel-Bild
+   *  (lib/ai/describe-instagram-dish.ts). Wenn vorhanden, wird sie
+   *  prominent als zweiter Satz eingebaut — damit Flux weiss, wie das
+   *  Gericht tatsaechlich aussehen soll (Form, Farbe, Garnish), nicht
+   *  nur "irgendein Kaiserschmarren". Loest Ingo-Feedback "die Bilder
+   *  matchen nicht das Reel". */
+  dishDescription?: string | null
 ): string {
   const a = angle(spec, brandSlug);
   const style = getBrandImageStyle(brandSlug);
-  const parts = [
+  const parts: string[] = [
     `A still-life food photograph of ${recipe.title}, served in a ${spec.servingVessel}, photographed ${a}, on ${spec.sceneContext}.`,
+  ];
+  // Wenn wir das echte Reel gesehen haben — Form/Farbe/Garnish direkt in
+  // den Prompt, prominent vor dem rest. Flux 2 Pro respektiert spezifische
+  // visuelle Beschreibungen wesentlich staerker als generische
+  // textureFocus-Adjektive.
+  if (dishDescription && dishDescription.trim()) {
+    parts.push(
+      `The dish itself looks like this — match these visual specifics: ${dishDescription.trim()}.`
+    );
+  }
+  parts.push(
     // textureFocus drives the dish's visible character (creamy/melty/crispy/
     // golden) — without it Flux renders a generically "correct" version of
     // the dish that misses the recipe's signature look. Iter 12 had this
@@ -101,8 +119,8 @@ export function heroPrompt(
     `The finished dish has visible ${spec.textureFocus} character — true to the recipe.`,
     `${spec.heroElement}.`,
     `${spec.lightingMood}.`,
-    `${style.cameraAesthetic}, ${toneWord(spec)} tones${steamSuffix(spec)}.`,
-  ];
+    `${style.cameraAesthetic}, ${toneWord(spec)} tones${steamSuffix(spec)}.`
+  );
   if (style.styleSuffix) parts.push(`${style.styleSuffix}.`);
   return parts.join(" ");
 }
@@ -164,7 +182,11 @@ export function buildPrompt(
   style: PromptStyle,
   recipe: Recipe,
   spec: RecipeImageSpec,
-  brandSlug: string
+  brandSlug: string,
+  /** Optionale Gemini-Vision-Beschreibung vom Reel-Bild. Nur hero nutzt
+   *  sie aktuell — lifestyle/macro sind General-Purpose-Slots und brauchen
+   *  keine 1:1-Reel-Treue. */
+  dishDescription?: string | null
 ): { prompt: string; negative: string } {
   switch (style) {
     case "lifestyle":
@@ -180,7 +202,7 @@ export function buildPrompt(
     case "hero":
     default:
       return {
-        prompt: heroPrompt(recipe, spec, brandSlug),
+        prompt: heroPrompt(recipe, spec, brandSlug, dishDescription),
         negative: heroNegative(brandSlug),
       };
   }
