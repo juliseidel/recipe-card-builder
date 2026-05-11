@@ -100,9 +100,9 @@ export const recipeHeroes: Record<string, string> = {
     "https://gejrjcwuqaspgwtakwho.supabase.co/storage/v1/object/public/recipe-heroes/956b97d5-c209-44d3-9b9c-d842bedb8b79.jpg?v=v9.4",
 
   // Lokale Flux-Heroes — 3 Rezepte ohne sourceUrl, kein Reel-Cover vorhanden
-  "drei-zutaten-eisbowl": "/brands/biene/heroes/drei-zutaten-eisbowl.jpg?v=v9.4",
-  "xl-mexican-bowl": "/brands/biene/heroes/xl-mexican-bowl.jpg?v=v9.4",
-  "xxl-frueh-cookie": "/brands/biene/heroes/xxl-frueh-cookie.jpg?v=v9.4",
+  "drei-zutaten-eisbowl": "/brands/biene/heroes/drei-zutaten-eisbowl.jpg",
+  "xl-mexican-bowl": "/brands/biene/heroes/xl-mexican-bowl.jpg",
+  "xxl-frueh-cookie": "/brands/biene/heroes/xxl-frueh-cookie.jpg",
 };
 
 // Helper that returns the hero URL for a recipe slug, or undefined if no
