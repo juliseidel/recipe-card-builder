@@ -3,7 +3,8 @@
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getBrand } from "@/lib/brands";
+import { type Brand } from "@/lib/brands";
+import { getBrandClient } from "@/lib/custom-brands";
 import { getPacksForBrand, type Pack } from "@/lib/packs";
 import { addCustomPack, slugifyPack } from "@/lib/custom-packs";
 import { moodPresets, displayFontOptions } from "@/lib/pack-presets";
@@ -21,7 +22,22 @@ type PackEditorPageProps = {
 
 export default function NewPackPage({ params }: PackEditorPageProps) {
   const { brand: brandSlug } = use(params);
-  const brand = getBrand(brandSlug);
+  // Brand wird async geladen — getBrandClient checked sowohl Code-Brands
+  // (Biene) als auch DB-Brands (Supabase brands-Tabelle). Vorher war das
+  // ein sync getBrand-Call, der DB-Brands ignoriert hat — Folge: User
+  // klickt aus einem DB-Brand-Workspace auf "Neuer Pack" und sah
+  // "Workspace nicht gefunden". Drei-Zustand-State: undefined = Loading,
+  // null = wirklich nicht gefunden, Brand = ready.
+  const [brand, setBrand] = useState<Brand | null | undefined>(undefined);
+  useEffect(() => {
+    let active = true;
+    void getBrandClient(brandSlug).then((b) => {
+      if (active) setBrand(b ?? null);
+    });
+    return () => {
+      active = false;
+    };
+  }, [brandSlug]);
   const router = useRouter();
   const staticPacks = useMemo(() => getPacksForBrand(brandSlug), [brandSlug]);
 
@@ -132,6 +148,16 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
   const missingCount = requirements.filter((r) => !r.ok).length;
   const isValid = missingCount === 0;
 
+  if (brand === undefined) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <SiteHeader />
+        <main className="flex flex-1 items-center justify-center text-ink-muted">
+          Workspace wird geladen…
+        </main>
+      </div>
+    );
+  }
   if (!brand) {
     return (
       <div className="flex min-h-screen flex-col">
