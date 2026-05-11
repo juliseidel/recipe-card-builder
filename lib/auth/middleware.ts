@@ -26,6 +26,9 @@ const PUBLIC_PATHS = [
   "/welcome",
   "/submission",
   "/api/pdf",
+  // /api/admin/* checked Auth selber via Bearer-Token mit SUPABASE_SERVICE_ROLE_KEY.
+  // Wird nur fuer einmalige Bulk-Operationen (z. B. Hero-Reseed) gebraucht.
+  "/api/admin",
   "/icon.svg",
   "/apple-icon",
 ];
