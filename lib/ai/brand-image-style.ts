@@ -115,7 +115,7 @@ export const BIENE_STYLE: BrandImageStyle = {
   // klar funktioniert besser; die "main ingredient"-Auswahl ueberlassen
   // wir Gemini's Intuition.
   heroElementGuidance:
-    "A complete English phrase describing the scene: 'a small wooden cutting board with a small ceramic bowl of [main recipe ingredient in its most photogenic natural form] sits softly in the background, behind the dish'. The cutting board is a separate prop in the background, never under the dish itself.",
+    "A complete English phrase describing the scene: 'a small light beige natural blond-wood cutting board with a small white ceramic bowl of [main recipe ingredient in its most photogenic natural form] sits softly in the background, behind the dish'. The cutting board is a separate prop in the background, never under the dish itself. The wood is pale and natural, not dark walnut or warm-stained; the bowl is plain white ceramic, small and unfussy.",
   // Per-shape angle overrides. Calibrated against Bienes real reels:
   // pasta-bowls and plated mains shoot top-down (most of her content),
   // layered desserts (cheesecake, tiramisu) shoot 30° three-quarter so
