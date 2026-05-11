@@ -1883,27 +1883,21 @@ export async function getRecipesForPack(
   packSlug: string
 ): Promise<Recipe[]> {
   const fromCode = staticRecipesForPack(packSlug);
-  const codeSlugs = new Set(fromCode.map((r) => r.slug));
 
   // Single gecachter DB-Roundtrip (30s TTL). Pack-Page navigation ist
   // wieder fluessig — wiederholte Visits in 30s gehen aus Memory.
   const dbRows = await getPackDbRows(packSlug);
 
-  // Hero-Override fuer static recipes
-  const staticWithDbHero = fromCode.map((r) => {
+  // Returnt NUR die statischen Recipes mit DB-Hero-Override.
+  // Custom Recipes (is_custom=true) werden client-side via
+  // getCustomRecipesForPack() vom RecipeGrid + NutritionOverview geladen
+  // — wenn wir sie hier auch returnen wuerden, gaeben Page-Renders doppelte
+  // Karten (Server-static-plus-custom-Array + Client-fetched-custom-Array,
+  // beide gemerged via mergeAndRenumber → jede Custom-Karte doppelt).
+  return fromCode.map((r) => {
     const row = dbRows.find((x) => x.recipe_slug === r.slug);
     return row?.hero ? { ...r, hero: withHeroCacheBust(row.hero) } : r;
   });
-
-  // Custom recipes (is_custom=true), die nicht in der static-Liste sind
-  const dbOnly = dbRows
-    .filter((row) => row.data && !codeSlugs.has(row.recipe_slug))
-    .map((row) => row.data as Recipe);
-
-  if (dbOnly.length === 0) return staticWithDbHero;
-  return [...staticWithDbHero, ...dbOnly].sort(
-    (a, b) => a.number - b.number
-  );
 }
 
 export async function getRecipe(
