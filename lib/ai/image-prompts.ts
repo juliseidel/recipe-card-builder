@@ -89,11 +89,13 @@ export function heroPrompt(
   spec: RecipeImageSpec,
   brandSlug: string,
   /** Optional: Gemini-Vision-Beschreibung vom echten Reel-Bild
-   *  (lib/ai/describe-instagram-dish.ts). Wenn vorhanden, wird sie
-   *  prominent als zweiter Satz eingebaut — damit Flux weiss, wie das
-   *  Gericht tatsaechlich aussehen soll (Form, Farbe, Garnish), nicht
-   *  nur "irgendein Kaiserschmarren". */
-  dishDescription?: string | null
+   *  (lib/ai/describe-instagram-dish.ts). Holistic, ein Satz. */
+  dishDescription?: string | null,
+  /** Wenn true, wird Jan's "preserve dish shape and color and garnish
+   *  placement matching the reference image" Wording aktiviert — gilt
+   *  fuer Flux Kontext Pro Calls mit Reference-Image. Sonst (text-only
+   *  Fallback) wird das Reel nicht erwaehnt. */
+  withReferenceImage: boolean = false
 ): string {
   const a = angle(spec, brandSlug);
   const style = getBrandImageStyle(brandSlug);
@@ -101,22 +103,28 @@ export function heroPrompt(
     `A still-life food photograph of ${recipe.title}, served in a ${spec.servingVessel}, photographed ${a}, on ${spec.sceneContext}.`,
   ];
   if (dishDescription && dishDescription.trim()) {
+    // Vision-Description als sekundaerer Anker — die spezifischen
+    // visuellen Details vom echten Reel-Bild.
     parts.push(
-      // Wenn wir das echte Reel gesehen haben: Form/Farbe/Garnish-Anker
-      // — Flux 2 Pro folgt spezifischen visuellen Beschreibungen
-      // wesentlich treuer als generischen Adjektiven.
-      `The dish should match these visual specifics, especially the exact color tone: ${dishDescription.trim()}.`,
-      // Jan's Original-Wording "homemade imperfect character preserved" —
-      // verhindert, dass Flux das Bild zu clean/symmetrisch macht (z. B.
-      // exakt eine Himbeere pro Kaiserschmarren-Stueck statt natuerlich
-      // verstreuter Frucht). Plus: kurzer Single-Staging-Hinweis.
-      `Keep the homemade, naturally imperfect character — asymmetric garnish, organic placement, not every piece identically topped. Single staging only — one main composition, no demo slice or duplicate plating alongside.`
+      `The dish itself: ${dishDescription.trim()}.`
     );
-  } else {
-    // Ohne Vision-Description nutzen wir textureFocus als Backup-Anker
-    // (sonst rendert Flux eine generische Version des Gerichts).
+  } else if (!withReferenceImage) {
+    // Ohne Vision-Description UND ohne Reference: Backup-Anker, sonst
+    // rendert Flux eine generische Version des Gerichts.
     parts.push(
       `The finished dish has visible ${spec.textureFocus} character — true to the recipe.`
+    );
+  }
+  if (withReferenceImage) {
+    // Jan's Original-Wording aus Prompt #4 — zwingt Flux Kontext, das
+    // Gericht 1:1 vom Reference-Image zu uebernehmen, nur Umgebung und
+    // Licht werden neu gestagt. Ohne diesen Satz interpretiert Flux
+    // Kontext die Reference zu kreativ.
+    parts.push(
+      `Homemade imperfect character preserved from the reference image, dish shape and color and garnish placement matching the reference, environment and lighting re-staged for warmth.`,
+      // Anti-Bienenfee-Doppelung: falls das Reel selbst die Doppel-
+      // Staging zeigt, soll Flux nur eine Anrichtung uebernehmen.
+      `Single staging only — one main composition, no demo slice alongside.`
     );
   }
   parts.push(
@@ -190,9 +198,11 @@ export function buildPrompt(
   spec: RecipeImageSpec,
   brandSlug: string,
   /** Optionale Gemini-Vision-Beschreibung vom Reel-Bild. Nur hero nutzt
-   *  sie aktuell — lifestyle/macro sind General-Purpose-Slots und brauchen
-   *  keine 1:1-Reel-Treue. */
-  dishDescription?: string | null
+   *  sie aktuell. */
+  dishDescription?: string | null,
+  /** Wenn true: heroPrompt aktiviert Jan's "preserve reference"-Wording.
+   *  Gilt fuer Flux Kontext Pro Calls mit referenceImage. */
+  withReferenceImage: boolean = false
 ): { prompt: string; negative: string } {
   switch (style) {
     case "lifestyle":
@@ -208,7 +218,13 @@ export function buildPrompt(
     case "hero":
     default:
       return {
-        prompt: heroPrompt(recipe, spec, brandSlug, dishDescription),
+        prompt: heroPrompt(
+          recipe,
+          spec,
+          brandSlug,
+          dishDescription,
+          withReferenceImage
+        ),
         negative: heroNegative(brandSlug),
       };
   }

@@ -43,55 +43,69 @@ export type GenerateHeroResult = {
  * Top-Level Entry-Point. Returnt die public-URL des hochgeladenen JPEGs
  * oder null, wenn nichts klappt.
  *
- * Pipeline (2026-05-11 nachmittags v2):
+ * Pipeline (v5 — Jan's Hybrid-Approach):
  *
  *   IF sourceUrl vorhanden UND !forceFlux:
  *     1) Apify scraped Reel-Cover (displayUrl)
- *     2) Gemini 2.5 Flash Vision beschreibt NUR das Gericht
- *        ("a stack of fluffy golden Kaiserschmarren pieces dusted with
- *         powdered sugar, served with red strawberry compote alongside")
- *     3) heroPrompt baut diese Beschreibung prominent in den Flux-Prompt
- *     4) Flux 2 Pro text-only generiert: Brand-Style-Staging plus das
- *        spezifische Gericht
+ *     2) Gemini 2.5 Flash Vision beschreibt NUR das Gericht in einem
+ *        natuerlichen englischen Satz (holistic, kein Stichpunkt-Check)
+ *     3) Flux Kontext Pro generiert mit:
+ *        - Reference-Image: displayUrl (1:1 das echte Reel-Bild)
+ *        - Text-Prompt: Brand-Style + Vision-Description + Jan's
+ *          "preserve dish shape and color and garnish placement matching
+ *          the reference image" Wording
+ *     → Das Gericht wird visuell vom Reference-Bild uebernommen,
+ *       Umgebung und Licht werden im Brand-Style neu gestagt.
  *
- *   ELSE (kein sourceUrl ODER forceFlux ODER Vision failt):
- *     → wie bisher: nur Recipe-Text → Spec → text-only Flux
- *
- * Loest Ingo-Feedback: "die Bilder vom Reel matchen nicht mit den Bildern
- * vom Rezept". Vorher generierte Flux "irgendeinen Kaiserschmarren";
- * jetzt sieht Gemini erst das echte Reel und gibt Flux einen konkreten
- * visuellen Anker. Brand-Style (Steinplatte, Holzunterlage, Hero-Element)
- * bleibt aus dem Image-Spec.
- *
- * Die uploadKeyframeBasedHero-Funktion (Image-to-Image mit Flux Kontext)
- * bleibt im Code als dead code, falls wir spaeter doch Reference-Image
- * brauchen — z. B. fuer Komposition-treue. Aktuell ist Text-Description
- * der bessere Ansatz, weil Flux Kontext zu kreativ interpretiert.
+ *   ELSE (kein sourceUrl ODER forceFlux):
+ *     → text-only Flux 2 Pro mit Brand-DNA-Prompt (kein Reel-Match,
+ *       Flux interpretiert das Gericht aus dem Recipe-Text).
  */
 export async function generateHeroForRecipe(
   opts: GenerateHeroOpts
 ): Promise<GenerateHeroResult | null> {
-  const dishDescription = await maybeDescribeDishFromReel(opts);
+  const reelData = await maybeDescribeDishFromReel(opts);
+
+  if (reelData && reelData.displayUrl) {
+    const heroUrl = await uploadKontextHero({
+      recipe: opts.recipe,
+      recipeId: opts.recipeId,
+      brandSlug: opts.brandSlug,
+      dishDescription: reelData.description,
+      referenceImageUrl: reelData.displayUrl,
+    });
+    if (heroUrl) {
+      return {
+        heroUrl,
+        source: "flux-text-only",
+        dishDescription: reelData.description ?? undefined,
+      };
+    }
+    // Wenn Kontext failt, weiter mit text-only Fallback
+    console.warn("[generate-hero] kontext failed, falling back to text-only");
+  }
+
   const heroUrl = await uploadTextOnlyFluxHero(
     opts.recipe,
     opts.recipeId,
     opts.brandSlug,
-    dishDescription
+    reelData?.description ?? null
   );
   if (!heroUrl) return null;
   return {
     heroUrl,
     source: "flux-text-only",
-    dishDescription: dishDescription ?? undefined,
+    dishDescription: reelData?.description ?? undefined,
   };
 }
 
 // Optional-Step vor Flux: wenn das Rezept aus Instagram stammt, Reel-Cover
-// laden und Gemini Vision das Gericht beschreiben lassen. Bei jedem Fehler
-// (Apify down, Bild nicht ladbar, Vision schweigt) graceful auf null.
+// laden + Gemini Vision das Gericht beschreiben lassen. Returnt sowohl
+// die Description als auch die displayUrl, damit der Aufrufer beides
+// nutzen kann (description fuer text-prompt, displayUrl als reference).
 async function maybeDescribeDishFromReel(
   opts: GenerateHeroOpts
-): Promise<string | null> {
+): Promise<{ description: string | null; displayUrl: string | null } | null> {
   if (opts.forceFlux) return null;
   if (!opts.recipe.sourceUrl) return null;
 
@@ -111,7 +125,7 @@ async function maybeDescribeDishFromReel(
         `[generate-hero] vision-desc ${opts.recipeId}: ${desc.slice(0, 140)}`
       );
     }
-    return desc;
+    return { description: desc, displayUrl: post.displayUrl };
   } catch (err) {
     console.warn(
       "[generate-hero] vision pre-step failed, continuing without:",
@@ -119,6 +133,49 @@ async function maybeDescribeDishFromReel(
     );
     return null;
   }
+}
+
+// ─── Path A (v5 default): Flux Kontext Pro mit Reference-Image ─────────────
+// Reel-Cover-URL geht als image_prompt direkt an BFL — das Gericht wird
+// 1:1 vom Reference uebernommen, Umgebung und Licht werden neu gestagt.
+async function uploadKontextHero(opts: {
+  recipe: Recipe;
+  recipeId: string;
+  brandSlug: string;
+  dishDescription: string | null;
+  referenceImageUrl: string;
+}): Promise<string | null> {
+  if (!process.env.BFL_API_KEY) {
+    console.warn("[generate-hero] BFL_API_KEY missing");
+    return null;
+  }
+  const { recipe, recipeId, brandSlug, dishDescription, referenceImageUrl } =
+    opts;
+
+  const spec = await generateImageSpec(recipe, brandSlug);
+  const { prompt, negative } = buildPrompt(
+    "hero",
+    recipe,
+    spec,
+    brandSlug,
+    dishDescription,
+    true // withReferenceImage — aktiviert Jan's "preserve reference" Wording
+  );
+
+  const result = await generateImage({
+    prompt,
+    negativePrompt: negative,
+    model: "flux-kontext-pro",
+    aspectRatio: "1:1",
+    outputFormat: "jpeg",
+    safetyTolerance: 2,
+    referenceImage: referenceImageUrl,
+  });
+  const buf = await downloadImage(result.imageUrl);
+
+  const supabase = getServerSupabase();
+  await ensureHeroBucket(supabase);
+  return await uploadJpeg(supabase, recipeId, buf);
 }
 
 // ─── Path A: Keyframe-basiert ──────────────────────────────────────────────
