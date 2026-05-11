@@ -4,7 +4,7 @@ import {
   ApifyError,
   scrapeInstagramProfile,
 } from "@/lib/integrations/apify";
-import { analyzeCreatorVisualStyle } from "@/lib/ai/analyze-creator-style";
+import { analyzeCreatorStyleFromText } from "@/lib/ai/analyze-creator-style";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 import type { Brand } from "@/lib/brands";
 
@@ -31,10 +31,9 @@ import type { Brand } from "@/lib/brands";
 //   5. revalidate Workspace + Hub
 
 export const runtime = "nodejs";
-// PR 7: Reel-Frame-Mining via ffmpeg (4 Reels parallel ~20-25s) + Gemini
-// Pro Vision (~20-30s) + Apify (~15s) = ~60-75s typisch. 120s gibt
-// Headroom fuer Cold-Starts + Vercel-Lambda-Limits.
-export const maxDuration = 120;
+// PR 11: Text-basierter Style-Selector statt Vision. Apify ~15s +
+// Gemini Flash Text ~3-5s = ~20s typisch. 60s gibt Headroom.
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   if (!process.env.APIFY_TOKEN) {
@@ -127,20 +126,16 @@ export async function POST(req: Request) {
     `[regenerate-style] @${handle}: ${profile.latestPosts.length} posts vom Apify`
   );
 
-  // ─── 3. Vision-Analyzer ─────────────────────────────────────────────────
-  const imageStyle = await analyzeCreatorVisualStyle(profile.latestPosts);
-  if (!imageStyle) {
-    return NextResponse.json(
-      {
-        error:
-          "Vision-Analyse hat keinen klaren Brand-Style erkennen koennen. Eventuell hat der Creator zu wenige saubere Dish-Shots in den letzten Posts (haupsaechlich Talking-Head-Reels mit Werbe-Overlays). Versuche es spaeter erneut, wenn neue Posts da sind.",
-        stage: "analyze",
-        postsAvailable: profile.latestPosts.length,
-        withDisplayUrl: profile.latestPosts.filter((p) => p.displayUrl).length,
-      },
-      { status: 422 }
-    );
-  }
+  // ─── 3. Text-basierter Style-Selector (PR 11) ───────────────────────────
+  // Pivot weg von Gemini Pro Vision (das reliable 400 INVALID_ARGUMENT
+  // warf). Gemini Flash waehlt aus 6 vorgefertigten Brand-Style-Templates,
+  // bei Fail deterministic keyword-match. Returnt IMMER einen Style —
+  // kein 422 mehr.
+  const styleResult = await analyzeCreatorStyleFromText({ profile });
+  const imageStyle = styleResult.style;
+  console.log(
+    `[regenerate-style] @${handle} picked "${styleResult.templateId}" via ${styleResult.source}: ${styleResult.reasoning.slice(0, 200)}`
+  );
 
   // ─── 4. Brand-Row updaten ───────────────────────────────────────────────
   // Defensive: read-modify-write damit wir andere Felder (Stats etc.) nicht
@@ -174,8 +169,10 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     brandSlug: brand.slug,
+    templateId: styleResult.templateId,
+    source: styleResult.source,
+    reasoning: styleResult.reasoning,
     lightingCount: imageStyle.lightingOptions.length,
     sceneCount: imageStyle.sceneOptions.length,
-    cameraAesthetic: imageStyle.cameraAesthetic.slice(0, 120),
   });
 }

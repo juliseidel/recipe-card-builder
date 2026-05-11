@@ -4,7 +4,7 @@ import {
   scrapeInstagramProfile,
 } from "@/lib/integrations/apify";
 import { analyzeCreatorIdentity } from "@/lib/ai/analyze-creator-identity";
-import { analyzeCreatorVisualStyle } from "@/lib/ai/analyze-creator-style";
+import { analyzeCreatorStyleFromText } from "@/lib/ai/analyze-creator-style";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 
 // Onboarding-Helper-Endpoint. Frontend tippt nur den Instagram-Handle,
@@ -18,12 +18,12 @@ import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 //      die Form-Felder, latestPosts gehen in PR 5 weiter fuer die
 //      Brand-DNA-Vision-Analyse
 //
-// Vercel-Lambda: Apify (~10-20s) + Gemini-Identity (~3-5s) + Avatar (~2s)
-// + Gemini-Vision-Style (~15-25s) — parallel ergibt das ~30-40s typisch.
-// 120s Lambda-Cap gibt Headroom fuer Cold-Starts.
+// Vercel-Lambda: Apify (~10-20s) + Gemini-Identity-Flash (~3-5s) +
+// Avatar-Upload (~2s) + Gemini-Text-Style-Flash (~3-5s) — parallel ~20-25s
+// typisch. 60s gibt Headroom (PR 11: Pivot weg von Vision).
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 const AVATAR_BUCKET = "brand-avatars";
 const ACCEPTED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -113,17 +113,16 @@ export async function POST(req: Request) {
     }
   }
 
-  // ─── 3. Identitaet + Visual-Style parallel ──────────────────────────────
+  // ─── 3. Identitaet + Style parallel ─────────────────────────────────────
   // Identity-Analyse: Gemini Flash, Bio + Captions → Brand-Felder (~3-5s)
-  // Visual-Style-Analyse: Gemini Pro multimodal, 6-8 Reel-Covers →
-  //   BrandImageStyleOverride (Lighting, Scene, Camera, etc. ~15-25s)
-  // Beide unabhaengig — `Promise.allSettled` damit ein Fail im einen den
-  // anderen nicht abwuergt. Style-Failure ist tolerierbar (Pipeline-
-  // Fallback uebernimmt generischen Style); Identity-Failure ist hart
-  // (User landet mit halb-leerem Form, das ist die Quick-Start-Erwartung).
+  // Style-Selektion (PR 11): Text-basiert (kein Vision) — Gemini Flash
+  //   waehlt aus 6 vorgefertigten Brand-Style-Templates anhand Bio +
+  //   Captions + Hashtags. Falls Flash fail't: deterministic keyword
+  //   match. Funktioniert IMMER, Style wird IMMER in brand.imageStyle
+  //   gespeichert.
   const [identitySettled, styleSettled] = await Promise.allSettled([
     analyzeCreatorIdentity(profile),
-    analyzeCreatorVisualStyle(profile.latestPosts),
+    analyzeCreatorStyleFromText({ profile }),
   ]);
 
   if (identitySettled.status === "rejected") {
@@ -147,14 +146,19 @@ export async function POST(req: Request) {
   }
 
   const identity = identitySettled.value;
-  const imageStyle =
+  const styleResult =
     styleSettled.status === "fulfilled" ? styleSettled.value : null;
+  const imageStyle = styleResult?.style ?? null;
   if (styleSettled.status === "rejected") {
     console.warn(
-      "[analyze-instagram] visual-style analyse failed:",
+      "[analyze-instagram] style selection failed unexpectedly:",
       styleSettled.reason instanceof Error
         ? styleSettled.reason.message
         : styleSettled.reason
+    );
+  } else if (styleResult) {
+    console.log(
+      `[analyze-instagram] style picked: ${styleResult.templateId} (${styleResult.source})`
     );
   }
 
