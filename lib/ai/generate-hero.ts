@@ -165,11 +165,9 @@ async function uploadKontextHero(opts: {
   const result = await generateImage({
     prompt,
     negativePrompt: negative,
-    // flux-kontext-max: hoehere Fidelity-Variante derselben Image-to-Image-
-    // Architektur. $0.06 statt $0.04 pro Bild, ~30 % laenger — aber
-    // deutlich treuer zum Reference-Image, was die Detail-Treue (Farbe,
-    // Form, Anordnung) gegenueber Pro spuerbar verbessert.
-    model: "flux-kontext-max",
+    // flux-kontext-pro: Image-to-Image mit Reference. Max-Variante haben
+    // wir getestet, hat aber die Bilder nicht treuer gemacht — Pro reicht.
+    model: "flux-kontext-pro",
     aspectRatio: "1:1",
     outputFormat: "jpeg",
     safetyTolerance: 2,
