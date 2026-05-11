@@ -65,8 +65,15 @@ export async function POST(req: Request) {
   // (Origin), damit es sowohl auf Vercel-Prod als auch auf Preview-URLs
   // automatisch passt. Localhost wuerde Apify natuerlich nicht erreichen
   // — fuer lokale Tests muesste man ngrok nutzen.
+  //
+  // APIFY_WEBHOOK_SECRET: optionaler Defense-in-Depth-Check. Wenn gesetzt,
+  // bauen wir den Secret als Query-Param in die Webhook-URL ein, sodass
+  // Apify ihn beim Callback mitschickt. Endpoint validiert das.
   const origin = new URL(req.url).origin;
-  const webhookUrl = `${origin}/api/apify-webhook`;
+  const webhookSecret = process.env.APIFY_WEBHOOK_SECRET;
+  const webhookUrl = webhookSecret
+    ? `${origin}/api/apify-webhook?secret=${encodeURIComponent(webhookSecret)}`
+    : `${origin}/api/apify-webhook`;
 
   try {
     const { runId } = await startReelBackfill({

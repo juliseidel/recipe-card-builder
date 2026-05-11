@@ -57,7 +57,12 @@ export async function GET(req: Request) {
   }
 
   const origin = new URL(req.url).origin;
-  const webhookUrl = `${origin}/api/apify-webhook`;
+  // Identisches Secret-Handling wie in /api/brands/backfill — Apify muss
+  // den Secret beim Callback mitschicken, sonst gibt der Webhook 403.
+  const webhookSecret = process.env.APIFY_WEBHOOK_SECRET;
+  const webhookUrl = webhookSecret
+    ? `${origin}/api/apify-webhook?secret=${encodeURIComponent(webhookSecret)}`
+    : `${origin}/api/apify-webhook`;
 
   const results: Array<{
     brandSlug: string;
