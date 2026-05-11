@@ -331,7 +331,12 @@ async function uploadJpeg(
     return null;
   }
   const { data } = supabase.storage.from(HERO_BUCKET).getPublicUrl(filePath);
-  return data.publicUrl ?? null;
+  if (!data.publicUrl) return null;
+  // Cache-Bust: jeder Re-Roll bekommt einen frischen ?t=<ms> Suffix. Sonst
+  // sieht Vercel Image Optimization dieselbe URL und liefert das alte
+  // optimierte Bild aus dem CDN-Cache, obwohl wir das underlying JPEG
+  // gerade ueberschrieben haben (Supabase upsert behaelt den filePath).
+  return `${data.publicUrl}?t=${Date.now()}`;
 }
 
 async function ensureHeroBucket(supabase: SupabaseClient): Promise<void> {

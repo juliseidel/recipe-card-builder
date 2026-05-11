@@ -1840,9 +1840,20 @@ export async function getRecipe(
   packSlug: string,
   recipeSlug: string
 ): Promise<Recipe | undefined> {
-  // Code wins. Only consult the DB for slugs that aren't in the static list.
+  // Code wins fuer das Rezept-Inhalt (Title, Steps, Nutrition etc.). ABER:
+  // das hero-Feld bekommt eine Ausnahme — wenn der Operator den
+  // "KI-Alternative"-Button im Detail-View geklickt hat, hat der enrich-
+  // Endpoint ein frisches Hero in die DB geschrieben. Das wollen wir
+  // sehen, sonst ist der Re-Roll-Button unsichtbar (Map ueberschreibt
+  // immer den DB-Eintrag). Loesung: static recipes laden, dann fuer das
+  // hero-Feld einen 1-Spalten-DB-Query nachlegen und wenn da ein hero
+  // ist, ueberschreiben.
   const fromCode = staticRecipe(packSlug, recipeSlug);
-  if (fromCode) return fromCode;
+  if (fromCode) {
+    const dbHero = await fetchDbHero(packSlug, recipeSlug);
+    if (dbHero) return { ...fromCode, hero: dbHero };
+    return fromCode;
+  }
 
   try {
     const { getServerSupabase, hasServerSupabase } = await import(
@@ -1862,6 +1873,35 @@ export async function getRecipe(
   } catch (err) {
     console.warn("[recipes] DB load failed", err);
     return undefined;
+  }
+}
+
+// Liest NUR data.hero aus der DB-Row eines statischen Rezepts. Wird vom
+// getRecipe()-Pfad genutzt, damit ein per "KI-Alternative" neu generiertes
+// Hero die Map ueberschreiben kann. Returnt null wenn keine Row, keine DB
+// oder kein hero-Feld gesetzt — dann fallt der Code-Pfad auf die Map zurueck.
+async function fetchDbHero(
+  packSlug: string,
+  recipeSlug: string
+): Promise<string | null> {
+  try {
+    const { getServerSupabase, hasServerSupabase } = await import(
+      "./supabase-server"
+    );
+    if (!hasServerSupabase()) return null;
+    const supabase = getServerSupabase();
+    const { data, error } = await supabase
+      .from("recipes")
+      .select("data")
+      .eq("pack_slug", packSlug)
+      .eq("recipe_slug", recipeSlug)
+      .eq("is_custom", false)
+      .maybeSingle();
+    if (error || !data) return null;
+    const recipe = (data as { data: Recipe }).data;
+    return recipe?.hero ?? null;
+  } catch {
+    return null;
   }
 }
 
