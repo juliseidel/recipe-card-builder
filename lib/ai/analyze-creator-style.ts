@@ -282,7 +282,7 @@ export async function analyzeCreatorVisualStyle(
     });
   }
 
-  const t0 = Date.now();
+  const tVision = Date.now();
   let raw: BrandImageStyleOverride;
   try {
     raw = await callGeminiMultimodal<BrandImageStyleOverride>({
@@ -300,7 +300,7 @@ export async function analyzeCreatorVisualStyle(
       retries: 1,
     });
     console.log(
-      `[analyze-style] gemini-pro durch in ${Date.now() - t0}ms`
+      `[analyze-style] gemini-pro durch in ${Date.now() - tVision}ms`
     );
   } catch (err) {
     console.error(
