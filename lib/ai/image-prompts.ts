@@ -137,11 +137,12 @@ export function heroPrompt(
 // Negative covers Flux 2 Pro's typical failure modes for instagram-style
 // food prompts. The brand `negativeAddition` adds creator-specific
 // exclusions on top (for Biene: cast-iron pan, cream counter, title overlay).
-// Bewusst konsolidiert: jede Regel einmal, keine 5-fach-Variationen. Zu
-// viele Negatives macht Flux ueberregelmaessig — er versucht jede einzeln
-// zu erfuellen und rendert "zu clean" (z. B. exakt symmetrisches Garnish).
+// Nur die wirklich essentiellen Negatives — User-Feedback: Massen-Negatives
+// machen Flux ueberregelmaessig (versucht jede einzeln zu erfuellen). Mit
+// einem Reference-Image braucht's keine Anti-Garnish/Symmetrie-Regeln —
+// das uebernimmt das Reference-Bild von alleine.
 const HERO_BASE_NEGATIVE =
-  "no text, no labels, no logos, no packaging, no brand names, no hands, no people, no faces, no studio lighting, no white void background, no cool blue tones, no fluorescent lighting, no plastic-looking sauce, no unnatural gloss, no watermark, no duplicate dishes, no demo slice alongside, no two plating versions, no overly symmetric garnish placement, no identical perfectly arranged pieces";
+  "no text, no logos, no labels, no packaging, no brand names, no watermark, no hands, no people, no faces, no studio lighting";
 
 export function heroNegative(brandSlug: string): string {
   const add = getBrandImageStyle(brandSlug).negativeAddition;

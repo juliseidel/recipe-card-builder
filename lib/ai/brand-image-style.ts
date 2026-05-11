@@ -87,8 +87,12 @@ export const BIENE_STYLE: BrandImageStyle = {
   // negate it aggressively here. "no parsley" alone wasn't enough in
   // testing — it kept rendering loose green leaves which look like parsley
   // even if Flux semantically classed them as something else.
+  // Nur die brand-spezifischen Negatives, die wirklich helfen.
+  // Frueher waren hier 25+ Items mit vielen Variationen ("no parsley sprigs",
+  // "no scattered parsley on counter", "no scattered parsley on board", ...).
+  // Konsolidiert auf 3 Kernregeln — der Rest macht Flux ueberregelmaessig.
   negativeAddition:
-    "no styled food magazine, no decorative props, no recipe title overlay, no large letters in the image, no instagram caption text, no cast-iron pan as the main vessel, no frying pan, no skillet, no cream-coloured counter, no oak wood counter, no marble counter, no beige countertop, no parsley anywhere in the image, no parsley sprigs, no scattered parsley on the counter, no scattered parsley on the cutting board, no decorative green herbs around the dish, no random green leaves on the countertop, no scattered greenery, no scattered herbs of any kind, no fresh herb garnish that is not part of this recipe, no basil leaves on the counter, no mint leaves on the counter, no garnish in the ingredient bowl",
+    "no parsley or scattered herbs around the dish, no cast-iron pan as vessel, no recipe title text overlay",
   // No "smartphone reel" or "phone" — both trigger Flux 2 Pro's reel-frame
   // mode, which renders headline overlays. "Natural unstaged" gets the
   // same look without the trigger word.
@@ -103,8 +107,12 @@ export const BIENE_STYLE: BrandImageStyle = {
   // MAIN HEADLINE INGREDIENT (the thing that NAMES the dish — cheese for
   // cheese-pasta, blueberries for blueberry-cheesecake, eggs for an
   // omelette). NEVER parsley, herbs, salt, oil or garnish in the bowl.
+  // Bienes Signature-Framing in einem klaren Satz — frueher 300+ Woerter
+  // mit Beispielen + sechs Negationen. Das ueberforderte Flux. Knapp und
+  // klar funktioniert besser; die "main ingredient"-Auswahl ueberlassen
+  // wir Gemini's Intuition.
   heroElementGuidance:
-    "Return a complete English phrase. Fill in the recipe's MAIN HEADLINE INGREDIENT — the ingredient that NAMES the dish — in its MOST PHOTOGENIC AND ICONIC FORM (e.g. for 'Käse-Nudeln': grated parmesan or shaved hard cheese, NEVER sliced processed cheese or sandwich cheese; for 'Erdbeer-Cheesecake': fresh whole strawberries, NEVER strawberry sauce; for 'Banana-Bread-Pudding': fresh sliced banana, NEVER bottled banana sauce; for 'Schoko-Biskuitrolle': cocoa powder or chocolate shavings, NEVER pre-made chocolate sauce). NEVER pick parsley, herbs, salt, oil, or any garnish — those are NOT main ingredients. The phrase: 'separately on the counter in the soft upper background of the scene sits a small wooden cutting board, and on top of that cutting board rests a small ceramic bowl of [MAIN HEADLINE INGREDIENT IN ITS MOST PHOTOGENIC FORM]'. The cutting board sits on the counter as a SEPARATE prop in the background — the dish bowl is in the foreground, NOT placed on top of the cutting board. Both the cutting board AND the small ingredient bowl MUST be present — that is Biene's signature framing. The countertop around the dish stays clean — NO scattered herbs, NO scattered green leaves, NO decorative greenery anywhere outside the dish itself.",
+    "A complete English phrase describing the scene: 'a small wooden cutting board with a small ceramic bowl of [main recipe ingredient in its most photogenic natural form] sits softly in the background, behind the dish'. The cutting board is a separate prop in the background, never under the dish itself.",
   // Per-shape angle overrides. Calibrated against Bienes real reels:
   // pasta-bowls and plated mains shoot top-down (most of her content),
   // layered desserts (cheesecake, tiramisu) shoot 30° three-quarter so

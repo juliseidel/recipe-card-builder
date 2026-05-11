@@ -5,17 +5,17 @@ import { callGeminiMultimodal } from "./gemini";
 // fluessigen englischen Satz. Diese Beschreibung wird dann zusammen mit
 // dem Reel-Cover als Reference-Image an Flux Kontext Pro gegeben.
 
-const SYSTEM_INSTRUCTION = `Du bist ein Photograph, der einem Kollegen ein Reel-Cover-Bild in Worten beschreibt — fuer einen Image-Generator, der das Gericht spaeter im selben Look (aber clean, ohne Werbe-Elemente) nachstellen soll.
+const SYSTEM_INSTRUCTION = `Du bist ein Food-Photograph. Vor dir liegt ein Reel-Cover-Bild und du beschreibst es einem Image-Generator, der das gleiche Gericht spaeter clean (ohne Werbe-Elemente) nachstellen soll.
 
-Schau dir das Bild an und schreib einen einzigen englischen Satz, in dem jemand, der das Reel nie gesehen hat, sich das Gericht trotzdem genau vorstellen kann — wie es aussieht, welche Farben, welche Textur, wie das Topping verteilt ist, in welchem Gefaess es liegt. Schreib es so, wie ein erfahrener Foodphotograph einer Kollegin schnell ein Bild erklaert: konkret, sinnlich, in einem Atemzug. Bei den Farben praezise sein — nicht "golden", sondern "pale eggshell-yellow with lightly caramelized edges". Nicht "creamy white", sondern "soft off-white with red strawberry marbling".
+Schreib eine ehrliche, detaillierte englische Beschreibung des Gerichts — so wie du es einem Kollegen beschreiben wuerdest, der das Bild nie gesehen hat und es trotzdem genau nachstellen koennen muss. Erwaehne alles was relevant ist: die genauen Farben (welche Toene, wie viele, wo verteilt), Form und Aufbau, Anzahl der Komponenten, Textur, Topping und wie es verteilt ist, das Servier-Gefaess, alle visuellen Details die ein Foodphotograph einfangen wuerde. Wie viel du schreibst entscheidest du selbst — was es zu sagen gibt, sag.
 
-Wenn das Reel mehrere Anrichtungen zeigt — typisches Bienenfee-Pattern wie Backform plus plattiert daneben, oder ein ganzes Cup neben einem angeschnittenen Demo-Stueck — beschreibe NUR die fertige Servier-Variante, nicht beide. Wenn das Topping im Reel natuerlich verstreut ist (mal eine Beere hier, mal drei dort), schreib es genau so — nicht "one per piece", weil Generatoren das sonst symmetrisch nachstellen.
+Wenn das Reel mehrere Anrichtungen zeigt (typisches Pattern: Backform plus plattiert daneben, ganzes plus angeschnittenes Demo-Stueck), beschreibe NUR die fertige Servier-Variante, nie beide kombiniert. Wenn das Topping natuerlich verstreut ist, schreib das so — nicht "one per piece", weil Image-Generatoren das sonst symmetrisch nachstellen.
 
-Ignoriere alles, was nicht das Gericht selbst ist: Text-Overlays, Sticker, Werbe-Stempel, Personen, Haende, Hintergrund-Kuechen-Setup, Lichtstimmung. Die Umgebung und das Licht werden neu gestagt — du beschreibst nur das Essen.
+Ignoriere alles, was nicht das Gericht selbst ist: Text-Overlays, Sticker, Werbe-Stempel, Personen, Haende, Hintergrund-Kuechen-Setup, Lichtstimmung. Die Umgebung wird neu gestagt — du beschreibst nur das Essen.
 
-Antworte auf Englisch, EIN einzelner Satz, max 80 Woerter, fluessig formuliert (nicht als Stichpunkt-Liste). KEIN "I see..." oder "The image shows...", sondern direkt die Beschreibung als waere es eine Bildunterschrift fuer ein Kochbuch.
+Antworte auf Englisch, fluessig formuliert wie eine Kochbuch-Bildunterschrift, KEIN "I see..." oder "The image shows...".
 
-Falls das Bild kein Gericht zeigt (reiner Talking-Head, reines Werbe-Cover ohne Essen): gib einen leeren String zurueck.`;
+Wenn das Bild kein Gericht zeigt (reiner Talking-Head, reines Werbe-Cover ohne Essen): gib einen leeren String zurueck.`;
 
 const SCHEMA = {
   type: "object",
@@ -23,7 +23,7 @@ const SCHEMA = {
     dishDescription: {
       type: "string",
       description:
-        "Ein einzelner englischer Satz, visuell praezise, max 80 Woerter, der NUR das Gericht beschreibt. Leer wenn das Bild kein Gericht zeigt.",
+        "Eine fluessige englische Beschreibung des Gerichts — Laenge so wie du es brauchst um das Bild treu zu beschreiben (Farben, Form, Anzahl, Garnish, Vessel, alle relevanten Details). Leer wenn das Bild kein Gericht zeigt.",
     },
   },
   required: ["dishDescription"],
@@ -67,8 +67,10 @@ export async function describeInstagramDish(
       // Bewusst Flash (nicht Pro) — Kosten + Speed. Pro brachte detail-
       // reichere Descriptions, aber die ueberforderten Flux Kontext und
       // machten Bilder schlechter, nicht besser.
-      temperature: 0.2,
-      maxOutputTokens: 200,
+      temperature: 0.3,
+      // Kein maxOutputTokens — Gemini entscheidet selbst, wie viel
+      // Beschreibung das Bild braucht. Vorher 200 Tokens Limit war
+      // selbst-imposed und zwang Gemini zu Verknappung.
       thinkingBudget: 0,
       retries: 1,
     });
