@@ -92,8 +92,7 @@ export function heroPrompt(
    *  (lib/ai/describe-instagram-dish.ts). Wenn vorhanden, wird sie
    *  prominent als zweiter Satz eingebaut — damit Flux weiss, wie das
    *  Gericht tatsaechlich aussehen soll (Form, Farbe, Garnish), nicht
-   *  nur "irgendein Kaiserschmarren". Loest Ingo-Feedback "die Bilder
-   *  matchen nicht das Reel". */
+   *  nur "irgendein Kaiserschmarren". */
   dishDescription?: string | null
 ): string {
   const a = angle(spec, brandSlug);
@@ -101,27 +100,26 @@ export function heroPrompt(
   const parts: string[] = [
     `A still-life food photograph of ${recipe.title}, served in a ${spec.servingVessel}, photographed ${a}, on ${spec.sceneContext}.`,
   ];
-  // Wenn wir das echte Reel gesehen haben — Form/Farbe/Garnish direkt in
-  // den Prompt, prominent vor dem rest. Flux 2 Pro respektiert spezifische
-  // visuelle Beschreibungen wesentlich staerker als generische
-  // textureFocus-Adjektive.
   if (dishDescription && dishDescription.trim()) {
     parts.push(
-      `The dish itself looks like this — match these visual specifics exactly, especially the color tone: ${dishDescription.trim()}.`,
-      // Anti-Duplikat: Flux 2 Pro neigt dazu, das Gericht zweimal ins
-      // Bild zu stellen (Backform plus plattiert, ganzes Stueck plus
-      // angeschnittenes Demo-Stueck), weil Reels diesen Pattern zeigen.
-      // Wir muessen explizit: nur EINE Anrichtung, KEINE Demo-Slice.
-      `Show the dish in a single staging — exactly one main composition, exactly one serving variant. No second portion alongside, no cross-section demo slice next to it, no whole-plus-cut comparison. The hero element (fruit bowl, garnish bowl) sits in the background as accent, not as a second plating of the dish.`
+      // Wenn wir das echte Reel gesehen haben: Form/Farbe/Garnish-Anker
+      // — Flux 2 Pro folgt spezifischen visuellen Beschreibungen
+      // wesentlich treuer als generischen Adjektiven.
+      `The dish should match these visual specifics, especially the exact color tone: ${dishDescription.trim()}.`,
+      // Jan's Original-Wording "homemade imperfect character preserved" —
+      // verhindert, dass Flux das Bild zu clean/symmetrisch macht (z. B.
+      // exakt eine Himbeere pro Kaiserschmarren-Stueck statt natuerlich
+      // verstreuter Frucht). Plus: kurzer Single-Staging-Hinweis.
+      `Keep the homemade, naturally imperfect character — asymmetric garnish, organic placement, not every piece identically topped. Single staging only — one main composition, no demo slice or duplicate plating alongside.`
+    );
+  } else {
+    // Ohne Vision-Description nutzen wir textureFocus als Backup-Anker
+    // (sonst rendert Flux eine generische Version des Gerichts).
+    parts.push(
+      `The finished dish has visible ${spec.textureFocus} character — true to the recipe.`
     );
   }
   parts.push(
-    // textureFocus drives the dish's visible character (creamy/melty/crispy/
-    // golden) — without it Flux renders a generically "correct" version of
-    // the dish that misses the recipe's signature look. Iter 12 had this
-    // gap: Käse-Nudeln came out as plain pasta because "creamy, melty" was
-    // never injected into the prompt.
-    `The finished dish has visible ${spec.textureFocus} character — true to the recipe.`,
     `${spec.heroElement}.`,
     `${spec.lightingMood}.`,
     `${style.cameraAesthetic}, ${toneWord(spec)} tones${steamSuffix(spec)}.`
@@ -133,8 +131,11 @@ export function heroPrompt(
 // Negative covers Flux 2 Pro's typical failure modes for instagram-style
 // food prompts. The brand `negativeAddition` adds creator-specific
 // exclusions on top (for Biene: cast-iron pan, cream counter, title overlay).
+// Bewusst konsolidiert: jede Regel einmal, keine 5-fach-Variationen. Zu
+// viele Negatives macht Flux ueberregelmaessig — er versucht jede einzeln
+// zu erfuellen und rendert "zu clean" (z. B. exakt symmetrisches Garnish).
 const HERO_BASE_NEGATIVE =
-  "no text, no labels, no logos, no packaging, no cartons, no bottles, no jars with labels, no bags, no brand names, no hands, no people, no faces, no rigid centering, no plastic-looking sauce, no unnatural gloss, no studio lighting, no white void background, no cool blue tones, no fluorescent lighting, no headline at the bottom of the image, no large letters anywhere, no typography, no watermark, no duplicate dishes, no multiple plating versions, no two servings of the same dish, no demonstration shot alongside finished shot, no before-and-after staging, no cross-section view alongside finished serving, no opened slice next to whole serving, no demo cut showing the interior, no second piece on a plate next to a baking tray, no half-portion as visual demo";
+  "no text, no labels, no logos, no packaging, no brand names, no hands, no people, no faces, no studio lighting, no white void background, no cool blue tones, no fluorescent lighting, no plastic-looking sauce, no unnatural gloss, no watermark, no duplicate dishes, no demo slice alongside, no two plating versions, no overly symmetric garnish placement, no identical perfectly arranged pieces";
 
 export function heroNegative(brandSlug: string): string {
   const add = getBrandImageStyle(brandSlug).negativeAddition;

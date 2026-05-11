@@ -45,7 +45,7 @@ BESCHREIBE praezise und kompakt diese EINE Anrichtung:
 - Form / Aufbau: z.B. "small fluffy ripped-up pieces", "a stack of round flat discs"
 - HAUPTFARBE praezise (siehe oben): konkrete Farb-Adjektive
 - Textur / Konsistenz: cremig, knusprig, fluffig, glaenzend, krustig, saftig
-- Topping / Garnierung: z.B. "dusted with powdered sugar", "topped with raspberries", "with a small glass bowl of berry compote alongside"
+- Topping / Garnierung mit NATUERLICHEM Verteilungs-Pattern: z.B. "raspberries scattered irregularly across the pieces, not one per piece" — nicht "topped with one raspberry per piece" (das macht Flux ueberregelmaessig). Wenn das Reel die Frucht/Garnish in einer kleinen Schale daneben hat, sag das so.
 - Serving-Vessel: das eine echte Servier-Gefaess (NICHT die Backform UND den Teller — entscheide dich)
 
 IGNORIERE STRENG:
