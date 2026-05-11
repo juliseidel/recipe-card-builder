@@ -19,83 +19,11 @@ import type { InstagramProfilePost } from "@/lib/integrations/apify";
 // uns die ~3x Latenz von Pro leisten — die DNA wird nur einmal pro
 // Creator generiert.
 
-// Gemini API ist beim responseSchema strikt — minItems/maxItems +
-// nested objects ohne required-Feld haben fuer 400 INVALID_ARGUMENT
-// gesorgt. Schema vereinfacht: keine min/max-Constraints (wir slicen
-// post-process), defaultAngles als FLACHES Feld-Set mit ALLEN required
-// (Gemini will alle nested properties als required-Liste).
-const RESPONSE_SCHEMA = {
-  type: "object",
-  properties: {
-    lightingOptions: {
-      type: "array",
-      items: { type: "string" },
-      description:
-        "Bis zu 5 englische Lighting-Strings (Gemini-Enum fuer Stage 2). Format: 'warm morning light streaming from the left with soft shadows' oder 'cool diffused daylight with even illumination'. Variiere direction/intensity/color-temperature. NIE generisch 'natural light' — immer Detail.",
-    },
-    sceneOptions: {
-      type: "array",
-      items: { type: "string" },
-      description:
-        "Bis zu 5 englische Scene-Strings — Surface, auf der das Essen steht. Format: 'a smooth pale-grey concrete kitchen counter' oder 'a warm walnut wooden cutting board'. 5 Varianten desselben Materials wenn der Creator nur eine Surface nutzt.",
-    },
-    styleSuffix: {
-      type: "string",
-      description:
-        "Optionaler English Suffix der an jeden Hero-Prompt angehaengt wird. Ein oder zwei Saetze. Leerer String wenn nicht noetig.",
-    },
-    negativeAddition: {
-      type: "string",
-      description:
-        "Comma-separated englische Negative-Items spezifisch fuer diesen Creator. Was sieht man NIE in seinen Bildern? z.B. 'no parsley, no cast-iron pan'. Max 5 Items, leer wenn keine.",
-    },
-    cameraAesthetic: {
-      type: "string",
-      description:
-        "Ein English Satz zum Camera-Setup. Pick je nach Look: 'natural unstaged food photograph, modern minimal styling, homemade-feeling' vs. 'Shot on Leica SL2 50mm at f/5.6, cookbook-style with intentional styling'.",
-    },
-    heroElementGuidance: {
-      type: "string",
-      description:
-        "English Beschreibung wo+wie der Creator Hero-Zutat/Garnish platziert. Wenn kein konsistentes Pattern: leerer String.",
-    },
-    angleFlat: {
-      type: "string",
-      description:
-        "Camera-Angle fuer flat dishes (pizza, pancake). z.B. 'from a high overhead angle looking down (about 75 degrees)'. Leer wenn unklar.",
-    },
-    angleLayered: {
-      type: "string",
-      description: "Camera-Angle fuer layered dishes (lasagna, layer cake).",
-    },
-    angleTall: {
-      type: "string",
-      description: "Camera-Angle fuer tall dishes (burger, muffin).",
-    },
-    angleLiquid: {
-      type: "string",
-      description: "Camera-Angle fuer liquid (soup, smoothie).",
-    },
-    angleMixed: {
-      type: "string",
-      description: "Camera-Angle fuer mixed (bowl, salad).",
-    },
-  },
-  required: [
-    "lightingOptions",
-    "sceneOptions",
-    "styleSuffix",
-    "negativeAddition",
-    "cameraAesthetic",
-    "heroElementGuidance",
-    "angleFlat",
-    "angleLayered",
-    "angleTall",
-    "angleLiquid",
-    "angleMixed",
-  ],
-};
-
+// PR 10: responseSchema komplett entfernt. Bisheriger Schema-Validator
+// hat trotz Flattening + Compression weiterhin 400 INVALID_ARGUMENT
+// geworfen. Wir lassen Gemini Text/JSON returnen, parsen post-process.
+// Schema-Anweisungen leben nur noch im System-Prompt.
+//
 // Gemini-Response hat flache angle-Felder; wir bauen das original
 // defaultAngles-Objekt im normalisierten Output wieder zusammen.
 type RawStyleResponse = Omit<
@@ -338,28 +266,58 @@ export async function analyzeCreatorVisualStyle(
   const tVision = Date.now();
   let raw: RawStyleResponse;
   try {
-    raw = await callGeminiMultimodal<RawStyleResponse>({
+    // PR 10: Schema komplett raus — Gemini's responseSchema-Validator
+    // hat mit multiple Konfigurationen 400 INVALID_ARGUMENT geworfen
+    // (auch nach Schema-Flattening in PR 9). Wir lassen Gemini Text
+    // returnen mit klarem JSON-Output-Auftrag im System-Prompt und
+    // parsen die Antwort manuell. So eliminiert sich der ganze
+    // Schema-Validation-Pfad als Fehlerquelle.
+    //
+    // Gemini 2.5 Pro Multimodal in "text"-Mode ist erfahrungsgemaess
+    // sehr zuverlaessig mit JSON-Output wenn der Prompt klar ist.
+    const rawText = await callGeminiMultimodal<string>({
       parts,
-      schema: RESPONSE_SCHEMA,
-      systemInstruction: SYSTEM_INSTRUCTION,
-      // Pro statt Flash — bessere Bild-Detail-Erkennung, die DNA wird nur
-      // einmal pro Creator generiert, also lohnt sich die hoehere Latenz +
-      // Kosten.
+      // Kein schema → callGeminiMultimodal returnt den Text direkt
+      systemInstruction:
+        SYSTEM_INSTRUCTION +
+        `\n\nANTWORT-FORMAT: Gib AUSSCHLIESSLICH ein JSON-Objekt zurueck mit diesen Feldern (keine Code-Fences, kein Markdown, nur raw JSON):\n{\n  "lightingOptions": ["string", "string", "string", "string", "string"],\n  "sceneOptions": ["string", "string", "string", "string", "string"],\n  "styleSuffix": "string",\n  "negativeAddition": "string",\n  "cameraAesthetic": "string",\n  "heroElementGuidance": "string",\n  "angleFlat": "string",\n  "angleLayered": "string",\n  "angleTall": "string",\n  "angleLiquid": "string",\n  "angleMixed": "string"\n}`,
       model: "pro",
-      // Mittlere Temp — Voice + Detail, aber nicht Halluzination
       temperature: 0.5,
-      maxOutputTokens: 2048,
+      // Hoeher als vorher (2048): JSON-Output mit 5+5 verbosen Strings
+      // kann knapp werden. 4096 gibt Headroom.
+      maxOutputTokens: 4096,
       thinkingBudget: 0,
       retries: 1,
     });
     console.log(
-      `[analyze-style] gemini-pro durch in ${Date.now() - tVision}ms`
+      `[analyze-style] gemini-pro durch in ${Date.now() - tVision}ms, response length ${rawText.length}`
     );
+    // Code-Fences abstrippen falls Gemini doch welche packt
+    const cleaned = rawText
+      .trim()
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/```\s*$/, "")
+      .trim();
+    try {
+      raw = JSON.parse(cleaned) as RawStyleResponse;
+    } catch (parseErr) {
+      console.error(
+        "[analyze-style] JSON-parse failed. Raw response (first 1500 chars):",
+        cleaned.slice(0, 1500)
+      );
+      throw parseErr;
+    }
   } catch (err) {
-    console.error(
-      "[analyze-style] gemini-pro call failed",
-      err instanceof Error ? err.message : err
-    );
+    // Volles Detail loggen — vorher nur die ersten 400 Zeichen, das hat
+    // den eigentlichen Validator-Hint verschluckt.
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const detail =
+      err && typeof err === "object" && "detail" in err
+        ? String((err as { detail: unknown }).detail).slice(0, 2000)
+        : "(no detail)";
+    console.error("[analyze-style] gemini-pro call failed");
+    console.error("  message:", errMsg);
+    console.error("  detail :", detail);
     return null;
   }
 
