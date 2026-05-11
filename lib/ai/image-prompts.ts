@@ -208,19 +208,20 @@ export async function lifestyleNegative(
   return add ? `${LIFESTYLE_BASE_NEGATIVE}, ${add}` : LIFESTYLE_BASE_NEGATIVE;
 }
 
-// REFERENCE-FIRST Prompt fuer DB-Brands (PR 12). Anders als der heroPrompt
-// fuer Code-Brands (Biene), der einen ausgepraegten Style ueberlagert,
-// laesst dieser Prompt der Reel-Reference maximalen Raum:
-//   - kein Counter-Override (keine sceneOptions)
-//   - kein Lighting-Override (keine lightingOptions)
-//   - kein Camera-Aesthetic-Override
-//   - kein heroElement das die Komposition aendert
+// REFERENCE-FIRST Prompt fuer DB-Brands (PR 12, ueberarbeitet in PR 13).
+// Anders als der heroPrompt fuer Code-Brands (Biene), der einen ausgepraegten
+// Style ueberlagert, folgt dieser Prompt der Reel-Reference visuell, aber
+// REMOVED konsequent alle Werbe-Elemente aus dem Reel-Cover.
 //
-// Flux 2 Pro mit input_image kann so das Reel-Bild 1:1 nachempfinden,
-// nur in hoeherer Aufloesung + ggf. mit etwas besserer Bildqualitaet.
-// Genau das, was ein Team-Member fuer einen neu onboardeten Creator
-// erwartet: das Bild sieht aus wie sein Reel, nicht wie eine fremde
-// Interpretation.
+// PR 13 Fix: vorheriger Prompt sagte "preserve everything" — Flux hat das
+// woertlich genommen und auch Text-Overlays + POV-Captions + Werbe-Sticker
+// 1:1 ins generierte Bild kopiert. Neues Wording:
+//   - "Re-render" statt "preserve" → klar: Re-Rendering, nicht Pure-Copy
+//   - Explizit: "remove all text overlays, captions, stickers, watermarks"
+//   - Negatives massiv ausgebaut fuer Text-Entfernung
+//
+// Visuell soll das Bild der Reel-Aesthetik folgen (Counter, Lighting,
+// Dish-Form, Vessel), aber CLEAN ohne Werbe-Klotz oben drauf.
 export function buildReferenceFirstPrompt(
   recipe: Recipe
 ): { prompt: string; negative: string } {
@@ -230,13 +231,41 @@ export function buildReferenceFirstPrompt(
       : "";
   return {
     prompt: [
-      `${recipe.title}.`,
-      `Preserve the reference image entirely: same dish, same vessel, same counter, same lighting, same composition, same camera angle, same garnish.`,
-      `Re-render with high fidelity and natural details${steam}.`,
-      `Homemade imperfect character, natural unstaged food photograph.`,
+      `Re-render this dish ("${recipe.title}") from the reference image as a clean editorial food photograph.`,
+      `Match the dish itself precisely: same food, same vessel, same plating, same garnish placement, same general surface and lighting style as in the reference.`,
+      `CRITICAL: completely remove any text overlays, captions, POV text, stickers, watermarks, brand stamps, hashtags, or graphic elements from the reference image — render the scene as if those overlays were never there. The final image must have NO text whatsoever.`,
+      `Natural unstaged food photograph, homemade imperfect character, no studio look${steam}.`,
     ].join(" "),
-    negative:
-      "no text, no labels, no logos, no packaging, no watermark, no overlay, no recipe title text, no studio lighting, no white void background",
+    negative: [
+      "text",
+      "captions",
+      "subtitles",
+      "stickers",
+      "watermarks",
+      "overlays",
+      "overlay text",
+      "POV text",
+      "descriptive text on image",
+      "recipe title text",
+      "instagram captions",
+      "@username",
+      "hashtags in image",
+      "typography",
+      "font",
+      "letters",
+      "words",
+      "writing",
+      "labels",
+      "logos",
+      "packaging",
+      "graphic elements",
+      "promotional graphics",
+      "ad banners",
+      "studio lighting",
+      "white void background",
+    ]
+      .map((s) => `no ${s}`)
+      .join(", "),
   };
 }
 
