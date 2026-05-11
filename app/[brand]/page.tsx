@@ -137,20 +137,20 @@ export default async function BrandPage({ params }: BrandPageProps) {
                 className="text-[11px] font-semibold uppercase tracking-[0.18em]"
                 style={{ color: brand.tokens.inkMuted }}
               >
-                Workspace · Pack-Sammlung
+                Team-Studio · {brand.name}-Workspace
               </span>
               <h2
                 className="font-display text-[32px] leading-none tracking-[-0.01em]"
                 style={{ color: brand.tokens.ink }}
               >
-                Deine Packs
+                Aktive Packs
               </h2>
               <p
                 className="mt-1 text-[14px]"
                 style={{ color: brand.tokens.inkMuted }}
               >
                 {packs.length} Konzepte · {totalRecipes} Rezepte · alle druckfertig.
-                Klick auf ein Pack, um die Karten zu sehen, zu bearbeiten oder als PDF zu exportieren.
+                Klick auf ein Pack, um Karten zu reviewen, zu bearbeiten oder als PDF zu exportieren.
               </p>
             </div>
 

@@ -5,6 +5,7 @@ import type { Recipe } from "@/lib/recipes";
 import { SiteHeader } from "./site-header";
 import { RecipeCardFull, type EnrichingState } from "./recipe-card-full";
 import { PdfExportButton } from "./pdf-export-button";
+import { HeroRerollButton } from "./hero-reroll-button";
 
 type NavTarget = {
   href: string;
@@ -23,6 +24,11 @@ type Props = {
   // Set while a custom recipe waits for Gemini micros + Flux hero. The card
   // swaps the matching slots for skeletons so the gap is visible.
   enriching?: EnrichingState;
+  // DB-Row-ID des Rezepts. Wenn vorhanden, zeigt der Toolbar den
+  // "Bild neu generieren"-Button. Statische Rezepte aus lib/recipes.ts
+  // haben kein id-Feld auf dem Recipe-Type — die ID kommt aus der DB-Row
+  // und wird vom Caller separat reingereicht.
+  recipeId?: string;
 };
 
 export function RecipeDetailLayout({
@@ -35,6 +41,7 @@ export function RecipeDetailLayout({
   isCustom = false,
   deleteAction,
   enriching,
+  recipeId,
 }: Props) {
   return (
     <div
@@ -76,8 +83,18 @@ export function RecipeDetailLayout({
             </span>
           </nav>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {deleteAction}
+            {recipeId ? (
+              <HeroRerollButton
+                recipeId={recipeId}
+                tint={{
+                  bg: pack.mood.background,
+                  ink: pack.mood.ink,
+                  accent: pack.mood.accent,
+                }}
+              />
+            ) : null}
             <PdfExportButton
               type="recipe"
               brandSlug={brand.slug}

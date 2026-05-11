@@ -2,7 +2,11 @@ import { notFound } from "next/navigation";
 import { getBrand } from "@/lib/brands";
 import { getPack } from "@/lib/packs";
 import { getCustomPackServer } from "@/lib/custom-packs-server";
-import { getRecipe, getRecipesForPack } from "@/lib/recipes";
+import {
+  getRecipe,
+  getRecipeRowIdFromDb,
+  getRecipesForPack,
+} from "@/lib/recipes";
 import { RecipeDetailLayout } from "@/components/recipe-detail-layout";
 import { CustomRecipeView } from "@/components/custom-recipe-view";
 import { StaticRecipeDeleteButton } from "@/components/static-recipe-delete-button";
@@ -68,11 +72,21 @@ export default async function RecipePage({ params }: RecipePageProps) {
           }
         : null;
 
+    // DB-Row-UUID parallel zum static-recipe-Load holen — wird vom
+    // "Bild neu generieren"-Button gebraucht. Falls Supabase nicht verfuegbar
+    // ist oder die Row fehlt, blendet die Toolbar den Button automatisch aus.
+    const recipeId = await getRecipeRowIdFromDb(
+      brand.slug,
+      pack.slug,
+      recipe.slug
+    );
+
     return (
       <RecipeDetailLayout
         brand={brand}
         pack={pack}
         recipe={recipe}
+        recipeId={recipeId ?? undefined}
         totalRecipes={staticRecipes.length}
         previous={previous}
         next={next}

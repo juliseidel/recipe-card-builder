@@ -30,14 +30,14 @@ export function LoginForm({ redirectTo }: Props) {
       <div className="w-full max-w-[440px]">
         <div className="mb-9 flex flex-col items-center gap-2.5 text-center">
           <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.28em] text-ink-subtle">
-            Studio · für Creator
+            Internes Studio · Brand-Workspace
           </span>
           <h1 className="font-display text-[44px] leading-[1.0] tracking-[-0.02em] text-ink sm:text-[52px]">
             Recipe Card Builder
           </h1>
           <p className="mt-1 max-w-[340px] text-[13.5px] leading-relaxed text-ink-muted">
-            Druckfertige Rezeptkarten für deine Marke — in deinem
-            persönlichen Workspace.
+            Druckfertige Rezeptkarten kuratieren — pro Creator-Brand, im
+            gemeinsamen Team-Workspace.
           </p>
         </div>
 
@@ -50,7 +50,7 @@ export function LoginForm({ redirectTo }: Props) {
               Anmelden
             </h2>
             <p className="text-[13px] leading-relaxed text-ink-muted">
-              Mit deinen Creator-Zugangsdaten anmelden, um dein Studio zu
+              Mit deinem Team-Zugang anmelden und den Brand-Workspace
               öffnen.
             </p>
           </div>

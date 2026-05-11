@@ -32,6 +32,11 @@ type Body = {
    *  respektieren den Marker — verhindert dass jeder Page-Visit einer
    *  fehlgeschlagenen Karte automatisch einen neuen Gemini-Call ausloest. */
   force?: boolean;
+  /** Wenn true: Hero wird neu generiert, auch wenn schon eines vorhanden
+   *  ist. Wird vom "Bild neu generieren"-Button im Detail-View / Editor
+   *  gesetzt. Micros + Story bleiben dabei unangetastet (es sei denn
+   *  `force` ist zusaetzlich gesetzt). */
+  forceHero?: boolean;
 };
 
 export async function POST(req: Request) {
@@ -93,7 +98,7 @@ export async function POST(req: Request) {
     !recipe.nutrition?.micros || recipe.nutrition.micros.length === 0;
   const previousMicrosAttempt = Boolean(recipe.nutrition?.microsAttemptedAt);
   const needsMicros = microsEmpty && (!previousMicrosAttempt || body.force);
-  const needsHero = !recipe.hero;
+  const needsHero = !recipe.hero || Boolean(body.forceHero);
   // Story is "needed" if the description is empty or still equals the
   // pack-level fallback we wrote at save time. Once the user types their
   // own description (or a previous AI-Story has run), we leave it alone.

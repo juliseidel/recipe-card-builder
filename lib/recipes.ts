@@ -1864,3 +1864,35 @@ export async function getRecipe(
     return undefined;
   }
 }
+
+// Holt die DB-Row-UUID eines (auch statisch geseedeten) Rezepts. Wird vom
+// Detail-View gebraucht, damit der "Bild neu generieren"-Button die richtige
+// Row in /api/recipes/enrich addressieren kann. getRecipe() liest "code wins"
+// aus lib/recipes.ts und kennt die DB-ID nicht — diese Funktion macht den
+// expliziten Lookup. Returnt null, wenn keine Row da ist (z. B. lokale Dev-Env
+// ohne Supabase-Konfig oder Row noch nicht geseedet).
+export async function getRecipeRowIdFromDb(
+  brandSlug: string,
+  packSlug: string,
+  recipeSlug: string
+): Promise<string | null> {
+  try {
+    const { getServerSupabase, hasServerSupabase } = await import(
+      "./supabase-server"
+    );
+    if (!hasServerSupabase()) return null;
+    const supabase = getServerSupabase();
+    const { data, error } = await supabase
+      .from("recipes")
+      .select("id")
+      .eq("brand_slug", brandSlug)
+      .eq("pack_slug", packSlug)
+      .eq("recipe_slug", recipeSlug)
+      .maybeSingle();
+    if (error || !data) return null;
+    return (data as { id: string }).id;
+  } catch (err) {
+    console.warn("[recipes] row-id lookup failed", err);
+    return null;
+  }
+}

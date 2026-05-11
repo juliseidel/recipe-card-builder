@@ -193,6 +193,7 @@ Regeln:
 • subtitle: nur wenn die Caption einen offensichtlichen Untertitel hat (z. B. nach dem Titel ein Stichpunkt-Satz). Sonst leer.
 • description: 1-3 Saetze, Bienes warmer Ton, du-Form, ohne Hashtag-Salat.
 • Sub-Gruppen ('Fuer den Teig:', 'Fuer die Glasur:'): explizit als group-Feld bei Zutaten UND Schritten markieren.
+• KONSISTENZ (wichtig!): Jede Zutat in 'ingredients' MUSS irgendwo im Rezept-Ablauf vorkommen — entweder direkt namentlich in einem Schritt-Text, oder implizit als Teil von 'Alle trockenen Zutaten vermengen' / 'Alle Zutaten verrühren'. Wenn eine Zutat weder explizit noch implizit verwendet wird, lass sie weg. Niemals Geister-Zutaten zurückgeben (z. B. 'MORE Zerup' wenn der Sirup nirgendwo im Workflow auftaucht).
 • confidence:
   - 'high' wenn klare Zutatenliste + nummerierte Schritte + Nährwerte
   - 'medium' wenn Rezept erkennbar aber Lücken (z. B. keine Nährwerte)
@@ -216,7 +217,12 @@ function preprocessCaption(raw: string): string {
 }
 
 export type ParseResult =
-  | { ok: true; recipe: ParsedInstagramRecipe }
+  | {
+      ok: true;
+      recipe: ParsedInstagramRecipe;
+      /** Hinweis aus dem Konsistenz-Pass, falls etwas korrigiert wurde. */
+      reconciliation: string | null;
+    }
   | { ok: false; error: string };
 
 export async function parseRecipeFromCaption(
@@ -256,7 +262,156 @@ export async function parseRecipeFromCaption(
     };
   }
 
-  return { ok: true, recipe: normalizeParsed(raw) };
+  const parsed = normalizeParsed(raw);
+
+  // Konsistenz-Pass: orphan-Zutaten (z. B. "MORE Zerup" ohne Step-Verwendung)
+  // entfernen oder in passenden Schritt einbauen. Best-effort — wenn der Pass
+  // selber failt, geben wir das Rohrezept zurueck, ohne den Import zu blocken.
+  const reconciled = await reconcileConsistency(parsed);
+  return {
+    ok: true,
+    recipe: reconciled.recipe,
+    reconciliation: reconciled.summary,
+  };
+}
+
+// ─── Konsistenz-Pass (zweiter Gemini-Call) ──────────────────────────────────
+// Ingo-Feedback: Im ersten Import landete "MORE Zerup" als Zutat im Rezept,
+// obwohl der Sirup in keinem Schritt verwendet wurde. Der primary parse
+// hatte das geistige Modell "Caption nennt Zutat, also liste sie", ohne
+// den Workflow zu prüfen. Dieser zweite Pass fragt Gemini gezielt nach
+// Inkonsistenzen und gibt eine bereinigte Version zurück.
+
+const RECONCILE_SCHEMA = {
+  type: "object",
+  properties: {
+    needsFix: {
+      type: "boolean",
+      description:
+        "true, wenn Zutaten korrigiert werden mussten. false wenn alles konsistent war.",
+    },
+    ingredients: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          amount: { type: "string" },
+          name: { type: "string" },
+          group: { type: "string" },
+        },
+        required: ["amount", "name"],
+      },
+    },
+    steps: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          text: { type: "string" },
+          group: { type: "string" },
+        },
+        required: ["text"],
+      },
+    },
+    summary: {
+      type: "string",
+      description:
+        "Kurzer Hinweis fuer den User, was geaendert wurde — z. B. '1 unbenutzte Zutat entfernt: MORE Zerup.' oder '2 Zutaten in Schritt 3 ergaenzt.'. Leerer String wenn keine Aenderung.",
+    },
+  },
+  required: ["needsFix", "ingredients", "steps", "summary"],
+};
+
+const RECONCILE_SYSTEM = `Du pruefst Rezept-Konsistenz: jede Zutat MUSS im Workflow vorkommen — entweder explizit namentlich in einem Schritt, oder implizit ueber Catch-Alls ('Alle trockenen Zutaten vermengen.', 'Alle Zutaten in den Mixer geben.', 'Fuer die Glasur alles verruehren.').
+
+Eingabe: ein Rezept mit Zutatenliste + Schritten.
+
+Aufgabe: identifiziere Geister-Zutaten (Zutaten, die weder explizit noch implizit im Workflow vorkommen) und behandle sie nach Prioritaet:
+1. Wenn die Zutat sinnvoll in einen bestehenden Schritt eingebaut werden kann (z. B. 'Topping zum Servieren') → ergaenze einen Schritt oder erweitere einen bestehenden.
+2. Wenn die Zutat redundant/aus Versehen aufgelistet wirkt → entferne sie aus der Liste.
+
+Gib das **vollstaendige korrigierte** ingredients- und steps-Array zurueck (gleiches Format wie Eingabe). Wenn nichts zu fixen war: needsFix=false und Listen unveraendert weitergeben.
+
+summary: ein deutscher Satz fuer den User. Bei Aenderung konkret nennen, was passiert ist. Bei needsFix=false: leerer String.
+
+Antworte AUSSCHLIESSLICH im JSON-Schema.`;
+
+async function reconcileConsistency(
+  recipe: ParsedInstagramRecipe
+): Promise<{ recipe: ParsedInstagramRecipe; summary: string | null }> {
+  // Wenn das Rezept gar keine Schritte oder Zutaten hat, lohnt sich der Call
+  // nicht — der primary parse hat eh schon eine Lücke gemeldet (low confidence).
+  if (recipe.ingredients.length === 0 || recipe.steps.length === 0) {
+    return { recipe, summary: null };
+  }
+
+  const payload = {
+    ingredients: recipe.ingredients.map((i) => ({
+      amount: i.amount,
+      name: i.name,
+      ...(i.group ? { group: i.group } : {}),
+    })),
+    steps: recipe.steps.map((s) => ({
+      text: s.text,
+      ...(s.group ? { group: s.group } : {}),
+    })),
+  };
+
+  try {
+    const raw = await callGemini<{
+      needsFix: boolean;
+      ingredients: Array<{ amount: string; name: string; group?: string }>;
+      steps: Array<{ text: string; group?: string }>;
+      summary: string;
+    }>({
+      prompt: `Rezept zur Konsistenz-Pruefung:\n\n${JSON.stringify(payload, null, 2)}`,
+      schema: RECONCILE_SCHEMA,
+      systemInstruction: RECONCILE_SYSTEM,
+      temperature: 0.1,
+      maxOutputTokens: 4096,
+      thinkingBudget: 0,
+      retries: 1,
+    });
+
+    if (!raw.needsFix || !raw.summary?.trim()) {
+      return { recipe, summary: null };
+    }
+
+    const fixedIngredients: Ingredient[] = (raw.ingredients ?? [])
+      .filter((i) => i?.name?.trim())
+      .map((i) => ({
+        amount: (i.amount ?? "").trim() || "n. A.",
+        name: i.name.trim(),
+        ...(i.group?.trim() ? { group: i.group.trim() } : {}),
+      }));
+
+    const fixedSteps: RecipeStep[] = (raw.steps ?? [])
+      .filter((s) => s?.text?.trim())
+      .map((s) => ({
+        text: s.text.trim(),
+        ...(s.group?.trim() ? { group: s.group.trim() } : {}),
+      }));
+
+    // Defensive: wenn der Reconciliation-Pass die Listen komplett leerraeumt
+    // (sehr unwahrscheinlich, aber Gemini), behalten wir das Original.
+    if (fixedIngredients.length === 0 || fixedSteps.length === 0) {
+      return { recipe, summary: null };
+    }
+
+    return {
+      recipe: {
+        ...recipe,
+        ingredients: fixedIngredients,
+        steps: fixedSteps,
+      },
+      summary: raw.summary.trim(),
+    };
+  } catch {
+    // Best-effort: bei Fehler einfach das unkorrigierte Rezept zurueckgeben,
+    // damit der Import-Flow weiterlaeuft. Inkonsistenz ist weniger schlimm
+    // als ein komplett geblocktes Rezept.
+    return { recipe, summary: null };
+  }
 }
 
 // Roh-Antwort von Gemini — flach (kcal/protein/... statt nutrition.kcal),

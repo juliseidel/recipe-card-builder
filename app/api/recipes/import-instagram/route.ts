@@ -91,6 +91,9 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     recipe: parsed.recipe,
+    // Hinweis aus dem Konsistenz-Pass — z. B. "1 unbenutzte Zutat entfernt
+    // (MORE Zerup)." — null wenn nichts korrigiert werden musste.
+    reconciliation: parsed.reconciliation,
     source: {
       url: post.postUrl,
       username: post.ownerUsername,

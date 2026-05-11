@@ -371,6 +371,7 @@ export function CustomRecipeView({
         brand={brand}
         pack={pack}
         recipe={recipe}
+        recipeId={recipe?.id}
         totalRecipes={allRecipes.length}
         previous={previous}
         next={next}

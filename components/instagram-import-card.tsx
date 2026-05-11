@@ -15,7 +15,11 @@ type Props = {
   /** Wird aufgerufen, sobald Apify + Gemini fertig sind und das Form
    *  gefüllt werden kann. Die Editor-Page hängt sich daran und setzt
    *  ihre State-Variablen. */
-  onImported: (recipe: ParsedInstagramRecipe, source: ImportSource) => void;
+  onImported: (
+    recipe: ParsedInstagramRecipe,
+    source: ImportSource,
+    reconciliation: string | null
+  ) => void;
   /** Optional: zeigt nach erfolgreichem Import einen Reset-Button, der
    *  zurück in den "leeren" Import-Zustand schaltet. */
   onReset?: () => void;
@@ -24,6 +28,10 @@ type Props = {
   importedSource: ImportSource | null;
   importedConfidence: "high" | "medium" | "low" | null;
   importedNotes: string | null;
+  /** Hinweis aus dem Konsistenz-Pass — z. B. wenn eine Zutat ohne
+   *  Verwendung entfernt wurde. Wird als getoenter Hinweis-Block unter
+   *  dem Confidence-Badge angezeigt, damit der User es nicht uebersieht. */
+  importedReconciliation: string | null;
 };
 
 type Stage =
@@ -45,6 +53,7 @@ export function InstagramImportCard({
   importedSource,
   importedConfidence,
   importedNotes,
+  importedReconciliation,
 }: Props) {
   const [url, setUrl] = useState("");
   const [stage, setStage] = useState<Stage>("idle");
@@ -86,11 +95,17 @@ export function InstagramImportCard({
         );
       }
       setStage("done");
-      onImported(data.recipe as ParsedInstagramRecipe, {
-        url: data.source?.url ?? url.trim(),
-        username: data.source?.username ?? null,
-        imageUrl: data.source?.imageUrl ?? null,
-      });
+      onImported(
+        data.recipe as ParsedInstagramRecipe,
+        {
+          url: data.source?.url ?? url.trim(),
+          username: data.source?.username ?? null,
+          imageUrl: data.source?.imageUrl ?? null,
+        },
+        typeof data.reconciliation === "string" && data.reconciliation.trim()
+          ? data.reconciliation.trim()
+          : null
+      );
     } catch (err) {
       setStage("error");
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
@@ -187,6 +202,22 @@ export function InstagramImportCard({
                   was du brauchst.
                 </span>
               )}
+              {importedReconciliation ? (
+                <span
+                  className="mt-2 inline-flex items-start gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] leading-snug"
+                  style={{
+                    borderColor: "#d9770640",
+                    background: "#d977060c",
+                    color: "#92400e",
+                  }}
+                >
+                  <ReconcileIcon />
+                  <span>
+                    <strong className="font-semibold">Konsistenz-Check:</strong>{" "}
+                    {importedReconciliation}
+                  </span>
+                </span>
+              ) : null}
             </div>
           </div>
           {onReset ? (
@@ -438,6 +469,27 @@ function CheckCircleIcon() {
         d="M5 8l2.2 2.2L11 6"
         stroke="currentColor"
         strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ReconcileIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden
+      style={{ flexShrink: 0, marginTop: 1 }}
+    >
+      <path
+        d="M3 5.5h7l-2-2m5 7h-7l2 2"
+        stroke="currentColor"
+        strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
       />

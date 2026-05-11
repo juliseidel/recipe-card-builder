@@ -99,6 +99,11 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     "high" | "medium" | "low" | null
   >(null);
   const [importedNotes, setImportedNotes] = useState<string | null>(null);
+  // Hinweis aus dem Konsistenz-Pass (z. B. "1 unbenutzte Zutat entfernt:
+  // MORE Zerup."). null, wenn nichts korrigiert werden musste.
+  const [importedReconciliation, setImportedReconciliation] = useState<
+    string | null
+  >(null);
 
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
@@ -313,7 +318,8 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
   // 1:1 mit dem Manuell-Modus funktioniert.
   const handleImported = (
     parsed: ParsedInstagramRecipe,
-    source: ImportSource
+    source: ImportSource,
+    reconciliation: string | null
   ) => {
     setTitle(parsed.title);
     setSubtitle(parsed.subtitle);
@@ -394,6 +400,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     setImportedSource(source);
     setImportedConfidence(parsed.confidence);
     setImportedNotes(parsed.notes);
+    setImportedReconciliation(reconciliation);
     // Original-Link aus dem Import-Source uebernehmen, damit der QR-Code
     // beim PDF-Export auf das Reel zeigt. Im manuellen Modus kann das
     // Feld danach noch editiert werden.
@@ -409,6 +416,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
     setImportedSource(null);
     setImportedConfidence(null);
     setImportedNotes(null);
+    setImportedReconciliation(null);
   };
 
   if (!brand) {
@@ -922,6 +930,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                 importedSource={importedSource}
                 importedConfidence={importedConfidence}
                 importedNotes={importedNotes}
+                importedReconciliation={importedReconciliation}
               />
             ) : null}
 
