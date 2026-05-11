@@ -19,6 +19,25 @@ export type BrandStats = {
   niche: string;
 };
 
+// Optionales Brand-DNA-Override fuer die Image-Pipeline. Code-Brands
+// (Biene) haben ihre DNA in lib/ai/brand-image-style.ts hardgecodet —
+// DB-Brands speichern dieselben Felder hier in brand.imageStyle, generiert
+// von der Vision-Analyse beim Onboarding (PR 5).
+//
+// Schema identisch zu BrandImageStyle in lib/ai/brand-image-style.ts,
+// ohne den brandSlug — der kommt aus brand.slug.
+export type BrandImageStyleOverride = {
+  lightingOptions: string[];
+  sceneOptions: string[];
+  styleSuffix: string;
+  negativeAddition: string;
+  cameraAesthetic: string;
+  heroElementGuidance: string;
+  defaultAngles?: Partial<
+    Record<"flat" | "layered" | "tall" | "liquid" | "mixed", string>
+  >;
+};
+
 export type Brand = {
   slug: string;
   name: string;
@@ -33,6 +52,10 @@ export type Brand = {
   fonts: BrandFonts;
   packCount: number;
   recipeCount: number;
+  /** Per-Brand Image-Pipeline-DNA. Bei Code-Brand (Biene) leer — Style
+   *  liegt in lib/ai/brand-image-style.ts. Bei DB-Brands von der Vision-
+   *  Analyse der letzten Reel-Covers generiert und hier persistiert. */
+  imageStyle?: BrandImageStyleOverride;
 };
 
 export const brands: Brand[] = [
