@@ -48,16 +48,6 @@ const nextConfig: NextConfig = {
     "/api/admin/reseed-heroes": [
       "./node_modules/@ffmpeg-installer/**/*",
     ],
-    // PR 7 — Brand-DNA-Vision nutzt ffmpeg fuer Reel-Frame-Mining
-    // (extrahiert die echten Hero-Bilder aus Reel-Videos statt nur Cover).
-    // Sowohl der Onboarding-Endpoint (analyze-instagram) als auch der
-    // Regenerate-Endpoint brauchen das Binary.
-    "/api/brands/analyze-instagram": [
-      "./node_modules/@ffmpeg-installer/**/*",
-    ],
-    "/api/brands/regenerate-style": [
-      "./node_modules/@ffmpeg-installer/**/*",
-    ],
   },
 };
 

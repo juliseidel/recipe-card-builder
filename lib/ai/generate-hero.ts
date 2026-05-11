@@ -2,8 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { generateImage, downloadImage } from "./bfl-flux";
 import { generateImageSpec } from "./recipe-image-spec";
-import { buildPrompt } from "./image-prompts";
+import { buildPrompt, buildReferenceFirstPrompt } from "./image-prompts";
 import { getServerSupabase } from "@/lib/supabase-server";
+import { isCodeBrand } from "@/lib/brands";
 import type { Recipe } from "@/lib/recipes";
 
 // Render-Aufloesung: Flux 2 Pro rendert nativ bei 2048x2048 (statt 1440x1440
@@ -235,15 +236,37 @@ async function uploadReferenceHero(opts: {
   referenceImage: string;
 }): Promise<string | null> {
   const { recipe, recipeId, brandSlug, referenceImage } = opts;
-  const spec = await generateImageSpec(recipe, brandSlug);
-  const { prompt, negative } = await buildPrompt(
-    "hero",
-    recipe,
-    spec,
-    brandSlug,
-    null, // KEINE Vision-Description — Jan's "do NOT describe the dish"
-    true // withReferenceImage
-  );
+
+  // PR 12: Style-Architektur ist jetzt zweigeteilt:
+  //   - Code-Brands (Biene) nutzen ihren hand-kalibrierten Style aus
+  //     brand-image-style.ts: voller heroPrompt mit BIENE_STYLE-Tokens.
+  //   - DB-Brands (alle neuen Creator) nutzen REFERENCE-FIRST: Flux
+  //     bekommt minimalen Prompt + Reel-Keyframe, soll das Bild 1:1
+  //     reproduzieren. Kein generic-Style der den Reel-Look zerstoert.
+  //
+  // Vorteil: kein "raten" was der Creator-Look ist. Bilder bleiben
+  // identisch zum Original-Reel, nur in hoeherer Aufloesung.
+  const useReferenceFirst = !isCodeBrand(brandSlug);
+
+  let prompt: string;
+  let negative: string;
+  if (useReferenceFirst) {
+    const built = buildReferenceFirstPrompt(recipe);
+    prompt = built.prompt;
+    negative = built.negative;
+  } else {
+    const spec = await generateImageSpec(recipe, brandSlug);
+    const built = await buildPrompt(
+      "hero",
+      recipe,
+      spec,
+      brandSlug,
+      null, // KEINE Vision-Description — Jan's "do NOT describe the dish"
+      true // withReferenceImage
+    );
+    prompt = built.prompt;
+    negative = built.negative;
+  }
 
   const result = await generateImage({
     prompt,
