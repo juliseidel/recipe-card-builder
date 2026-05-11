@@ -31,6 +31,14 @@ export function NutritionOverview({
   const [customRecipes, setCustomRecipes] = useState<CustomRecipe[]>([]);
   const [hiddenKeys, setHiddenKeys] = useState<Set<HiddenKey>>(new Set());
 
+  // Erweiterte Dependency: staticRecipes-Array-Identity ist nicht stabil
+  // ueber Server-Re-renders (jeder revalidatePath erzeugt neue Array-Ref),
+  // also reicht es als Trigger. Wenn der User eine neue Karte erstellt /
+  // loescht, ruft die App revalidatePath() → Server rendered neu →
+  // staticRecipes ist eine neue Array-Reference → dieses useEffect feuert
+  // erneut → Custom-Recipes + Hidden-Keys werden frisch geladen. Ohne
+  // diese Dependency hing der Nutrition-Overview auf dem ersten Mount-
+  // Snapshot fest und der User musste die Seite manuell neu laden.
   useEffect(() => {
     let active = true;
     void Promise.all([
@@ -44,7 +52,7 @@ export function NutritionOverview({
     return () => {
       active = false;
     };
-  }, [pack.slug]);
+  }, [pack.slug, staticRecipes]);
 
   // Same merge logic the pack PDF uses — newest custom cards first, curated
   // cards after, sequential 01..N numbers regardless of stored recipe.number.
