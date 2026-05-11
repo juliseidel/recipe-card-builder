@@ -54,14 +54,17 @@ export type BrandImageStyle = {
 // only universal signature element.
 export const BIENE_STYLE: BrandImageStyle = {
   brandSlug: "biene",
-  // Five lighting strings, all daylight-neutral. Bienes reels are bright
-  // and clean, never golden-hour-warm.
+  // Five lighting strings — zurueck auf Jan's Original-Optionen (warm,
+  // golden, amber). Frueher waren das hier daylight-neutral-Optionen
+  // basierend auf einer Pinterest-Annahme. User-Feedback (2026-05-11):
+  // Bienes echte Reels haben warmes Kuechen-Licht, nicht clinical-cool.
+  // Jan's Original-Wording matched besser ihren tatsaechlichen Reel-Look.
   lightingOptions: [
-    "bright morning daylight from a window on the left",
-    "soft natural daylight from a side window",
-    "bright midday daylight from above",
-    "fresh natural backlight from a kitchen window",
-    "clean cool daylight from a window on the right",
+    "warm morning light streaming from the left with soft shadows",
+    "golden afternoon light from a side window with long gentle shadows",
+    "warm diffused daylight from above, honey-toned",
+    "warm backlight glowing through a kitchen window, amber",
+    "late afternoon amber light from the right with soft highlights",
   ],
   // Five scene options, all variations on Bienes pale-grey concrete-stone
   // counter. Subtle differences (smooth, lightly-textured, near-window) so
