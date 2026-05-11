@@ -35,8 +35,14 @@ type Body = {
   /** Wenn true: Hero wird neu generiert, auch wenn schon eines vorhanden
    *  ist. Wird vom "Bild neu generieren"-Button im Detail-View / Editor
    *  gesetzt. Micros + Story bleiben dabei unangetastet (es sei denn
-   *  `force` ist zusaetzlich gesetzt). */
+   *  `force` ist zusaetzlich gesetzt). Pipeline-Strategie wie beim ersten
+   *  Mal: Reel-Cover wenn sourceUrl, sonst Flux. */
   forceHero?: boolean;
+  /** Wenn true: Hero wird zwingend ueber Flux 2 Pro generiert, auch wenn
+   *  Reel-Cover verfuegbar waere. Wird vom "KI-Alternative generieren"-
+   *  Button gesetzt — gedacht fuer den Fall, dass das Reel-Cover nicht
+   *  passt (Talking-Head, Sticker-Overlay, schlechte Belichtung). */
+  forceFlux?: boolean;
 };
 
 export async function POST(req: Request) {
@@ -98,7 +104,8 @@ export async function POST(req: Request) {
     !recipe.nutrition?.micros || recipe.nutrition.micros.length === 0;
   const previousMicrosAttempt = Boolean(recipe.nutrition?.microsAttemptedAt);
   const needsMicros = microsEmpty && (!previousMicrosAttempt || body.force);
-  const needsHero = !recipe.hero || Boolean(body.forceHero);
+  const needsHero =
+    !recipe.hero || Boolean(body.forceHero) || Boolean(body.forceFlux);
   // Story is "needed" if the description is empty or still equals the
   // pack-level fallback we wrote at save time. Once the user types their
   // own description (or a previous AI-Story has run), we leave it alone.
@@ -188,18 +195,28 @@ export async function POST(req: Request) {
   }
 
   // ─── HERO + STORY: ASYNC nach der Response ──────────────────────────
-  // Hero ist der lange Pol (Flux 2 Pro, 15-90s), Story braucht ~3-5s
-  // bei Gemini. Beide laufen in after() weiter, nachdem die Response
-  // schon raus ist. Das Detail-Polling holt die Werte ab, sobald sie
-  // in der DB stehen.
+  // Hero-Strategie (Ingo Phase 3): Wenn das Rezept aus Instagram kommt
+  // (sourceUrl gesetzt) und der User NICHT explizit forceHero=true klickt,
+  // nehmen wir den Reel-Cover-Frame statt Flux 2 Pro zu rendern. Das matcht
+  // das echte Reel viel besser als ein generiertes Brand-DNA-Bild.
+  //
+  //   • Default-Path (kein Hero da, sourceUrl vorhanden) → Reel-Cover
+  //   • Re-Roll-Button (forceHero=true) → Flux 2 Pro (alternative Strategie)
+  //   • Kein sourceUrl → Flux 2 Pro (Fallback)
+  //   • Beide failen → null, kein Hero
+  //
+  // Flux bleibt der lange Pol (15-90 s); Reel-Cover ist schnell (~2 s).
+  // Beide laufen in after() nach der Response. Das Detail-Polling holt
+  // den Hero ab, sobald er in der DB steht.
   if (needsHero) {
     after(async () => {
       try {
-        const heroUrl = await generateAndUploadHero(
+        const heroUrl = await generateHeroForRecipe({
           recipe,
-          row.id,
-          brandSlug
-        );
+          recipeId: row.id,
+          brandSlug,
+          forceFlux: Boolean(body.forceFlux),
+        });
         if (heroUrl) {
           await mergeRecipeData(row.id, () => ({ hero: heroUrl }));
         }
@@ -241,6 +258,68 @@ export async function POST(req: Request) {
     },
     { status: 202 }
   );
+}
+
+// Hero-Selector: Reel-Cover bevorzugt, Flux als Fallback / Re-Roll.
+// Returnt die public-URL des hochgeladenen JPEGs oder null, wenn nichts
+// klappt (Buckets nicht erreichbar, Apify aus, BFL aus, etc.).
+async function generateHeroForRecipe(opts: {
+  recipe: Recipe;
+  recipeId: string;
+  brandSlug: string;
+  forceFlux: boolean;
+}): Promise<string | null> {
+  const { recipe, recipeId, brandSlug, forceFlux } = opts;
+
+  // Path A: Reel-Cover (Default fuer Recipe mit sourceUrl)
+  if (!forceFlux && recipe.sourceUrl) {
+    try {
+      const reelHero = await uploadReelCoverHero(recipe.sourceUrl, recipeId);
+      if (reelHero) return reelHero;
+    } catch (err) {
+      console.warn(
+        "[enrich] reel-cover hero failed, falling back to Flux:",
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+
+  // Path B: Flux 2 Pro (Re-Roll oder Reel-Cover-Failure-Fallback)
+  return await generateAndUploadHero(recipe, recipeId, brandSlug);
+}
+
+// Reel-Cover als Hero: Apify-Scrape → sharp smart-crop → Storage-Upload.
+// Returnt null, wenn der Reel kein displayUrl liefert (z. B. privat).
+async function uploadReelCoverHero(
+  sourceUrl: string,
+  recipeId: string
+): Promise<string | null> {
+  const { extractReelHeroFromInstagram } = await import(
+    "@/lib/ai/extract-reel-hero"
+  );
+  const reel = await extractReelHeroFromInstagram(sourceUrl);
+  if (!reel) return null;
+
+  const supabase = getServerSupabase();
+  await ensureHeroBucket(supabase);
+
+  const filePath = `${recipeId}.jpg`;
+  const upload = await supabase.storage
+    .from(HERO_BUCKET)
+    .upload(filePath, reel.buffer, {
+      contentType: "image/jpeg",
+      upsert: true,
+      cacheControl: "31536000",
+    });
+  if (upload.error) {
+    console.error(
+      "[enrich] reel-cover upload failed:",
+      upload.error.message
+    );
+    return null;
+  }
+  const { data } = supabase.storage.from(HERO_BUCKET).getPublicUrl(filePath);
+  return data.publicUrl ?? null;
 }
 
 // Generate the recipe hero via the same pipeline used for the static 37

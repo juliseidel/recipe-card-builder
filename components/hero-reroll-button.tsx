@@ -3,12 +3,18 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-// "Bild neu generieren"-Button im Detail-View. Triggert /api/recipes/enrich
-// mit forceHero=true und pollt danach die Page, weil das Hero asynchron in
-// Vercel after() landet (15-90 s typische BFL-Flux-Laufzeit). Wir muten
-// nicht die ganze Page — die Karte bleibt sichtbar, der Button zeigt nur
-// kurz "Wird neu generiert…", und nach ~45 s holt router.refresh() das
-// neue Bild aus der DB.
+// "KI-Alternative generieren"-Button im Detail-View. Triggert
+// /api/recipes/enrich mit forceFlux=true — d. h. wir zwingen den Server,
+// statt den Reel-Cover-Frame ein neues Flux-2-Pro-Bild im Brand-Style zu
+// rendern. Use-Case: Reel-Cover ist Talking-Head, hat Sticker-Overlay,
+// oder zeigt nicht das fertige Essen — Operator klickt hier, um ein
+// kuratiertes Brand-Bild zu bekommen.
+//
+// Pollt die Page in mehreren Wellen, weil das Hero asynchron in Vercel
+// after() landet (15-90 s typische BFL-Flux-Laufzeit). Wir muten nicht
+// die ganze Page — die Karte bleibt sichtbar, der Button zeigt nur kurz
+// "Wird neu generiert…", und router.refresh() holt das neue Bild aus
+// der DB.
 
 type Props = {
   recipeId: string;
@@ -39,7 +45,7 @@ export function HeroRerollButton({ recipeId, tint }: Props) {
       const res = await fetch("/api/recipes/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recipeId, forceHero: true }),
+        body: JSON.stringify({ recipeId, forceFlux: true }),
       });
       if (!res.ok) throw new Error("enrich-call returned " + res.status);
       setStage("waiting");
@@ -66,11 +72,11 @@ export function HeroRerollButton({ recipeId, tint }: Props) {
 
   const label =
     stage === "idle"
-      ? "Bild neu generieren"
+      ? "KI-Alternative"
       : stage === "starting"
         ? "Wird gestartet…"
         : stage === "waiting"
-          ? "Bild wird generiert (45–90 s)…"
+          ? "KI-Bild wird generiert (45–90 s)…"
           : "Fertig — lade neu";
 
   const busy = stage === "starting" || stage === "waiting";
@@ -86,8 +92,8 @@ export function HeroRerollButton({ recipeId, tint }: Props) {
         background: "rgba(255,255,255,0.6)",
         color: tint.ink,
       }}
-      aria-label="Bild neu generieren"
-      title="Generiert ein neues Hero-Bild für diese Karte. Dauert 45–90 s."
+      aria-label="KI-Alternative generieren"
+      title="Generiert ein neues Hero-Bild im Brand-Style via Flux 2 Pro. Use-Case: das Reel-Cover passt nicht (Talking-Head, Sticker, schlechte Belichtung). Dauert 45–90 s."
     >
       {busy ? (
         <span
