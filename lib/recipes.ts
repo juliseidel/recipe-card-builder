@@ -1807,6 +1807,24 @@ function staticRecipe(
 //
 // Custom recipes (is_custom=true, written by the editor at /new) live ONLY
 // in the DB and are loaded via lib/custom-recipes.ts on the client.
+// Cache-Bust-Helper fuer DB-Hero-URLs.
+//
+// Hintergrund: das Bulk-Reseed schreibt Supabase-Storage-URLs in data.hero
+// ohne Query-Suffix (rohe https://.../uuid.jpg). Vercel Image Optimization
+// und der Browser haben unter dieser URL noch alte optimierte/cached
+// Varianten von frueheren Rendern (v3/v8). Die Code-Map in
+// lib/recipe-heroes.ts hat seit v9.4 ein ?v=v9.4 Cache-Bust-Suffix, das
+// Vercel zu einer frischen Optimierung zwingt.
+//
+// Damit DB-Heroes und Code-Map dasselbe Caching-Verhalten haben, appenden
+// wir den gleichen ?v=v9.4 Suffix nachtraeglich beim Lesen aus der DB —
+// wenn die URL nicht schon einen Query-Suffix hat (neue Renders vom
+// uploadJpeg-Fix bringen ?t=<ms> mit, den respektieren wir).
+function withHeroCacheBust(url: string): string {
+  if (url.includes("?")) return url;
+  return `${url}?v=v9.4`;
+}
+
 export async function getRecipesForPack(
   packSlug: string
 ): Promise<Recipe[]> {
@@ -1831,7 +1849,8 @@ export async function getRecipesForPack(
     // Pack-Uebersicht weiter die alten Bilder aus lib/recipe-heroes.ts.
     const dbHeroes: Record<string, string> = {};
     for (const row of data as Array<{ recipe_slug: string; data: Recipe }>) {
-      if (row.data?.hero) dbHeroes[row.recipe_slug] = row.data.hero;
+      if (row.data?.hero)
+        dbHeroes[row.recipe_slug] = withHeroCacheBust(row.data.hero);
     }
     const staticWithDbHero = fromCode.map((r) =>
       dbHeroes[r.slug] ? { ...r, hero: dbHeroes[r.slug] } : r
@@ -1865,7 +1884,7 @@ export async function getRecipe(
   const fromCode = staticRecipe(packSlug, recipeSlug);
   if (fromCode) {
     const dbHero = await fetchDbHero(packSlug, recipeSlug);
-    if (dbHero) return { ...fromCode, hero: dbHero };
+    if (dbHero) return { ...fromCode, hero: withHeroCacheBust(dbHero) };
     return fromCode;
   }
 
