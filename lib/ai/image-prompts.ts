@@ -116,12 +116,13 @@ export function heroPrompt(
     );
   }
   if (withReferenceImage) {
-    // Jan's Original-Wording aus Prompt #4 — zwingt Flux Kontext, das
-    // Gericht 1:1 vom Reference-Image zu uebernehmen, nur Umgebung und
-    // Licht werden neu gestagt. Kurz und klar — laengere Color-
-    // Preservation-Anweisungen haben in v6 die Bildqualitaet verschlechtert.
+    // Jan's "preserve reference"-Wording plus eine zusaetzliche Form-
+    // Treue-Anweisung. Flux Kontext interpretiert sonst gerne den
+    // Recipe-Titel ("Cups" → Cupcakes) statt der echten Form aus dem
+    // Reference-Bild zu folgen. Mit diesem expliziten Hinweis sollte
+    // die Form ehrlicher vom Reel uebernommen werden.
     parts.push(
-      `Homemade imperfect character preserved from the reference image, dish shape and color and garnish placement matching the reference, environment and lighting re-staged for warmth.`,
+      `Homemade imperfect character preserved from the reference image. Dish shape, form, color, and garnish placement must match the reference image exactly — follow the visual reference for the dish's form, do not interpret the recipe title. Environment and lighting re-staged for warmth.`,
       `Single staging only — one main composition, no demo slice alongside.`
     );
   }
