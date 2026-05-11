@@ -294,7 +294,8 @@ function EditorialLayout({
                 sizes="(min-width: 1024px) 320px, 100vw"
                 className="object-cover content-fade-in"
                 priority
-              />
+                quality={90}
+/>
             )}
           </div>
         </div>
@@ -798,7 +799,8 @@ function PatisserieLayout({
                       sizes="(min-width: 1024px) 320px, 80vw"
                       className="object-cover content-fade-in"
                       priority
-                    />
+                      quality={90}
+/>
                   )}
                 </div>
               </div>
@@ -1174,7 +1176,8 @@ function MinimalLayout({
             sizes="(min-width: 1024px) 920px, 100vw"
             className="object-cover content-fade-in"
             priority
-          />
+            quality={90}
+/>
         )}
         {/* Dunkler Gradient unten — sicherer Kontrast fuer Title */}
         <div
@@ -1649,7 +1652,8 @@ function SportLayout({
                 sizes="(min-width: 1024px) 340px, 100vw"
                 className="object-cover content-fade-in"
                 priority
-              />
+                quality={90}
+/>
             )}
           </div>
         </div>
@@ -2020,7 +2024,8 @@ function VitalLayout({
                 sizes="(min-width: 640px) 180px, 100vw"
                 className="object-cover content-fade-in"
                 priority
-              />
+                quality={90}
+/>
             )}
           </div>
 
@@ -2530,7 +2535,8 @@ function AmberLayout({
               sizes="(min-width: 1024px) 480px, 100vw"
               className="object-cover content-fade-in"
               priority
-            />
+              quality={90}
+/>
           )}
 
           {/* Avatar-Stempel oben rechts auf dem Hero */}
@@ -2987,7 +2993,8 @@ function DashboardLayout({
                 sizes="(min-width: 1024px) 360px, 100vw"
                 className="object-cover content-fade-in"
                 priority
-              />
+                quality={90}
+/>
               <div
                 className="absolute inset-0 mix-blend-multiply"
                 style={{ background: pack.mood.background, opacity: 0.18 }}
