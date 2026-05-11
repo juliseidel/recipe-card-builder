@@ -743,30 +743,17 @@ function PatisserieLayout({
               {pack.title}
             </span>
 
-            {/* Title — dynamische Schriftgroesse + aggressives Word-
-                Wrapping. Stufen sind dieselben wie im PDF-Patisserie
-                (lib/pdf/recipe-card-pdf.tsx#PatisseriePage), damit Web
-                und PDF konsistent rendern. `[overflow-wrap:anywhere]`
-                fuegt sich zu break-words + hyphens:auto dazu, weil
-                manche Browser bei zusammengesetzten deutschen
-                Substantiven mit Bindestrich (Erdbeer-Kuppeltorte,
-                KI-Süsskartoffel-Muffins) sonst doch nicht umbrechen. */}
+            {/* Title — fixe Schriftgröße für jedes Rezept. Statt 6 Stufen je
+                Titel-Länge zu skalieren, hält Patisserie jetzt eine einheitliche
+                Größe (38px). Compound-Words mit Bindestrich (Erdbeer-Kuppeltorte,
+                Maulwurfkuchen-Bowl) brechen sauber AM Bindestrich, nicht
+                mid-word — dafür ist `overflow-wrap:break-word` zuständig, das
+                nur an natürlichen Brechpunkten (Whitespace, Hyphen) bricht und
+                Mid-Word-Breaks erst als letzte Option zulässt. Das alte
+                `overflow-wrap:anywhere` hat "Maulwurfkuchen-Bowl" als
+                "MAULWURFK / - BOWL" zerrissen. */}
             <h1
-              className={[
-                "font-display italic tracking-[-0.015em]",
-                "leading-[1.02] break-words [hyphens:auto] [overflow-wrap:anywhere]",
-                recipe.title.length <= 14
-                  ? "text-[44px] sm:text-[52px]"
-                  : recipe.title.length <= 20
-                    ? "text-[38px] sm:text-[46px]"
-                    : recipe.title.length <= 26
-                      ? "text-[32px] sm:text-[38px]"
-                      : recipe.title.length <= 32
-                        ? "text-[26px] sm:text-[32px]"
-                        : recipe.title.length <= 40
-                          ? "text-[22px] sm:text-[26px]"
-                          : "text-[20px] sm:text-[24px]",
-              ].join(" ")}
+              className="font-display italic tracking-[-0.015em] leading-[1.04] text-[38px] [overflow-wrap:break-word] [word-break:normal]"
               style={{ color: pack.mood.ink }}
             >
               {recipe.title}
@@ -3144,7 +3131,7 @@ function SectionList({
               {group.items.map((ingredient, idx) => (
                 <li
                   key={`${ingredient.name}-${gIdx}-${idx}`}
-                  className={`grid grid-cols-[4.2rem_1fr] items-start gap-3 ${
+                  className={`grid grid-cols-[4.2rem_1fr] items-baseline gap-3 ${
                     minimal ? "py-2" : "border-b py-2.5"
                   }`}
                   style={{
