@@ -69,8 +69,12 @@ export function BrandStyleRefresh() {
         throw new Error(data?.error ?? "Regenerate fehlgeschlagen.");
       }
       setStage("success");
+      const sourceLabel =
+        data.source === "gemini"
+          ? "KI-Analyse"
+          : "Keyword-Match";
       setMessage(
-        `Brand-Style aktualisiert · ${data.lightingCount} Lighting-Optionen, ${data.sceneCount} Scenes. Naechstes Hero-Bild laeuft mit dem neuen Style.`
+        `Brand-Style aktualisiert · Template "${data.templateId}" (${sourceLabel}). ${data.reasoning ? data.reasoning.slice(0, 140) : ""} Naechstes Hero-Bild laeuft mit dem neuen Style.`
       );
       // Auto-dismiss success nach 8s
       dismissTimerRef.current = setTimeout(() => {
