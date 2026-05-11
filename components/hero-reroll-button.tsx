@@ -3,18 +3,19 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-// "KI-Alternative generieren"-Button im Detail-View. Triggert
-// /api/recipes/enrich mit forceFlux=true — d. h. wir zwingen den Server,
-// statt den Reel-Cover-Frame ein neues Flux-2-Pro-Bild im Brand-Style zu
-// rendern. Use-Case: Reel-Cover ist Talking-Head, hat Sticker-Overlay,
-// oder zeigt nicht das fertige Essen — Operator klickt hier, um ein
-// kuratiertes Brand-Bild zu bekommen.
+// "Bild neu generieren"-Button im Detail-View. Triggert /api/recipes/enrich
+// mit forceHero=true — d. h. die VOLLE Standard-Pipeline laeuft nochmal:
+// Apify scrape → ffmpeg Keyframes → Gemini-Vision-Pick → Flux 2 Pro mit
+// Keyframe als Reference. Nur der Render-Seed ist neu, also bekommt der
+// Operator eine alternative Variante desselben Setups. Wenn die auch
+// Quatsch ist, einfach nochmal klicken — Flux variiert ohne festen Seed.
 //
 // Pollt die Page in mehreren Wellen, weil das Hero asynchron in Vercel
 // after() landet (15-90 s typische BFL-Flux-Laufzeit). Wir muten nicht
 // die ganze Page — die Karte bleibt sichtbar, der Button zeigt nur kurz
 // "Wird neu generiert…", und router.refresh() holt das neue Bild aus
-// der DB.
+// der DB (data.hero wird vom enrich-Endpoint upserted, getRecipe()
+// liest das DB-hero ueber den Static-Map-Eintrag).
 
 type Props = {
   recipeId: string;
@@ -45,7 +46,11 @@ export function HeroRerollButton({ recipeId, tint }: Props) {
       const res = await fetch("/api/recipes/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recipeId, forceFlux: true }),
+        // forceHero (NICHT forceFlux): triggert die volle Standard-Pipeline
+        // (Apify → Video-Frames → Gemini-Keyframe → Flux 2 Pro mit Reference),
+        // nur mit anderem Render-Seed. forceFlux waere text-only-Fallback
+        // ohne Reference — das macht den Look schlechter, nicht besser.
+        body: JSON.stringify({ recipeId, forceHero: true }),
       });
       if (!res.ok) throw new Error("enrich-call returned " + res.status);
       setStage("waiting");
@@ -72,11 +77,11 @@ export function HeroRerollButton({ recipeId, tint }: Props) {
 
   const label =
     stage === "idle"
-      ? "KI-Alternative"
+      ? "Bild neu generieren"
       : stage === "starting"
         ? "Wird gestartet…"
         : stage === "waiting"
-          ? "KI-Bild wird generiert (45–90 s)…"
+          ? "Bild wird neu generiert (45–90 s)…"
           : "Fertig — lade neu";
 
   const busy = stage === "starting" || stage === "waiting";
@@ -92,8 +97,8 @@ export function HeroRerollButton({ recipeId, tint }: Props) {
         background: "rgba(255,255,255,0.6)",
         color: tint.ink,
       }}
-      aria-label="KI-Alternative generieren"
-      title="Generiert ein neues Hero-Bild im Brand-Style via Flux 2 Pro. Use-Case: das Reel-Cover passt nicht (Talking-Head, Sticker, schlechte Belichtung). Dauert 45–90 s."
+      aria-label="Bild neu generieren"
+      title="Generiert das Hero-Bild komplett neu — gleiche Pipeline (Reel-Keyframe + Flux Reference), nur anderer Render-Seed. Falls das erste Bild Quatsch ist, einfach nochmal klicken. Dauert 45–90 s."
     >
       {busy ? (
         <span
