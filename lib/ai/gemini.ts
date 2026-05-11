@@ -1,8 +1,19 @@
-// Thin Gemini 2.5 Flash client. We use the REST endpoint directly to keep the
+// Thin Gemini 2.5 client. We use the REST endpoint directly to keep the
 // dependency surface small — no @google/genai SDK needed for our use case.
+//
+// Two model variants are reachable via `model` option in GeminiOptions:
+//   - "flash" (default): gemini-2.5-flash, ~2-3 s, gut fuer Schema-Extraktion
+//   - "pro": gemini-2.5-pro, ~5-10 s, deutlich besseres Bild-Verstaendnis
+//     (Detail-Capture, Farb-Nuancen, raeumliche Anordnung) — wir nutzen
+//     Pro fuer Vision-Calls, wo Bild-Detail-Treue zaehlt.
 
-const ENDPOINT =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+const ENDPOINT_BASE =
+  "https://generativelanguage.googleapis.com/v1beta/models/";
+
+function endpointFor(model: "flash" | "pro"): string {
+  const slug = model === "pro" ? "gemini-2.5-pro" : "gemini-2.5-flash";
+  return `${ENDPOINT_BASE}${slug}:generateContent`;
+}
 
 export type GeminiSchema = Record<string, unknown>;
 
@@ -18,6 +29,8 @@ export type GeminiOptions = {
   thinkingBudget?: number;
   /** How many times to retry on 5xx / network errors. Default 2. */
   retries?: number;
+  /** "flash" (default, schnell) oder "pro" (genauer fuer Vision). */
+  model?: "flash" | "pro";
 };
 
 export class GeminiError extends Error {
@@ -87,7 +100,7 @@ export async function callGemini<T = unknown>(
 
     let res: Response;
     try {
-      res = await fetch(`${ENDPOINT}?key=${apiKey}`, {
+      res = await fetch(`${endpointFor(opts.model ?? "flash")}?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -180,6 +193,8 @@ export type GeminiPart =
 
 export type GeminiMultimodalOptions = Omit<GeminiOptions, "prompt"> & {
   parts: GeminiPart[];
+  /** "flash" (default) oder "pro" — pro fuer detail-kritische Vision-Calls. */
+  model?: "flash" | "pro";
 };
 
 export async function callGeminiMultimodal<T = unknown>(
@@ -224,7 +239,7 @@ export async function callGeminiMultimodal<T = unknown>(
     }
     let res: Response;
     try {
-      res = await fetch(`${ENDPOINT}?key=${apiKey}`, {
+      res = await fetch(`${endpointFor(opts.model ?? "flash")}?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

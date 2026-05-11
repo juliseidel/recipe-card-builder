@@ -116,14 +116,12 @@ export function heroPrompt(
     );
   }
   if (withReferenceImage) {
-    // Jan's Original-Wording aus Prompt #4 — zwingt Flux Kontext, das
-    // Gericht 1:1 vom Reference-Image zu uebernehmen, nur Umgebung und
-    // Licht werden neu gestagt. Ohne diesen Satz interpretiert Flux
-    // Kontext die Reference zu kreativ.
+    // Jan's Original-Wording + zusaetzliche Color-Preservation. Vorher
+    // hat Flux die Reference-Farben in Richtung "warm golden" gezogen,
+    // weil unser Brand-Style das suggerierte. Jetzt explizit: Farbpalette
+    // des Reference-Bilds beibehalten, auch wenn sie kuhl/neutral ist.
     parts.push(
-      `Homemade imperfect character preserved from the reference image, dish shape and color and garnish placement matching the reference, environment and lighting re-staged for warmth.`,
-      // Anti-Bienenfee-Doppelung: falls das Reel selbst die Doppel-
-      // Staging zeigt, soll Flux nur eine Anrichtung uebernehmen.
+      `Homemade imperfect character preserved from the reference image. Dish shape, color palette, garnish placement, and exact arrangement must match the reference exactly — preserve all original colors including any cool, muted or neutral tones, do not warm-tint, do not saturate, do not stylize the dish itself. Only environment and lighting are re-staged.`,
       `Single staging only — one main composition, no demo slice alongside.`
     );
   }

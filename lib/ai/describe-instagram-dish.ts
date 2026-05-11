@@ -1,26 +1,33 @@
 import { callGeminiMultimodal } from "./gemini";
 
-// Vision-Layer fuer die Hero-Pipeline: Gemini 2.5 Flash schaut sich das
-// Reel-Cover-Bild von Instagram an und beschreibt NUR das Gericht — Form,
-// Farbe, Textur, Garnish, Anrichtung. Bewusst NICHT: Text-Overlays,
-// Talking-Heads, Hintergrund, Beleuchtung. Diese Beschreibung wird dann
-// als Text-Hinweis in den Flux-Prompt eingebaut.
-//
-// Ingo-Feedback: aktuell sieht Gemini nie das echte Bild — Flux generiert
-// "irgendeinen Kaiserschmarren", nicht den fluffig-goldgelben mit Erdbeer-
-// Compote vom Reel. Dieser Vision-Call schliesst die Lücke.
+// Vision-Layer fuer die Hero-Pipeline: Gemini 2.5 Pro schaut sich das
+// Reel-Cover-Bild von Instagram an und beschreibt das Gericht mit ALLEN
+// DETAILS (Farbe, Form, Anzahl, Anordnung, Garnish, Vessel). Diese
+// Beschreibung wird dann zusammen mit dem Reel-Cover als Reference-Image
+// an Flux Kontext Max gegeben — drei zusammenpassende Signale fuer maximale
+// Detail-Treue zum Original.
 
-const SYSTEM_INSTRUCTION = `Du bist ein Photograph, der einem Kollegen ein Reel-Cover-Bild in Worten beschreibt — fuer einen Image-Generator, der das Gericht spaeter im selben Look (aber clean, ohne Werbe-Elemente) nachstellen soll.
+const SYSTEM_INSTRUCTION = `Du bist ein Food-Photograph, der einem Image-Generator ein Reel-Bild detailliert beschreibt — damit der Generator das Gericht spaeter im selben Look (clean, ohne Werbe-Elemente) und mit ALLEN ECHTEN DETAILS nachstellen kann. Detail-Treue ist hier kritisch: Farb-Paletten, Anordnung, Anzahl, Garnish — alles muss konkret sein.
 
-Schau dir das Bild an und schreib einen einzigen englischen Satz, in dem jemand, der das Reel nie gesehen hat, sich das Gericht trotzdem genau vorstellen kann — wie es aussieht, welche Farben, welche Textur, wie das Topping verteilt ist, in welchem Gefaess es liegt. Schreib es so, wie ein erfahrener Foodphotograph einer Kollegin schnell ein Bild erklaert: konkret, sinnlich, in einem Atemzug. Bei den Farben praezise sein — nicht "golden", sondern "pale eggshell-yellow with lightly caramelized edges". Nicht "creamy white", sondern "soft off-white with red strawberry marbling".
+Schau dir das Bild GENAU an und schreib eine fluessige Beschreibung (2-4 Saetze, max 150 Woerter) als waere es ein Kochbuch-Bildtext. Sei extrem praezise bei:
 
-Wenn das Reel mehrere Anrichtungen zeigt — typisches Bienenfee-Pattern wie Backform plus plattiert daneben, oder ein ganzes Cup neben einem angeschnittenen Demo-Stueck — beschreibe NUR die fertige Servier-Variante, nicht beide. Wenn das Topping im Reel natuerlich verstreut ist (mal eine Beere hier, mal drei dort), schreib es genau so — nicht "one per piece", weil Generatoren das sonst symmetrisch nachstellen.
+FARB-PALETTE — nicht "golden", sondern was du wirklich siehst: "warm honey-brown with light caramelized edges fading to pale ivory underneath"; "cool ice-cream-pink with bright crimson dots on chalk-white base"; "deep chocolate with espresso-dark crust". Gib mehrere Farben an, wenn das Bild mehrere hat. Sag explizit, ob die Farben warm, kuhl oder neutral wirken — Generatoren ziehen sonst standardmaeßig in Richtung warm-golden.
 
-Ignoriere alles, was nicht das Gericht selbst ist: Text-Overlays, Sticker, Werbe-Stempel, Personen, Haende, Hintergrund-Kuechen-Setup, Lichtstimmung. Die Umgebung und das Licht werden neu gestagt — du beschreibst nur das Essen.
+FORM & ANORDNUNG — wie ist das Gericht geschichtet/gestapelt/verteilt? "A neat 3×2 grid of round discs in a metal muffin tin"; "Loose pile of irregularly torn pieces on a deep plate"; "Three layers cleanly visible in a glass: white bottom, pink middle, white top, garnish floating on top".
 
-Antworte auf Englisch, EIN einzelner Satz, max 80 Woerter, fluessig formuliert (nicht als Stichpunkt-Liste). KEIN "I see..." oder "The image shows...", sondern direkt die Beschreibung als waere es eine Bildunterschrift fuer ein Kochbuch.
+ANZAHL — wie viele Einheiten/Stuecke/Schichten sind im Bild? Gib eine genaue Zahl wenn moeglich ("six round cups", "two stacked layers", "about eight torn pieces").
 
-Falls das Bild kein Gericht zeigt (reiner Talking-Head, reines Werbe-Cover ohne Essen): gib einen leeren String zurueck.`;
+TOPPING & GARNISH — exakte Verteilung: "raspberries scattered organically across, some clustered, some single — not one-per-piece"; "powdered sugar dusted unevenly heavier on the left side"; "small bowl of jam sitting on the right edge of the plate, separate from the dish". Wenn etwas in einer kleinen Schale daneben liegt, sag das.
+
+SERVING-VESSEL — was haellt das Gericht? "Black metal muffin tin", "white round ceramic plate with raised rim", "tall glass with vertical sides", "shallow dark stoneware bowl".
+
+Wenn das Reel mehrere Anrichtungen zeigt (Backform + plattiert daneben, ganzes + angeschnittenes), beschreibe NUR die finale Servier-Variante. Nie beide kombinieren.
+
+Ignoriere: Text-Overlays, Sticker, Werbe-Stempel, Personen, Hintergrund, Lichtstimmung. Nur das Gericht selbst.
+
+Antworte auf Englisch, KEIN "I see..." oder "The image shows..." — direkt die Beschreibung wie eine Bildunterschrift fuer einen Bildband. Konkret, sinnlich, detail-dicht.
+
+Wenn das Bild kein Gericht zeigt (Talking-Head, reines Werbe-Cover): leerer String.`;
 
 const SCHEMA = {
   type: "object",
@@ -28,7 +35,7 @@ const SCHEMA = {
     dishDescription: {
       type: "string",
       description:
-        "Ein einzelner englischer Satz, visuell praezise, max 60 Woerter, der NUR das Gericht beschreibt. Leer wenn das Bild kein Gericht zeigt.",
+        "Eine fluessige Beschreibung (2-4 Saetze, max 150 Woerter), die das Gericht mit allen Details abdeckt: Farbpalette, Form, Anzahl, Anordnung, Topping, Vessel. Leer wenn kein Gericht im Bild.",
     },
   },
   required: ["dishDescription"],
@@ -52,16 +59,14 @@ export async function describeInstagramDish(
   }
   const arrayBuffer = await res.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
+  const mimeType =
+    res.headers.get("content-type")?.split(";")[0]?.trim() || "image/jpeg";
 
-  // Content-Type: meistens image/jpeg von Instagram-CDN
-  const mimeType = res.headers.get("content-type")?.split(";")[0]?.trim() || "image/jpeg";
-
-  // 2) Gemini Vision Call
   try {
     const raw = await callGeminiMultimodal<{ dishDescription: string }>({
       parts: [
         {
-          text: "Beschreibe das Gericht auf diesem Reel-Cover-Bild. Folge der System-Instruction strikt.",
+          text: "Beschreibe das Gericht auf diesem Reel-Bild MIT ALLEN DETAILS (Farbe, Form, Anzahl, Anordnung, Garnish, Vessel). Folge der System-Instruction strikt.",
         },
         {
           inlineData: {
@@ -72,9 +77,13 @@ export async function describeInstagramDish(
       ],
       schema: SCHEMA,
       systemInstruction: SYSTEM_INSTRUCTION,
+      // gemini-2.5-pro statt flash — deutlich detail-genauer bei Vision-
+      // Calls, sieht Farb-Nuancen, raeumliche Anordnung, Anzahl der
+      // Komponenten praeziser. Kostet ~5-10 s statt 2-3 s — der Wert fuer
+      // die Hero-Pipeline ist es wert.
+      model: "pro",
       temperature: 0.2,
-      maxOutputTokens: 200,
-      thinkingBudget: 0,
+      maxOutputTokens: 600,
       retries: 1,
     });
     const desc = (raw.dishDescription ?? "").trim();
