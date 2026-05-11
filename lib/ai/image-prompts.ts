@@ -107,7 +107,13 @@ export function heroPrompt(
   // textureFocus-Adjektive.
   if (dishDescription && dishDescription.trim()) {
     parts.push(
-      `The dish itself looks like this — match these visual specifics: ${dishDescription.trim()}.`
+      `The dish itself looks like this — match these visual specifics: ${dishDescription.trim()}.`,
+      // Anti-Duplikat: Flux 2 Pro neigt dazu, das Gericht zweimal ins
+      // Bild zu stellen (Backform plus plattiert, Glas plus Anschnitt
+      // daneben), wenn das Reel-Cover beides zeigte oder der brand-style
+      // ein heroElement neben dem Gericht inszeniert. Explizit eine
+      // einzelne Komposition fordern.
+      `Show the dish in a single staging — one main composition, one serving variant only, no duplicate plating side-by-side.`
     );
   }
   parts.push(
@@ -129,7 +135,7 @@ export function heroPrompt(
 // food prompts. The brand `negativeAddition` adds creator-specific
 // exclusions on top (for Biene: cast-iron pan, cream counter, title overlay).
 const HERO_BASE_NEGATIVE =
-  "no text, no labels, no logos, no packaging, no cartons, no bottles, no jars with labels, no bags, no brand names, no hands, no people, no faces, no rigid centering, no plastic-looking sauce, no unnatural gloss, no studio lighting, no white void background, no cool blue tones, no fluorescent lighting, no headline at the bottom of the image, no large letters anywhere, no typography, no watermark";
+  "no text, no labels, no logos, no packaging, no cartons, no bottles, no jars with labels, no bags, no brand names, no hands, no people, no faces, no rigid centering, no plastic-looking sauce, no unnatural gloss, no studio lighting, no white void background, no cool blue tones, no fluorescent lighting, no headline at the bottom of the image, no large letters anywhere, no typography, no watermark, no duplicate dishes, no multiple plating versions, no two servings of the same dish, no demonstration shot alongside finished shot, no before-and-after staging";
 
 export function heroNegative(brandSlug: string): string {
   const add = getBrandImageStyle(brandSlug).negativeAddition;

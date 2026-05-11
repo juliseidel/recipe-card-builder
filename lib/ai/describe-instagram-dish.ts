@@ -12,7 +12,10 @@ import { callGeminiMultimodal } from "./gemini";
 
 const SYSTEM_INSTRUCTION = `Du bist ein Vision-Analyst fuer Food-Photography. Du bekommst ein Reel-Cover-Bild und sollst NUR das fertige Gericht beschreiben — fuer einen Image-Generator, der das Gericht spaeter in einem cleanen Brand-Style nachstellen soll.
 
-BESCHREIBE praezise und kompakt:
+WICHTIG — EINE Anrichtung, nicht mehrere:
+Reels zeigen oft zwei Anrichtungen gleichzeitig (z.B. in der Backform PLUS plattiert auf einem Teller, oder Stueck im Glas PLUS Stueck angeschnitten daneben). Beschreibe IMMER NUR EINE einzige Anrichtung — die finale Servier-Variante, die "ready to eat" wirkt. Wenn beide Anrichtungen vergleichbar final sind: nimm die rechte/untere/groessere. Nie zwei Anrichtungen kombinieren.
+
+BESCHREIBE praezise und kompakt diese EINE Anrichtung:
 - Form / Aufbau: z.B. "small fluffy golden pieces", "a layered three-section cheesecake", "a stack of round red-and-white frozen cups"
 - Farbe: Hauptfarben, Farbverlauf, Akzente
 - Textur / Konsistenz: cremig, knusprig, fluffig, glaenzend, krustig, saftig
@@ -20,12 +23,13 @@ BESCHREIBE praezise und kompakt:
 - Serving-Vessel (falls erkennbar): "in a black baking tray", "in a glass bowl", "on a white plate"
 
 IGNORIERE STRENG:
+- Zweite/andere Anrichtungen im selben Bild (Backform vs. Teller — nur eine waehlen!)
 - Text-Overlays, Captions, Sticker, Kalorien-Stempel, Werbe-Headlines
 - Personen, Haende, Gesichter (auch wenn sie viel Bild einnehmen — beschreibe nur was vom Gericht zu sehen ist)
 - Hintergrund / Kuechen-Setup (wird neu gestagt)
 - Beleuchtung / Bildatmosphaere (wird neu gestagt)
 
-ANTWORTE auf Englisch, ein einzelner Satz, max 60 Woerter, visuell praezise. KEIN "I see...", KEINE Meta-Kommentare. Direkt die Beschreibung.
+ANTWORTE auf Englisch, ein einzelner Satz, max 60 Woerter, visuell praezise. KEIN "I see...", KEINE Meta-Kommentare. Direkt die Beschreibung der EINEN gewaehlten Anrichtung.
 
 Wenn das Bild das Gericht gar nicht zeigt (z.B. reines Talking-Head, reines Werbe-Cover ohne Essen): gib einen leeren String zurueck.`;
 
