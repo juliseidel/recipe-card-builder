@@ -294,7 +294,7 @@ function EditorialLayout({
                 sizes="(min-width: 1024px) 320px, 100vw"
                 className="object-cover content-fade-in"
                 priority
-                quality={90}
+                quality={95}
 />
             )}
           </div>
@@ -799,7 +799,7 @@ function PatisserieLayout({
                       sizes="(min-width: 1024px) 320px, 80vw"
                       className="object-cover content-fade-in"
                       priority
-                      quality={90}
+                      quality={95}
 />
                   )}
                 </div>
@@ -1176,7 +1176,7 @@ function MinimalLayout({
             sizes="(min-width: 1024px) 920px, 100vw"
             className="object-cover content-fade-in"
             priority
-            quality={90}
+            quality={95}
 />
         )}
         {/* Dunkler Gradient unten — sicherer Kontrast fuer Title */}
@@ -1652,7 +1652,7 @@ function SportLayout({
                 sizes="(min-width: 1024px) 340px, 100vw"
                 className="object-cover content-fade-in"
                 priority
-                quality={90}
+                quality={95}
 />
             )}
           </div>
@@ -2024,7 +2024,7 @@ function VitalLayout({
                 sizes="(min-width: 640px) 180px, 100vw"
                 className="object-cover content-fade-in"
                 priority
-                quality={90}
+                quality={95}
 />
             )}
           </div>
@@ -2535,7 +2535,7 @@ function AmberLayout({
               sizes="(min-width: 1024px) 480px, 100vw"
               className="object-cover content-fade-in"
               priority
-              quality={90}
+              quality={95}
 />
           )}
 
@@ -2993,7 +2993,7 @@ function DashboardLayout({
                 sizes="(min-width: 1024px) 360px, 100vw"
                 className="object-cover content-fade-in"
                 priority
-                quality={90}
+                quality={95}
 />
               <div
                 className="absolute inset-0 mix-blend-multiply"
