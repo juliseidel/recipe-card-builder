@@ -135,6 +135,11 @@ export async function POST(req: Request) {
         keyframeTimestamp: result.keyframeTimestamp,
       });
       done += 1;
+      // Server-Cache der Pack-DB-Reads invalidieren — sonst sieht die
+      // App den neuen Hero erst nach Cache-TTL-Tick (30s).
+      const { revalidatePath } = await import("next/cache");
+      revalidatePath(`/${r.brand_slug}/${r.pack_slug}`);
+      revalidatePath(`/${r.brand_slug}/${r.pack_slug}/${r.recipe_slug}`);
     } catch (err) {
       items.push({
         recipeSlug: r.recipe_slug,

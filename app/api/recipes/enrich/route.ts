@@ -216,6 +216,13 @@ export async function POST(req: Request) {
         });
         if (result?.heroUrl) {
           await mergeRecipeData(row.id, () => ({ hero: result.heroUrl }));
+          // Cache der Pack-DB-Reads invalidieren, sonst zeigt die App den
+          // alten Hero bis zum naechsten 30s-TTL-Tick. Wir invalidieren
+          // die zwei Pfade, die das Hero anzeigen (Pack-Uebersicht +
+          // Detail-Page).
+          const { revalidatePath } = await import("next/cache");
+          revalidatePath(`/${brandSlug}/${packSlug}`);
+          revalidatePath(`/${brandSlug}/${packSlug}/${recipe.slug}`);
         }
       } catch (err) {
         console.error("[enrich] hero failed for", body.recipeId, err);
