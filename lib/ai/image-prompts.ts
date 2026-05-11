@@ -208,42 +208,6 @@ export async function lifestyleNegative(
   return add ? `${LIFESTYLE_BASE_NEGATIVE}, ${add}` : LIFESTYLE_BASE_NEGATIVE;
 }
 
-// REFERENCE-FIRST Prompt fuer DB-Brands (PR 12). Anders als der heroPrompt
-// fuer Code-Brands (Biene), der einen ausgepraegten Style ueberlagert,
-// laesst dieser Prompt der Reel-Reference maximalen Raum:
-//   - kein Counter-Override (keine sceneOptions)
-//   - kein Lighting-Override (keine lightingOptions)
-//   - kein Camera-Aesthetic-Override
-//   - kein heroElement das die Komposition aendert
-//
-// Flux 2 Pro mit input_image kann so das Reel-Bild 1:1 nachempfinden,
-// nur in hoeherer Aufloesung + ggf. mit etwas besserer Bildqualitaet.
-// Genau das, was ein Team-Member fuer einen neu onboardeten Creator
-// erwartet: das Bild sieht aus wie sein Reel, nicht wie eine fremde
-// Interpretation.
-//
-// PR 14: PR 13 revertet — die aggressive Text-Removal-Variante hat das
-// Bild zu weit vom Reel weg-gerendert. User-Feedback: "Das war davor
-// viel besser." Zurueck zur PR-12-Version mit "preserve entirely".
-export function buildReferenceFirstPrompt(
-  recipe: Recipe
-): { prompt: string; negative: string } {
-  const steam =
-    recipe.title.match(/suppe|soup|stew|eintopf|tee|kakao|brei/i)
-      ? ", with subtle steam rising"
-      : "";
-  return {
-    prompt: [
-      `${recipe.title}.`,
-      `Preserve the reference image entirely: same dish, same vessel, same counter, same lighting, same composition, same camera angle, same garnish.`,
-      `Re-render with high fidelity and natural details${steam}.`,
-      `Homemade imperfect character, natural unstaged food photograph.`,
-    ].join(" "),
-    negative:
-      "no text, no labels, no logos, no packaging, no watermark, no overlay, no recipe title text, no studio lighting, no white void background",
-  };
-}
-
 export async function buildPrompt(
   style: PromptStyle,
   recipe: Recipe,
