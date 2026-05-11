@@ -4,7 +4,6 @@ import {
   scrapeInstagramProfile,
 } from "@/lib/integrations/apify";
 import { analyzeCreatorIdentity } from "@/lib/ai/analyze-creator-identity";
-import { analyzeCreatorStyleFromText } from "@/lib/ai/analyze-creator-style";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 
 // Onboarding-Helper-Endpoint. Frontend tippt nur den Instagram-Handle,
@@ -113,24 +112,21 @@ export async function POST(req: Request) {
     }
   }
 
-  // ─── 3. Identitaet + Style parallel ─────────────────────────────────────
-  // Identity-Analyse: Gemini Flash, Bio + Captions → Brand-Felder (~3-5s)
-  // Style-Selektion (PR 11): Text-basiert (kein Vision) — Gemini Flash
-  //   waehlt aus 6 vorgefertigten Brand-Style-Templates anhand Bio +
-  //   Captions + Hashtags. Falls Flash fail't: deterministic keyword
-  //   match. Funktioniert IMMER, Style wird IMMER in brand.imageStyle
-  //   gespeichert.
-  const [identitySettled, styleSettled] = await Promise.allSettled([
-    analyzeCreatorIdentity(profile),
-    analyzeCreatorStyleFromText({ profile }),
-  ]);
-
-  if (identitySettled.status === "rejected") {
+  // ─── 3. Identitaet-Analyse (Style-Selektor raus seit PR 12) ─────────────
+  // Hero-Pipeline rendert fuer DB-Brands jetzt im Reference-First-Modus:
+  // Flux bekommt nur den Reel-Keyframe + minimalen "preserve reference"-
+  // Prompt. Heisst: kein Brand-Style noetig, das Bild sieht 1:1 wie das
+  // Reel aus. Bienes Code-Style ist davon unangetastet — Bienes Brand-
+  // DNA gilt nur fuer sie.
+  let identity;
+  try {
+    identity = await analyzeCreatorIdentity(profile);
+  } catch (err) {
     return NextResponse.json(
       {
         error:
-          identitySettled.reason instanceof Error
-            ? identitySettled.reason.message
+          err instanceof Error
+            ? err.message
             : "Konnte das Profil nicht analysieren.",
         stage: "analyze",
         profile: {
@@ -145,32 +141,10 @@ export async function POST(req: Request) {
     );
   }
 
-  const identity = identitySettled.value;
-  const styleResult =
-    styleSettled.status === "fulfilled" ? styleSettled.value : null;
-  const imageStyle = styleResult?.style ?? null;
-  if (styleSettled.status === "rejected") {
-    console.warn(
-      "[analyze-instagram] style selection failed unexpectedly:",
-      styleSettled.reason instanceof Error
-        ? styleSettled.reason.message
-        : styleSettled.reason
-    );
-  } else if (styleResult) {
-    console.log(
-      `[analyze-instagram] style picked: ${styleResult.templateId} (${styleResult.source})`
-    );
-  }
-
   return NextResponse.json({
     ok: true,
     identity,
     avatarUrl,
-    // imageStyle: optional — kann null sein wenn Vision-Analyse fehlschlug
-    // oder zu wenige Bilder verfuegbar waren (<3). Frontend speichert es
-    // wenn vorhanden in brand.imageStyle; Pipeline-Fallback fuer null.
-    imageStyle,
-    latestPosts: profile.latestPosts,
     raw: {
       handle: profile.username,
       followersCount: profile.followersCount,
