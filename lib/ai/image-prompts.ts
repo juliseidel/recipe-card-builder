@@ -135,9 +135,16 @@ export async function heroPrompt(
   if (withReferenceImage) {
     // Vessel explizit in die "matching the reference" Klausel — sonst koennte
     // Flux das Vessel kreativ interpretieren statt aus der Reference zu
-    // uebernehmen. Restliche Klausel ist Jan's Original-Wording.
+    // uebernehmen.
+    //
+    // WICHTIG: explizite Klausel gegen Text-Overlays + Personen aus der
+    // Reference. Reel-Covers haben oft Recipe-Titel als Overlay; bei
+    // Image-Posts auch Werbe-Stempel. Ohne diese Klausel uebernimmt Flux
+    // den Text als "Teil der Komposition". Wir machen klar: NUR das
+    // gekochte Gericht selbst stammt aus der Reference, NICHT Text /
+    // Personen / Hands / Bildunterschriften / Watermarks.
     parts.push(
-      `${style.cameraAesthetic}, ${toneWord(spec)} tones, homemade imperfect character preserved from the reference image, dish shape, color, serving vessel and garnish placement matching the reference, environment and lighting re-staged for warmth${steamSuffix(spec)}.`
+      `Use the reference image ONLY for the cooked dish itself — its shape, color, garnish, and serving vessel. The reference may contain text overlays, captions, recipe titles, watermarks, hands, fingers, or people: ALL of those must be entirely absent from the output. Re-stage the environment, surface, and lighting fresh from this prompt. ${style.cameraAesthetic}, ${toneWord(spec)} tones, homemade imperfect character preserved from the reference image, dish shape, color, serving vessel and garnish placement matching the reference, environment and lighting re-staged for warmth, no overlaid text or typography on the final image${steamSuffix(spec)}.`
     );
   } else if (dishDescription && dishDescription.trim()) {
     // Text-Only-Pfad mit Cover-Beschreibung als Anker
@@ -158,17 +165,28 @@ export async function heroPrompt(
   return parts.join(" ");
 }
 
-// Negative — Jan's Original-Set mit "Anti-Studio-Look"-Items (no rigid
-// centering, no plastic-looking sauce, no unnatural gloss, no white void
-// background, no cool blue tones, no fluorescent lighting). Die Brand-
-// negativeAddition kommt obendrauf (fuer Biene: kein Petersilien-Garnish,
-// keine Gusspfanne).
+// Negative — Jan's Original-Set, plus explizit verschaerfte Text- und
+// Body-Negatives (User-Feedback 2026-05-12: Reel-Cover-Texte wie "Der
+// genialste Hummus DIP!" wurden vorher von Flux ins Output uebernommen,
+// weil "no text" alleine bei Reference-Image-Mode zu wenig wog).
 //
-// Memory-Lesson v8: 25+ Items machten Flux ueberregelmaessig. Jan's Set
-// hat ~17 Items — das ist der Sweet-Spot zwischen Studio-Schutz und nicht-
-// uebersteuert.
+// Drei Variationen fuer Text — Flux interpretiert die unterschiedlich,
+// einzeln umgangen werden sie leichter:
+//   - "no text overlays" (gegen Reel-Cover-Style)
+//   - "no captions" (gegen Foto-Untertitel)
+//   - "no recipe titles" (gegen den haeufigen Spezialfall)
+//   - "no typography, no letters, no words" (Generalisierung)
+//
+// Body-Parts: vorher nur "no hands, no people, no faces". Erweitert um
+// "no fingers, no arms, no torso, no body parts visible" — Flux hatte bei
+// engen Crops mal nur einen Finger drin gerendert, was alleine "no hands"
+// nicht abdeckt.
+//
+// Memory-Lesson v8: 25+ Items machten Flux ueberregelmaessig. Aktuelle
+// Liste ist bei ~22 — knapp ueber dem alten Sweet-Spot, aber die Text-
+// Schutz-Items sind essentiell, weil sie das Hauptproblem loesen.
 const HERO_BASE_NEGATIVE =
-  "no text, no labels, no logos, no packaging, no cartons, no bottles, no jars with labels, no bags, no brand names, no watermark, no hands, no people, no faces, no rigid centering, no plastic-looking sauce, no unnatural gloss, no studio lighting, no white void background, no cool blue tones, no fluorescent lighting";
+  "no text, no text overlays, no captions, no recipe titles overlaid on image, no typography, no letters, no words on the image, no headlines, no labels, no logos, no packaging, no cartons, no bottles, no jars with labels, no bags, no brand names, no watermark, no signage, no banners, no hands, no fingers, no arms, no people, no faces, no body parts visible, no person in frame, no rigid centering, no plastic-looking sauce, no unnatural gloss, no studio lighting, no white void background, no cool blue tones, no fluorescent lighting";
 
 export async function heroNegative(brandSlug: string): Promise<string> {
   const style = await getBrandImageStyle(brandSlug);
@@ -198,7 +216,7 @@ export async function lifestylePrompt(
 }
 
 const LIFESTYLE_BASE_NEGATIVE =
-  "no text, no labels, no logos, no packaging, no hands, no people, no faces, no matched utensil pairs, no two forks, no two spoons, no two knives, no distorted cutlery, no plastic-looking sauce, no studio lighting, no white void background, no cool blue tones, no fluorescent lighting";
+  "no text, no text overlays, no captions, no recipe titles, no typography, no letters, no words on the image, no labels, no logos, no packaging, no watermark, no signage, no hands, no fingers, no arms, no people, no faces, no body parts visible, no person in frame, no matched utensil pairs, no two forks, no two spoons, no two knives, no distorted cutlery, no plastic-looking sauce, no studio lighting, no white void background, no cool blue tones, no fluorescent lighting";
 
 export async function lifestyleNegative(
   brandSlug: string

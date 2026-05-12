@@ -31,8 +31,8 @@ const SYSTEM_INSTRUCTION = `Du bist ein Vision-Selektor fuer Food-Photography. A
 ANFORDERUNGEN (alle muessen gelten):
 - Das Gericht ist fertig (gekocht, angerichtet, garniert — nicht roh, nicht in der Zubereitung)
 - Das Gericht ist das primaere Motiv (≥ 40 % der Bildflaeche)
-- Keine Haende, Loeffel, Pfannenwender darueber
-- Kein Text-Overlay / Caption / Sticker auf dem Essen
+- Keine Haende, Finger, Arme, Loeffel, Pfannenwender ueber dem Gericht
+- Kein Text-Overlay, kein Recipe-Titel, keine Caption, kein Sticker, kein Werbe-Stempel auf dem Bild
 - Bild scharf, kein Motion-Blur
 - Echte Farben sichtbar (nicht ueberbelichtet, nicht stark farbstich-verfaelscht)
 - Gericht matcht das beschriebene Rezept
@@ -50,7 +50,16 @@ VOLLSTAENDIG ABLEHNEN:
 - Heavy Motion-Blur
 - Frames die nur Zutaten oder Zubereitungsschritte zeigen
 
-Antworte AUSSCHLIESSLICH im JSON-Schema mit dem Index (0-basiert) des gewaehlten Frames und einer kurzen reasoning-Notiz. Wenn KEIN Frame die Anforderungen erfuellt, gib den am wenigsten schlechten zurueck und vermerke das in reasoning.`;
+KRITISCH — Null-Return-Path:
+Wenn ALLE Frames mindestens eines der folgenden Probleme haben — und KEINER ein clean food shot ohne Text/Personen ist — setze noCleanFrameAvailable auf true und chosenIndex auf -1:
+  - alle Frames haben Text-Overlays / Recipe-Titel / Cover-Schrift
+  - alle Frames zeigen prominent Personen, Haende oder Finger
+  - alle Frames sind mid-cooking / nur Zutaten / nicht das fertige Gericht
+Das Downstream-System uebernimmt dann text-only-Generation statt eines schlechten Reference-Image.
+
+Wenn mindestens ein Frame OK ist (auch wenn nicht perfekt), waehle den besten und setze noCleanFrameAvailable auf false. Compromise-Picks sind OK, solange das Gericht klar und ohne Text/Personen erkennbar ist.
+
+Antworte AUSSCHLIESSLICH im JSON-Schema.`;
 
 const SCHEMA = {
   type: "object",
@@ -58,15 +67,20 @@ const SCHEMA = {
     chosenIndex: {
       type: "integer",
       description:
-        "0-basierter Index des gewaehlten Frames in der uebergebenen Liste.",
+        "0-basierter Index des gewaehlten Frames in der uebergebenen Liste. -1 wenn noCleanFrameAvailable=true (kein Frame ist sauber genug).",
+    },
+    noCleanFrameAvailable: {
+      type: "boolean",
+      description:
+        "true wenn ALLE Frames Text-Overlays, prominente Personen oder unfertige Zubereitung zeigen — dann skippt das System die Reference und macht text-only Generation.",
     },
     reasoning: {
       type: "string",
       description:
-        "Ein deutscher Satz: warum dieser Frame gewaehlt wurde (oder welche Kompromisse gemacht wurden).",
+        "Ein deutscher Satz: warum dieser Frame gewaehlt wurde — oder warum noCleanFrameAvailable=true (welche Probleme alle Frames hatten).",
     },
   },
-  required: ["chosenIndex", "reasoning"],
+  required: ["chosenIndex", "noCleanFrameAvailable", "reasoning"],
 };
 
 export type KeyframeSelection = {
@@ -75,13 +89,15 @@ export type KeyframeSelection = {
   reasoning: string;
 };
 
+// Returnt null wenn keiner der Frames sauber genug ist — dann fallback
+// im Caller zu text-only Flux mit Vision-Description als Anker.
 export async function selectBestKeyframe(opts: {
   frames: ExtractedFrame[];
   recipeTitle: string;
   caption: string;
-}): Promise<KeyframeSelection> {
+}): Promise<KeyframeSelection | null> {
   if (opts.frames.length === 0) {
-    throw new Error("No frames to choose from");
+    return null;
   }
   if (opts.frames.length === 1) {
     return { frame: opts.frames[0], index: 0, reasoning: "Nur ein Frame verfuegbar." };
@@ -114,6 +130,7 @@ export async function selectBestKeyframe(opts: {
 
   const raw = await callGeminiMultimodal<{
     chosenIndex: number;
+    noCleanFrameAvailable: boolean;
     reasoning: string;
   }>({
     parts,
@@ -124,6 +141,15 @@ export async function selectBestKeyframe(opts: {
     thinkingBudget: 0,
     retries: 1,
   });
+
+  // Null-Return-Path: Gemini hat erkannt dass ALLE Frames Probleme haben.
+  // Caller faellt auf text-only Generation zurueck.
+  if (raw.noCleanFrameAvailable || raw.chosenIndex < 0) {
+    console.log(
+      `[select-keyframe] no clean frame — ${(raw.reasoning ?? "").slice(0, 200)}`
+    );
+    return null;
+  }
 
   const idx = Math.min(
     Math.max(0, Math.floor(raw.chosenIndex ?? 0)),
