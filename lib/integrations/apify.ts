@@ -435,10 +435,13 @@ export async function startReelBackfill(opts: {
   username: string;
   /** Vollstaendige HTTPS-URL des Webhook-Endpoints. */
   webhookUrl: string;
-  /** Wie viele Posts max? Standard: 500 (~2 Jahre bei aktiven Creators).
+  /** Wie viele Posts max? Standard: 200 (~1 Jahr bei aktiven Creators).
+   *  Frueher 500 — runtergeschraubt fuer Apify-Cost (Apify rechnet nach
+   *  Items, nicht nach behaltenen Recipes). 200 reichen fuer eine solide
+   *  Pack-Vorschlags-Basis bei den meisten Food-Creators.
    *  Fuer Daily-Refresh setzt der Cron-Job das auf 30-50 runter. */
   resultsLimit?: number;
-  /** Wie weit zurueck scrapen? Standard 730 (2 Jahre). Cron-Refresh setzt
+  /** Wie weit zurueck scrapen? Standard 365 (1 Jahr). Cron-Refresh setzt
    *  das auf 30 — wir brauchen nur neue Posts seit dem letzten Lauf. */
   onlyPostsNewerThanDays?: number;
 }): Promise<{ runId: string; datasetId: string }> {
@@ -489,10 +492,10 @@ export async function startReelBackfill(opts: {
     // wichtigen `timestamp` + `videoUrl`-Felder. "details" wuerde nur
     // Profil-Metadaten + ~30 latestPosts liefern.
     resultsType: "posts",
-    resultsLimit: opts.resultsLimit ?? 500,
+    resultsLimit: opts.resultsLimit ?? 200,
     // onlyPostsNewerThan ist als String-Filter erlaubt ("2 years", "30 days"),
     // limitiert serverseitig den Apify-Run.
-    onlyPostsNewerThan: `${opts.onlyPostsNewerThanDays ?? 730} days`,
+    onlyPostsNewerThan: `${opts.onlyPostsNewerThanDays ?? 365} days`,
   };
 
   const res = await fetch(`${endpoint}&webhooks=${webhooksBase64}`, {

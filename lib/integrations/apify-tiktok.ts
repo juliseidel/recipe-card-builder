@@ -379,10 +379,11 @@ export async function startTikTokBackfill(opts: {
   const webhooksBase64 = Buffer.from(JSON.stringify(webhooks)).toString("base64");
 
   // oldestPostDateUnified als "X days"-String — clockworks akzeptiert das.
+  // Default 200 Posts / 365 Tage (Cost-Optimierung Mai 2026 — vorher 500/730).
   const body = {
     profiles: [username],
-    resultsPerPage: opts.resultsLimit ?? 500,
-    oldestPostDateUnified: `${opts.onlyPostsNewerThanDays ?? 730} days`,
+    resultsPerPage: opts.resultsLimit ?? 200,
+    oldestPostDateUnified: `${opts.onlyPostsNewerThanDays ?? 365} days`,
     shouldDownloadVideos: false,
     shouldDownloadCovers: false,
     proxyCountryCode: "None",

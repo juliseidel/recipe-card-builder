@@ -91,12 +91,12 @@ export async function POST(req: Request, { params }: RouteParams) {
         ? await startTikTokBackfill({
             username,
             webhookUrl,
-            resultsLimit: 500,
+            resultsLimit: 200,
           })
         : await startReelBackfill({
             username,
             webhookUrl,
-            resultsLimit: 500,
+            resultsLimit: 200,
           });
     await updateScrapeRunId(scrapeId, runId);
     return NextResponse.json({

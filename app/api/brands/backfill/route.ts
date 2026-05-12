@@ -35,7 +35,7 @@ type Body = {
   brandSlug: string;
   /** Handle des Creators ohne @ (Instagram-Username oder TikTok-Username). */
   username: string;
-  /** Optional: max Posts. Default 500 fuer ~2 Jahre. */
+  /** Optional: max Posts. Default 200 fuer ~1 Jahr (Cost-Optimierung). */
   resultsLimit?: number;
   /** Plattform — default 'instagram' fuer Backward-Compat. */
   platform?: SocialPlatform;
@@ -114,12 +114,12 @@ export async function POST(req: Request) {
         ? await startTikTokBackfill({
             username: body.username,
             webhookUrl,
-            resultsLimit: body.resultsLimit ?? 500,
+            resultsLimit: body.resultsLimit ?? 200,
           })
         : await startReelBackfill({
             username: body.username,
             webhookUrl,
-            resultsLimit: body.resultsLimit ?? 500,
+            resultsLimit: body.resultsLimit ?? 200,
           });
     await updateScrapeRunId(scrapeId, runId);
     return NextResponse.json(
