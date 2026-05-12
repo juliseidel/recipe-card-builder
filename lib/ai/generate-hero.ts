@@ -5,7 +5,6 @@ import { generateImageSpec } from "./recipe-image-spec";
 import { buildPrompt } from "./image-prompts";
 import {
   withBrandImageStyleOverride,
-  type BrandImageStyle,
 } from "./brand-image-style";
 import {
   analyzeKeyframeStyle,
@@ -125,93 +124,6 @@ export async function generateHeroForRecipe(
   return { heroUrl, source: "flux-text-only" };
 }
 
-// ─── Style-Extraction aus dem Reel ──────────────────────────────────────────
-// Wichtig: das ist UNABHAENGIG vom Reference-Use. Selbst wenn der Keyframe
-// die Hand des Creators zeigt oder das displayUrl Text drauf hat, koennen
-// wir aus dem Bild den visuellen STIL ableiten (Surface-Farbe, Lighting,
-// Camera-Aesthetic, Hero-Element-Pattern). analyzeKeyframeStyle ignoriert
-// Haende/Text/Personen in der Description per System-Instruction.
-//
-// Resultat: der Per-Reel-Stil wird als BrandImageStyle-Override ueber den
-// ganzen Generation-Run gelegt — auch im text-only Fallback. So bekommt
-// jedes Bild den echten Look des Creators, NICHT das generische
-// Onboarding-Template (z.B. Domis dunkler Holzbrett-Look statt modern-
-// minimal das beim Text-Onboarding geschaetzt wurde).
-//
-// Code-Brands (Biene) bekommen NIE einen Override — deren BIENE_STYLE ist
-// hand-kalibriert und bleibt unangetastet.
-async function extractDerivedStyleFromPost(opts: {
-  videoUrl: string | null;
-  displayUrl: string | null;
-  brandSlug: string;
-}): Promise<BrandImageStyle | null> {
-  if (isCodeBrand(opts.brandSlug)) return null;
-
-  // Priority 1: aus dem letzten Video-Frame. Reels zeigen typically am
-  // Ende das fertige Gericht (sauberster Style-Sample, auch wenn Hand
-  // dabei ist — die wird im Description-Step ignoriert).
-  if (opts.videoUrl) {
-    try {
-      const { extractVideoFrames } = await import("./extract-video-frames");
-      const frames = await extractVideoFrames(opts.videoUrl, {
-        intervalSeconds: 2.0,
-        maxFrames: 4, // nur 4 Frames reicht, wir brauchen nur EINEN Sample
-      });
-      if (frames.length > 0) {
-        // Letzten Frame waehlen — der ist im Reel-Aufbau am wahrscheinlichsten
-        // das fertige Plated-Dish.
-        const sample = frames[frames.length - 1];
-        const reelStyle = await analyzeKeyframeStyle(sample.dataUri);
-        if (reelStyle) {
-          console.log(
-            `[style-extract] from video for ${opts.brandSlug}: scene="${reelStyle.sceneContext.slice(0, 60)}", lighting="${reelStyle.lightingMood.slice(0, 50)}"`
-          );
-          return buildStyleFromReel(reelStyle, opts.brandSlug);
-        }
-      }
-    } catch (err) {
-      console.warn(
-        "[style-extract] video path failed:",
-        err instanceof Error ? err.message : err
-      );
-    }
-  }
-
-  // Priority 2: displayUrl analysieren. Bei Image-Posts oder wenn die
-  // Video-Pipeline gescheitert ist.
-  if (opts.displayUrl) {
-    try {
-      const res = await fetch(opts.displayUrl, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
-        },
-      });
-      if (res.ok) {
-        const buf = await res.arrayBuffer();
-        const mimeType =
-          res.headers.get("content-type")?.split(";")[0]?.trim() ||
-          "image/jpeg";
-        const dataUri = `data:${mimeType};base64,${Buffer.from(buf).toString("base64")}`;
-        const reelStyle = await analyzeKeyframeStyle(dataUri);
-        if (reelStyle) {
-          console.log(
-            `[style-extract] from displayUrl for ${opts.brandSlug}: scene="${reelStyle.sceneContext.slice(0, 60)}", lighting="${reelStyle.lightingMood.slice(0, 50)}"`
-          );
-          return buildStyleFromReel(reelStyle, opts.brandSlug);
-        }
-      }
-    } catch (err) {
-      console.warn(
-        "[style-extract] displayUrl path failed:",
-        err instanceof Error ? err.message : err
-      );
-    }
-  }
-
-  return null;
-}
-
 // ─── Reference-Path: Keyframe (preferred) oder Cover (fallback) ────────────
 async function tryReferenceBasedHero(
   opts: GenerateHeroOpts
@@ -230,74 +142,60 @@ async function tryReferenceBasedHero(
     if (!normalized) return null;
     const post = await scrapeInstagramPost(normalized);
 
-    // Style-Override aus dem Reel ableiten — UNABHAENGIG vom Reference-Use.
-    // Damit kriegt jeder Hero den echten Creator-Look, auch wenn der
-    // Keyframe-Pick null returnt (Hand im Bild) oder displayUrl wegen
-    // Text/Person geskippt wird. Bei Code-Brand (Biene) ist das null.
-    const derivedStyle = await extractDerivedStyleFromPost({
-      videoUrl: post.videoUrl,
-      displayUrl: post.displayUrl,
-      brandSlug: opts.brandSlug,
-    });
+    // 2a) Bevorzugt: Keyframe aus dem Video. Jan's Original-Approach.
+    if (post.videoUrl) {
+      const keyframeResult = await uploadKeyframeHero({
+        recipe: opts.recipe,
+        recipeId: opts.recipeId,
+        brandSlug: opts.brandSlug,
+        videoUrl: post.videoUrl,
+        caption: post.caption,
+      });
+      if (keyframeResult) return keyframeResult;
+      console.warn(
+        `[generate-hero] keyframe path failed for ${opts.recipeId}, trying cover fallback`
+      );
+    }
 
-    // Die ganze Reference-Pipeline laeuft im Override-Context. Alle
-    // nested calls (generateImageSpec, buildPrompt, getBrandImageStyle)
-    // sehen den per-Reel-abgeleiteten Style statt des Onboarding-Templates.
-    const runReferencePipeline = async (): Promise<GenerateHeroResult | null> => {
-      // Stufe 1: Video-Keyframe (clean → input_image).
-      if (post.videoUrl) {
-        const keyframeResult = await uploadKeyframeHero({
+    // Stufe 2: displayUrl-Reference mit Vision-Pre-Check.
+    // Image-Posts haben oft Recipe-Titel als Cover-Overlay (Bienes Hummus-
+    // DIP hatte z.B. "Der genialste Hummus DIP!" als Schrift im Cover).
+    // Ohne Pre-Check uebernimmt Flux das. Loesung: Gemini Vision
+    // klassifiziert hasTextOverlay + hasPerson, bei Risiko skippen wir
+    // die Reference und gehen direkt zu text-only mit Vision-Description
+    // als visuellem Anker.
+    if (post.displayUrl) {
+      const { describeInstagramDish } = await import("./describe-instagram-dish");
+      const vision = await describeInstagramDish(post.displayUrl);
+
+      if (vision && !vision.hasTextOverlay && !vision.hasPerson) {
+        // Sauberes displayUrl → Reference-Pfad
+        const heroUrl = await uploadReferenceHero({
           recipe: opts.recipe,
           recipeId: opts.recipeId,
           brandSlug: opts.brandSlug,
-          videoUrl: post.videoUrl,
-          caption: post.caption,
+          referenceImage: post.displayUrl,
         });
-        if (keyframeResult) return keyframeResult;
-        console.warn(
-          `[generate-hero] keyframe path produced no clean frame for ${opts.recipeId}, trying displayUrl with vision-precheck`
+        if (heroUrl) return { heroUrl, source: "cover" };
+      } else if (vision) {
+        // Risiko-Bild (Text-Overlay oder Person sichtbar) → text-only
+        // Flux mit description als Anker statt Reference-Pfad.
+        console.log(
+          `[generate-hero] displayUrl risky for ${opts.recipeId}: hasTextOverlay=${vision.hasTextOverlay} hasPerson=${vision.hasPerson} → text-only with vision description`
         );
-      }
-
-      // Stufe 2: displayUrl-Reference mit Vision-Pre-Check gegen Text/Person.
-      if (post.displayUrl) {
-        const { describeInstagramDish } = await import(
-          "./describe-instagram-dish"
+        const heroUrl = await uploadTextOnlyFluxHeroWithDescription(
+          opts.recipe,
+          opts.recipeId,
+          opts.brandSlug,
+          vision.description || null
         );
-        const vision = await describeInstagramDish(post.displayUrl);
-
-        if (vision && !vision.hasTextOverlay && !vision.hasPerson) {
-          const heroUrl = await uploadReferenceHero({
-            recipe: opts.recipe,
-            recipeId: opts.recipeId,
-            brandSlug: opts.brandSlug,
-            referenceImage: post.displayUrl,
-          });
-          if (heroUrl) return { heroUrl, source: "cover" };
-        } else if (vision) {
-          console.log(
-            `[generate-hero] displayUrl risky for ${opts.recipeId}: hasTextOverlay=${vision.hasTextOverlay} hasPerson=${vision.hasPerson} → text-only with vision description (still using derived style)`
-          );
-          const heroUrl = await uploadTextOnlyFluxHeroWithDescription(
-            opts.recipe,
-            opts.recipeId,
-            opts.brandSlug,
-            vision.description || null
-          );
-          if (heroUrl) return { heroUrl, source: "flux-text-only" };
-        }
+        if (heroUrl) return { heroUrl, source: "flux-text-only" };
       }
-
-      return null;
-    };
-
-    if (derivedStyle) {
-      return await withBrandImageStyleOverride(
-        derivedStyle,
-        runReferencePipeline
-      );
+      // Vision-Call failed komplett → faellt durch zum default text-only
+      // im main entry-point (uploadTextOnlyFluxHero).
     }
-    return await runReferencePipeline();
+
+    return null;
   } catch (err) {
     console.warn(
       "[generate-hero] reference pipeline error:",
@@ -356,17 +254,40 @@ async function uploadKeyframeHero(opts: {
     `[generate-hero] keyframe ${recipeId}: idx=${selection.index}, t=${selection.frame.timestampSeconds}s — ${selection.reasoning.slice(0, 120)}`
   );
 
-  // 3) Flux 2 Pro mit Keyframe als input_image.
-  // Style-Override wurde bereits vom Caller (tryReferenceBasedHero via
-  // extractDerivedStyleFromPost) gesetzt — wir muessen hier nichts mehr
-  // extrahieren. Spart einen Gemini-Vision-Call gegenueber der alten
-  // Pipeline.
-  const heroUrl = await uploadReferenceHero({
-    recipe,
-    recipeId,
-    brandSlug,
-    referenceImage: selection.frame.dataUri,
-  });
+  // 3) Pro DB-Brand: aus dem GEWAEHLTEN Keyframe per Vision den visuellen
+  // Stil ableiten (Counter, Lighting, Camera). Diese Tokens werden als
+  // Per-Run-Override eingespeist — getBrandImageStyle picksauber den
+  // Override fuer diesen einen Hero-Run. Bienes Pfad bleibt davon
+  // unangetastet (isCodeBrand-Check).
+  const runReferenceHero = () =>
+    uploadReferenceHero({
+      recipe,
+      recipeId,
+      brandSlug,
+      referenceImage: selection.frame.dataUri,
+    });
+
+  let heroUrl: string | null;
+  if (!isCodeBrand(brandSlug)) {
+    const reelStyle = await analyzeKeyframeStyle(selection.frame.dataUri);
+    if (reelStyle) {
+      console.log(
+        `[generate-hero] reel-style ${recipeId}: scene=${reelStyle.sceneContext.slice(0, 60)}, lighting=${reelStyle.lightingMood.slice(0, 50)}`
+      );
+      const dynamicStyle = buildStyleFromReel(reelStyle, brandSlug);
+      heroUrl = await withBrandImageStyleOverride(
+        dynamicStyle,
+        runReferenceHero
+      );
+    } else {
+      // Vision-Fail → existing brand.imageStyle aus dem Onboarding nutzen
+      // (oder Fallback). Pipeline laeuft normal weiter.
+      heroUrl = await runReferenceHero();
+    }
+  } else {
+    // Code-Brand (Biene) — kein Override, der hardcoded BIENE_STYLE greift
+    heroUrl = await runReferenceHero();
+  }
   if (!heroUrl) return null;
 
   return {
