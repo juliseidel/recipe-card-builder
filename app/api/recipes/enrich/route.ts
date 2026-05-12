@@ -1,5 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { generateMicros } from "@/lib/ai/generate-micros";
+import { generateMacros } from "@/lib/ai/generate-macros";
 import { generateStory } from "@/lib/ai/generate-story";
 import { generateHeroForRecipe } from "@/lib/ai/generate-hero";
 import { GeminiError } from "@/lib/ai/gemini";
@@ -90,6 +91,20 @@ export async function POST(req: Request) {
     getPack(brandSlug, packSlug) ??
     (await getCustomPackServer(brandSlug, packSlug));
 
+  // Macros-Auto-Fill: wenn IRGENDEIN Macro-Wert 0 ist (= nicht angegeben),
+  // schaetzen wir die fehlenden Felder via Gemini. Sehr haeufiger Fall:
+  // Instagram-Caption hat nur "30g Protein" → kcal/carbs/fat = 0. Ohne
+  // diesen Schritt blieben die auf 0 (Card sieht halbleer aus). Marker
+  // verhindert endlose Retries bei dauerhaft fehlschlagenden Recipes.
+  const macrosIncomplete =
+    (recipe.nutrition?.kcal ?? 0) === 0 ||
+    (recipe.nutrition?.protein ?? 0) === 0 ||
+    (recipe.nutrition?.carbs ?? 0) === 0 ||
+    (recipe.nutrition?.fat ?? 0) === 0;
+  const previousMacrosAttempt = Boolean(recipe.nutrition?.macrosAttemptedAt);
+  const needsMacros =
+    macrosIncomplete && (!previousMacrosAttempt || body.force);
+
   // Mikros-Marker: wenn ein vorheriger Versuch gescheitert ist
   // (microsAttemptedAt gesetzt, micros aber leer), respektieren wir das
   // beim Auto-Trigger und starten KEINEN neuen Versuch — sonst feuert
@@ -124,11 +139,75 @@ export async function POST(req: Request) {
       recipe.description.trim() === "" ||
       recipe.description.trim() === pack?.description.trim());
 
-  if (!needsMicros && !needsHero && !needsStory) {
+  if (!needsMicros && !needsHero && !needsStory && !needsMacros) {
     return NextResponse.json({
       status: "already-enriched",
       recipeId: row.id,
     });
+  }
+
+  // ─── MAKROS: SYNC vor MIKROS ────────────────────────────────────────
+  // Reihenfolge ist wichtig: Mikros-Pipeline nutzt die Makros als
+  // Kontext-Anker ("Bekannte Makros: 380 kcal · 31g Protein …"). Wenn die
+  // Makros nur teilweise da waren (z. B. nur Protein), war der Mikros-Call
+  // auf einer luedrigen Datenbasis. Jetzt fuellen wir Makros zuerst, dann
+  // sieht generateMicros() konsistente Werte und kann besser schaetzen.
+  //
+  // Merge-Regel: User-Werte sind heilig — wir uebernehmen NUR die Felder
+  // die 0 waren. Falls der User 30g Protein eingetippt hat und Gemini
+  // schaetzt 28g, gewinnt die 30 vom User. Wahrheit > Schaetzung.
+  if (needsMacros) {
+    try {
+      const generated = await generateMacros(recipe);
+      const merged = {
+        kcal: recipe.nutrition.kcal || generated.kcal,
+        protein: recipe.nutrition.protein || generated.protein,
+        carbs: recipe.nutrition.carbs || generated.carbs,
+        fat: recipe.nutrition.fat || generated.fat,
+      };
+      await mergeRecipeData(row.id, (current) => ({
+        nutrition: {
+          ...current.nutrition,
+          kcal: current.nutrition.kcal || generated.kcal,
+          protein: current.nutrition.protein || generated.protein,
+          carbs: current.nutrition.carbs || generated.carbs,
+          fat: current.nutrition.fat || generated.fat,
+          macrosAttemptedAt: undefined,
+        },
+      }));
+      // In-Memory recipe-Objekt mit den frischen Werten synchronisieren,
+      // damit der nachfolgende Mikros-Call (und alles Async danach) den
+      // neuen Stand als Kontext nutzt.
+      recipe.nutrition = { ...recipe.nutrition, ...merged };
+    } catch (err) {
+      const isGeminiErr = err instanceof GeminiError;
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error("[enrich] macros failed sync", {
+        recipeId: body.recipeId,
+        recipeTitle: recipe.title,
+        ingredientCount: recipe.ingredients.length,
+        nutritionBasis: recipe.nutritionBasis,
+        errorName: err instanceof Error ? err.name : "unknown",
+        errorMessage,
+        geminiStatus: isGeminiErr ? err.status : undefined,
+        geminiDetailSnippet: isGeminiErr
+          ? String(err.detail).slice(0, 500)
+          : undefined,
+      });
+      try {
+        await mergeRecipeData(row.id, (current) => ({
+          nutrition: {
+            ...current.nutrition,
+            macrosAttemptedAt: Date.now(),
+          },
+        }));
+      } catch (markerErr) {
+        console.error(
+          "[enrich] could not persist macros failure marker",
+          markerErr
+        );
+      }
+    }
   }
 
   // ─── MIKROS: SYNC vor der Response ──────────────────────────────────
@@ -268,6 +347,7 @@ export async function POST(req: Request) {
     {
       status: "enriching",
       recipeId: row.id,
+      macros: needsMacros,
       micros: needsMicros,
       hero: needsHero,
       story: needsStory,

@@ -32,6 +32,11 @@ export type Nutrition = {
    *  (force=true im Request-Body) startet einen neuen Versuch. Bei
    *  erfolgreicher Generierung wird das Feld geloescht. */
   microsAttemptedAt?: number;
+  /** Analog zu microsAttemptedAt: Marker fuer fehlgeschlagenen
+   *  Macro-Auto-Fill-Versuch. Wird nur gesetzt, wenn Macros incomplete
+   *  waren (irgendein Wert war 0) UND Gemini scheiterte. Verhindert
+   *  endlose Retries bei jedem Page-Visit. */
+  macrosAttemptedAt?: number;
 };
 
 // Steps support optional grouping ("Für den Teig:", "Für die Glasur:") via
