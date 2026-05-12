@@ -42,3 +42,17 @@ drop policy if exists "anyone can delete custom packs" on public.packs;
 create policy "anyone can delete custom packs"
   on public.packs for delete
   using (is_custom = true);
+
+-- UPDATE-Policy fehlte in V1 — Folge war ein silent-fail beim Layout-
+-- Lock-In: User waehlt im LayoutPicker z. B. "amber", aber
+-- updateCustomPackLayout() wurde von Supabase mit "0 rows affected"
+-- geantwortet, ohne dass error gesetzt war. Der Pack blieb auf seinem
+-- Default ("editorial") haengen, ab der zweiten Recipe-Karte sah man das
+-- als "Layout wird nicht uebernommen". Update-Policy spiegelt insert/
+-- delete: jedem ist erlaubt, custom packs zu aendern (Team-Demo-Tool,
+-- spaeter ggf. auf authenticated einschraenken).
+drop policy if exists "anyone can update custom packs" on public.packs;
+create policy "anyone can update custom packs"
+  on public.packs for update
+  using (is_custom = true)
+  with check (is_custom = true);
