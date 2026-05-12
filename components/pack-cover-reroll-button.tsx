@@ -43,7 +43,15 @@ export function PackCoverRerollButton({ packId, tint }: Props) {
       const res = await fetch("/api/packs/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ packId, forceCover: true }),
+        // Klick regeneriert beide grafischen Pack-Assets: Cover UND
+        // Foreword-Image. Beide laufen ueber Flux, parallel im Background.
+        // Vorher nur Cover — User hatten dann keinen Weg, das Foreword-
+        // Bild allein zu refreshen wenn's thematisch nicht passt.
+        body: JSON.stringify({
+          packId,
+          forceCover: true,
+          forceForewordImage: true,
+        }),
       });
       if (!res.ok) throw new Error("enrich-call returned " + res.status);
       setStage("waiting");
@@ -70,11 +78,11 @@ export function PackCoverRerollButton({ packId, tint }: Props) {
 
   const label =
     stage === "idle"
-      ? "Cover neu generieren"
+      ? "Cover + Vorwort neu"
       : stage === "starting"
         ? "Wird gestartet…"
         : stage === "waiting"
-          ? "Cover wird neu generiert (20–40 s)…"
+          ? "Cover + Vorwort werden neu generiert (20–40 s)…"
           : "Fertig — lade neu";
 
   const busy = stage === "starting" || stage === "waiting";
@@ -90,8 +98,8 @@ export function PackCoverRerollButton({ packId, tint }: Props) {
         background: "rgba(255,255,255,0.6)",
         color: tint.ink,
       }}
-      aria-label="Pack-Cover neu generieren"
-      title="Generiert das Pack-Cover komplett neu via Flux 2 Pro. Falls das aktuelle Cover hängt oder dir nicht gefällt — einfach klicken. Dauert ~20–40 Sekunden."
+      aria-label="Pack-Cover + Vorwort-Bild neu generieren"
+      title="Generiert Pack-Cover UND Vorwort-Stillleben komplett neu via Flux 2 Pro. Falls eines der beiden Bilder hängt oder thematisch nicht passt — einfach klicken. Dauert ~20–40 Sekunden, beide parallel."
     >
       {busy ? (
         <span
