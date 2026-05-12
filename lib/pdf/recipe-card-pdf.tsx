@@ -4940,11 +4940,6 @@ function IngredientRow({
   // kollidieren wuerden.
   const padV = rowPadV ?? (compact ? 3.5 : 4.5);
   const amountFont = compact ? 7.5 : 8;
-  // amountW zurueck auf 46/54 — "nach Geschmack" darf bewusst auf zwei
-  // Zeilen wrappen ("Nach \n Geschmack"), das sieht eleganter aus als
-  // einzeilig durchgezogen. alignItems "flex-start" stellt sicher, dass
-  // die Border-Bottom-Linie sauber unter dem ganzen Row liegt (nicht
-  // zwischen "Nach" und "Geschmack").
   const amountW = compact ? 46 : 54;
   // Capitalize-First fuer text-only amounts ("nach Geschmack" -> "Nach
   // Geschmack", "etwas" -> "Etwas"). Numeric amounts ("1", "15 g") bleiben
@@ -4952,6 +4947,16 @@ function IngredientRow({
   const displayAmount = ing.amount
     ? ing.amount.charAt(0).toUpperCase() + ing.amount.slice(1)
     : ing.amount;
+  // Lange amounts wie "Nach Geschmack" wrappen auf zwei Zeilen. Bei
+  // diesen Faellen wechseln wir auf alignItems "center", damit der
+  // Name vertikal zwischen den beiden amount-Zeilen sitzt — sonst
+  // wirkt die Border-Bottom-Linie visuell als wuerde sie "zwischen Nach
+  // und Geschmack durchgehen". Bei kurzen single-line amounts bleibt
+  // flex-start mit paddingTop=1 (font-metric-Compensation gegen Inter).
+  const amountIsLong = Boolean(displayAmount) && displayAmount.length > 10;
+  const rowAlign: "center" | "flex-start" = amountIsLong
+    ? "center"
+    : "flex-start";
   const nameFont = nameFontSize ?? (compact ? 9 : 9.5);
   const noteFont = noteFontSize ?? (compact ? 7 : 7.5);
   // Name + Note werden in EINEM Text-Element gerendert mit nested
@@ -4971,7 +4976,7 @@ function IngredientRow({
         borderBottomColor: withAlpha(theme.ink, 0.08),
         paddingVertical: padV,
         gap: 5,
-        alignItems: "flex-start",
+        alignItems: rowAlign,
       }}
     >
       <Text
@@ -4980,7 +4985,8 @@ function IngredientRow({
           color: theme.inkSoft,
           width: amountW,
           fontWeight: bold ? 600 : 400,
-          paddingTop: 1,
+          paddingTop: amountIsLong ? 0 : 1,
+          lineHeight: amountIsLong ? 1.3 : undefined,
         }}
       >
         {displayAmount}
