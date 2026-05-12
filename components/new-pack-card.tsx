@@ -84,7 +84,7 @@ export function NewPackCard({ brand, nextNumber = 6 }: NewPackCardProps) {
         >
           Neues Pack
           <span className="block text-[18px] font-normal italic opacity-70">
-            in Bienes Welt
+            in {brand.name}s Welt
           </span>
         </h3>
         <p

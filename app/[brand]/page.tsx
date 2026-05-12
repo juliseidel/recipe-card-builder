@@ -160,23 +160,6 @@ export default async function BrandPage({ params }: BrandPageProps) {
               </p>
             </div>
 
-            <div
-              className="flex items-center gap-5 rounded-xl border px-4 py-2.5 text-[12px]"
-              style={{
-                borderColor: brand.tokens.line,
-                background: brand.tokens.surface,
-                color: brand.tokens.inkMuted,
-              }}
-            >
-              <span className="flex items-center gap-2">
-                <span
-                  className="size-1.5 rounded-full"
-                  style={{ background: brand.tokens.accent }}
-                />
-                Zuletzt bearbeitet
-              </span>
-              <span style={{ color: brand.tokens.ink }}>Heute, 14:32</span>
-            </div>
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

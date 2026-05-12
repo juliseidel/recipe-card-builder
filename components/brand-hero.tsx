@@ -1,5 +1,6 @@
 import Image from "next/image";
 import type { Brand } from "@/lib/brands";
+import { formatFollowersCompact } from "@/lib/format-followers";
 
 type BrandHeroProps = {
   brand: Brand;
@@ -12,6 +13,7 @@ type BrandHeroProps = {
    *  hinterlegten Statisch-Wert zurueck. */
   liveRecipeCount?: number;
 };
+
 
 export function BrandHero({
   brand,
@@ -95,7 +97,11 @@ export function BrandHero({
               background: brand.tokens.surface,
             }}
           >
-            <Stat label="Follower" value={brand.stats.followers} brand={brand} />
+            <Stat
+              label="Follower"
+              value={formatFollowersCompact(brand.stats.followers)}
+              brand={brand}
+            />
             <Divider brand={brand} />
             <Stat
               label="Packs"

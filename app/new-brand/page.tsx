@@ -16,6 +16,7 @@ import {
   DEFAULT_BRAND_FONTS,
   DEFAULT_BRAND_STATS,
 } from "@/lib/brand-presets";
+import { formatFollowersCompact } from "@/lib/format-followers";
 import { SiteHeader } from "@/components/site-header";
 import { BrandHubCard } from "@/components/brand-hub-card";
 
@@ -43,6 +44,10 @@ export default function NewBrandPage() {
   const [bio, setBio] = useState("");
   const [tagline, setTagline] = useState("");
   const [niche, setNiche] = useState("");
+  // Follower-Count als formatierter String ("247K"). Beim Auto-Fill aus
+  // Apify's raw.followersCount gesetzt — landet beim Save in
+  // brand.stats.followers und wird im Workspace-Hero gezeigt.
+  const [followers, setFollowers] = useState("");
   const [moodId, setMoodId] = useState(DEFAULT_BRAND_MOOD_ID);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -110,6 +115,13 @@ export default function NewBrandPage() {
       // Avatar setzen, falls Server-Upload erfolgreich war.
       if (data.avatarUrl) {
         setAvatarUrl(data.avatarUrl as string);
+      }
+      // Follower-Count aus Apify-Profil. raw.followersCount ist eine Zahl
+      // (z.B. 247193) — wir formatieren das kompakt ("247K") und speichern
+      // den String fuer brand.stats.followers.
+      const followersCount = data.raw?.followersCount as number | undefined;
+      if (typeof followersCount === "number" && followersCount > 0) {
+        setFollowers(formatFollowersCompact(followersCount));
       }
       // Vision-Analyse: optional, kann null sein wenn zu wenige Bilder
       // verfuegbar waren oder Gemini fehlschlug. Wir speichern den Style
@@ -222,7 +234,7 @@ export default function NewBrandPage() {
       signature: `Deine ${name.trim()}`,
       avatar: avatarUrl ?? "",
       stats: {
-        followers: "",
+        followers: followers.trim(),
         niche: niche.trim() || DEFAULT_BRAND_STATS.niche,
       },
       tokens: selectedMood,

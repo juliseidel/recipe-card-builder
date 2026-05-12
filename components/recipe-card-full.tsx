@@ -111,7 +111,7 @@ export function WebStoryBlock({
         className="mb-2 text-[10px] font-semibold uppercase tracking-[0.22em]"
         style={{ color: pack.mood.accent }}
       >
-        Bienes Story
+        Story
       </div>
       <p
         className="max-w-[60ch] font-display text-[17px] italic leading-relaxed"
@@ -400,7 +400,7 @@ function EditorialLayout({
             className="mb-2 text-[10px] font-semibold uppercase tracking-[0.22em]"
             style={{ color: pack.mood.accent }}
           >
-            Bienes Story
+            Story
           </div>
           <p
             className="font-display text-[19px] italic leading-relaxed"
@@ -2095,7 +2095,7 @@ function VitalLayout({
             className="mb-2 block text-[10.5px] font-bold uppercase tracking-[0.22em]"
             style={{ color: pack.mood.accent }}
           >
-            Bienes Story
+            Story
           </span>
           <p
             className="max-w-[60ch] font-display text-[17px] italic leading-relaxed"
@@ -2642,7 +2642,7 @@ function AmberLayout({
             className="mb-2 block text-[10.5px] font-bold uppercase tracking-[0.26em]"
             style={{ color: pack.mood.accent }}
           >
-            Bienes Story
+            Story
           </span>
           <p
             className="mx-auto max-w-[60ch] font-display text-[17px] italic leading-relaxed"

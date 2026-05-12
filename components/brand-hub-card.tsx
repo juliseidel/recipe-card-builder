@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Brand } from "@/lib/brands";
 
 // Hub-Card fuer den Workspace-Uebersichtsraster. Eine Karte pro Creator.
@@ -28,17 +28,32 @@ type Props = {
 export function BrandHubCard({ brand, packCount, recipeCount, badge }: Props) {
   const router = useRouter();
   const [entering, setEntering] = useState(false);
+  // Verhindert mehrfaches Prefetchen — User-Hover ist schon ein klares
+  // Signal "ich klicke gleich", Re-Calls bei Re-Renders sind unnoetig.
+  const prefetchedRef = useRef(false);
+
+  // Welcome-Page bei Hover prefetchen. Beseitigt den weissen Flash zwischen
+  // Card-Fade-out und Welcome-Animation-Start. Die Page hat `force-dynamic`,
+  // daher cached Next nur das Bundle — aber das reicht: ohne Prefetch
+  // startet das Server-Rendering erst beim Click, mit Prefetch ist es
+  // schon warm.
+  const handlePrefetch = () => {
+    if (prefetchedRef.current) return;
+    prefetchedRef.current = true;
+    router.prefetch(`/welcome?brand=${encodeURIComponent(brand.slug)}`);
+    router.prefetch(`/${brand.slug}`);
+  };
 
   const handleClick = () => {
     if (entering) return;
     setEntering(true);
-    // Cinematic-Transition: kurze Verzoegerung damit der Hover-State noch
-    // die letzten Frames sichtbar bleiben — fuehlt sich smoother an als
-    // ein instant-router.push. Welcome-Page uebernimmt dann die Animation
-    // und landet im Workspace.
+    // 80 ms statt 180 ms: die Hover-Card hat seinen "Hover-out"-Moment
+    // bereits im transition (entering → opacity 0). 80 ms reicht, damit
+    // der User die Click-Confirmation sieht — und Welcome-Page ist
+    // dank Prefetch sofort da, ohne weisse Flash-Phase.
     setTimeout(() => {
       router.push(`/welcome?brand=${encodeURIComponent(brand.slug)}`);
-    }, 180);
+    }, 80);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -56,6 +71,8 @@ export function BrandHubCard({ brand, packCount, recipeCount, badge }: Props) {
       type="button"
       onClick={handleClick}
       onKeyDown={handleKeyDown}
+      onMouseEnter={handlePrefetch}
+      onFocus={handlePrefetch}
       disabled={entering}
       aria-label={`${brand.name}-Workspace öffnen`}
       className={`group relative flex flex-col gap-5 overflow-hidden rounded-[28px] border p-7 text-left transition-all duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-1.5 hover:shadow-[0_24px_60px_-30px_rgba(0,0,0,0.35)] active:translate-y-0 active:scale-[0.99] active:duration-150 disabled:cursor-default ${

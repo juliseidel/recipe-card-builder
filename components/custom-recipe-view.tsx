@@ -561,7 +561,7 @@ function EnrichmentToast({
             {mode === "done"
               ? "Karte komplett — Mikros & Bild sind drin"
               : mode === "both"
-              ? "Bienes Küche zaubert deine Karte"
+              ? "Die KI zaubert deine Karte"
               : mode === "hero"
               ? "KI rendert dein Hero-Bild"
               : "Mikronährstoffe werden analysiert"}

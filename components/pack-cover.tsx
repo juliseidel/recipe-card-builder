@@ -57,7 +57,7 @@ export function PackCover({
               strokeLinejoin="round"
             />
           </svg>
-          Bienes Workspace
+          {brand.name}s Workspace
         </Link>
 
         <div
