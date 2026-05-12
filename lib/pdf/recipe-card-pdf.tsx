@@ -1378,13 +1378,50 @@ function MinimalPage({
             />
           ) : null}
 
-          {/* (Dunkler Gradient entfernt — wurde fuer weisse Title-Overlay
-              gebraucht. Title rendert jetzt in t.ink (schwarz), das auf
-              den meisten Foto-Hintergruenden lesbarer ist als weiss und
-              den Gradient ueberfluessig macht.) */}
+          {/* Dunkler Gradient unten — bewusst staerker als vorher (75 %
+              statt 62 %), damit weisser Title-Overlay auf JEDEM Foto
+              klar lesbar ist, egal ob heller (Apfel) oder dunkler
+              (Tiramisu) Hintergrund. */}
+          <View
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: HERO_HEIGHT,
+            }}
+          >
+            <Svg
+              width="595"
+              height={HERO_HEIGHT}
+              viewBox={`0 0 595 ${HERO_HEIGHT}`}
+            >
+              <Defs>
+                <LinearGradient
+                  id="heroGrad"
+                  x1="0"
+                  y1={HERO_HEIGHT}
+                  x2="0"
+                  y2="0"
+                >
+                  <Stop offset="0" stopColor="#000" stopOpacity={0.78} />
+                  <Stop offset="0.4" stopColor="#000" stopOpacity={0.32} />
+                  <Stop offset="0.75" stopColor="#000" stopOpacity={0.05} />
+                  <Stop offset="1" stopColor="#000" stopOpacity={0} />
+                </LinearGradient>
+              </Defs>
+              <Rect
+                x="0"
+                y="0"
+                width="595"
+                height={HERO_HEIGHT}
+                fill="url(#heroGrad)"
+              />
+            </Svg>
+          </View>
 
-          {/* Top strip — Pack-Caption + Recipe-Number in t.ink fuer
-              Lesbarkeit auf hellem Foto-Hintergrund. */}
+          {/* Top strip — Pack-Caption + Recipe-Number in Weiss mit
+              textShadow fuer Lesbarkeit auf hellen Bildbereichen. */}
           <View
             style={{
               position: "absolute",
@@ -1401,8 +1438,9 @@ function MinimalPage({
                 fontSize: 8.5,
                 fontWeight: 700,
                 letterSpacing: 2.2,
-                color: t.ink,
+                color: "#ffffff",
                 textTransform: "uppercase",
+                textShadow: "0 1px 2px rgba(0, 0, 0, 0.65)",
               }}
             >
               {pack.title}
@@ -1413,8 +1451,9 @@ function MinimalPage({
                   fontSize: 9,
                   fontWeight: 600,
                   letterSpacing: 1.4,
-                  color: t.ink,
+                  color: "#ffffff",
                   textTransform: "uppercase",
+                  textShadow: "0 1px 2px rgba(0, 0, 0, 0.65)",
                 }}
               >
                 Rezept {pad2(recipe.number)} / {pad2(totalRecipes)}
@@ -1445,9 +1484,12 @@ function MinimalPage({
             </View>
           ) : null}
 
-          {/* Title overlay unten links — t.ink (schwarz) statt vorher Accent.
-              User-Feedback: schwarz ist auf den meisten Fotos besser
-              lesbar als Akzent-Farbe und macht den Title klar dominant. */}
+          {/* Title overlay unten links — Weiss + textShadow + verstaerkter
+              Gradient unter dem Bild. Drei kombinierte Lesbarkeit-Tricks:
+              (1) starker Gradient macht den Hintergrund unter dem Title
+              dunkler, (2) Weiss kontrastiert gegen den jetzt dunklen
+              Hintergrund, (3) Drop-Shadow gibt extra Tiefe falls Foto
+              bereits dunkel ist und der Gradient weniger wirkt. */}
           <View
             style={{
               position: "absolute",
@@ -1463,8 +1505,9 @@ function MinimalPage({
                 fontWeight: 700,
                 letterSpacing: -0.6,
                 lineHeight: 1.02,
-                color: t.ink,
+                color: "#ffffff",
                 textTransform: "none",
+                textShadow: "0 2px 6px rgba(0, 0, 0, 0.85)",
               }}
             >
               {recipe.title}
@@ -1474,10 +1517,11 @@ function MinimalPage({
                 fontFamily: "Fraunces",
                 fontStyle: "italic",
                 fontSize: 12,
-                color: t.ink,
-                opacity: 0.85,
+                color: "#ffffff",
+                opacity: 0.95,
                 marginTop: 6,
                 lineHeight: 1.35,
+                textShadow: "0 1px 3px rgba(0, 0, 0, 0.75)",
               }}
             >
               {recipe.subtitle}
