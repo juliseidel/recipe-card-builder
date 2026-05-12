@@ -192,6 +192,15 @@ export async function buildPackFromReels(
     }
     seenSlugs.add(slug);
 
+    // Hero-Placeholder: Reel-Cover-URL als initialer hero, damit der User
+    // in der Pack-Detail-Ansicht sofort etwas sieht (Instagram-Cover oder
+    // TikTok-Thumbnail), waehrend der KI-Hero im Hintergrund generiert
+    // wird. Wenn die display_url fehlt, bleibt hero leer und das UI
+    // faellt auf pack.coverImage zurueck. /api/recipes/enrich erkennt
+    // einen Placeholder-Hero (Instagram/TikTok-CDN-URL) und ueberschreibt
+    // ihn mit dem frisch generierten Flux-Bild.
+    const heroPlaceholder = entry.reel.display_url ?? "";
+
     const recipe: Recipe = {
       slug,
       packSlug: opts.pack.slug,
@@ -218,6 +227,7 @@ export async function buildPackFromReels(
       nutritionBasis: entry.parsed.nutritionBasis,
       sourceUrl: entry.reel.post_url,
       sourceLabel: `Instagram · ${new URL(entry.reel.post_url).pathname.split("/").slice(0, 4).join("/")}`,
+      hero: heroPlaceholder,
     };
 
     recipeRows.push({

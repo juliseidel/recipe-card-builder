@@ -380,6 +380,9 @@ export default function SuggestionPreviewPage() {
                       alt={r.recipeTitle ?? `Reel ${r.igId}`}
                       className="h-full w-full object-cover transition-transform duration-[600ms] group-hover:scale-[1.04]"
                       loading="lazy"
+                      // Instagram/TikTok-CDN blockiert Cross-Origin-Requests
+                      // mit Referrer-Header — ohne no-referrer kriegen wir 403.
+                      referrerPolicy="no-referrer"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-[11px] font-mono uppercase tracking-[0.14em]" style={{ color: inkMuted }}>

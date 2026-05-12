@@ -23,6 +23,16 @@ const nextConfig: NextConfig = {
         hostname: "*.supabase.co",
         pathname: "/storage/v1/object/public/**",
       },
+      // Instagram/Facebook CDNs — werden vom Pack-Builder als Placeholder-
+      // Hero gesetzt (display_url des Source-Reels), damit der User schon
+      // VOR der KI-Hero-Generierung etwas sieht. Hostnames sind dynamisch
+      // (scontent-fra3-1, scontent-ams4-2, ...) — Wildcard deckt alle ab.
+      { protocol: "https", hostname: "**.cdninstagram.com" },
+      { protocol: "https", hostname: "**.fbcdn.net" },
+      // TikTok CDNs fuer TikTok-Brand-Cover als Placeholder.
+      { protocol: "https", hostname: "**.tiktokcdn.com" },
+      { protocol: "https", hostname: "**.tiktokcdn-us.com" },
+      { protocol: "https", hostname: "**.tiktokcdn-eu.com" },
     ],
   },
   // PDF rendering reads font + brand images at runtime via fs. The dynamic

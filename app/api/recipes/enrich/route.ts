@@ -101,8 +101,20 @@ export async function POST(req: Request) {
     !recipe.nutrition?.micros || recipe.nutrition.micros.length === 0;
   const previousMicrosAttempt = Boolean(recipe.nutrition?.microsAttemptedAt);
   const needsMicros = microsEmpty && (!previousMicrosAttempt || body.force);
+  // Placeholder-Hero-Detection: Pack-Builder setzt initial reel.display_url
+  // als hero, damit der User sofort etwas im Pack-Detail sieht. Diese
+  // CDN-URLs (Instagram / TikTok / fbcdn) sind aber nur temporaere
+  // Platzhalter — der echte KI-Hero ueberschreibt sie. Wir erkennen sie
+  // an den CDN-Hostnames und triggern die Hero-Pipeline trotzdem.
+  const isPlaceholderHero = Boolean(
+    recipe.hero &&
+      /cdninstagram\.com|fbcdn\.net|tiktokcdn|tiktok-domain/i.test(recipe.hero)
+  );
   const needsHero =
-    !recipe.hero || Boolean(body.forceHero) || Boolean(body.forceFlux);
+    !recipe.hero ||
+    isPlaceholderHero ||
+    Boolean(body.forceHero) ||
+    Boolean(body.forceFlux);
   // Story is "needed" if the description is empty or still equals the
   // pack-level fallback we wrote at save time. Once the user types their
   // own description (or a previous AI-Story has run), we leave it alone.
