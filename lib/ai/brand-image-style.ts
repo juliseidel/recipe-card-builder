@@ -212,6 +212,16 @@ const STYLES: Record<string, BrandImageStyle> = {
   julia: JULIA_STYLE,
 };
 
+// Sagt: haben wir fuer diesen Slug einen hand-kalibrierten Code-Style?
+// Wichtig fuer generate-hero.ts: bei Brands mit Code-Style soll KEIN
+// dynamischer Reel-Style-Override gefahren werden — der hardcoded Style
+// gewinnt. Semantisch verschieden von isCodeBrand() in lib/brands.ts —
+// das prueft, ob der Brand im brands-Array steht (= UI-Editierbarkeit).
+// Hier geht es nur um die Style-Quelle der Hero-Pipeline.
+export function hasHardCodedStyle(brandSlug: string): boolean {
+  return brandSlug in STYLES;
+}
+
 // ─── Per-Run Style-Override (PR 16) ──────────────────────────────────────────
 // AsyncLocalStorage erlaubt es, fuer einen einzelnen Hero-Generation-Run
 // einen dynamisch aus dem Reel abgeleiteten Style einzuspeisen, ohne die

@@ -5,13 +5,13 @@ import { generateImageSpec } from "./recipe-image-spec";
 import { buildPrompt } from "./image-prompts";
 import {
   withBrandImageStyleOverride,
+  hasHardCodedStyle,
 } from "./brand-image-style";
 import {
   analyzeKeyframeStyle,
   buildStyleFromReel,
 } from "./analyze-keyframe-style";
 import { getServerSupabase } from "@/lib/supabase-server";
-import { isCodeBrand } from "@/lib/brands";
 import type { Recipe } from "@/lib/recipes";
 
 // Render-Aufloesung: Flux 2 Pro rendert nativ bei 2048x2048 (statt 1440x1440
@@ -222,11 +222,13 @@ async function uploadKeyframeHero(opts: {
     `[generate-hero] keyframe ${recipeId}: idx=${selection.index}, t=${selection.frame.timestampSeconds}s — ${selection.reasoning.slice(0, 120)}`
   );
 
-  // 3) Pro DB-Brand: aus dem GEWAEHLTEN Keyframe per Vision den visuellen
-  // Stil ableiten (Counter, Lighting, Camera). Diese Tokens werden als
-  // Per-Run-Override eingespeist — getBrandImageStyle picksauber den
-  // Override fuer diesen einen Hero-Run. Bienes Pfad bleibt davon
-  // unangetastet (isCodeBrand-Check).
+  // 3) Pro Brand ohne hand-kalibrierten Code-Style: aus dem GEWAEHLTEN
+  // Keyframe per Vision den visuellen Stil ableiten (Counter, Lighting,
+  // Camera). Diese Tokens werden als Per-Run-Override eingespeist —
+  // getBrandImageStyle picksauber den Override fuer diesen einen
+  // Hero-Run. Brands mit Code-Style (Biene, Julia) bleiben davon
+  // unangetastet — ihre hardgecodete DNA gewinnt, garantiert
+  // konsistenter Look ueber alle Recipes hinweg.
   const runReferenceHero = () =>
     uploadReferenceHero({
       recipe,
@@ -236,7 +238,7 @@ async function uploadKeyframeHero(opts: {
     });
 
   let heroUrl: string | null;
-  if (!isCodeBrand(brandSlug)) {
+  if (!hasHardCodedStyle(brandSlug)) {
     const reelStyle = await analyzeKeyframeStyle(selection.frame.dataUri);
     if (reelStyle) {
       console.log(
