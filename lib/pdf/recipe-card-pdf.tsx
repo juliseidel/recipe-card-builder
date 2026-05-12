@@ -4987,74 +4987,59 @@ function StepsList({
               {group.name}
             </Text>
           ) : null}
-          {group.items.map((item) => {
-            // PERFECT alignment — Number-Glyph optisch zentriert auf der
-            // Mitte der ersten Text-Zeile, EGAL ob 1 oder 5 Zeilen Text:
-            //
-            //   - Outer Row: alignItems "flex-start" -> bei Multi-Line bleibt
-            //     der Number-Wrapper an der ersten Zeile (statt zur Mitte
-            //     des Multi-Line-Texts zu wandern, wie es alignItems "center"
-            //     verursachen wuerde).
-            //   - Number-Wrapper: feste Hoehe = textLineHeight, justifyContent
-            //     "center" -> die Number-Glyph-Box wird im Wrapper vertikal
-            //     zentriert. Damit liegt das visuelle Zentrum der Number auf
-            //     dem visuellen Zentrum der ersten Text-Zeile, auch wenn
-            //     Fraunces und Inter unterschiedliche Glyph-Metriken haben.
-            //   - Number-Text: lineHeight 1 -> Glyph-Box ist exakt fontSize
-            //     hoch, kein zusaetzliches Padding ueber/unter dem Glyph,
-            //     centering durch den Wrapper bleibt praezise.
-            //
-            // Warum nicht das alte alignItems "center"-Pattern: das funktioniert
-            // nur bei Single-Line-Steps. Bei Multi-Line wandert die Number-Box
-            // zur Vertikal-Mitte des ganzen Step-Texts (= Zeile 3 von 5), was
-            // optisch komplett falsch ist.
-            const textLineHeight = stepFontSize * 1.45;
-            return (
-              <View
-                key={item.index}
+          {group.items.map((item) => (
+            <View
+              key={item.index}
+              style={{
+                flexDirection: "row",
+                marginBottom: stepMarginBottom,
+                gap: 10,
+                alignItems: "center",
+              }}
+            >
+              {/* Number und Text rendern mit EXAKT identischer fontSize und
+                  lineHeight. Damit haben beide Line-Boxes mathematisch
+                  garantiert identische Hoehe und identische Glyph-Center-
+                  Position. alignItems "center" aligned die Boxes mittig,
+                  was bei identischer Box-Hoehe gleichbedeutend ist mit
+                  Glyph-Center auf Glyph-Center.
+
+                  Hervorhebung der Number rein typografisch:
+                  - Fraunces Italic (statt Inter regular wie der Body)
+                  - Bold 700
+                  - Akzent-Farbe statt body ink
+
+                  Die Number sieht klar unterschiedlich aus, sitzt aber
+                  exakt auf der Hoehe der ersten Text-Zeile — bei
+                  Single-Line genauso wie bei Multi-Line-Steps. */}
+              <Text
                 style={{
-                  flexDirection: "row",
-                  marginBottom: stepMarginBottom,
-                  gap: 10,
-                  alignItems: "flex-start",
+                  fontFamily: "Fraunces",
+                  fontSize: stepFontSize,
+                  fontStyle: "italic",
+                  fontWeight: 700,
+                  color: theme.accent,
+                  width: 22,
+                  lineHeight: 1.45,
                 }}
               >
-                <View
-                  style={{
-                    width: 22,
-                    height: textLineHeight,
-                    justifyContent: "center",
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: "Fraunces",
-                      fontSize: stepFontSize,
-                      fontStyle: "italic",
-                      fontWeight: 700,
-                      color: theme.accent,
-                      lineHeight: 1,
-                    }}
-                  >
-                    {item.index + 1}
-                  </Text>
-                </View>
-                <Text
-                  style={{
-                    flex: 1,
-                    fontSize: stepFontSize,
-                    lineHeight: 1.45,
-                    color: theme.ink,
-                  }}
-                >
-                  {checklist ? (
-                    <Text style={{ color: theme.inkSubtle }}>☐ </Text>
-                  ) : null}
-                  {item.text}
-                </Text>
-              </View>
-            );
-          })}
+                {item.index + 1}
+              </Text>
+              <Text
+                style={{
+                  flex: 1,
+                  fontSize: stepFontSize,
+                  lineHeight: 1.45,
+                  color: theme.ink,
+                }}
+              >
+                {checklist ? (
+                  <Text style={{ color: theme.inkSubtle }}>☐ </Text>
+                ) : null}
+                {item.text}
+              </Text>
+            </View>
+          ))}
         </View>
       ))}
     </View>
