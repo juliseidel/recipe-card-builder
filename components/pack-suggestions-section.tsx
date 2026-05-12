@@ -30,6 +30,8 @@ type Suggestion = {
   reasoning: string;
   reelCount: number;
   score: number | null;
+  /** KI-generiertes Pack-Cover (Flux). Bevorzugt vor previewImages. */
+  coverUrl: string | null;
   previewImages: string[];
 };
 
@@ -70,6 +72,20 @@ export function PackSuggestionsSection({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadSuggestions();
   }, [loadSuggestions, refreshToken]);
+
+  // Auto-Poll solange mindestens ein Cover noch fehlt — KI-Cover-Generation
+  // laeuft im Hintergrund fuer ~30-60s nach dem ersten Onboarding. Wir
+  // pollen alle 8s und stoppen sobald alle Suggestions ein Cover haben
+  // (oder die Section unmounted ist).
+  useEffect(() => {
+    if (!suggestions || suggestions.length === 0) return;
+    const anyMissing = suggestions.some((s) => !s.coverUrl);
+    if (!anyMissing) return;
+    const interval = setInterval(() => {
+      void loadSuggestions();
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [suggestions, loadSuggestions]);
 
   const handleAccept = async (id: string) => {
     setBusyIds((prev) => ({ ...prev, [id]: "accept" }));
@@ -188,7 +204,9 @@ export function PackSuggestionsSection({
       >
         {suggestions.map((s) => {
           const busy = busyIds[s.id];
-          const coverUrl = s.previewImages[0] ?? null;
+          // KI-Cover bevorzugt (Flux Pack-Cover), Fallback: Reel-Cover
+          // (display_url des Top-Reels), Fallback: nichts → Brand-Gradient.
+          const coverUrl = s.coverUrl || s.previewImages[0] || null;
           return (
             <article
               key={s.id}

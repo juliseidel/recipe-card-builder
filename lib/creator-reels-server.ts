@@ -82,6 +82,11 @@ export type SuggestionRow = {
   accepted_pack_id: string | null;
   created_at: string;
   updated_at: string;
+  /** KI-generiertes Pack-Cover (Flux 2 Pro), wird im Hintergrund nach
+   *  Suggestions-Generation gerendert. null = noch nicht fertig oder
+   *  Cover-Generation failed. UI faellt dann auf Reel-Cover-Background
+   *  zurueck. */
+  cover_url: string | null;
 };
 
 // ─── Scrapes ───────────────────────────────────────────────────────────────
@@ -531,4 +536,21 @@ export async function clearPendingSuggestions(
     .eq("brand_slug", brandSlug)
     .eq("status", "pending");
   if (error) console.error("[creator-reels] clearPendingSuggestions failed", error);
+}
+
+// Cover-URL fuer eine Suggestion setzen. Wird vom Suggestion-Cover-
+// Generator aufgerufen nachdem das Flux-Bild in Supabase Storage liegt.
+export async function updateSuggestionCover(
+  suggestionId: string,
+  coverUrl: string
+): Promise<void> {
+  if (!hasServerSupabase()) return;
+  const supabase = getServerSupabase();
+  const { error } = await supabase
+    .from("pack_suggestions")
+    .update({ cover_url: coverUrl, updated_at: new Date().toISOString() })
+    .eq("id", suggestionId);
+  if (error) {
+    console.error("[creator-reels] updateSuggestionCover failed", error);
+  }
 }

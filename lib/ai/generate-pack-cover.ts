@@ -8,10 +8,15 @@ import { generateImage, downloadImage } from "./bfl-flux";
 // (so "7 Tage Frühstück" gets a breakfast scene, "Bienes Backwelt" gets a
 // cake, etc.) instead of hardcoding category mappings that always drift
 // in edge cases.
+//
+// Akzeptiert entweder einen voll-strukturierten Pack ODER nur die
+// minimalen Felder (title, tagline, bgHex). Letzteres wird vom Pack-
+// Suggestions-Cover-Generator genutzt: dort gibt's keinen echten Pack
+// in der DB, nur das Vorschlags-Konzept.
 
-type PackCoverInput = {
-  pack: Pack;
-};
+type PackCoverInput =
+  | { pack: Pack }
+  | { title: string; tagline?: string; bgHex: string };
 
 // Hex → English colour word so Flux's text encoder anchors the backdrop
 // colour properly. Without the word the model treats the hex as noise.
@@ -33,8 +38,10 @@ export async function generatePackCover(input: PackCoverInput): Promise<{
   buffer: Buffer;
   contentType: "image/jpeg";
 }> {
-  const { pack } = input;
-  const bgHex = pack.mood.background;
+  // Normalize beide Eingabe-Formen auf die internen Felder.
+  const title = "pack" in input ? input.pack.title : input.title;
+  const tagline = "pack" in input ? input.pack.tagline : input.tagline;
+  const bgHex = "pack" in input ? input.pack.mood.background : input.bgHex;
   const bgWord = colourWord(bgHex);
 
   // Minimal prompt. The dish is implied from the pack name — Flux is good
@@ -43,8 +50,8 @@ export async function generatePackCover(input: PackCoverInput): Promise<{
   // top-down, single dish, real food.
   const prompt = [
     `Top-down food photography on a completely solid ${bgWord} (${bgHex}) painted backdrop.`,
-    `One single beautiful dish that fits the theme "${pack.title}".`,
-    pack.tagline ? `Vibe: ${pack.tagline}.` : "",
+    `One single beautiful dish that fits the theme "${title}".`,
+    tagline ? `Vibe: ${tagline}.` : "",
     `The entire background is the ${bgWord} colour, edge to edge — no other surfaces, no table texture, no objects bleeding in.`,
     `Soft diffused natural daylight, gentle shadow underneath the dish.`,
     `Composition: dish centred, square 1:1 frame.`,

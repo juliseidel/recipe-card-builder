@@ -6,12 +6,14 @@ import {
   countReelsForBrand,
   insertSuggestions,
   clearPendingSuggestions,
+  getSuggestionsForBrand,
   updateScrapeStatus,
   type NewSuggestion,
 } from "@/lib/creator-reels-server";
 import { loadBrand } from "@/lib/custom-brands-server";
 import { classifyReels } from "@/lib/ai/classify-reels";
 import { suggestPacks } from "@/lib/ai/suggest-packs";
+import { generateSuggestionCovers } from "./generate-suggestion-covers";
 
 // Orchestrierung der Phase-2 + Phase-3 Pipeline. Wird vom Apify-Webhook
 // im after()-Hook ausgefuehrt, nachdem das Dataset persistiert wurde.
@@ -116,4 +118,37 @@ export async function runClassificationAndSuggestions(opts: {
     recipeCount,
     suggestionCount,
   });
+
+  // ─── Schritt 4: KI-Cover fuer Suggestions im Hintergrund ────────────
+  // Genau wie beim Pack-Akzeptieren wird fuer jeden Vorschlag ein
+  // Flux-Pack-Cover generiert (~$0.15 × N Vorschlaege). Parallel-Chunks
+  // von 3, total ~25-50s fuer 6-10 Suggestions. Wenn die Pipeline hier
+  // crasht oder timed out, bleibt status='done' und das UI rendert den
+  // Reel-Cover-Fallback bis ein erneuter Trigger durchlaeuft.
+  //
+  // Wichtig: Cover-Gen wird IMMER versucht (nicht nur wenn suggestPacks
+  // gerade neue erzeugt hat), damit ein Resume nach Lambda-Timeout den
+  // Cover-Schritt sauber nachholt.
+  try {
+    const pending = await getSuggestionsForBrand(brandSlug, "pending");
+    const missingCover = pending.filter((s) => !s.cover_url);
+    if (missingCover.length > 0) {
+      console.log(
+        `[classify-and-suggest] generating ${missingCover.length} suggestion-covers for brand=${brandSlug}`
+      );
+      await generateSuggestionCovers({
+        brandSlug,
+        suggestions: missingCover.map((s) => ({
+          id: s.id,
+          title: s.title,
+          tagline: s.tagline,
+        })),
+      });
+    }
+  } catch (err) {
+    console.error(
+      "[classify-and-suggest] suggestion-cover generation failed (non-fatal):",
+      err instanceof Error ? err.message : err
+    );
+  }
 }

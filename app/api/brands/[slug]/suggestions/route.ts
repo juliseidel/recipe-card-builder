@@ -50,6 +50,9 @@ export async function GET(_req: Request, { params }: RouteParams) {
         reasoning: s.reasoning,
         reelCount: s.reel_ids.length,
         score: s.score,
+        // KI-generiertes Pack-Cover (Flux). Wenn null, faellt das UI auf
+        // Reel-Cover (previewImages[0]) als Background zurueck.
+        coverUrl: s.cover_url,
         previewImages,
       };
     }),
