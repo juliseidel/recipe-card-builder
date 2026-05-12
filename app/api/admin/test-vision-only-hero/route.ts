@@ -184,34 +184,17 @@ export async function POST(req: Request) {
     "slightly imperfect framing, homemade and unstaged",
   ].join(", ");
 
-  // Prompt-Struktur:
-  // 1. Scene Setup (winkel, surface, hero-element)
-  // 2. Lighting aus Vision (direkt)
-  // 3. Dish Description (alle 16 Vision-Felder)
-  // 4. Camera Specs (smartphone)
-  // 5. Tone aus Vision (direkt)
+  // V4-Prompt-Struktur: NUR compose, keine Einzel-Felder mehr.
+  // compose ist Gemini's konsolidierte Beschreibung — alle Detail-Felder
+  // sind dort wortgleich integriert. Einzel-Felder im Prompt würden
+  // doppelte Farb-Signals geben (Hauptursache der V2/V3-Farbverschiebung).
   const positivePrompt = [
     `A ${angle} view of ${recipe.title}, placed on ${spec.sceneContext}.`,
     `${spec.heroElement}, styled deliberately as part of the scene.`,
     `${lightingPhrase}.`,
     "",
     `The dish itself (render exactly as described — this IS the dish, do not improvise):`,
-    `Form: ${dishDescription.form}`,
-    `Colors: ${dishDescription.exactDishColors}`,
-    `Vessel: ${dishDescription.vesselDescription}${dishDescription.vesselSize ? ` (${dishDescription.vesselSize})` : ""}.`,
-    dishDescription.layering ? `Layering: ${dishDescription.layering}` : "",
-    dishDescription.toppings && dishDescription.toppings !== "None visible"
-      ? `Toppings: ${dishDescription.toppings}`
-      : "",
-    dishDescription.spatialArrangement
-      ? `Arrangement: ${dishDescription.spatialArrangement}`
-      : "",
-    `Textures: ${dishDescription.textures}`,
-    dishDescription.cuttingPlaneVisible
-      ? `Cross-section: ${dishDescription.cuttingPlaneVisible}`
-      : "",
-    "",
-    `Compose: ${dishDescription.compose}`,
+    dishDescription.compose,
     "",
     `${cameraSpecs}, ${toneWord} tones, true to life colors${steam}.`,
   ]
