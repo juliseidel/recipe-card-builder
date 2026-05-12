@@ -3,7 +3,9 @@ import {
   getServerSupabase,
   hasServerSupabase,
 } from "@/lib/supabase-server";
+import { getSuggestionsForBrand } from "@/lib/creator-reels-server";
 import { runClassificationAndSuggestions } from "@/lib/reel-library/classify-and-suggest";
+import { generateSuggestionCovers } from "@/lib/reel-library/generate-suggestion-covers";
 
 // Public-getriggerter Endpoint, der die Klassifikations-Pipeline fuer einen
 // Brand fortsetzt. Notwendig wenn:
@@ -66,6 +68,41 @@ async function handle(req: Request) {
     );
   }
   if (!scrape) {
+    // Kein aktiver Scrape — aber vielleicht existieren pending Suggestions
+    // ohne Cover (Cover-Gen ist im after-Hook gecrashed oder lief noch nie).
+    // Diese koennen wir direkt nachholen, ohne classify-loop.
+    const pending = await getSuggestionsForBrand(brandSlug, "pending");
+    const missingCover = pending.filter((s) => !s.cover_url);
+    if (missingCover.length > 0) {
+      after(async () => {
+        try {
+          console.log(
+            `[resume-classification] cover-only resume for brand=${brandSlug} (${missingCover.length} pending without cover)`
+          );
+          await generateSuggestionCovers({
+            brandSlug,
+            suggestions: missingCover.map((s) => ({
+              id: s.id,
+              title: s.title,
+              tagline: s.tagline,
+            })),
+          });
+        } catch (err) {
+          console.error(
+            "[resume-classification] cover-only resume failed",
+            err instanceof Error ? err.message : err
+          );
+        }
+      });
+      return NextResponse.json({
+        ok: true,
+        brandSlug,
+        mode: "cover-only",
+        coversToGenerate: missingCover.length,
+        message:
+          "Kein aktiver Scrape, aber Pack-Cover-Generation wird im Hintergrund nachgeholt.",
+      });
+    }
     return NextResponse.json({
       ok: true,
       message: "Kein aktiver Scrape fuer diesen Brand — nichts zu tun.",
