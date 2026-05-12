@@ -4986,18 +4986,8 @@ function StepsList({
             </Text>
           ) : null}
           {group.items.map((item) => {
-            // Number-Line-Box muss exakt so hoch sein wie eine Text-
-            // Zeile, damit Single-Line-Steps die Number nicht visuell
-            // tiefer haben als den Text. Math: textLineHeight =
-            // stepFontSize * 1.45. Damit Number-Box dieselbe Hoehe
-            // hat, brauchen wir lineHeight = textLineHeight /
-            // numFontSize. Mit dieser dynamischen lineHeight sitzt
-            // die Number-Glyph zentriert in einer Box, die exakt
-            // einer Text-Zeile entspricht — egal ob 1 oder 5 Zeilen
-            // Step-Text folgen, die erste Zeile ist immer auf
-            // gleicher Hoehe wie die Number.
-            const numberLineHeight =
-              (stepFontSize * 1.45) / stepNumFontSize;
+            // Text-Zeile-Hoehe: stepFontSize * lineHeight 1.45
+            const textLineHeight = stepFontSize * 1.45;
             return (
               <View
                 key={item.index}
@@ -5005,20 +4995,38 @@ function StepsList({
                   flexDirection: "row",
                   marginBottom: stepMarginBottom,
                   gap: 10,
+                  alignItems: "flex-start",
                 }}
               >
-                <Text
+                {/* Number-Wrapper: explizite View mit Hoehe einer
+                    Text-Zeile, in der die Number-Glyph vertikal
+                    zentriert sitzt (justifyContent center). Damit
+                    landen Number-Glyph-Center und First-Text-Line-
+                    Center bei single-line UND multi-line steps auf
+                    derselben Y-Position. Vorher (nur lineHeight-Trick)
+                    hat react-pdf den Glyph nicht zentriert in der
+                    Line-Box gerendert, sondern oben — bei single-line
+                    sah die Number dadurch immer hoeher aus als der
+                    Text. */}
+                <View
                   style={{
-                    fontFamily: "Fraunces",
-                    fontSize: stepNumFontSize,
-                    fontWeight: bold ? 700 : 400,
-                    color: theme.accent,
-                    width: 20,
-                    lineHeight: numberLineHeight,
+                    width: 22,
+                    height: textLineHeight,
+                    justifyContent: "center",
                   }}
                 >
-                  {item.index + 1}
-                </Text>
+                  <Text
+                    style={{
+                      fontFamily: "Fraunces",
+                      fontSize: stepNumFontSize,
+                      fontWeight: bold ? 700 : 400,
+                      color: theme.accent,
+                      lineHeight: 1,
+                    }}
+                  >
+                    {item.index + 1}
+                  </Text>
+                </View>
                 <Text
                   style={{
                     flex: 1,
