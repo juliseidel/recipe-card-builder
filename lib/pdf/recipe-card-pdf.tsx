@@ -1378,10 +1378,13 @@ function MinimalPage({
             />
           ) : null}
 
-          {/* Dunkler Gradient unten — bewusst staerker als vorher (75 %
-              statt 62 %), damit weisser Title-Overlay auf JEDEM Foto
-              klar lesbar ist, egal ob heller (Apfel) oder dunkler
-              (Tiramisu) Hintergrund. */}
+          {/* Zwei-Layer-Gradient fuer maximale Lesbarkeit der weissen
+              Texte ohne textShadow (react-pdf unterstuetzt das nicht):
+              (1) Top-Gradient — kleiner dunkler Band oben fuer Pack-
+                  Caption + Recipe-Number.
+              (2) Bottom-Gradient — aggressiverer dunkler Band unten (92 %
+                  schwarz) damit Title + Subtitle auf JEDEM Foto klar
+                  lesbar sind, egal wie hell oder bunt das Hero-Bild ist. */}
           <View
             style={{
               position: "absolute",
@@ -1398,15 +1401,26 @@ function MinimalPage({
             >
               <Defs>
                 <LinearGradient
-                  id="heroGrad"
+                  id="heroGradTop"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2={HERO_HEIGHT}
+                >
+                  <Stop offset="0" stopColor="#000" stopOpacity={0.55} />
+                  <Stop offset="0.25" stopColor="#000" stopOpacity={0.15} />
+                  <Stop offset="0.45" stopColor="#000" stopOpacity={0} />
+                </LinearGradient>
+                <LinearGradient
+                  id="heroGradBottom"
                   x1="0"
                   y1={HERO_HEIGHT}
                   x2="0"
                   y2="0"
                 >
-                  <Stop offset="0" stopColor="#000" stopOpacity={0.78} />
-                  <Stop offset="0.4" stopColor="#000" stopOpacity={0.32} />
-                  <Stop offset="0.75" stopColor="#000" stopOpacity={0.05} />
+                  <Stop offset="0" stopColor="#000" stopOpacity={0.92} />
+                  <Stop offset="0.35" stopColor="#000" stopOpacity={0.4} />
+                  <Stop offset="0.7" stopColor="#000" stopOpacity={0.05} />
                   <Stop offset="1" stopColor="#000" stopOpacity={0} />
                 </LinearGradient>
               </Defs>
@@ -1415,13 +1429,20 @@ function MinimalPage({
                 y="0"
                 width="595"
                 height={HERO_HEIGHT}
-                fill="url(#heroGrad)"
+                fill="url(#heroGradTop)"
+              />
+              <Rect
+                x="0"
+                y="0"
+                width="595"
+                height={HERO_HEIGHT}
+                fill="url(#heroGradBottom)"
               />
             </Svg>
           </View>
 
-          {/* Top strip — Pack-Caption + Recipe-Number in Weiss mit
-              textShadow fuer Lesbarkeit auf hellen Bildbereichen. */}
+          {/* Top strip — Pack-Caption + Recipe-Number in Weiss. Der
+              Top-Gradient darunter sorgt fuer Lesbarkeit. */}
           <View
             style={{
               position: "absolute",
@@ -1440,7 +1461,6 @@ function MinimalPage({
                 letterSpacing: 2.2,
                 color: "#ffffff",
                 textTransform: "uppercase",
-                textShadow: "0 1px 2px rgba(0, 0, 0, 0.65)",
               }}
             >
               {pack.title}
@@ -1453,7 +1473,6 @@ function MinimalPage({
                   letterSpacing: 1.4,
                   color: "#ffffff",
                   textTransform: "uppercase",
-                  textShadow: "0 1px 2px rgba(0, 0, 0, 0.65)",
                 }}
               >
                 Rezept {pad2(recipe.number)} / {pad2(totalRecipes)}
@@ -1484,12 +1503,9 @@ function MinimalPage({
             </View>
           ) : null}
 
-          {/* Title overlay unten links — Weiss + textShadow + verstaerkter
-              Gradient unter dem Bild. Drei kombinierte Lesbarkeit-Tricks:
-              (1) starker Gradient macht den Hintergrund unter dem Title
-              dunkler, (2) Weiss kontrastiert gegen den jetzt dunklen
-              Hintergrund, (3) Drop-Shadow gibt extra Tiefe falls Foto
-              bereits dunkel ist und der Gradient weniger wirkt. */}
+          {/* Title overlay unten links — Weiss auf aggressivem Bottom-
+              Gradient. Bei einem 92 %-schwarzen Untergrund garantiert
+              lesbar, egal welches Foto. */}
           <View
             style={{
               position: "absolute",
@@ -1507,7 +1523,6 @@ function MinimalPage({
                 lineHeight: 1.02,
                 color: "#ffffff",
                 textTransform: "none",
-                textShadow: "0 2px 6px rgba(0, 0, 0, 0.85)",
               }}
             >
               {recipe.title}
@@ -1521,7 +1536,6 @@ function MinimalPage({
                 opacity: 0.95,
                 marginTop: 6,
                 lineHeight: 1.35,
-                textShadow: "0 1px 3px rgba(0, 0, 0, 0.75)",
               }}
             >
               {recipe.subtitle}
