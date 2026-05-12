@@ -2,6 +2,7 @@ import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
 import { PdfExportButton } from "./pdf-export-button";
 import { PackDeleteButton } from "./pack-delete-button";
+import { PackCoverRerollButton } from "./pack-cover-reroll-button";
 
 type PackActionsProps = {
   brand: Brand;
@@ -34,7 +35,17 @@ export function PackActions({ brand, pack, customPackId }: PackActionsProps) {
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {customPackId ? (
+            <PackCoverRerollButton
+              packId={customPackId}
+              tint={{
+                bg: pack.mood.background,
+                ink: pack.mood.ink,
+                accent: pack.mood.accent,
+              }}
+            />
+          ) : null}
           {customPackId ? (
             <PackDeleteButton
               packId={customPackId}

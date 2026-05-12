@@ -29,6 +29,15 @@ const FOREWORD_BUCKET = "pack-forewords";
 
 type Body = {
   packId: string;
+  /** Erzwingt Re-Generation des Covers, auch wenn schon eines existiert.
+   *  Wird vom Pack-Cover-Reroll-Button im UI gesetzt — User klickt
+   *  "Cover neu generieren", wenn ihm das aktuelle nicht gefaellt oder
+   *  die Generierung haengen geblieben ist. */
+  forceCover?: boolean;
+  /** Erzwingt Re-Generation des Vorwort-Bildes. Analog forceCover. */
+  forceForewordImage?: boolean;
+  /** Erzwingt Re-Generation des Vorwort-Textes (Greeting + Story + Signoff). */
+  forceForewordText?: boolean;
 };
 
 export async function POST(req: Request) {
@@ -90,12 +99,17 @@ export async function POST(req: Request) {
   // mustn't burn a fresh Flux/Gemini call for results we already have.
   // Cover counts as "done" when its URL points at our own bucket;
   // foreword counts as "done" when both fields are populated.
+  //
+  // force-Parameter-Override: wenn forceCover/forceForeword* gesetzt,
+  // ignorieren wir den hasX-Check und regenerieren trotzdem. Genutzt vom
+  // Pack-Cover-Reroll-Button im UI.
   const hasCover =
+    !body.forceCover &&
     (pack.coverImage ?? "").includes(
       `/storage/v1/object/public/${COVER_BUCKET}/`
     );
-  const hasForewordText = !!pack.foreword;
-  const hasForewordImage = !!pack.forewordImage;
+  const hasForewordText = !body.forceForewordText && !!pack.foreword;
+  const hasForewordImage = !body.forceForewordImage && !!pack.forewordImage;
 
   if (hasCover && hasForewordText && hasForewordImage) {
     return NextResponse.json({
