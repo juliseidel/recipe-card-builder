@@ -3138,7 +3138,8 @@ function VitalPage({
         paddingBottom: 16,
       }}
     >
-      {/* TOP STRIP — Pack-Info + Recipe-Number */}
+      {/* TOP STRIP — Pack-Title + Recipe-Number. "Pack XX"-Praefix entfernt
+          (tool-interne Nummerierung gehoert nicht aufs Druck-PDF). */}
       <View
         style={{
           flexDirection: "row",
@@ -3158,7 +3159,7 @@ function VitalPage({
             textTransform: "uppercase",
           }}
         >
-          Pack {pad2(pack.number)} · {pack.title}
+          {pack.title}
         </Text>
         {hideRecipeIndex ? null : (
           <Text
@@ -4037,7 +4038,8 @@ function AmberPage({
         paddingBottom: 14,
       }}
     >
-      {/* TOP STRIP */}
+      {/* TOP STRIP — Pack-Title + Recipe-Number. "Pack XX"-Praefix entfernt
+          (tool-interne Nummerierung gehoert nicht aufs Druck-PDF). */}
       <View
         style={{
           flexDirection: "row",
@@ -4056,7 +4058,7 @@ function AmberPage({
             textTransform: "uppercase",
           }}
         >
-          Pack {pad2(pack.number)} · {pack.title}
+          {pack.title}
         </Text>
         {hideRecipeIndex ? null : (
           <Text

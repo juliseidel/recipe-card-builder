@@ -40,12 +40,12 @@ export function PackPdfDocument({
   forewordImageDataUri,
   avatarDataUri,
 }: PackPdfProps) {
-  // Show foreword only when text is cached AND the still-life image
-  // loaded successfully. Anything less and we fall through to the legacy
-  // cover→index sequence.
-  const showForeword = Boolean(
-    forewordContent && forewordImageDataUri
-  );
+  // Show foreword whenever cached text is available. The still-life image
+  // is optional — Variants render a graceful Text-Only-Layout wenn
+  // forewordImageDataUri null ist. So bleibt das Vorwort fuer Custom-Packs
+  // verfuegbar, auch wenn die Flux-Bild-Generierung gefailt ist oder der
+  // User das Bild bewusst weglassen will.
+  const showForeword = Boolean(forewordContent);
   const t = packTheme(pack);
   const titleFont = fontFamilyForPack(pack);
 
@@ -589,6 +589,13 @@ function NutritionOverviewPage({
 }
 
 // ─── OUTRO ───────────────────────────────────────────────────────────────────
+// Default-Abschiedstext fuer den Fall, dass das Pack keinen persoenlichen
+// outro-Text mitbringt (z.B. Bienen Code-Brand-Packs in pack-forewords.ts,
+// die das Feld nie kannten). Fuer Custom-Packs schreibt Gemini den Outro
+// Pack- und Saison-spezifisch — siehe lib/ai/generate-foreword.ts.
+const DEFAULT_OUTRO =
+  "Danke, dass du mit mir kochst. Wenn dir die Karten gefallen, schick sie gerne weiter — und teil dein Ergebnis auf Instagram. Ich liebe es, eure Versionen zu sehen.";
+
 function OutroPage({
   brand,
   pack,
@@ -599,6 +606,7 @@ function OutroPage({
   titleFont: "Fraunces" | "Inter";
 }) {
   const t = packTheme(pack);
+  const outroText = pack.foreword?.outro?.trim() || DEFAULT_OUTRO;
   return (
     <Page
       size="A4"
@@ -634,12 +642,10 @@ function OutroPage({
             marginTop: 16,
             textAlign: "center",
             lineHeight: 1.55,
-            maxWidth: 360,
+            maxWidth: 380,
           }}
         >
-          Danke, dass du mit mir kochst. Wenn dir die Karten gefallen, schick sie
-          gerne weiter — und teil dein Ergebnis auf Instagram. Ich liebe es, eure
-          Versionen zu sehen.
+          {outroText}
         </Text>
         <Text
           style={{

@@ -228,7 +228,7 @@ export async function buildPackFromReels(
       },
       nutritionBasis: entry.parsed.nutritionBasis,
       sourceUrl: entry.reel.post_url,
-      sourceLabel: `Instagram · ${new URL(entry.reel.post_url).pathname.split("/").slice(0, 4).join("/")}`,
+      sourceLabel: "Original-Reel",
       hero: heroPlaceholder,
     };
 

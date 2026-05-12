@@ -320,6 +320,12 @@ function PatisserieForewordPage({
 // ─── SPORT — Pack 2 (Volumen-Wunder) ────────────────────────────────────────
 // Square hero image right with sage-green accent border, bold sans
 // greeting in Inter-Tight, macro-bar-inspired info strip.
+//
+// Image-Less-Mode: Wenn kein imageDataUri vorhanden ist, render keine
+// Placeholder-Box — der Text-Block nimmt die ganze Breite, mit pack.subtitle
+// als Stat-Strip oben statt unter dem Bild. Custom-Packs koennen so ein
+// rein-textliches Vorwort haben, das visuell als "Mini-Editorial" wirkt
+// statt als "Bild fehlt".
 function SportForewordPage({
   brand,
   pack,
@@ -329,6 +335,7 @@ function SportForewordPage({
 }: ForewordPageProps) {
   const t = packTheme(pack);
   const accentSoft = blendWithWhite(t.accent, 0.55);
+  const hasImage = Boolean(imageDataUri);
 
   return (
     <Page
@@ -364,6 +371,7 @@ function SportForewordPage({
               flexDirection: "column",
               justifyContent: "center",
               gap: 12,
+              maxWidth: hasImage ? undefined : 460,
             }}
           >
             <View
@@ -376,7 +384,7 @@ function SportForewordPage({
             <Text
               style={{
                 fontFamily: "Inter",
-                fontSize: 30,
+                fontSize: hasImage ? 30 : 36,
                 fontWeight: 700,
                 lineHeight: 1.05,
                 color: t.ink,
@@ -386,12 +394,27 @@ function SportForewordPage({
             >
               {content.greeting}
             </Text>
+            {!hasImage ? (
+              <Text
+                style={{
+                  fontFamily: "Inter",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: 1.8,
+                  color: t.accent,
+                  textTransform: "uppercase",
+                  marginTop: 2,
+                }}
+              >
+                {pack.subtitle}
+              </Text>
+            ) : null}
             <Text
               style={{
                 fontFamily: "Inter",
-                fontSize: 13,
+                fontSize: hasImage ? 13 : 14,
                 fontWeight: 400,
-                lineHeight: 1.6,
+                lineHeight: 1.65,
                 color: t.ink,
                 marginTop: 4,
               }}
@@ -430,46 +453,40 @@ function SportForewordPage({
             </View>
           </View>
 
-          {/* Right: sharp-cornered hero with thick accent rim */}
-          <View
-            style={{
-              width: 240,
-              padding: 6,
-              backgroundColor: accentSoft,
-              borderTopWidth: 4,
-              borderTopColor: t.accent,
-              borderRadius: 2,
-              alignSelf: "center",
-            }}
-          >
-            {imageDataUri ? (
-              <Image
-                src={imageDataUri}
-                style={{ width: 228, height: 285, objectFit: "cover" }}
-              />
-            ) : (
-              <View
-                style={{
-                  width: 228,
-                  height: 285,
-                  backgroundColor: blendWithWhite(t.accent, 0.85),
-                }}
-              />
-            )}
-            <Text
+          {/* Right: sharp-cornered hero with thick accent rim — only when
+              an image is available. Without image we skip the whole column
+              so the text-block can breathe across the full width. */}
+          {hasImage ? (
+            <View
               style={{
-                marginTop: 8,
-                fontSize: 8,
-                fontWeight: 700,
-                letterSpacing: 1.6,
-                color: t.inkSoft,
-                textTransform: "uppercase",
-                textAlign: "center",
+                width: 240,
+                padding: 6,
+                backgroundColor: accentSoft,
+                borderTopWidth: 4,
+                borderTopColor: t.accent,
+                borderRadius: 2,
+                alignSelf: "center",
               }}
             >
-              {pack.subtitle}
-            </Text>
-          </View>
+              <Image
+                src={imageDataUri as string}
+                style={{ width: 228, height: 285, objectFit: "cover" }}
+              />
+              <Text
+                style={{
+                  marginTop: 8,
+                  fontSize: 8,
+                  fontWeight: 700,
+                  letterSpacing: 1.6,
+                  color: t.inkSoft,
+                  textTransform: "uppercase",
+                  textAlign: "center",
+                }}
+              >
+                {pack.subtitle}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         <AuthorStrip
@@ -566,7 +583,7 @@ function MinimalForewordPage({
                 textTransform: "uppercase",
               }}
             >
-              Pack {pack.number.toString().padStart(2, "0")} · {pack.title}
+              {pack.title}
             </Text>
           </View>
 
@@ -905,23 +922,17 @@ function EditorialForewordPage({
             gap: 18,
           }}
         >
-          {/* Wide hero band */}
-          <View style={{ width: "100%", height: 220, overflow: "hidden" }}>
-            {imageDataUri ? (
+          {/* Wide hero band — wird komplett weggelassen wenn kein
+              imageDataUri da ist. So bekommt das Vorwort mehr Raum fuers
+              Editorial-Greeting + Body, statt eines leeren Farbblocks. */}
+          {imageDataUri ? (
+            <View style={{ width: "100%", height: 220, overflow: "hidden" }}>
               <Image
                 src={imageDataUri}
                 style={{ width: "100%", height: 220, objectFit: "cover" }}
               />
-            ) : (
-              <View
-                style={{
-                  width: "100%",
-                  height: 220,
-                  backgroundColor: blendWithWhite(t.accent, 0.85),
-                }}
-              />
-            )}
-          </View>
+            </View>
+          ) : null}
 
           {/* Greeting — italic Fraunces, generous size, sits below hero */}
           <Text

@@ -43,14 +43,17 @@ export function PackCoverRerollButton({ packId, tint }: Props) {
       const res = await fetch("/api/packs/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Klick regeneriert beide grafischen Pack-Assets: Cover UND
-        // Foreword-Image. Beide laufen ueber Flux, parallel im Background.
-        // Vorher nur Cover — User hatten dann keinen Weg, das Foreword-
-        // Bild allein zu refreshen wenn's thematisch nicht passt.
+        // Klick regeneriert alle drei Pack-Assets: Cover, Foreword-Bild
+        // UND Foreword-Text. Foreword-Text ist neu im Bundle weil aeltere
+        // Vorworte (Marketing-Sprache, kein outro-Feld) sonst hartnaeckig
+        // in der DB bleiben — der User klickt aber "Cover + Vorwort neu"
+        // mit der berechtigten Erwartung, dass der ganze Vorwort-Block
+        // aktualisiert wird. Gemini-Call ist schnell (~5s), kostet nichts.
         body: JSON.stringify({
           packId,
           forceCover: true,
           forceForewordImage: true,
+          forceForewordText: true,
         }),
       });
       if (!res.ok) throw new Error("enrich-call returned " + res.status);

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { queryReelsForBrand, type ReelRow } from "@/lib/creator-reels-server";
 import { generatePackMeta } from "@/lib/ai/generate-pack-meta";
 import { buildPackFromReels, pickMoodById } from "@/lib/reel-library/pack-builder";
+import { loadBrand } from "@/lib/custom-brands-server";
 
 // Auto-Pack-Generator. Wird vom Auto-Tab in /[brand]/new aufgerufen. User
 // gibt Filter (Timeframe, MealTypes, Cuisines), Server:
@@ -100,10 +101,13 @@ export async function POST(req: Request) {
 
   const selected = sortReels(allMatching, sortBy).slice(0, limit);
 
-  // Meta-Generierung (Title, Description, Mood).
+  // Meta-Generierung (Title, Description, Mood). Brand wird mitgegeben, damit
+  // die Description in der Stimme der Creatorin geschrieben wird statt in
+  // generischer Marketing-Sprache.
+  const brand = await loadBrand(body.brandSlug);
   let meta;
   try {
-    meta = await generatePackMeta(selected);
+    meta = await generatePackMeta(selected, brand);
   } catch (err) {
     console.error("[generate-auto] generatePackMeta failed", err);
     // Fallback: simple Default-Meta. Pack wird trotzdem erstellt.
