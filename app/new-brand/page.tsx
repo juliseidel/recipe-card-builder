@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import type { Brand, BrandImageStyleOverride } from "@/lib/brands";
+import type { Brand } from "@/lib/brands";
 import {
   addCustomBrand,
   brandSlugTaken,
@@ -66,12 +66,9 @@ export default function NewBrandPage() {
   const [igLoading, setIgLoading] = useState(false);
   const [igError, setIgError] = useState<string | null>(null);
   const [igSuccess, setIgSuccess] = useState<string | null>(null);
-  // Brand-DNA aus der Vision-Analyse (Lighting, Scene, Camera-Aesthetic).
-  // Wird beim Save in brand.imageStyle persistiert und von der Hero-
-  // Pipeline (PR 5 Pipeline-Refactor) genutzt. null = noch keine Analyse,
-  // oder Vision-Analyse hat fehlgeschlagen — dann Pipeline-Fallback.
-  const [detectedStyle, setDetectedStyle] =
-    useState<BrandImageStyleOverride | null>(null);
+  // Style-Template-Auswahl ist deaktiviert (Mai 2026): jeder Creator
+  // bekommt seine Brand-DNA als Code-Brand in lib/ai/brand-image-style.ts
+  // hand-kalibriert. brand.imageStyle bleibt null im DB-Eintrag.
 
   const handleAutoFill = async () => {
     if (!igHandle.trim() || igLoading) return;
@@ -123,17 +120,11 @@ export default function NewBrandPage() {
       if (typeof followersCount === "number" && followersCount > 0) {
         setFollowers(formatFollowersCompact(followersCount));
       }
-      // Vision-Analyse: optional, kann null sein wenn zu wenige Bilder
-      // verfuegbar waren oder Gemini fehlschlug. Wir speichern den Style
-      // wenn vorhanden — landet beim Save in brand.imageStyle.
-      if (data.imageStyle) {
-        setDetectedStyle(data.imageStyle as BrandImageStyleOverride);
-      }
-      const styleStatus = data.imageStyle
-        ? " · Brand-DNA aus den letzten Reel-Covers analysiert"
-        : "";
+      // Style-Template-Selection ist deaktiviert — brand.imageStyle bleibt
+      // null, Brand-DNA wird per Code-Brand in lib/ai/brand-image-style.ts
+      // separat hand-kalibriert.
       setIgSuccess(
-        `Profil @${data.raw?.handle ?? igHandle} importiert${styleStatus} — bitte ueberpruefe die Felder unten.`
+        `Profil @${data.raw?.handle ?? igHandle} importiert — bitte ueberpruefe die Felder unten.`
       );
     } catch (err) {
       setIgError(
@@ -241,11 +232,8 @@ export default function NewBrandPage() {
       fonts: DEFAULT_BRAND_FONTS,
       packCount: 0,
       recipeCount: 0,
-      // Brand-DNA aus der Vision-Analyse. Wenn detectedStyle null ist
-      // (kein Auto-Fill genutzt oder Vision-Analyse fehlgeschlagen),
-      // lassen wir das Feld weg — Pipeline faellt dann auf den generischen
-      // Style aus brand-image-style.ts zurueck.
-      ...(detectedStyle ? { imageStyle: detectedStyle } : {}),
+      // imageStyle wird bewusst NICHT gesetzt — Brand-DNA wird per
+      // Code-Brand in lib/ai/brand-image-style.ts hand-kalibriert.
     };
 
     const saved = await addCustomBrand(newBrand);
