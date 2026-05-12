@@ -127,24 +127,17 @@ function CoverPage({
       style={{ backgroundColor: t.bg, fontFamily: "Inter", color: t.ink }}
     >
       <View style={{ flex: 1, padding: 40, justifyContent: "space-between" }}>
+        {/* Top strip — nur Brand-Handle rechts. "Pack XX · Kategorie" wurde
+            entfernt, weil das fuer Custom-Packs des Users (Julia etc.) als
+            Pack-Nummerierung des internen Tools nichts auf dem fertigen
+            Druck-PDF zu suchen hat. */}
         <View
           style={{
             flexDirection: "row",
-            justifyContent: "space-between",
+            justifyContent: "flex-end",
             alignItems: "center",
           }}
         >
-          <Text
-            style={{
-              fontSize: 9,
-              fontWeight: 600,
-              letterSpacing: 1.8,
-              color: t.inkSoft,
-              textTransform: "uppercase",
-            }}
-          >
-            Pack {pad2(pack.number)} · {pack.category}
-          </Text>
           <Text
             style={{
               fontSize: 9,
@@ -158,13 +151,18 @@ function CoverPage({
           </Text>
         </View>
 
-        {/* Hero image */}
+        {/* Hero image — Container etwas hoeher als breit (320x420 = 4:5
+            Portrait), damit hochformatige Selfie-Cover ohne Crop
+            angezeigt werden. Vorher 380x380 quadratisch → Julias Kopf
+            wurde oben weggeschnitten weil das Original-Foto 1122x1402
+            ist. Mit 4:5 matched der Container die haeufigste Portrait-
+            Ratio; landscape oder square Cover bleiben centered. */}
         {coverDataUri ? (
           <View
             style={{
               alignSelf: "center",
-              width: 380,
-              height: 380,
+              width: 320,
+              height: 420,
               borderRadius: 12,
               overflow: "hidden",
               marginVertical: 12,
@@ -172,7 +170,12 @@ function CoverPage({
           >
             <Image
               src={coverDataUri}
-              style={{ width: 380, height: 380, objectFit: "cover" }}
+              style={{
+                width: 320,
+                height: 420,
+                objectFit: "cover",
+                objectPosition: "center 15%",
+              }}
             />
           </View>
         ) : null}
@@ -203,17 +206,25 @@ function CoverPage({
             {pack.subtitle}
           </Text>
 
-          <Text
-            style={{
-              fontSize: 11,
-              lineHeight: 1.55,
-              color: t.inkSoft,
-              marginTop: 16,
-              maxWidth: 460,
-            }}
-          >
-            {pack.description}
-          </Text>
+          {/* Description — nur rendern wenn ein echter Pack-Text vorhanden,
+              NICHT die generische Default-Phrase aus dem internen Editor
+              ("Eigene Sammlung in ... Welt. Karten kannst du im Editor
+              erstellen ..."). Die ist Tool-Onboarding-Text, nicht
+              Druck-Material. */}
+          {pack.description &&
+          !/Karten kannst du im Editor/.test(pack.description) ? (
+            <Text
+              style={{
+                fontSize: 11,
+                lineHeight: 1.55,
+                color: t.inkSoft,
+                marginTop: 16,
+                maxWidth: 460,
+              }}
+            >
+              {pack.description}
+            </Text>
+          ) : null}
 
           <View
             style={{

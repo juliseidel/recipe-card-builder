@@ -181,8 +181,10 @@ function TopStrip({
           textTransform: "uppercase",
         }}
       >
-        {rightLabel ??
-          `Pack ${pack.number.toString().padStart(2, "0")} · ${pack.title}`}
+        {/* Vorher: "Pack 03 · Airfryer Lieblinge". Die "Pack XX" Nummerierung
+            ist tool-intern, gehoert nicht aufs Druck-PDF. Jetzt nur der
+            Pack-Titel. */}
+        {rightLabel ?? pack.title}
       </Text>
     </View>
   );

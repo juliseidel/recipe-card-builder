@@ -200,9 +200,12 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
         subtitle: subtitle.trim() || category.trim() || "Eigenes Konzept",
         category: category.trim() || "Eigenes Konzept",
         tagline: tagline.trim() || `${title.trim()} — ${brand.name}s neue Sammlung`,
-        description:
-          description.trim() ||
-          `Eigene Sammlung in ${brand.name}s Welt. Karten kannst du im Editor erstellen, jede mit ihrem eigenen Layout.`,
+        // Default leer statt Tool-Onboarding-Phrase. Vorher: "Eigene
+        // Sammlung in ... Welt. Karten kannst du im Editor erstellen,
+        // jede mit ihrem eigenen Layout." — landete unschoen auf dem
+        // gedruckten Pack-Cover. Pack-PDF rendert description nur wenn
+        // truthy, leerer String wird sauber uebersprungen.
+        description: description.trim(),
         coverImage: uploadedCoverUrl ?? PENDING_COVER,
         mood: selectedMood,
         displayFont,

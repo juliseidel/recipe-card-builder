@@ -1000,10 +1000,14 @@ function PatisseriePage({
         </View>
 
         {/* ─── RIGHT: CREAM BODY ───────────────────────────────────── */}
-        {/* paddingTop/Bottom density-aware. Bei spacious zusaetzlich
-            justifyContent "center": Content wird vertikal zentriert,
-            sodass kurze Recipes nicht mehr oben kleben + unten Weiss
-            lassen, sondern symmetrisch in der Spalten-Mitte sitzen. */}
+        {/* User-Feedback: justifyContent "center" bei spacious hat dafuer
+            gesorgt dass kurze Karten ihren Inhalt MITTIG hatten waehrend
+            laengere Karten oben starteten — Layout sah von Karte zu
+            Karte unterschiedlich aus. Konsistenz schlaegt Whitespace-
+            Optimierung. Alle Karten starten jetzt top-aligned mit
+            denselben Abstaenden, egal ob Story dabei oder nicht. Bei
+            sehr kurzen Recipes bleibt unten ein bisschen Raum — das ist
+            ok, dafuer sind ALLE Karten einheitlich angeordnet. */}
         <View
           style={{
             flex: 1,
@@ -1011,7 +1015,6 @@ function PatisseriePage({
             paddingHorizontal: 32,
             paddingTop: d.bodyPadTop,
             paddingBottom: d.bodyPadBottom,
-            justifyContent: density === "spacious" ? "center" : "flex-start",
           }}
         >
           {/* Top stats strip — identity-relevant numbers, on the body
@@ -1140,13 +1143,13 @@ function PatisseriePage({
             ))}
           </View>
 
-          {/* Story-Block — nur bei wirklich kurzen Recipes (spacious-
-              Density), wo Body-Hoehe Reserve hat. Bei mittel+langen
-              Recipes braucht der Body den Platz fuer Zutaten + Steps. */}
+          {/* Story-Block — bei kurzen Recipes (spacious-Density), wo
+              Body-Hoehe Reserve hat. Konstante margin/padding fuer
+              Konsistenz zwischen allen Karten. */}
           {showStoryHere ? (
             <View
               style={{
-                marginTop: density === "spacious" ? 22 : 14,
+                marginTop: 18,
                 paddingTop: 12,
                 paddingBottom: 12,
                 paddingLeft: 14,
@@ -1169,8 +1172,8 @@ function PatisseriePage({
             </View>
           ) : null}
 
-          {/* MAN NEHME — full ingredients list with sub-group headers */}
-          <View style={{ marginTop: density === "spacious" ? 28 : 18 }}>
+          {/* MAN NEHME — konstanter marginTop fuer Layout-Konsistenz */}
+          <View style={{ marginTop: 22 }}>
             <SectionHeader label="Man nehme" theme={t} italic />
             <IngredientsList
               grouped={grouped}
@@ -1181,8 +1184,8 @@ function PatisseriePage({
             />
           </View>
 
-          {/* ZUBEREITUNG — numbered steps */}
-          <View style={{ marginTop: density === "spacious" ? 24 : 14 }}>
+          {/* ZUBEREITUNG — konstanter marginTop fuer Layout-Konsistenz */}
+          <View style={{ marginTop: 18 }}>
             <SectionHeader label="Zubereitung" theme={t} italic />
             <StepsList
               steps={recipe.steps}
@@ -2026,60 +2029,57 @@ const PATISSERIE_DENSITY: Record<
     microsPadBottom: number;
   }
 > = {
+  // v3 (User-Feedback): paddingTop/Bottom angeglichen, damit Karten
+  // unabhaengig von Density visuell konsistent wirken. stepNumFontSize bei
+  // spacious von 24 auf 20 reduziert — bei kurzen Step-Texten wirkte die
+  // Riesen-"1" gegenueber dem Text vertikal verschoben.
   compact: {
     headPadTop: 22,
     headPadBottom: 12,
     titleFontSize: 30,
     subtitleFontSize: 12,
-    bodyPadTop: 14,
-    bodyPadBottom: 12,
+    bodyPadTop: 30,
+    bodyPadBottom: 28,
     ingRowPadV: 2.5,
     ingFontSize: 9,
     ingNoteFontSize: 6.5,
-    stepMarginBottom: 6,
+    stepMarginBottom: 7,
     stepFontSize: 9,
     stepNumFontSize: 16,
     microsPadTop: 9,
     microsPadBottom: 10,
   },
-  // balanced is the legacy default — bit-identical to the previous patisserie
-  // hard-coded values so the 3 mid-range Backwelt recipes (Süßkartoffel-
-  // Muffins, Mini Franzbrötchen, Protein-Brot) render exactly as before.
   balanced: {
     headPadTop: 28,
     headPadBottom: 16,
     titleFontSize: 36,
     subtitleFontSize: 14,
-    bodyPadTop: 18,
-    bodyPadBottom: 16,
+    bodyPadTop: 32,
+    bodyPadBottom: 30,
     ingRowPadV: 3.5,
     ingFontSize: 9.5,
     ingNoteFontSize: 7,
-    stepMarginBottom: 8,
+    stepMarginBottom: 9,
     stepFontSize: 9.5,
     stepNumFontSize: 18,
     microsPadTop: 8,
     microsPadBottom: 9,
   },
-  // spacious — fuer kurze Recipes (z.B. 5 Zutaten + 4 Steps). v2 (2026-05-12):
-  // Werte deutlich erhoeht weil das Body-Layout sonst nach 60% der Seite endet
-  // und unten viel Weiss bleibt. Mehr breathing room + groessere Steps lassen
-  // die Card auch bei wenig Content "intentional" wirken statt "halbleer".
   spacious: {
-    headPadTop: 38,
-    headPadBottom: 22,
-    titleFontSize: 42,
+    headPadTop: 32,
+    headPadBottom: 18,
+    titleFontSize: 40,
     subtitleFontSize: 15,
-    bodyPadTop: 44,
-    bodyPadBottom: 44,
-    ingRowPadV: 7,
-    ingFontSize: 10.5,
+    bodyPadTop: 34,
+    bodyPadBottom: 32,
+    ingRowPadV: 5,
+    ingFontSize: 10,
     ingNoteFontSize: 7.5,
-    stepMarginBottom: 16,
-    stepFontSize: 10.5,
-    stepNumFontSize: 24,
-    microsPadTop: 12,
-    microsPadBottom: 14,
+    stepMarginBottom: 11,
+    stepFontSize: 10,
+    stepNumFontSize: 20,
+    microsPadTop: 11,
+    microsPadBottom: 12,
   },
 };
 
@@ -4989,8 +4989,14 @@ function StepsList({
               key={item.index}
               style={{
                 flexDirection: "row",
+                // alignItems "baseline" sorgt dafuer dass die Step-Nummer
+                // und der Step-Text auf der typografischen Grundlinie
+                // ausgerichtet sind, statt am oberen Rand (was bei
+                // groesserer Nummer-FontSize visuell verschoben wirkte —
+                // "Drücke die Bananen" hing tiefer als die "1").
+                alignItems: "baseline",
                 marginBottom: stepMarginBottom,
-                gap: 6,
+                gap: 8,
               }}
             >
               <Text
