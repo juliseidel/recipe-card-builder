@@ -539,18 +539,11 @@ function MinimalForewordPage({
             />
           ) : null}
 
-          {/* Subtiler dunkler Verlauf am unteren Rand fuer Avatar-
-              Lesbarkeit, falls das Stillleben sehr hell ist. */}
-          <View
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: HERO_HEIGHT * 0.4,
-              backgroundColor: "rgba(0, 0, 0, 0.18)",
-            }}
-          />
+          {/* (Vorher: 18% black overlay im unteren Drittel fuer Avatar-
+              Lesbarkeit. Entfernt — User-Feedback: "die Haelfte ist dunkler
+              als die andere, das sieht komisch aus". Avatar hat eigenen
+              weissen Rand, Top-Caption hat eigene Lesbarkeit auch ohne
+              Overlay.) */}
 
           <View
             style={{
@@ -641,7 +634,7 @@ function MinimalForewordPage({
             flex: 1,
             paddingHorizontal: 56,
             paddingTop: 36,
-            paddingBottom: 28,
+            paddingBottom: 44,
             flexDirection: "column",
             justifyContent: "center",
             gap: 22,
@@ -694,11 +687,21 @@ function MinimalForewordPage({
           </View>
         </View>
 
-        <AuthorStrip
-          brand={brand}
-          pack={pack}
-          avatarDataUri={avatarDataUri}
-        />
+        {/* AuthorStrip mit eigenem Horizontal- + Bottom-Padding fuer Atemraum.
+            Vorher rendered der Strip full-bleed ohne padding, was den Avatar
+            und die Signature optisch eingequetscht erscheinen lies. */}
+        <View
+          style={{
+            paddingHorizontal: 56,
+            paddingBottom: 36,
+          }}
+        >
+          <AuthorStrip
+            brand={brand}
+            pack={pack}
+            avatarDataUri={avatarDataUri}
+          />
+        </View>
       </View>
     </Page>
   );

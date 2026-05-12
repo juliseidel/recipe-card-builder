@@ -1306,7 +1306,15 @@ function MinimalPage({
   const time = totalTime(recipe);
   const pl = recipe.servings === 1 ? "Portion" : "Stücke";
   const stueckSing = recipe.servings === 1 ? "Portion" : "Stück";
-  const density = getDensity(recipe);
+  // Bei vielen Steps (>=6) override auf compact-density, sonst ueberlaufen
+  // lange Step-Texte den verfuegbaren Body-Slot — z.B. Solero-Tiramisu im
+  // Sweet-Moments-Pack hat 7 Schritte, von denen mehrere 3-4 Zeilen
+  // Anweisungstext haben. In compact-density bekommt jeder Step kleinere
+  // Schrift + weniger marginBottom, was sauber auf eine A4-Seite passt
+  // ohne Step-Ueberlappung.
+  const baseDensity = getDensity(recipe);
+  const density =
+    (recipe.steps?.length ?? 0) >= 6 ? "compact" : baseDensity;
   const d = MINIMAL_DENSITY[density];
   const grouped = groupIngredients(recipe.ingredients);
 
@@ -1470,7 +1478,10 @@ function MinimalPage({
             </View>
           ) : null}
 
-          {/* Title overlay unten links — Bold Inter-Tight, weiss */}
+          {/* Title overlay unten links — Pack-Accent-Farbe (rosa/honey/etc.)
+              statt vorher weiss. User wollte den Rezeptnamen in Akzent-Farbe
+              haben, das gibt der Hero-Komposition mehr Brand-Identitaet als
+              ein neutrales Weiss auf jedem Foto. */}
           <View
             style={{
               position: "absolute",
@@ -1486,7 +1497,7 @@ function MinimalPage({
                 fontWeight: 700,
                 letterSpacing: -0.6,
                 lineHeight: 1.02,
-                color: "#ffffff",
+                color: t.accent,
                 textTransform: "none",
               }}
             >
@@ -1497,8 +1508,8 @@ function MinimalPage({
                 fontFamily: "Fraunces",
                 fontStyle: "italic",
                 fontSize: 12,
-                color: "#ffffff",
-                opacity: 0.92,
+                color: t.accent,
+                opacity: 0.95,
                 marginTop: 6,
                 lineHeight: 1.35,
               }}
