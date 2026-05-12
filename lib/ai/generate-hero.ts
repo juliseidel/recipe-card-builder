@@ -14,20 +14,25 @@ import { getServerSupabase } from "@/lib/supabase-server";
 import { isCodeBrand } from "@/lib/brands";
 import type { Recipe } from "@/lib/recipes";
 
-// Render-Aufloesung: Flux 2 Pro rendert nativ bei 2048x2048 (statt 1440x1440
-// wie in PR #57). Detail-View braucht auf Retina 1840 Display-px — mit
-// 1440er-Source musste der Browser ~28% hochskalieren, was leicht "billig"
-// wirkte. 2048 ist Flux-2-Pro's solide Upper-Bound und liefert das Bild
-// nativ scharf fuer Retina ohne Upscale.
-const FLUX_RENDER_WIDTH = 2048;
-const FLUX_RENDER_HEIGHT = 2048;
+// Render-Aufloesung: Flux 2 Pro rendert nativ bei 1440x1440 (User-Feedback
+// 2026-05-12: Speed war wichtiger als die letzten 5-10% Detail-Schaerfe).
+// 2048 nativ (PR #58) kostete 15-25s pro Generation — bei 12 Heroes nach
+// Pack-Annahme = ~5 Min wartezeit. 1440 nativ kostet 8-15s, ~50% schneller.
+//
+// Detail-Schaerfe: Sharp upscaled von 1440 auf 3072 mit Lanczos3 (2.13x
+// Resize statt 1.5x). Lanczos3 holt fast die gleiche Schaerfe wie ein
+// 2048er-Source raus — bei normaler Display-Skalierung (1840 Retina-px im
+// Detail-View) kaum sichtbar.
+//
+// Trade-off-Schalter: hier auf 2048 zurueckdrehen falls das 1440-Bild als
+// "matschig" wahrgenommen wird. flux-2-pro bleibt das Modell — wechseln
+// auf flux-pro-1.1 wuerde Reference-Fidelity opfern.
+const FLUX_RENDER_WIDTH = 1440;
+const FLUX_RENDER_HEIGHT = 1440;
 
-// Storage-Aufloesung: Sharp upscaled das Flux-Bild von 2048 auf 3072 mit
-// Lanczos3 + modesty Sharpening. Lanczos3 ist Industry-Standard fuer Photo-
-// Upscaling und packt das ~1.5x mit minimalen Artefakten. Bei 3072er-Source
-// hat Vercel Image Optimization 60% Downscale-Headroom fuer die Detail-View
-// (1840 Display-px) statt 28% Upscale wie vorher — sichtbar schaerfer.
-// Gleichzeitig genug Reserve fuer PDF-Print (300 dpi @ ~26cm).
+// Storage-Aufloesung: Sharp upscaled das Flux-Bild von 1440 auf 3072 mit
+// Lanczos3 + modesty Sharpening. Bei 3072er-Source hat Vercel Image
+// Optimization Headroom fuer Display-Skalierung + PDF-Print (300 dpi @ ~26cm).
 const STORAGE_LONG_EDGE = 3072;
 const STORAGE_JPEG_QUALITY = 95;
 
