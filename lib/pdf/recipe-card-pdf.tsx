@@ -1709,7 +1709,7 @@ function MinimalPage({
                   textTransform: "uppercase",
                 }}
               >
-                Mikronährstoffe pro {stueckSing} · % Tagesbedarf
+                Mikronährstoffe pro Portion · % Tagesbedarf
               </Text>
             </View>
             <View
@@ -1778,6 +1778,11 @@ function MinimalPage({
             gap: 16,
           }}
         >
+          {/* Linker Footer-Block: Avatar + Handle-+-Pack-Caption.
+              brand.signature ("Deine Julia") + BeeIcon entfernt — kam
+              an zu vielen Stellen vor (User-Feedback). Text rechts neben
+              dem Avatar ist jetzt vertikal mittig (alignItems "center"),
+              sodass das Layout sauber ausbalanciert wirkt. */}
           <View
             style={{
               flexDirection: "row",
@@ -1802,40 +1807,17 @@ function MinimalPage({
                 />
               </View>
             ) : null}
-            <View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 5,
-                }}
-              >
-                <Text
-                  style={{
-                    fontFamily: "Fraunces",
-                    fontStyle: "italic",
-                    fontSize: 13,
-                    color: t.ink,
-                    lineHeight: 1.05,
-                  }}
-                >
-                  {brand.signature}
-                </Text>
-                <BeeIcon brandSlug={brand.slug} size={14} />
-              </View>
-              <Text
-                style={{
-                  fontSize: 7,
-                  fontWeight: 600,
-                  letterSpacing: 1.4,
-                  color: t.inkSoft,
-                  textTransform: "uppercase",
-                  marginTop: 2,
-                }}
-              >
-                {brand.handle} · {pack.title}
-              </Text>
-            </View>
+            <Text
+              style={{
+                fontSize: 8.5,
+                fontWeight: 600,
+                letterSpacing: 1.6,
+                color: t.inkSoft,
+                textTransform: "uppercase",
+              }}
+            >
+              {brand.handle} · {pack.title}
+            </Text>
           </View>
 
           {qrDataUri ? (
@@ -4933,7 +4915,10 @@ function IngredientRow({
   // kollidieren wuerden.
   const padV = rowPadV ?? (compact ? 3.5 : 4.5);
   const amountFont = compact ? 7.5 : 8;
-  const amountW = compact ? 46 : 54;
+  // amountW vergrossert auf 56/66 (vorher 46/54), damit "nach Geschmack"
+  // in einer Zeile passt statt auf zwei umzubrechen. Bei 8 pt Inter:
+  // "nach Geschmack" (14 Zeichen) braucht ~62 pt — 66 gibt einen Puffer.
+  const amountW = compact ? 56 : 66;
   const nameFont = nameFontSize ?? (compact ? 9 : 9.5);
   const noteFont = noteFontSize ?? (compact ? 7 : 7.5);
   // Name + Note werden in EINEM Text-Element gerendert mit nested

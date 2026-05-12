@@ -127,29 +127,11 @@ function CoverPage({
       style={{ backgroundColor: t.bg, fontFamily: "Inter", color: t.ink }}
     >
       <View style={{ flex: 1, padding: 40, justifyContent: "space-between" }}>
-        {/* Top strip — nur Brand-Handle rechts. "Pack XX · Kategorie" wurde
-            entfernt, weil das fuer Custom-Packs des Users (Julia etc.) als
-            Pack-Nummerierung des internen Tools nichts auf dem fertigen
-            Druck-PDF zu suchen hat. */}
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "flex-end",
-            alignItems: "center",
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 9,
-              fontWeight: 500,
-              letterSpacing: 1.4,
-              color: t.inkSoft,
-              textTransform: "uppercase",
-            }}
-          >
-            {brand.handle}
-          </Text>
-        </View>
+        {/* Top strip leer — Brand-Handle oben rechts entfernt
+            (User-Feedback: kam auch auf jedem Recipe-Footer + im
+            Bottom-Strip vor, war redundant). Lassen wir das Cover oben
+            atmen. */}
+        <View style={{ height: 0 }} />
 
         {/* Hero image — Container etwas hoeher als breit (320x420 = 4:5
             Portrait), damit hochformatige Selfie-Cover ohne Crop
@@ -228,10 +210,11 @@ function CoverPage({
             </Text>
           ) : null}
 
-          {/* Recipe-Count + Handle. brand.signature ("Deine Julia") wurde
-              hier entfernt — kam zusaetzlich auf jedem Recipe-Footer +
-              auf der Outro-Page, das war "zu viel" (User-Feedback). Die
-              Signature steht jetzt nur noch zentral auf der Outro-Page. */}
+          {/* Recipe-Count alleine. brand.signature ("Deine Julia") und
+              brand.handle (@juliabreitenfeld) entfernt — beide kamen auf
+              jedem Recipe-Footer + auf der Outro-Page nochmal vor, das
+              war "zu viel" (User-Feedback). Auf der Cover-Page steht
+              jetzt nur noch der Recipe-Count als ruhige Schlusszeile. */}
           <View
             style={{
               flexDirection: "row",
@@ -243,8 +226,6 @@ function CoverPage({
             <Text style={{ fontSize: 10, color: t.inkSoft }}>
               {recipes.length} Rezepte
             </Text>
-            <Text style={{ fontSize: 10, color: t.inkSoft, opacity: 0.4 }}>·</Text>
-            <Text style={{ fontSize: 10, color: t.inkSoft }}>{brand.handle}</Text>
           </View>
         </View>
       </View>
