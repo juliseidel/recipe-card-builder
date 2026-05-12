@@ -130,12 +130,18 @@ async function tryReferenceBasedHero(
   if (!opts.recipe.sourceUrl) return null;
 
   try {
-    const { scrapeInstagramPost, normalizeInstagramUrl } = await import(
-      "@/lib/integrations/apify"
+    // scrapeAnySocialPost detected die Plattform aus der URL und routet
+    // zum richtigen Apify-Actor (Instagram-Scraper oder TikTok-Scraper).
+    // Beide liefern den shared InstagramPost-Shape — der Rest der
+    // Pipeline (ffmpeg Frame-Extract, Keyframe-Pick, Flux) ist platform-
+    // agnostisch, weil TikTok-Videos auch direkte MP4-URLs sind und
+    // TikTok-Cover-Bilder ueber normale https-URLs erreichbar.
+    const { scrapeAnySocialPost } = await import(
+      "@/lib/integrations/platform"
     );
-    const normalized = normalizeInstagramUrl(opts.recipe.sourceUrl);
-    if (!normalized) return null;
-    const post = await scrapeInstagramPost(normalized);
+    const scraped = await scrapeAnySocialPost(opts.recipe.sourceUrl);
+    if (!scraped) return null;
+    const { post } = scraped;
 
     // 2a) Bevorzugt: Keyframe aus dem Video. Jan's Original-Approach.
     if (post.videoUrl) {
@@ -319,21 +325,20 @@ async function uploadTextOnlyFluxHero(
 
   // Vision-Description nur wenn sourceUrl vorhanden — sonst gibt's eh
   // nichts zu beschreiben. Best-effort: Failure stoppt den Fallback nicht.
+  // Platform-agnostisch: scrapeAnySocialPost routet zwischen Instagram-
+  // und TikTok-Scraper basierend auf der URL.
   let dishDescription: string | null = null;
   if (recipe.sourceUrl) {
     try {
-      const { scrapeInstagramPost, normalizeInstagramUrl } = await import(
-        "@/lib/integrations/apify"
+      const { scrapeAnySocialPost } = await import(
+        "@/lib/integrations/platform"
       );
-      const normalized = normalizeInstagramUrl(recipe.sourceUrl);
-      if (normalized) {
-        const post = await scrapeInstagramPost(normalized);
-        if (post.displayUrl) {
-          const { describeInstagramDish } = await import(
-            "./describe-instagram-dish"
-          );
-          dishDescription = await describeInstagramDish(post.displayUrl);
-        }
+      const scraped = await scrapeAnySocialPost(recipe.sourceUrl);
+      if (scraped?.post.displayUrl) {
+        const { describeInstagramDish } = await import(
+          "./describe-instagram-dish"
+        );
+        dishDescription = await describeInstagramDish(scraped.post.displayUrl);
       }
     } catch (err) {
       console.warn(

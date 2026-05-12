@@ -81,3 +81,34 @@ export function profileUrlFor(
   }
   return `https://www.instagram.com/${clean}/`;
 }
+
+/** Generischer Post-Scrape, der je nach URL den richtigen Apify-Actor
+ *  ansprich. Wird von der Hero-Pipeline (lib/ai/generate-hero.ts) genutzt,
+ *  damit die Reference-Based-Bild-Generierung sowohl fuer Instagram-Reels
+ *  als auch fuer TikTok-Videos funktioniert.
+ *
+ *  Output-Shape ist InstagramPost (gemeinsamer Typ) — der Downstream-Code
+ *  (Keyframe-Extraction, Vision-Description, Flux) braucht keine
+ *  Plattform-Knowledge. Returnt null wenn die URL weder Instagram noch
+ *  TikTok ist (statt zu werfen — Hero-Pipeline kann dann auf Text-Only
+ *  Fallback gehen). */
+export async function scrapeAnySocialPost(
+  url: string
+): Promise<{ post: import("./apify").InstagramPost; platform: SocialPlatform } | null> {
+  const platform = detectPlatformFromUrl(url);
+  if (!platform) return null;
+
+  if (platform === "tiktok") {
+    const { scrapeTikTokPost, normalizeTikTokUrl } = await import("./apify-tiktok");
+    const normalized = normalizeTikTokUrl(url);
+    if (!normalized) return null;
+    const post = await scrapeTikTokPost(normalized);
+    return { post, platform };
+  }
+
+  const { scrapeInstagramPost, normalizeInstagramUrl } = await import("./apify");
+  const normalized = normalizeInstagramUrl(url);
+  if (!normalized) return null;
+  const post = await scrapeInstagramPost(normalized);
+  return { post, platform };
+}
