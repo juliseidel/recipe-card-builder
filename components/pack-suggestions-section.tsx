@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { Brand } from "@/lib/brands";
 
 // Pack-Vorschlaege-Section im Workspace. Wird ueber "Aktive Packs"
@@ -44,11 +44,8 @@ export function PackSuggestionsSection({
   brand: Brand;
   refreshToken?: number;
 }) {
-  const router = useRouter();
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
-  const [busyIds, setBusyIds] = useState<Record<string, "accept" | "dismiss">>(
-    {}
-  );
+  const [busyIds, setBusyIds] = useState<Record<string, "dismiss">>({});
   const [error, setError] = useState<string | null>(null);
 
   const loadSuggestions = useCallback(async () => {
@@ -86,33 +83,6 @@ export function PackSuggestionsSection({
     }, 8000);
     return () => clearInterval(interval);
   }, [suggestions, loadSuggestions]);
-
-  const handleAccept = async (id: string) => {
-    setBusyIds((prev) => ({ ...prev, [id]: "accept" }));
-    setError(null);
-    try {
-      const res = await fetch(`/api/pack-suggestions/${id}/accept`, {
-        method: "POST",
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error ?? "Annehmen fehlgeschlagen.");
-      }
-      setSuggestions((prev) =>
-        prev ? prev.filter((s) => s.id !== id) : prev
-      );
-      router.push(`/${brand.slug}/${json.packSlug}`);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Annehmen fehlgeschlagen.");
-    } finally {
-      setBusyIds((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
-    }
-  };
 
   const handleDismiss = async (id: string) => {
     setBusyIds((prev) => ({ ...prev, [id]: "dismiss" }));
@@ -210,116 +180,114 @@ export function PackSuggestionsSection({
           return (
             <article
               key={s.id}
-              className="group relative flex w-[320px] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-[0_28px_60px_-30px_rgba(26,18,11,0.32)] sm:w-[360px]"
+              className="group relative w-[320px] shrink-0 snap-start overflow-hidden rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-[0_28px_60px_-30px_rgba(26,18,11,0.32)] sm:w-[360px]"
               style={{
                 borderColor: brand.tokens.line,
                 background: brand.tokens.surface,
-                minHeight: 360,
               }}
             >
-              {/* Background — Reel-Cover als Bild, mit dunklem Gradient
-                  Overlay fuer Text-Lesbarkeit. Bei fehlendem Cover:
-                  Mood-Gradient mit Brand-Akzent. */}
-              <div
-                className="absolute inset-0 bg-cover bg-center transition-transform duration-[700ms] group-hover:scale-[1.04]"
-                style={
-                  coverUrl
-                    ? { backgroundImage: `url("${coverUrl}")` }
-                    : {
-                        background: `linear-gradient(135deg, ${brand.tokens.accent}33 0%, ${brand.tokens.background} 70%)`,
-                      }
-                }
-                aria-hidden
-              />
-              {/* Dunkler Gradient — unten staerker, oben fast transparent.
-                  Macht Title + Buttons lesbar ohne Cover-Bild zu verstecken. */}
-              <div
-                className="absolute inset-0"
-                style={{
-                  background: coverUrl
-                    ? "linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.78) 100%)"
-                    : "linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.35) 100%)",
-                }}
-                aria-hidden
-              />
+              {/* Ganze Karte ist klickbar → öffnet die Preview-Page mit
+                  Recipes + Layout-Picker. "Annehmen" passiert erst dort
+                  (vorher kein blind-accept mehr). */}
+              <Link
+                href={`/${encodeURIComponent(brand.slug)}/suggestion/${encodeURIComponent(s.id)}`}
+                className="flex h-full flex-col"
+                style={{ minHeight: 360 }}
+              >
+                {/* Background — Cover-Bild (KI oder Reel) mit Gradient-Overlay */}
+                <div
+                  className="absolute inset-0 bg-cover bg-center transition-transform duration-[700ms] group-hover:scale-[1.04]"
+                  style={
+                    coverUrl
+                      ? { backgroundImage: `url("${coverUrl}")` }
+                      : {
+                          background: `linear-gradient(135deg, ${brand.tokens.accent}33 0%, ${brand.tokens.background} 70%)`,
+                        }
+                  }
+                  aria-hidden
+                />
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background: coverUrl
+                      ? "linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.78) 100%)"
+                      : "linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.35) 100%)",
+                  }}
+                  aria-hidden
+                />
 
-              {/* Foreground content */}
-              <div className="relative flex h-full flex-col gap-3 p-5">
-                <header className="flex items-start justify-between gap-3">
-                  <span
-                    className="rounded-full px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.16em] backdrop-blur"
-                    style={{
-                      background: "rgba(255,255,255,0.18)",
-                      color: "white",
-                    }}
-                  >
-                    {s.category || "Pack-Konzept"}
-                  </span>
-                  <span
-                    className="rounded-full px-2.5 py-1 text-[10.5px] font-mono font-semibold uppercase tracking-[0.12em] backdrop-blur"
-                    style={{
-                      background: "rgba(255,255,255,0.18)",
-                      color: "white",
-                    }}
-                  >
-                    {s.reelCount} Reels
-                  </span>
-                </header>
+                {/* Foreground content */}
+                <div className="relative flex h-full flex-col gap-3 p-5">
+                  <header className="flex items-start justify-between gap-3">
+                    <span
+                      className="rounded-full px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.16em] backdrop-blur"
+                      style={{
+                        background: "rgba(255,255,255,0.18)",
+                        color: "white",
+                      }}
+                    >
+                      {s.category || "Pack-Konzept"}
+                    </span>
+                    <span
+                      className="rounded-full px-2.5 py-1 text-[10.5px] font-mono font-semibold uppercase tracking-[0.12em] backdrop-blur"
+                      style={{
+                        background: "rgba(255,255,255,0.18)",
+                        color: "white",
+                      }}
+                    >
+                      {s.reelCount} Reels
+                    </span>
+                  </header>
 
-                <div className="mt-auto flex flex-col gap-2.5">
-                  <h3 className="font-display text-[22px] leading-[1.08] tracking-[-0.01em] text-white">
-                    {s.title}
-                  </h3>
-                  {s.subtitle ? (
-                    <p className="text-[12.5px] leading-relaxed text-white/85">
-                      {s.subtitle}
-                    </p>
-                  ) : null}
+                  <div className="mt-auto flex flex-col gap-2.5">
+                    <h3 className="font-display text-[22px] leading-[1.08] tracking-[-0.01em] text-white">
+                      {s.title}
+                    </h3>
+                    {s.subtitle ? (
+                      <p className="text-[12.5px] leading-relaxed text-white/85">
+                        {s.subtitle}
+                      </p>
+                    ) : null}
 
-                  <div className="mt-3 flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void handleAccept(s.id)}
-                      disabled={Boolean(busy)}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-[12.5px] font-semibold text-white transition-all hover:opacity-95 disabled:cursor-wait disabled:opacity-60"
+                    <div
+                      className="mt-3 inline-flex items-center gap-1.5 self-start rounded-full px-4 py-2.5 text-[12.5px] font-semibold text-white transition-all group-hover:translate-x-0.5"
                       style={{ background: brand.tokens.accent }}
                     >
-                      {busy === "accept" ? (
-                        <>
-                          <span className="size-3 animate-spin rounded-full border-[2px] border-white/30 border-t-white" />
-                          Erstelle Pack…
-                        </>
-                      ) : (
-                        <>
-                          Annehmen
-                          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden>
-                            <path
-                              d="M2.5 5.5h6m0 0L5.75 2.75M8.5 5.5l-2.75 2.75"
-                              stroke="currentColor"
-                              strokeWidth="1.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        </>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleDismiss(s.id)}
-                      disabled={Boolean(busy)}
-                      className="rounded-full border px-3.5 py-2.5 text-[12px] font-medium text-white backdrop-blur transition-colors hover:bg-white/15 disabled:opacity-50"
-                      style={{
-                        borderColor: "rgba(255,255,255,0.3)",
-                        background: "rgba(255,255,255,0.08)",
-                      }}
-                      title="Verwerfen"
-                    >
-                      ×
-                    </button>
+                      Vorschau ansehen
+                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden>
+                        <path
+                          d="M2.5 5.5h6m0 0L5.75 2.75M8.5 5.5l-2.75 2.75"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </Link>
+
+              {/* Dismiss-Button absolute, mit stopPropagation damit der
+                  umgebende Link nicht triggert. */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void handleDismiss(s.id);
+                }}
+                disabled={Boolean(busy)}
+                className="absolute right-3 top-3 z-10 grid size-7 place-items-center rounded-full border text-[14px] font-medium text-white backdrop-blur transition-all hover:bg-white/25 disabled:opacity-50"
+                style={{
+                  borderColor: "rgba(255,255,255,0.3)",
+                  background: "rgba(255,255,255,0.08)",
+                }}
+                aria-label="Vorschlag verwerfen"
+                title="Verwerfen"
+              >
+                ×
+              </button>
             </article>
           );
         })}

@@ -38,6 +38,10 @@ export type BuildPackOptions = {
    *  einkommenden Request, damit der Trigger sowohl auf Vercel-Prod als
    *  auch Preview-URLs funktioniert. */
   origin: string;
+  /** Optional: bereits existierende Cover-URL — wird von Pack-Suggestions
+   *  durchgereicht (cover_url wurde beim Onboarding via Flux generiert).
+   *  Verhindert doppelte Cover-Generierung beim Pack-Akzeptieren. */
+  presetCoverImage?: string;
 };
 
 export type BuildPackResult = {
@@ -132,8 +136,9 @@ export async function buildPackFromReels(
     .length;
   const packNumber = staticCount + (customCount ?? 0) + 1;
 
-  // 3. Pack-Row anlegen. coverImage bleibt leer — wird vom Enrich-Endpoint
-  // gefuellt (Flux 2 Pro Cookbook-Cover).
+  // 3. Pack-Row anlegen. coverImage entweder das vom Caller mitgegebene
+  // Preset (Pack-Suggestion-Cover) ODER leer (dann generiert /packs/enrich
+  // ein frisches Flux 2 Pro Cookbook-Cover).
   const packData: Pack = {
     slug: opts.pack.slug,
     brandSlug: opts.brandSlug,
@@ -144,7 +149,7 @@ export async function buildPackFromReels(
     tagline: opts.pack.tagline,
     description: opts.pack.description,
     recipeCount: successes.length,
-    coverImage: "",
+    coverImage: opts.presetCoverImage ?? "",
     mood: opts.pack.mood,
     displayFont: opts.pack.displayFont,
     cardLayout: opts.pack.cardLayout,

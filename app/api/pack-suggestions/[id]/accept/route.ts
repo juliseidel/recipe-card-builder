@@ -5,6 +5,7 @@ import {
 } from "@/lib/creator-reels-server";
 import { buildPackFromReels, pickMoodById } from "@/lib/reel-library/pack-builder";
 import { brandMoodPresets } from "@/lib/brand-presets";
+import type { CardLayout } from "@/lib/packs";
 
 // Annahme eines Pack-Vorschlags. Triggert die volle Pack-Erstellungs-
 // Pipeline: alle zugeordneten Reels werden geparst → Recipe-Rows + Pack-
@@ -85,6 +86,17 @@ function slugifyPack(input: string): string {
 
 type RouteParams = { params: Promise<{ id: string }> };
 
+// Valid layout-IDs gemaess CardLayout-Typ in lib/packs.ts. Wir akzeptieren
+// einen optionalen layout-Param im Body und prüfen ihn gegen diese Liste.
+const VALID_LAYOUTS: readonly CardLayout[] = [
+  "editorial",
+  "vital",
+  "minimal",
+  "patisserie",
+  "amber",
+  "dashboard",
+] as const;
+
 export async function POST(req: Request, { params }: RouteParams) {
   // brandMoodPresets ist hier nicht direkt genutzt — ein Hinweis fuer den
   // Code-Reader, dass das Mood-Picking ueber pickMoodById (pack-presets)
@@ -104,6 +116,20 @@ export async function POST(req: Request, { params }: RouteParams) {
       { error: `Vorschlag ist bereits ${suggestion.status}.` },
       { status: 409 }
     );
+  }
+
+  // Optional: Body kann ein layout-Override mitschicken. Wenn nicht: aus
+  // category abgeleitet (moodForCategory-Heuristik unten).
+  let overrideLayout: CardLayout | null = null;
+  try {
+    const body = await req.json().catch(() => null);
+    if (body && typeof body.layout === "string") {
+      if ((VALID_LAYOUTS as readonly string[]).includes(body.layout)) {
+        overrideLayout = body.layout as CardLayout;
+      }
+    }
+  } catch {
+    // No body — alles default.
   }
 
   const origin = new URL(req.url).origin;
@@ -126,9 +152,14 @@ export async function POST(req: Request, { params }: RouteParams) {
       category: suggestion.category,
       mood: packMood,
       displayFont,
-      cardLayout,
+      cardLayout: overrideLayout ?? cardLayout,
     },
     origin,
+    // Cover-Reuse: das beim Onboarding bereits generierte Suggestion-Cover
+    // wird übernommen, statt ein neues Flux-Cover beim Pack-Akzeptieren zu
+    // bauen. Spart ~$0.15 + ~15s Wartezeit. Wenn cover_url null ist (Cover-
+    // Gen noch nicht durch), generiert /api/packs/enrich frisch nach.
+    presetCoverImage: suggestion.cover_url ?? undefined,
   });
 
   if (!result) {
