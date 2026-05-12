@@ -4992,40 +4992,44 @@ function StepsList({
                 flexDirection: "row",
                 marginBottom: stepMarginBottom,
                 gap: 10,
-                // Number und Text jeweils in eigene Views packen
-                // (statt nackte Text-Elemente), damit react-pdf-yoga
-                // sauber alignen kann — Views haben klare Box-Heights,
-                // Text-Elemente werden manchmal anders behandelt.
                 alignItems: "center",
               }}
             >
-              <View style={{ width: 22 }}>
-                <Text
-                  style={{
-                    fontFamily: "Fraunces",
-                    fontSize: stepNumFontSize,
-                    fontWeight: bold ? 700 : 400,
-                    color: theme.accent,
-                    lineHeight: 1,
-                  }}
-                >
-                  {item.index + 1}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={{
-                    fontSize: stepFontSize,
-                    lineHeight: 1.45,
-                    color: theme.ink,
-                  }}
-                >
-                  {checklist ? (
-                    <Text style={{ color: theme.inkSubtle }}>☐ </Text>
-                  ) : null}
-                  {item.text}
-                </Text>
-              </View>
+              {/* WICHTIG: Number rendert mit EXAKT derselben fontSize +
+                  lineHeight wie der Text. Damit haben beide Line-Boxes
+                  identische Hoehe, und die Glyph-Centers liegen
+                  mathematisch garantiert auf derselben Y-Position.
+                  Number wird stattdessen ueber Italic + Bold + Akzent-
+                  farbe hervorgehoben. stepNumFontSize-Prop wird hier
+                  bewusst ignoriert, weil andere Schriftgroessen sofort
+                  das vertical alignment brechen (Box-Centers vs.
+                  Glyph-Centers Problem in react-pdf). */}
+              <Text
+                style={{
+                  fontFamily: "Fraunces",
+                  fontSize: stepFontSize,
+                  fontStyle: "italic",
+                  fontWeight: 700,
+                  color: theme.accent,
+                  width: 22,
+                  lineHeight: 1.45,
+                }}
+              >
+                {item.index + 1}
+              </Text>
+              <Text
+                style={{
+                  flex: 1,
+                  fontSize: stepFontSize,
+                  lineHeight: 1.45,
+                  color: theme.ink,
+                }}
+              >
+                {checklist ? (
+                  <Text style={{ color: theme.inkSubtle }}>☐ </Text>
+                ) : null}
+                {item.text}
+              </Text>
             </View>
           ))}
         </View>
