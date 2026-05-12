@@ -1,131 +1,41 @@
 import { NextResponse } from "next/server";
-import sharp from "sharp";
 import {
   scrapeInstagramPost,
   normalizeInstagramUrl,
 } from "@/lib/integrations/apify";
-import { extractVideoFrames } from "@/lib/ai/extract-video-frames";
-import { describeDishStructured } from "@/lib/ai/describe-dish-structured";
-import {
-  selectReferenceFrame,
-  type CropMode,
-} from "@/lib/ai/select-reference-frame";
-import { generateImageSpec } from "@/lib/ai/recipe-image-spec";
-import { getBrandImageStyle } from "@/lib/ai/brand-image-style";
-import { generateImage, downloadImage } from "@/lib/ai/bfl-flux";
-import { recipes } from "@/lib/recipes";
-import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
+import { parseRecipeFromCaption } from "@/lib/ai/parse-instagram";
+import { generateHeroForRecipe } from "@/lib/ai/generate-hero";
+import type { Recipe } from "@/lib/recipes";
+import { hasServerSupabase } from "@/lib/supabase-server";
 
-// V7 — Hybrid: Vision-Description + Reference-Image (cropped) für echte
-// Farbe. Reference-Pfad nur wenn ein cleaner Frame existiert; sonst
-// V6-Fallback (Text-Only mit Vision-Description).
+// Test-Endpoint für die ECHTE V9.5-Hero-Pipeline.
 //
-// Pipeline:
-//   1. Apify scrape + 25 Frames extrahieren
-//   2. PARALLEL: describeDishStructured (last 8) + selectReferenceFrame (last 15)
-//   3. Wenn Frame-Selection cleanEnough=true:
-//      a. Sharp crop basierend auf cropMode (center_square/top/bottom)
-//      b. Safety-Check: Gemini Vision schaut cropped Frame nochmal
-//      c. Wenn sauber → Flux mit input_image
-//      d. Wenn schmutzig → V6-Fallback
-//   4. Wenn Frame-Selection cleanEnough=false → V6-Fallback direkt
+// Body: { sourceUrl, brandSlug? }
 //
-// V6-Fallback = identisch zu V6: nur Vision-compose + lightingDescription
-// + minimaler smartphone hint. Kein Reference-Image.
+// Flow:
+//   1. Apify scrape Reel
+//   2. parse-instagram.ts parst Caption zu Recipe-Daten (mit fallback wenn parse fail)
+//   3. generateHeroForRecipe() aus lib/ai/generate-hero.ts (=V9.5-Pipeline)
+//   4. URL zurück
+//
+// Sinn: Testen ob V9.5 bei Reels mit Text in jedem Frame korrekt zum
+// text-only Fallback wechselt und ein text-freies Bild produziert.
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const TEST_BUCKET = "test-vision-hero";
-
-function steamSuffix(temp: string): string {
-  return temp === "hot" ? ", with subtle steam rising" : "";
-}
-
-// Sharp Crop: nimmt 9:16-Frame (1080x1920 typisch) und cropt 1:1.
-async function cropFrame(
-  dataUri: string,
-  mode: CropMode
-): Promise<string | null> {
-  if (mode === "uncroppable") return null;
-  const base64 = dataUri.split(",")[1] ?? "";
-  if (!base64) return null;
-  const buf = Buffer.from(base64, "base64");
-
-  const img = sharp(buf);
-  const meta = await img.metadata();
-  const width = meta.width ?? 0;
-  const height = meta.height ?? 0;
-  if (width === 0 || height === 0) return null;
-
-  // Quadrat-Größe = kleinere Dimension (typically 1080 wenn 1080x1920)
-  const sq = Math.min(width, height);
-
-  let top = 0;
-  const left = Math.floor((width - sq) / 2); // immer horizontal mittig
-
-  if (height > sq) {
-    // portrait — wir können vertikal cropen
-    if (mode === "center_square") {
-      top = Math.floor((height - sq) / 2);
-    } else if (mode === "top_square") {
-      top = 0;
-    } else if (mode === "bottom_square") {
-      top = height - sq;
-    }
-  }
-
-  const cropped = await img
-    .extract({ left, top, width: sq, height: sq })
-    .jpeg({ quality: 92, mozjpeg: true })
-    .toBuffer();
-  return `data:image/jpeg;base64,${cropped.toString("base64")}`;
-}
-
-// Safety-Check: lade cropped frame als blob URL → temp upload → vision check.
-// Einfacher: data URI direkt an describeInstagramDish — aber das Helper-File
-// erwartet eine URL. Wir machen einen Inline-Vision-Call.
-async function verifyCroppedFrameClean(dataUri: string): Promise<{
-  clean: boolean;
-  reason: string;
-} | null> {
-  const base64 = dataUri.split(",")[1] ?? "";
-  if (!base64) return null;
-  try {
-    const { callGeminiMultimodal } = await import("@/lib/ai/gemini");
-    const result = await callGeminiMultimodal<{
-      clean: boolean;
-      reason: string;
-    }>({
-      parts: [
-        {
-          text: "Prüfe ob dieses Bild als Reference-Image für ein KI-Bild-Generierungs-System taugt. Es muss SAUBER sein: kein sichtbarer Text/Buchstaben/Schrift/Banner/Sticker/Watermark, keine Hand/Finger/Personen/Körperteile, kein Logo. Wenn auch nur ein kleines Stück Text/Hand sichtbar ist → clean=false.",
-        },
-        {
-          inlineData: { mimeType: "image/jpeg", data: base64 },
-        },
-      ],
-      schema: {
-        type: "object",
-        properties: {
-          clean: { type: "boolean" },
-          reason: { type: "string" },
-        },
-        required: ["clean", "reason"],
-      },
-      systemInstruction:
-        "Du bist ein strikter Quality-Auditor. Antworte ehrlich: ist dieses Bild komplett frei von Text, Schrift, Banner, Stickern, Watermarks, Logos, Händen, Personen, Körperteilen? Bei Zweifel: clean=false.",
-      model: "flash",
-      temperature: 0.1,
-      maxOutputTokens: 256,
-      thinkingBudget: 0,
-      retries: 1,
-    });
-    return { clean: Boolean(result.clean), reason: (result.reason ?? "").trim() };
-  } catch (err) {
-    console.warn("[verifyCroppedFrameClean] failed:", err);
-    return null;
-  }
+function slugify(s: string): string {
+  return (s || "test")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[äÄ]/g, "ae")
+    .replace(/[öÖ]/g, "oe")
+    .replace(/[üÜ]/g, "ue")
+    .replace(/[ß]/g, "ss")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60) || "test";
 }
 
 export async function POST(req: Request) {
@@ -156,239 +66,124 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { recipeSlug?: string; brandSlug?: string };
+  let body: { sourceUrl?: string; brandSlug?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  if (!body.recipeSlug) {
+  if (!body.sourceUrl) {
     return NextResponse.json(
-      { error: "recipeSlug missing in body" },
+      { error: "sourceUrl missing in body" },
       { status: 400 }
     );
   }
   const brandSlug = body.brandSlug || "biene";
 
   const t0 = Date.now();
-  const recipe = recipes.find((r) => r.slug === body.recipeSlug);
-  if (!recipe) {
-    return NextResponse.json(
-      { error: `Recipe '${body.recipeSlug}' not found` },
-      { status: 404 }
-    );
-  }
-  if (!recipe.sourceUrl) {
-    return NextResponse.json(
-      { error: `Recipe '${body.recipeSlug}' has no sourceUrl` },
-      { status: 422 }
-    );
-  }
-
-  // ─── 1. Apify scrape ────────────────────────────────────────────────────
-  const normalized = normalizeInstagramUrl(recipe.sourceUrl);
+  const normalized = normalizeInstagramUrl(body.sourceUrl);
   if (!normalized) {
     return NextResponse.json(
       { error: "sourceUrl not normalizable" },
       { status: 422 }
     );
   }
-  const tApify0 = Date.now();
+
+  // 1. Apify scrape
   const post = await scrapeInstagramPost(normalized);
-  const tApify = Date.now() - tApify0;
 
-  if (!post.videoUrl) {
-    return NextResponse.json(
-      { error: "Reel has no videoUrl" },
-      { status: 422 }
-    );
-  }
-
-  // ─── 2. ffmpeg 25 Frames @ 1.0s ─────────────────────────────────────────
-  const tFrames0 = Date.now();
-  const frames = await extractVideoFrames(post.videoUrl, {
-    intervalSeconds: 1.0,
-    maxFrames: 25,
+  // 2. Caption parsen → Recipe-Daten
+  const parsed = await parseRecipeFromCaption(post.caption, {
+    username: post.ownerUsername,
   });
-  const tFrames = Date.now() - tFrames0;
-  if (frames.length === 0) {
-    return NextResponse.json(
-      { error: "No frames extracted from video" },
-      { status: 500 }
-    );
-  }
 
-  // ─── 3. Parallel: Description (last 8) + Reference-Selection (last 15) ─
-  const visionSample = frames.slice(-8);
-  const selectionSample = frames.slice(-15);
-  const tVision0 = Date.now();
-  const [dishDescription, refSelection] = await Promise.all([
-    describeDishStructured({
-      frames: visionSample,
-      recipeTitle: recipe.title,
-      caption: post.caption,
-    }),
-    selectReferenceFrame(selectionSample),
-  ]);
-  const tVision = Date.now() - tVision0;
-
-  if (!dishDescription) {
-    return NextResponse.json(
-      { error: "Vision description failed" },
-      { status: 500 }
-    );
-  }
-
-  // ─── 4. Spec für steam ──────────────────────────────────────────────────
-  const tSpec0 = Date.now();
-  const spec = await generateImageSpec(recipe, brandSlug);
-  const tSpec = Date.now() - tSpec0;
-  const steam = steamSuffix(spec.servingTemperature);
-
-  // ─── 5. Reference-Pfad-Entscheidung ─────────────────────────────────────
-  let referenceImage: string | null = null;
-  let referencePath: "cropped" | "fallback" | "no-selection" = "no-selection";
-  let safetyReason = "";
-
-  if (refSelection && refSelection.cleanEnough && refSelection.chosenIndex >= 0) {
-    const sourceFrame = selectionSample[refSelection.chosenIndex];
-    if (sourceFrame) {
-      const cropped = await cropFrame(sourceFrame.dataUri, refSelection.cropMode);
-      if (cropped) {
-        // Safety-Check auf cropped Frame
-        const verify = await verifyCroppedFrameClean(cropped);
-        if (verify && verify.clean) {
-          referenceImage = cropped;
-          referencePath = "cropped";
-          safetyReason = verify.reason;
-        } else {
-          referencePath = "fallback";
-          safetyReason = verify
-            ? `Safety-Check failed: ${verify.reason}`
-            : "Safety-Check call failed";
-        }
-      }
-    }
+  // Recipe-Object für die Hero-Pipeline. Wenn Caption-Parse failed,
+  // bauen wir ein Minimal-Recipe mit caption-snippet als title.
+  let recipe: Recipe;
+  if (parsed.ok) {
+    recipe = {
+      slug: slugify(parsed.recipe.title),
+      packSlug: "test-pack",
+      number: 1,
+      title: parsed.recipe.title,
+      subtitle: parsed.recipe.subtitle || "",
+      description: parsed.recipe.description || "",
+      prepTime: parsed.recipe.prepTime,
+      cookTime:
+        parsed.recipe.cookTime && parsed.recipe.cookTime > 0
+          ? parsed.recipe.cookTime
+          : undefined,
+      difficulty: parsed.recipe.difficulty,
+      servings: parsed.recipe.servings,
+      tags: parsed.recipe.tags,
+      ingredients: parsed.recipe.ingredients,
+      steps: parsed.recipe.steps,
+      nutrition: parsed.recipe.nutrition,
+      nutritionBasis: parsed.recipe.nutritionBasis,
+      sourceUrl: normalized,
+      sourceLabel: `Instagram · @${post.ownerUsername}`,
+    };
   } else {
-    referencePath = "fallback";
-    safetyReason = refSelection
-      ? `Vision-Selector: cleanEnough=false (${refSelection.reasoning})`
-      : "Vision-Selector returned null";
+    const firstLine = post.caption.split("\n")[0]?.slice(0, 80) || "Test Recipe";
+    recipe = {
+      slug: slugify(firstLine),
+      packSlug: "test-pack",
+      number: 1,
+      title: firstLine,
+      subtitle: "",
+      description: "",
+      prepTime: 10,
+      difficulty: "Einfach",
+      servings: 2,
+      tags: [],
+      ingredients: [],
+      steps: [],
+      nutrition: { kcal: 0, protein: 0, carbs: 0, fat: 0 },
+      nutritionBasis: "portion",
+      sourceUrl: normalized,
+      sourceLabel: `Instagram · @${post.ownerUsername}`,
+    };
   }
 
-  // ─── 6. Prompt bauen — identisch zu V6 ──────────────────────────────────
-  const positivePrompt = [
-    `${recipe.title}, a casual home-cooking snapshot.`,
-    "",
-    dishDescription.compose,
-    "",
-    dishDescription.lightingDescription,
-    "",
-    `Shot on iPhone, natural smartphone photograph, everything in sharp focus, slightly imperfect framing${steam}.`,
-  ]
-    .filter((s) => s.length > 0)
-    .join("\n");
-
-  const baseNegative =
-    "no text, no labels, no logos, no packaging, no watermark, no hands, no people, no faces, no studio lighting, no white void background";
-  const style = await getBrandImageStyle(brandSlug);
-  const negativePrompt = style.negativeAddition
-    ? `${baseNegative}, ${style.negativeAddition}`
-    : baseNegative;
-
-  // ─── 7. Flux 2 Pro Call (mit oder ohne Reference) ───────────────────────
-  const tFlux0 = Date.now();
-  const result = await generateImage({
-    prompt: positivePrompt,
-    negativePrompt,
-    model: "flux-2-pro",
-    aspectRatio: "1:1",
-    width: 2048,
-    height: 2048,
-    outputFormat: "jpeg",
-    safetyTolerance: 2,
-    ...(referenceImage ? { referenceImage } : {}),
+  // 3. Echte V9.5-Pipeline aufrufen
+  const result = await generateHeroForRecipe({
+    recipe,
+    recipeId: `test-${Date.now()}`,
+    brandSlug,
   });
-  const tFlux = Date.now() - tFlux0;
-
-  // ─── 8. Sharp Lanczos auf 3072, q=95 ────────────────────────────────────
-  const buf = await downloadImage(result.imageUrl);
-  const processed = await sharp(buf)
-    .resize(3072, 3072, { kernel: sharp.kernel.lanczos3, fit: "fill" })
-    .sharpen({ sigma: 0.5, m1: 0.6, m2: 0.4 })
-    .jpeg({ quality: 95, mozjpeg: true, progressive: true })
-    .toBuffer();
-
-  // ─── 9. Upload ──────────────────────────────────────────────────────────
-  const supabase = getServerSupabase();
-  await supabase.storage.createBucket(TEST_BUCKET, {
-    public: true,
-    fileSizeLimit: 8 * 1024 * 1024,
-    allowedMimeTypes: ["image/jpeg"],
-  });
-  const filePath = `${body.recipeSlug}-v7-${referencePath}-${Date.now()}.jpg`;
-  const upload = await supabase.storage
-    .from(TEST_BUCKET)
-    .upload(filePath, processed, {
-      contentType: "image/jpeg",
-      upsert: true,
-      cacheControl: "31536000",
-    });
-  if (upload.error) {
-    return NextResponse.json(
-      { error: `Upload failed: ${upload.error.message}` },
-      { status: 500 }
-    );
-  }
-  const { data } = supabase.storage.from(TEST_BUCKET).getPublicUrl(filePath);
-  const publicUrl = `${data.publicUrl}?t=${Date.now()}`;
-
-  // Optional: cropped reference auch hochladen für Debug-Inspektion
-  let referenceImageUrl: string | null = null;
-  if (referenceImage) {
-    try {
-      const refBase64 = referenceImage.split(",")[1] ?? "";
-      const refBuf = Buffer.from(refBase64, "base64");
-      const refPath = `${body.recipeSlug}-v7-REFERENCE-${Date.now()}.jpg`;
-      const refUpload = await supabase.storage
-        .from(TEST_BUCKET)
-        .upload(refPath, refBuf, {
-          contentType: "image/jpeg",
-          upsert: true,
-        });
-      if (!refUpload.error) {
-        const { data: refData } = supabase.storage
-          .from(TEST_BUCKET)
-          .getPublicUrl(refPath);
-        referenceImageUrl = refData.publicUrl;
-      }
-    } catch (err) {
-      console.warn("[V7] reference debug upload failed:", err);
-    }
-  }
 
   const tTotal = Date.now() - t0;
 
+  if (!result) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "generateHeroForRecipe returned null — all paths failed",
+        recipe: { title: recipe.title, slug: recipe.slug },
+        post: {
+          videoUrl: post.videoUrl ? "yes" : "no",
+          displayUrl: post.displayUrl ? "yes" : "no",
+          caption: post.caption.slice(0, 200),
+        },
+        timings: { totalMs: tTotal },
+      },
+      { status: 500 }
+    );
+  }
+
   return NextResponse.json({
     ok: true,
-    version: "v7",
-    generatedUrl: publicUrl,
-    referenceImageUrl, // null wenn fallback path
-    timings: {
-      apifyMs: tApify,
-      framesMs: tFrames,
-      visionMs: tVision,
-      specMs: tSpec,
-      fluxMs: tFlux,
-      totalMs: tTotal,
+    version: "v9.5-real-pipeline",
+    generatedUrl: result.heroUrl,
+    pipelinePath: result.source, // "keyframe" | "cover" | "flux-text-only"
+    keyframeReasoning: result.keyframeReasoning,
+    keyframeTimestamp: result.keyframeTimestamp,
+    recipe: {
+      title: recipe.title,
+      slug: recipe.slug,
+      sourceUrl: recipe.sourceUrl,
     },
-    framesExtracted: frames.length,
-    referencePath,
-    referenceSelection: refSelection,
-    safetyReason,
-    fluxSeed: result.seed,
-    dishDescription,
-    positivePrompt,
-    negativePrompt,
+    timings: { totalMs: tTotal },
+    captionSnippet: post.caption.slice(0, 300),
   });
 }
