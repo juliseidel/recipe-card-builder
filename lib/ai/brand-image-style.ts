@@ -136,7 +136,7 @@ export const BIENE_STYLE: BrandImageStyle = {
   },
 };
 
-// ─── Julia Breitenfeld · @juliabreitenfeld ──────────────────────────────────
+// ─── Julia · @juliabreitenfeld (DB-Brand-Slug: "julia") ─────────────────────
 // Calibrated against 5 IG-Feed + Reel-Cover-Screenshots vom User (2026-05-12).
 // Observed signature elements (Hero-applicable — i.e. WITHOUT hands/people,
 // per HERO_BASE_NEGATIVE which bans Korperteile universell):
@@ -155,7 +155,7 @@ export const BIENE_STYLE: BrandImageStyle = {
 //     aber HERO_BASE_NEGATIVE verbietet hands/people/faces universell. Hero-
 //     Bilder sind reine Food-Photography, kein Creator im Bild.
 export const JULIA_STYLE: BrandImageStyle = {
-  brandSlug: "juliabreitenfeld",
+  brandSlug: "julia",
   // Five lighting strings — harsh, contrasty, outdoor-feel. Bewusst gegen
   // Bienes warm-soft kalibriert; Julias echte Posts haben crisp hard shadows,
   // nicht weiches Morgen-Diffus.
@@ -209,7 +209,7 @@ export const JULIA_STYLE: BrandImageStyle = {
 // ─── Lookup by brand slug ────────────────────────────────────────────────────
 const STYLES: Record<string, BrandImageStyle> = {
   biene: BIENE_STYLE,
-  juliabreitenfeld: JULIA_STYLE,
+  julia: JULIA_STYLE,
 };
 
 // ─── Per-Run Style-Override (PR 16) ──────────────────────────────────────────
