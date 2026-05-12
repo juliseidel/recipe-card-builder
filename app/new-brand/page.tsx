@@ -630,6 +630,20 @@ export default function NewBrandPage() {
                 />
               </Field>
 
+              <Field
+                label="Follower"
+                hint="Kompakte Schreibweise — taucht im Hub und im Workspace-Hero auf"
+              >
+                <input
+                  className="editor-input"
+                  type="text"
+                  placeholder='z. B. „280K" oder „1.2M"'
+                  value={followers}
+                  onChange={(e) => setFollowers(e.target.value)}
+                  maxLength={20}
+                />
+              </Field>
+
               <Field label="Niche / Tagline (optional)">
                 <input
                   className="editor-input"

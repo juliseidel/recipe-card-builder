@@ -127,7 +127,7 @@ export async function scrapeTikTokProfile(
   const username = rawHandle.replace(/^@+/, "").trim();
   if (!username || !/^[A-Za-z0-9._]+$/.test(username)) {
     throw new ApifyError(
-      "Das ist kein gueltiger TikTok-Handle. Erwartet: bienesfitlife oder @bienesfitlife."
+      "Das ist kein gültiger TikTok-Handle. Erwartet: bienesfitlife oder @bienesfitlife."
     );
   }
 
@@ -158,7 +158,7 @@ export async function scrapeTikTokProfile(
     const isAbort = (err as Error).name === "AbortError";
     throw new ApifyError(
       isAbort
-        ? "Apify-Cold-Start bei TikTok dauert gerade laenger. Klick nochmal — der zweite Versuch geht meist in 5-10 Sekunden durch."
+        ? "Apify-Cold-Start bei TikTok dauert gerade länger. Klick nochmal — der zweite Versuch geht meist in 5-10 Sekunden durch."
         : `Netzwerk-Fehler: ${(err as Error).message}`
     );
   }
@@ -167,11 +167,11 @@ export async function scrapeTikTokProfile(
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
     if (res.status === 401) {
-      throw new ApifyError("Apify-Token ungueltig oder abgelaufen.", 401, errText);
+      throw new ApifyError("Apify-Token ungültig oder abgelaufen.", 401, errText);
     }
     if (res.status === 402) {
       throw new ApifyError(
-        "Apify-Limit erreicht. Bitte spaeter erneut versuchen oder Free-Tier upgraden.",
+        "Apify-Limit erreicht. Bitte später erneut versuchen oder Free-Tier upgraden.",
         402,
         errText
       );
@@ -186,7 +186,7 @@ export async function scrapeTikTokProfile(
   const items = (await res.json()) as TikTokItemRaw[];
   if (!Array.isArray(items) || items.length === 0) {
     throw new ApifyError(
-      "TikTok-Apify hat keinen Datensatz zurueckgeliefert. Eventuell hat der Account noch keine Posts, ist privat, oder der Handle stimmt nicht."
+      "TikTok-Apify hat keinen Datensatz zurückgeliefert. Eventuell hat der Account noch keine Posts, ist privat, oder der Handle stimmt nicht."
     );
   }
 
@@ -253,7 +253,7 @@ export async function scrapeTikTokPost(rawUrl: string): Promise<InstagramPost> {
   const normalized = normalizeTikTokUrl(rawUrl);
   if (!normalized) {
     throw new ApifyError(
-      "Das ist keine gueltige TikTok-URL. Erwartet: tiktok.com/@user/video/... oder vm.tiktok.com/..."
+      "Das ist keine gültige TikTok-URL. Erwartet: tiktok.com/@user/video/... oder vm.tiktok.com/..."
     );
   }
 
@@ -290,7 +290,7 @@ export async function scrapeTikTokPost(rawUrl: string): Promise<InstagramPost> {
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
     if (res.status === 401) {
-      throw new ApifyError("Apify-Token ungueltig oder abgelaufen.", 401, errText);
+      throw new ApifyError("Apify-Token ungültig oder abgelaufen.", 401, errText);
     }
     if (res.status === 402) {
       throw new ApifyError(
@@ -309,7 +309,7 @@ export async function scrapeTikTokPost(rawUrl: string): Promise<InstagramPost> {
   const items = (await res.json()) as TikTokItemRaw[];
   if (!Array.isArray(items) || items.length === 0) {
     throw new ApifyError(
-      "Apify hat keinen TikTok-Post zurueckgeliefert. Eventuell ist der Post privat oder geloescht."
+      "Apify hat keinen TikTok-Post zurückgeliefert. Eventuell ist der Post privat oder gelöscht."
     );
   }
   const item = items[0];
@@ -321,7 +321,7 @@ export async function scrapeTikTokPost(rawUrl: string): Promise<InstagramPost> {
   const caption = (item.text ?? "").trim();
   if (!caption || caption.length < 20) {
     throw new ApifyError(
-      "Dieser TikTok-Post hat keine ausreichende Beschreibung — fuer ein Rezept braucht's Zutaten + Schritte in der Caption. Schau nach einem Video mit ausgeschriebenem Rezept."
+      "Dieser TikTok-Post hat keine ausreichende Beschreibung — für ein Rezept braucht's Zutaten + Schritte in der Caption. Schau nach einem Video mit ausgeschriebenem Rezept."
     );
   }
 
@@ -361,7 +361,7 @@ export async function startTikTokBackfill(opts: {
   }
   const username = opts.username.replace(/^@+/, "").trim();
   if (!username || !/^[A-Za-z0-9._]+$/.test(username)) {
-    throw new ApifyError("Kein gueltiger TikTok-Handle fuer den Backfill.");
+    throw new ApifyError("Kein gültiger TikTok-Handle für den Backfill.");
   }
 
   const endpoint = `${APIFY_BASE}/acts/${TIKTOK_ACTOR_ID}/runs?token=${apiToken}`;
@@ -489,7 +489,7 @@ export async function quickScrapeTikTokReels(opts: {
   }
   const username = opts.username.replace(/^@+/, "").trim();
   if (!username || !/^[A-Za-z0-9._]+$/.test(username)) {
-    throw new ApifyError("Kein gueltiger TikTok-Handle.");
+    throw new ApifyError("Kein gültiger TikTok-Handle.");
   }
 
   const endpoint = `${APIFY_BASE}/acts/${TIKTOK_ACTOR_ID}/run-sync-get-dataset-items?token=${apiToken}&format=json`;

@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "Das ist keine gueltige Instagram- oder TikTok-URL. Erwartet: instagram.com/p/... · instagram.com/reel/... · tiktok.com/@user/video/...",
+          "Das ist keine gültige Instagram- oder TikTok-URL. Erwartet: instagram.com/p/... · instagram.com/reel/... · tiktok.com/@user/video/...",
       },
       { status: 400 }
     );

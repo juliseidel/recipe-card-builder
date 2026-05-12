@@ -2,36 +2,36 @@ import { callGemini } from "./gemini";
 import type { InstagramProfile } from "@/lib/integrations/apify";
 import type { SocialPlatform } from "@/lib/integrations/platform";
 
-// Audience-Analyzer fuer das Creator-Onboarding. Komplementaer zum
-// Identity-Analyzer (lib/ai/analyze-creator-identity.ts): waehrend dieser
-// die Workspace-Brand-Felder ableitet, schaetzt der Audience-Analyzer ab,
+// Audience-Analyzer für das Creator-Onboarding. Komplementär zum
+// Identity-Analyzer (lib/ai/analyze-creator-identity.ts): während dieser
+// die Workspace-Brand-Felder ableitet, schätzt der Audience-Analyzer ab,
 // WER eigentlich dem Creator folgt und WORAUF die Zielgruppe anspringt.
 //
 // Verwendung:
 //   1. Onboarding-Flow zeigt die Insights direkt nach dem Profil-Import
 //      ("Wir haben 247K Follower analysiert — hier ist das Audience-Profil")
 //   2. Insights werden in brand.data.audienceAnalysis (JSONB) persistiert
-//   3. Spaeter nutzt der Pack-Suggester die Daten, um Pack-Vorschlaege auf
-//      die echte Zielgruppe zu kalibrieren (z.B. "Snack-Pack fuer
-//      berufstaetige Frauen 25-34" statt generisch)
+//   3. Später nutzt der Pack-Suggester die Daten, um Pack-Vorschläge auf
+//      die echte Zielgruppe zu kalibrieren (z.B. "Snack-Pack für
+//      berufstätige Frauen 25-34" statt generisch)
 
 export type AudienceAnalysis = {
-  /** Primaeres Demographie-Cluster: 1 Satz, konkret. */
+  /** Primäres Demographie-Cluster: 1 Satz, konkret. */
   primaryDemographic: string;
   /** Wahrscheinliche Alters-Range. 'Mitte 20 bis Mitte 30' / '18-25' / '30-45'. */
   ageRange: string;
-  /** Geschlechter-Tendenz: 'ueberwiegend Frauen' / 'gemischt, leicht weiblich' / 'breit gemischt'. */
+  /** Geschlechter-Tendenz: 'überwiegend Frauen' / 'gemischt, leicht weiblich' / 'breit gemischt'. */
   genderTendency: string;
   /** 3-6 Interessen-Themen (1-3 Worte pro Item). */
   interests: string[];
-  /** 2-4 konkrete Pain Points / Bedurfnisse der Zielgruppe. */
+  /** 2-4 konkrete Pain Points / Bedürfnisse der Zielgruppe. */
   painPoints: string[];
   /** Content-Style des Creators: 'casual', 'professionell', 'edukativ', 'inspirational' etc.
    *  1-3 Worte. */
   contentStyle: string;
-  /** Tonalitaet: 'warm-persoenlich', 'sachlich-direkt', 'energetisch-motivierend', etc. */
+  /** Tonalität: 'warm-persönlich', 'sachlich-direkt', 'energetisch-motivierend', etc. */
   tonality: string;
-  /** Zusammenfassung in 1-2 Saetzen — taucht prominent in der UI auf. */
+  /** Zusammenfassung in 1-2 Sätzen — taucht prominent in der UI auf. */
   summary: string;
 };
 
@@ -41,7 +41,7 @@ const RESPONSE_SCHEMA = {
     primaryDemographic: {
       type: "string",
       description:
-        "Primaeres Zielgruppen-Cluster in einem Satz. Konkret: Alter, Geschlechter-Tendenz, Lebensphase, Hauptmotiv. Max 140 Zeichen.",
+        "Primäres Zielgruppen-Cluster in einem Satz. Konkret: Alter, Geschlechter-Tendenz, Lebensphase, Hauptmotiv. Max 140 Zeichen. Beispiel: 'Berufstätige Frauen Mitte 20 bis Mitte 30 mit Fokus auf gesunde Ernährung im Alltag'.",
     },
     ageRange: {
       type: "string",
@@ -51,7 +51,7 @@ const RESPONSE_SCHEMA = {
     genderTendency: {
       type: "string",
       description:
-        "Geschlechter-Tendenz der Audience. 'ueberwiegend Frauen', 'gemischt, leicht weiblich', 'breit gemischt'. Max 40 Zeichen.",
+        "Geschlechter-Tendenz der Audience. 'überwiegend Frauen', 'gemischt, leicht weiblich', 'breit gemischt'. Max 40 Zeichen.",
     },
     interests: {
       type: "array",
@@ -63,22 +63,22 @@ const RESPONSE_SCHEMA = {
       type: "array",
       items: { type: "string" },
       description:
-        "2-4 konkrete Bedurfnisse/Probleme der Zielgruppe. Kurze Phrasen. Beispiele: 'wenig Zeit zum Kochen', 'Heisshunger-Attacken', 'Plateau beim Abnehmen', 'Buero-Mealprep ohne Aufwand'.",
+        "2-4 konkrete Bedürfnisse oder Probleme der Zielgruppe. Kurze Phrasen. Beispiele: 'wenig Zeit zum Kochen', 'Heißhunger-Attacken', 'Plateau beim Abnehmen', 'Büro-Mealprep ohne Aufwand'.",
     },
     contentStyle: {
       type: "string",
       description:
-        "Content-Style des Creators in 1-3 Worten. Beispiele: 'casual & warm', 'professionell & klar', 'edukativ & detail', 'inspirational'.",
+        "Content-Style des Creators in 1-3 Worten. Beispiele: 'casual & warm', 'professionell & klar', 'edukativ & detailreich', 'inspirational'.",
     },
     tonality: {
       type: "string",
       description:
-        "Tonalitaet der Caption-Sprache. 'warm-persoenlich', 'sachlich-direkt', 'energetisch-motivierend', 'humorvoll-locker'. Max 40 Zeichen.",
+        "Tonalität der Caption-Sprache. 'warm-persönlich', 'sachlich-direkt', 'energetisch-motivierend', 'humorvoll-locker'. Max 40 Zeichen.",
     },
     summary: {
       type: "string",
       description:
-        "1-2 Saetze Audience-Zusammenfassung. Warm-faktisch, ohne Marketing-Sprech. Max 260 Zeichen. Beispiel: 'Ueberwiegend Frauen Mitte 20 bis Mitte 30, die nach Feierabend schnelle Protein-Rezepte suchen und sich von Bienes warmer du-Form-Tonalitaet abholen lassen.'",
+        "1-2 Sätze Audience-Zusammenfassung. Warm-faktisch, ohne Marketing-Sprech. Max 260 Zeichen. Beispiel: 'Überwiegend Frauen Mitte 20 bis Mitte 30, die nach Feierabend schnelle Protein-Rezepte suchen und sich von Bienes warmer du-Form-Tonalität abholen lassen.'",
     },
   },
   required: [
@@ -93,23 +93,29 @@ const RESPONSE_SCHEMA = {
   ],
 };
 
-const SYSTEM_INSTRUCTION = `Du analysierst Social-Media-Creator-Profile (Instagram oder TikTok) und schaetzt die wahrscheinliche Zielgruppe ab. Du arbeitest fuer einen internen Recipe-Card-Builder, der Food-Creator beim Aufbau ihrer Recipe-Library hilft — die Audience-Analyse fliesst in das Workspace-Profil und in spaetere Pack-Vorschlaege ein.
+const SYSTEM_INSTRUCTION = `Du analysierst Social-Media-Creator-Profile (Instagram oder TikTok) und schätzt die wahrscheinliche Zielgruppe ab. Du arbeitest für einen internen Recipe-Card-Builder, der Food-Creator beim Aufbau ihrer Recipe-Library hilft — die Audience-Analyse fließt in das Workspace-Profil und in spätere Pack-Vorschläge ein.
 
 Vorgehen:
-1. Lies Bio + die Caption-Stichproben sorgfaeltig
-2. Interpretiere Tonalitaet (du-Form / Sie-Form, locker / professionell, humorvoll / sachlich)
-3. Achte auf Hinweise zu Lebensphase (Berufstaetig, Studentin, Mutter, etc.)
-4. Schaetze Alter/Geschlecht-Tendenz NICHT aus dem Creator selbst, sondern aus den Themen + der Anrede
-5. Pain Points = konkrete Frustrationen oder Bedurfnisse, die der Creator in den Captions adressiert
+1. Lies Bio + die Caption-Stichproben sorgfältig
+2. Interpretiere Tonalität (du-Form / Sie-Form, locker / professionell, humorvoll / sachlich)
+3. Achte auf Hinweise zu Lebensphase (berufstätig, Studentin, Mutter, etc.)
+4. Schätze Alter/Geschlecht-Tendenz NICHT aus dem Creator selbst, sondern aus den Themen + der Anrede
+5. Pain Points = konkrete Frustrationen oder Bedürfnisse, die der Creator in den Captions adressiert
 
-Tonalitaets-Regeln fuer dein Output:
+WICHTIG zu deutscher Schreibweise — verwende immer korrekte Umlaute und ß:
+• ä statt ae: "Sätze", "Tonalität", "schätzen", "berufstätig", "Mädchen"
+• ö statt oe: "können", "möglich", "größer", "öffentlich"
+• ü statt ue: "für", "über", "Bedürfnisse", "Büro", "überwiegend", "Frühstück"
+• ß statt ss bei langen Vokalen: "ausschließlich", "Maß", "groß", "Straße"
+Niemals "ue", "oe", "ae", "ss" wo Umlaute oder ß stehen müssen.
+
+Tonalitäts-Regeln für dein Output:
 • Warm-faktisch, niemals Marketing-Sprech
-• Konkret statt abstrakt: 'berufstaetige Frauen Mitte 20 bis Mitte 30' > 'aktive Zielgruppe'
+• Konkret statt abstrakt: 'berufstätige Frauen Mitte 20 bis Mitte 30' > 'aktive Zielgruppe'
 • Keine Werbe-Adjektive ('absolut', 'traumhaft', 'perfekt')
-• Keine Anfuehrungszeichen, keine Hashtags, keine Emojis
-• Deutsche Umlaute korrekt: ä ö ü ß (nicht ae oe ue ss)
+• Keine Anführungszeichen, keine Hashtags, keine Emojis
 
-Bei zu wenig Informationen (z.B. nur 2 Captions, keine Bio): trotzdem versuchen, aber mit konservativen Schaetzungen.
+Bei zu wenig Informationen (z.B. nur 2 Captions, keine Bio): trotzdem versuchen, aber mit konservativen Schätzungen.
 
 Antworte AUSSCHLIESSLICH im JSON-Schema.`;
 
@@ -140,7 +146,7 @@ function formatProfileForPrompt(
     profile.biography || "(leer)",
     "",
     "Caption-Stichproben:",
-    captionSamples || "(keine Captions verfuegbar)",
+    captionSamples || "(keine Captions verfügbar)",
   ]
     .filter(Boolean)
     .join("\n");
@@ -163,7 +169,7 @@ export async function analyzeAudience(
 ): Promise<AudienceAnalysis> {
   const prompt = [
     `Analysiere die wahrscheinliche Zielgruppe folgenden ${platform === "tiktok" ? "TikTok" : "Instagram"}-Creators.`,
-    `Tonalitaet: warm-faktisch, konkret. Keine Werbesprache.`,
+    `Tonalität: warm-faktisch, konkret. Keine Werbesprache. Verwende immer korrekte deutsche Umlaute (ä, ö, ü, ß).`,
     ``,
     formatProfileForPrompt(profile, platform),
     ``,
@@ -181,6 +187,8 @@ export async function analyzeAudience(
   });
 
   // Defensive Sanitization — Caps + Trim + Mindest-Werte.
+  // Plus: Wenn Gemini trotz Instruction noch "ae/oe/ue/ss" liefert,
+  // konvertieren wir das hier zu Umlauten (defensiver Fallback).
   return {
     primaryDemographic:
       sanitize(result.primaryDemographic, 140) ||
@@ -203,7 +211,7 @@ export async function analyzeAudience(
     tonality: sanitize(result.tonality, 40) || "—",
     summary:
       sanitize(result.summary, 260) ||
-      "Audience-Analyse konnte nicht vollstaendig generiert werden.",
+      "Audience-Analyse konnte nicht vollständig generiert werden.",
   };
 }
 
@@ -211,6 +219,11 @@ function sanitize(s: string, max: number): string {
   let out = (s ?? "").toString().trim();
   out = out.replace(/^["'„«]+|["'"»]+$/g, "");
   out = out.replace(/\s+/g, " ");
+  // Defensive Umlaut-Wiederherstellung — wenn Gemini trotz Instruction noch
+  // "ae/oe/ue/ss" liefert. Nur die häufigsten deutschen Wörter, damit wir
+  // nicht versehentlich englische Wörter zerschießen (z.B. "Mealprep" oder
+  // "User" bleiben unverändert).
+  out = restoreUmlauts(out);
   if (out.length > max) {
     const cut = out.slice(0, max);
     const lastDot = Math.max(
@@ -219,6 +232,58 @@ function sanitize(s: string, max: number): string {
       cut.lastIndexOf("?")
     );
     out = lastDot > max * 0.5 ? cut.slice(0, lastDot + 1) : cut + "…";
+  }
+  return out;
+}
+
+// Häufige falsche Schreibweisen → korrigierte deutsche Form. Bewusst
+// konservativ — nur Wörter die im KI-Output regelmäßig auftauchen, um
+// englische Worte (User, Page, etc.) und Mealprep-Vokabular nicht zu
+// zerschiessen.
+const UMLAUT_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\bfuer\b/g, "für"],
+  [/\bFuer\b/g, "Für"],
+  [/\buebe(r|rw)/g, "übe$1"],
+  [/\bUebe(r|rw)/g, "Übe$1"],
+  [/Tonalitaet/g, "Tonalität"],
+  [/tonalitaet/g, "tonalität"],
+  [/persoenlich/g, "persönlich"],
+  [/Persoenlich/g, "Persönlich"],
+  [/Bedurfnisse/g, "Bedürfnisse"],
+  [/bedurfnisse/g, "bedürfnisse"],
+  [/Beduerfnisse/g, "Bedürfnisse"],
+  [/beduerfnisse/g, "bedürfnisse"],
+  [/berufstaetig/g, "berufstätig"],
+  [/Berufstaetig/g, "Berufstätig"],
+  [/Saetze/g, "Sätze"],
+  [/saetze/g, "sätze"],
+  [/Saetzen/g, "Sätzen"],
+  [/spaeter/g, "später"],
+  [/Spaeter/g, "Später"],
+  [/waehrend/g, "während"],
+  [/Waehrend/g, "Während"],
+  [/Heisshunger/g, "Heißhunger"],
+  [/heisshunger/g, "heißhunger"],
+  [/Buero/g, "Büro"],
+  [/Frueh/g, "Früh"],
+  [/frueh/g, "früh"],
+  [/Vorschlaege/g, "Vorschläge"],
+  [/vorschlaege/g, "vorschläge"],
+  [/moeglich/g, "möglich"],
+  [/Moeglich/g, "Möglich"],
+  [/koennen/g, "können"],
+  [/Koennen/g, "Können"],
+  [/maedchen/g, "mädchen"],
+  [/schaetz/g, "schätz"],
+  [/Schaetz/g, "Schätz"],
+  [/ausschliesslich/g, "ausschließlich"],
+  [/Ausschliesslich/g, "Ausschließlich"],
+];
+
+function restoreUmlauts(s: string): string {
+  let out = s;
+  for (const [pattern, replacement] of UMLAUT_REPLACEMENTS) {
+    out = out.replace(pattern, replacement);
   }
   return out;
 }

@@ -75,7 +75,7 @@ export async function POST(req: Request) {
   }
   if (!isValidHandle(body.handle)) {
     return NextResponse.json(
-      { error: "Das ist kein gueltiger Handle. Erlaubt: Buchstaben, Zahlen, Punkte, Unterstriche." },
+      { error: "Das ist kein gültiger Handle. Erlaubt: Buchstaben, Zahlen, Punkte, Unterstriche." },
       { status: 400 }
     );
   }
@@ -119,7 +119,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "Das Profil ist privat — Auto-Fill funktioniert nur fuer oeffentliche Accounts. Bitte manuell befuellen.",
+          "Das Profil ist privat — Auto-Fill funktioniert nur für öffentliche Accounts. Bitte manuell befüllen.",
         stage: "scrape",
       },
       { status: 422 }

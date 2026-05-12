@@ -42,12 +42,12 @@ const RESPONSE_SCHEMA = {
     bio: {
       type: "string",
       description:
-        "2-3 Saetze deutsche Beschreibung des Creators im warmen, du-Form-naheen Ton. Keine Hashtag-Salven, keine Affiliate-Codes, keine Anfuehrungszeichen. Beschreibt Nische + Persoenlichkeit. Max 240 Zeichen.",
+        "2-3 Sätze deutsche Beschreibung des Creators im warmen, du-Form-nahen Ton. Keine Hashtag-Salven, keine Affiliate-Codes, keine Anführungszeichen. Beschreibt Nische + Persönlichkeit. Verwende korrekte deutsche Umlaute (ä, ö, ü, ß). Max 240 Zeichen.",
     },
     tagline: {
       type: "string",
       description:
-        "Ein Satz Headline fuer die Hub-Card. Kurz, konkret, sinnlich. Max 80 Zeichen. Beispiele: 'Abnehmen ohne Verzicht', 'Mealprep fuer Berufstaetige', 'Vegane Backwerke ohne Mehl'.",
+        "Ein Satz Headline für die Hub-Card. Kurz, konkret, sinnlich. Max 80 Zeichen. Beispiele: 'Abnehmen ohne Verzicht', 'Mealprep für Berufstätige', 'Vegane Backwerke ohne Mehl'.",
     },
     niche: {
       type: "string",
@@ -63,23 +63,28 @@ const RESPONSE_SCHEMA = {
   required: ["name", "fullName", "bio", "tagline", "niche", "signature"],
 };
 
-const SYSTEM_INSTRUCTION = `Du analysierst Instagram-Profile von Food-/Fitness-/Recipe-Creators und leitest daraus die Identitaet ihres Workspaces in unserem internen Recipe-Card-Builder-Tool ab.
+const SYSTEM_INSTRUCTION = `Du analysierst Social-Media-Profile (Instagram oder TikTok) von Food-/Fitness-/Recipe-Creators und leitest daraus die Identität ihres Workspaces in unserem internen Recipe-Card-Builder-Tool ab.
 
-Tonalitaet (extrem wichtig fuer Bio + Tagline + Signature):
-• warm, persoenlich, du-Form-Naehe — wie zu einer Freundin
-• KEINE Werbesprache ("absolut traumhaft", "perfekt fuer jeden Anlass")
-• KEINE Hashtags, KEINE Emojis, KEINE Anfuehrungszeichen
+Tonalität (extrem wichtig für Bio + Tagline + Signature):
+• warm, persönlich, du-Form-Nähe — wie zu einer Freundin
+• KEINE Werbesprache ("absolut traumhaft", "perfekt für jeden Anlass")
+• KEINE Hashtags, KEINE Emojis, KEINE Anführungszeichen
 • Sinnlich-konkret statt abstrakt
 • Beziehe dich auf die konkreten Themen des Profils (z.B. "Mealprep", "Backen ohne Zucker", "vegane Bowls")
 
-Deutsche Schreibweise korrekt: ä, ö, ü, ß. Niemals 'fuer' wenn 'fuer' gemeint ist (auch wenn das Schema 'fuer' enthaelt — du antwortest auf Deutsch mit Umlauten in deinem JSON-Content).
+WICHTIG zu deutscher Schreibweise — verwende immer korrekte Umlaute und ß:
+• ä statt ae: "Sätze", "Tonalität", "tätig", "Mädchen", "spät"
+• ö statt oe: "können", "möglich", "größer", "öffentlich"
+• ü statt ue: "für", "über", "Bedürfnisse", "Frühstück"
+• ß statt ss bei langen Vokalen: "ausschließlich", "Maß", "groß", "Straße"
+Niemals "ue", "oe", "ae", "ss" wo Umlaute oder ß stehen müssen.
 
 Display-Name-Regel:
-• Wenn der Instagram-fullName ein Vorname + Nachname ist, nimm den Vornamen als Display-Name ('Lina Mueller' → name: 'Lina')
+• Wenn der Profil-fullName ein Vorname + Nachname ist, nimm den Vornamen als Display-Name ('Lina Müller' → name: 'Lina')
 • Wenn der Account ein Marken-Account ist (z.B. 'Bienesfitlife'), wandle in eine knackige Form um ('Bienesfitlife' → 'Biene' wenn die Bio-Sprache das suggeriert)
-• Bei Unsicherheit: Username ohne Suffix-Endungen uebernehmen
+• Bei Unsicherheit: Username ohne Suffix-Endungen übernehmen
 
-Follower-Format fuer Niche-Feld:
+Follower-Format für Niche-Feld:
 • 819000 → '819K'
 • 1200000 → '1.2M'
 • 95000 → '95K'
@@ -89,7 +94,7 @@ Niche-Bullet-Format:
 • 'Vegan · Backen · 230K Instagram'
 • Hauptbereich zuerst, Reichweite zuletzt
 
-Antworte AUSSCHLIESSLICH im JSON-Schema, ohne Erklaerung.`;
+Antworte AUSSCHLIESSLICH im JSON-Schema, ohne Erklärung.`;
 
 function formatProfileForPrompt(profile: InstagramProfile): string {
   const followerStr =
@@ -138,8 +143,9 @@ export async function analyzeCreatorIdentity(
   profile: InstagramProfile
 ): Promise<CreatorIdentity> {
   const prompt = [
-    `Analysiere folgenden Instagram-Creator und leite die Workspace-Identitaet ab.`,
-    `Tonalitaet bei bio/tagline/signature: warm, du-Form, persoenlich — wie ein guter Freund den Creator beschreibt.`,
+    `Analysiere folgenden Creator und leite die Workspace-Identität ab.`,
+    `Tonalität bei bio/tagline/signature: warm, du-Form, persönlich — wie ein guter Freund den Creator beschreibt.`,
+    `Verwende immer korrekte deutsche Umlaute (ä, ö, ü, ß).`,
     ``,
     formatProfileForPrompt(profile),
     ``,
@@ -173,6 +179,11 @@ function sanitize(s: string, max: number): string {
   let out = (s ?? "").trim();
   out = out.replace(/^["'„«]+|["'"»]+$/g, "");
   out = out.replace(/\s+/g, " ");
+  // Defensive Umlaut-Wiederherstellung — wenn Gemini trotz System-Instruction
+  // noch "ae/oe/ue/ss"-Schreibweisen liefert, korrigieren wir die häufigsten
+  // Patterns. Konservativ: nur typische deutsche Wörter, damit englische
+  // Begriffe (Mealprep, User, etc.) unangetastet bleiben.
+  out = restoreUmlauts(out);
   if (out.length > max) {
     const cut = out.slice(0, max);
     const lastDot = Math.max(
@@ -181,6 +192,34 @@ function sanitize(s: string, max: number): string {
       cut.lastIndexOf("?")
     );
     out = lastDot > max * 0.5 ? cut.slice(0, lastDot + 1) : cut + "…";
+  }
+  return out;
+}
+
+const UMLAUT_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\bfuer\b/g, "für"],
+  [/\bFuer\b/g, "Für"],
+  [/Tonalitaet/g, "Tonalität"],
+  [/persoenlich/g, "persönlich"],
+  [/Persoenlich/g, "Persönlich"],
+  [/berufstaetig/g, "berufstätig"],
+  [/Berufstaetig/g, "Berufstätig"],
+  [/Saetze/g, "Sätze"],
+  [/Naehe\b/g, "Nähe"],
+  [/Erklaerung/g, "Erklärung"],
+  [/ueber(\w)/g, "über$1"],
+  [/Ueber(\w)/g, "Über$1"],
+  [/Persoenlichkeit/g, "Persönlichkeit"],
+  [/Nische\b/g, "Nische"],
+  [/Anfuehrungszeichen/g, "Anführungszeichen"],
+  [/ausschliesslich/g, "ausschließlich"],
+  [/Ausschliesslich/g, "Ausschließlich"],
+];
+
+function restoreUmlauts(s: string): string {
+  let out = s;
+  for (const [pattern, replacement] of UMLAUT_REPLACEMENTS) {
+    out = out.replace(pattern, replacement);
   }
   return out;
 }
