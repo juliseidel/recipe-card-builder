@@ -4985,52 +4985,56 @@ function StepsList({
               {group.name}
             </Text>
           ) : null}
-          {group.items.map((item) => (
-            <View
-              key={item.index}
-              style={{
-                flexDirection: "row",
-                // flex-start (default) — Number sitzt OBEN, neben der
-                // ersten Text-Zeile. alignItems "baseline" hat react-pdf
-                // bei multi-line Text auf die letzte Zeile gepinnt, was
-                // die Nummer fett nach unten verschob ("3" war Mitte des
-                // 3-Zeilen-Texts). Mit flex-start + lineHeight gematcht
-                // sitzen Number und erste Text-Zeile visuell aligned.
-                marginBottom: stepMarginBottom,
-                gap: 10,
-              }}
-            >
-              <Text
+          {group.items.map((item) => {
+            // Number-Line-Box muss exakt so hoch sein wie eine Text-
+            // Zeile, damit Single-Line-Steps die Number nicht visuell
+            // tiefer haben als den Text. Math: textLineHeight =
+            // stepFontSize * 1.45. Damit Number-Box dieselbe Hoehe
+            // hat, brauchen wir lineHeight = textLineHeight /
+            // numFontSize. Mit dieser dynamischen lineHeight sitzt
+            // die Number-Glyph zentriert in einer Box, die exakt
+            // einer Text-Zeile entspricht — egal ob 1 oder 5 Zeilen
+            // Step-Text folgen, die erste Zeile ist immer auf
+            // gleicher Hoehe wie die Number.
+            const numberLineHeight =
+              (stepFontSize * 1.45) / stepNumFontSize;
+            return (
+              <View
+                key={item.index}
                 style={{
-                  fontFamily: "Fraunces",
-                  fontSize: stepNumFontSize,
-                  fontWeight: bold ? 700 : 400,
-                  color: theme.accent,
-                  width: 20,
-                  // lineHeight 1.45 matched die Text-Spalte (stepFontSize *
-                  // 1.45). Damit haben Number-line-box und Text-line-box
-                  // exakt die gleiche Hoehe — Top-Edges aligned heisst
-                  // visuell Number sitzt auf der ersten Text-Zeile.
-                  lineHeight: 1.45,
+                  flexDirection: "row",
+                  marginBottom: stepMarginBottom,
+                  gap: 10,
                 }}
               >
-                {item.index + 1}
-              </Text>
-              <Text
-                style={{
-                  flex: 1,
-                  fontSize: stepFontSize,
-                  lineHeight: 1.45,
-                  color: theme.ink,
-                }}
-              >
-                {checklist ? (
-                  <Text style={{ color: theme.inkSubtle }}>☐ </Text>
-                ) : null}
-                {item.text}
-              </Text>
-            </View>
-          ))}
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontSize: stepNumFontSize,
+                    fontWeight: bold ? 700 : 400,
+                    color: theme.accent,
+                    width: 20,
+                    lineHeight: numberLineHeight,
+                  }}
+                >
+                  {item.index + 1}
+                </Text>
+                <Text
+                  style={{
+                    flex: 1,
+                    fontSize: stepFontSize,
+                    lineHeight: 1.45,
+                    color: theme.ink,
+                  }}
+                >
+                  {checklist ? (
+                    <Text style={{ color: theme.inkSubtle }}>☐ </Text>
+                  ) : null}
+                  {item.text}
+                </Text>
+              </View>
+            );
+          })}
         </View>
       ))}
     </View>
