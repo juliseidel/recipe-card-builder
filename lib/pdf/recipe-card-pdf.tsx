@@ -3592,28 +3592,29 @@ function VitalPage({
                   key={si}
                   style={{
                     flexDirection: "row",
-                    gap: 8,
-                    marginBottom: d.stepGap,
+                    gap: 10,
+                    marginBottom: d.stepGap + 4,
+                    alignItems: "flex-start",
                   }}
                   wrap={false}
                 >
-                  <View
+                  {/* Number rendert in DERSELBEN Font + fontSize + lineHeight
+                      wie der Body-Text. Damit sind Glyph-Metriken IDENTISCH
+                      und Baselines garantiert auf gleicher Y-Linie. Pop
+                      durch Italic + Bold + Akzent-Farbe statt durch
+                      groessere Schrift oder andere Font. */}
+                  <Text
                     style={{
+                      fontSize: d.stepFontSize,
+                      fontStyle: "italic",
+                      fontWeight: 700,
+                      color: t.accent,
                       width: 22,
-                      paddingTop: 1,
+                      lineHeight: 1.45,
                     }}
                   >
-                    <Text
-                      style={{
-                        fontFamily: "Fraunces",
-                        fontSize: d.stepFontSize + 4,
-                        color: t.accent,
-                        lineHeight: 1,
-                      }}
-                    >
-                      {pad2(si + 1)}
-                    </Text>
-                  </View>
+                    {pad2(si + 1)}
+                  </Text>
                   <Text
                     style={{
                       flex: 1,
@@ -4453,23 +4454,28 @@ function AmberPage({
                   key={si}
                   style={{
                     flexDirection: "row",
-                    gap: 8,
-                    marginBottom: d.stepGap,
+                    gap: 10,
+                    marginBottom: d.stepGap + 4,
+                    alignItems: "flex-start",
                   }}
                   wrap={false}
                 >
-                  <View style={{ width: 22, paddingTop: 1 }}>
-                    <Text
-                      style={{
-                        fontFamily: "Fraunces",
-                        fontSize: d.stepFontSize + 4,
-                        color: t.accent,
-                        lineHeight: 1,
-                      }}
-                    >
-                      {pad2(si + 1)}
-                    </Text>
-                  </View>
+                  {/* Number rendert in DERSELBEN Font + fontSize + lineHeight
+                      wie der Body-Text — Glyph-Metriken IDENTISCH, Baselines
+                      garantiert auf gleicher Y-Linie. Pop durch Italic +
+                      Bold + Akzent-Farbe. */}
+                  <Text
+                    style={{
+                      fontSize: d.stepFontSize,
+                      fontStyle: "italic",
+                      fontWeight: 700,
+                      color: t.accent,
+                      width: 22,
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    {pad2(si + 1)}
+                  </Text>
                   <Text
                     style={{
                       flex: 1,
