@@ -883,25 +883,24 @@ function PatisseriePage({
               {avatarDataUri ? (
                 <View
                   style={{
-                    width: 50,
-                    height: 50,
-                    borderRadius: 25,
+                    width: 64,
+                    height: 64,
+                    borderRadius: 32,
                     overflow: "hidden",
                     borderWidth: 1.5,
                     borderColor: t.accent,
                   }}
                 >
-                  {/* objectPosition "center 25%": pinned to top so face/head
-                      stays visible in portrait avatars (Julias Original-
-                      Foto ist hochformatig, ohne den Pin wird der Scheitel
-                      gecroppt). Cover bleibt; nur Anchor verschoben. */}
+                  {/* 64x64 statt 50x50 — bei Portrait-Avataren (Julia hat
+                      Schultern + Gesicht im 320x320 Original) bleibt im
+                      groesseren Circle mehr vom Kopf sichtbar. */}
                   <Image
                     src={avatarDataUri}
                     style={{
-                      width: 47,
-                      height: 47,
+                      width: 61,
+                      height: 61,
                       objectFit: "cover",
-                      objectPosition: "center 25%",
+                      objectPosition: "center 30%",
                     }}
                   />
                 </View>
@@ -1001,8 +1000,10 @@ function PatisseriePage({
         </View>
 
         {/* ─── RIGHT: CREAM BODY ───────────────────────────────────── */}
-        {/* paddingTop/Bottom density-aware: bei spacious deutlich mehr,
-            damit kurze Recipes nicht oben kleben + unten Weiss lassen. */}
+        {/* paddingTop/Bottom density-aware. Bei spacious zusaetzlich
+            justifyContent "center": Content wird vertikal zentriert,
+            sodass kurze Recipes nicht mehr oben kleben + unten Weiss
+            lassen, sondern symmetrisch in der Spalten-Mitte sitzen. */}
         <View
           style={{
             flex: 1,
@@ -1010,6 +1011,7 @@ function PatisseriePage({
             paddingHorizontal: 32,
             paddingTop: d.bodyPadTop,
             paddingBottom: d.bodyPadBottom,
+            justifyContent: density === "spacious" ? "center" : "flex-start",
           }}
         >
           {/* Top stats strip — identity-relevant numbers, on the body

@@ -567,8 +567,8 @@ function NutritionOverviewPage({
           }}
         >
           Alle Werte gelten pro Portion (kcal-Spalte) bzw. als Pack-Summe in der
-          letzten Zeile. Werte basieren auf Bienes Original-Rezepten und können je
-          nach verwendeten Marken (z. B. MORE Sahne Protein) leicht abweichen.
+          letzten Zeile. Werte basieren auf {brand.name}s Original-Rezepten und
+          können je nach verwendeten Marken leicht abweichen.
         </Text>
       </View>
 
