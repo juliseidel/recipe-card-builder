@@ -4986,8 +4986,18 @@ function StepsList({
             </Text>
           ) : null}
           {group.items.map((item) => {
-            // Text-Zeile-Hoehe: stepFontSize * lineHeight 1.45
-            const textLineHeight = stepFontSize * 1.45;
+            // Number-marginTop: schiebt die Number-Glyph nach unten,
+            // damit ihre Top-Edge mit der Text-Glyph-Top-Edge aligned
+            // ist. Math: Text rendert in lineHeight 1.45 → Glyph hat
+            // ~ (textLineHeight - textFontSize) / 2 Padding-Top in der
+            // Line-Box. Number rendert in lineHeight 1 → Glyph
+            // startet bei 0 (top der Line-Box). Damit beide Glyph-Tops
+            // gleich sind, brauchen wir marginTop = textPadding-top
+            // auf der Number. Funktioniert fuer single-line UND
+            // multi-line steps (Top-Edges aligned heisst Number sitzt
+            // immer auf der ersten Text-Zeile).
+            const numberMarginTop =
+              (stepFontSize * 1.45 - stepFontSize) / 2;
             return (
               <View
                 key={item.index}
@@ -4998,35 +5008,19 @@ function StepsList({
                   alignItems: "flex-start",
                 }}
               >
-                {/* Number-Wrapper: explizite View mit Hoehe einer
-                    Text-Zeile, in der die Number-Glyph vertikal
-                    zentriert sitzt (justifyContent center). Damit
-                    landen Number-Glyph-Center und First-Text-Line-
-                    Center bei single-line UND multi-line steps auf
-                    derselben Y-Position. Vorher (nur lineHeight-Trick)
-                    hat react-pdf den Glyph nicht zentriert in der
-                    Line-Box gerendert, sondern oben — bei single-line
-                    sah die Number dadurch immer hoeher aus als der
-                    Text. */}
-                <View
+                <Text
                   style={{
+                    fontFamily: "Fraunces",
+                    fontSize: stepNumFontSize,
+                    fontWeight: bold ? 700 : 400,
+                    color: theme.accent,
                     width: 22,
-                    height: textLineHeight,
-                    justifyContent: "center",
+                    lineHeight: 1,
+                    marginTop: numberMarginTop,
                   }}
                 >
-                  <Text
-                    style={{
-                      fontFamily: "Fraunces",
-                      fontSize: stepNumFontSize,
-                      fontWeight: bold ? 700 : 400,
-                      color: theme.accent,
-                      lineHeight: 1,
-                    }}
-                  >
-                    {item.index + 1}
-                  </Text>
-                </View>
+                  {item.index + 1}
+                </Text>
                 <Text
                   style={{
                     flex: 1,
