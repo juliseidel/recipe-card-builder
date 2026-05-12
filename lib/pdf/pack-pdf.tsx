@@ -193,18 +193,20 @@ function CoverPage({
           >
             {pack.title}
           </Text>
-          <Text
-            style={{
-              fontFamily: "Fraunces",
-              fontStyle: "italic",
-              fontSize: 18,
-              lineHeight: 1.3,
-              color: t.inkSoft,
-              marginTop: 10,
-            }}
-          >
-            {pack.subtitle}
-          </Text>
+          {pack.subtitle ? (
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontStyle: "italic",
+                fontSize: 18,
+                lineHeight: 1.3,
+                color: t.inkSoft,
+                marginTop: 10,
+              }}
+            >
+              {pack.subtitle}
+            </Text>
+          ) : null}
 
           {/* Description — nur rendern wenn ein echter Pack-Text vorhanden,
               NICHT die generische Default-Phrase aus dem internen Editor
@@ -226,6 +228,10 @@ function CoverPage({
             </Text>
           ) : null}
 
+          {/* Recipe-Count + Handle. brand.signature ("Deine Julia") wurde
+              hier entfernt — kam zusaetzlich auf jedem Recipe-Footer +
+              auf der Outro-Page, das war "zu viel" (User-Feedback). Die
+              Signature steht jetzt nur noch zentral auf der Outro-Page. */}
           <View
             style={{
               flexDirection: "row",
@@ -237,19 +243,6 @@ function CoverPage({
             <Text style={{ fontSize: 10, color: t.inkSoft }}>
               {recipes.length} Rezepte
             </Text>
-            <Text style={{ fontSize: 10, color: t.inkSoft, opacity: 0.4 }}>·</Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-              <Text
-                style={{
-                  fontFamily: "Fraunces",
-                  fontSize: 12,
-                  color: t.ink,
-                }}
-              >
-                {brand.signature}
-              </Text>
-              <BeeIcon brandSlug={brand.slug} size={13} />
-            </View>
             <Text style={{ fontSize: 10, color: t.inkSoft, opacity: 0.4 }}>·</Text>
             <Text style={{ fontSize: 10, color: t.inkSoft }}>{brand.handle}</Text>
           </View>

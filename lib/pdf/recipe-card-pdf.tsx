@@ -518,7 +518,7 @@ function EditorialMicrosBanner({
             textTransform: "uppercase",
           }}
         >
-          Mikronährstoffe {nutritionBasisInline(recipe.nutritionBasis)} · % Tagesbedarf
+          Mikronährstoffe pro Portion · % Tagesbedarf
         </Text>
       </View>
       <View style={{ flexDirection: "row", gap: 8 }}>
@@ -4840,7 +4840,15 @@ function IngredientsList({
                   textTransform: "uppercase",
                 }}
               >
-                Für {g.name.toLowerCase()}
+                {/* "Für den Teig" / "Für die Glasur" sind korrekte Genitiv-
+                    Konstruktionen — bei Gruppen-Namen die mit "den/die/das"
+                    anfangen ergaenzen wir "Für" davor. Bei One-Word-Gruppen
+                    ("Optional", "Topping", "Garnish") wuerde "Für Optional"
+                    grammatikalisch falsch klingen — dann rendern wir nur
+                    den Namen pur. */}
+                {/^(den|die|das)\s/i.test(g.name)
+                  ? `Für ${g.name.toLowerCase()}`
+                  : g.name}
               </Text>
             ) : null}
             <IngredientGroupBody
@@ -5345,20 +5353,10 @@ function CardFooter({
         }}
         fixed
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-          <Text
-            style={{
-              fontFamily: "Fraunces",
-              fontSize: 13,
-              fontStyle: italic ? "italic" : "normal",
-              color: brand.tokens.ink,
-            }}
-          >
-            {brand.signature}
-          </Text>
-          <BeeIcon brandSlug={brand.slug} size={14} />
-        </View>
-
+        {/* brand.signature ("Deine Julia") + BeeIcon hier entfernt — kam
+            auf jedem Recipe-Footer und war zusammen mit Cover + Outro
+            "zu viel" (User-Feedback). Footer zeigt jetzt nur noch Brand-
+            Handle + Pack-Title + ggf. QR-Stempel. */}
         <Text
           style={{
             flex: 1,
@@ -5367,7 +5365,7 @@ function CardFooter({
             letterSpacing: 1.4,
             color: brand.tokens.inkMuted,
             textTransform: "uppercase",
-            textAlign: hasQr ? "right" : "right",
+            textAlign: "left",
           }}
         >
           {brand.handle} · {pack.title}
@@ -5499,7 +5497,7 @@ function MicrosStrip({
             textTransform: "uppercase",
           }}
         >
-          Mikronährstoffe {nutritionBasisInline(recipe?.nutritionBasis)} · % Tagesbedarf
+          Mikronährstoffe pro Portion · % Tagesbedarf
         </Text>
       </View>
       <View
