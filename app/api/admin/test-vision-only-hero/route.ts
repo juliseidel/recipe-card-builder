@@ -5,28 +5,19 @@ import {
   normalizeInstagramUrl,
 } from "@/lib/integrations/apify";
 import { extractVideoFrames } from "@/lib/ai/extract-video-frames";
-import { describeDishStructured } from "@/lib/ai/describe-dish-structured";
+import {
+  describeDishStructured,
+  pickLightingOption,
+} from "@/lib/ai/describe-dish-structured";
 import { generateImageSpec } from "@/lib/ai/recipe-image-spec";
 import { getBrandImageStyle } from "@/lib/ai/brand-image-style";
 import { generateImage, downloadImage } from "@/lib/ai/bfl-flux";
 import { recipes } from "@/lib/recipes";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 
-// Test-Endpoint: Vision-Description-Only Hero-Generation (kein Reference-Image).
-//
-// Pipeline:
-//   1. Apify scraped Reel
-//   2. ffmpeg extrahiert 25 Frames @ 1.0s
-//   3. Letzten 5 Frames als Vision-Sample (Reels zeigen am Ende das fertige Gericht)
-//   4. Gemini 2.5 Pro Multimodal: strukturierte Multi-Frame Dish-Description
-//   5. Jan's Original-Hero-Prompt + Brand-DNA + strukturierte Description
-//   6. Flux 2 Pro text-only (KEIN input_image)
-//   7. Sharp Lanczos-Upscale auf 3072, q=95
-//   8. Upload in test-Bucket, public URL zurueckgeben
-//
-// Auth: Bearer-Token ADMIN_RESEED_TOKEN.
-//
-// Body: { recipeSlug: string } — z.B. "frozen-coconut-strawberry-cups"
+// V2 Test-Endpoint — Vision bestimmt vessel + lighting-direction, Spec
+// liefert nur noch dishShape + heroElement + scene-Backup. Erweitertes
+// 16-Feld Vision-Schema + 8 Frames an Gemini Pro.
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -144,14 +135,12 @@ export async function POST(req: Request) {
     );
   }
 
-  // ─── 3. Letzten 5 Frames als Vision-Sample ─────────────────────────────
-  // Reels zeigen typically am Ende das fertig angerichtete Gericht. Wir
-  // nehmen die letzten 5 — auch wenn da Text drauf ist, kann Gemini das
-  // IGNORIEREN, weil wir nur eine Text-Beschreibung daraus bauen. Flux
-  // sieht diese Frames NIE — nur die textuelle Beschreibung.
-  const sampleFrames = frames.slice(-5);
+  // ─── 3. Letzten 8 Frames an Gemini Pro (statt 5) ────────────────────────
+  // Reels zeigen am Ende das fertig angerichtete Gericht. Mehr Frames =
+  // konsistentere Beschreibung, weniger Snapshot-Zufall.
+  const sampleFrames = frames.slice(-8);
 
-  // ─── 4. Strukturierte Multi-Frame Vision-Description ────────────────────
+  // ─── 4. Strukturierte 16-Feld Multi-Frame Vision-Description ────────────
   const tVision0 = Date.now();
   const dishDescription = await describeDishStructured({
     frames: sampleFrames,
@@ -167,12 +156,15 @@ export async function POST(req: Request) {
     );
   }
 
-  // ─── 5. Image-Spec (9 cinematography fields) — wie heute ───────────────
+  // ─── 5. Image-Spec — aber WIR IGNORIEREN servingVessel! ─────────────────
+  // Spec dient nur noch für: dishShape (für angle-lookup), dishColorTone
+  // (toneWord), servingTemperature (steamSuffix), heroElement, sceneContext
+  // als Backup. Vessel kommt AUSSCHLIESSLICH aus Vision.
   const tSpec0 = Date.now();
   const spec = await generateImageSpec(recipe, "biene");
   const tSpec = Date.now() - tSpec0;
 
-  // ─── 6. Jan's Original-Prompt + strukturierte Description ──────────────
+  // ─── 6. Bauen des Prompts ────────────────────────────────────────────────
   const style = await getBrandImageStyle("biene");
   const angle =
     style.defaultAngles?.[spec.dishShape] ??
@@ -184,42 +176,64 @@ export async function POST(req: Request) {
   const tone = toneWord(spec.dishColorTone);
   const steam = steamSuffix(spec.servingTemperature);
 
-  // Jan's Hero-Prompt #4, mit strukturierter Dish-Description statt
-  // Reference-Image. Reference-Klausel ("matching the reference") wird
-  // hier zu "as described above" umformuliert, weil keine Reference da.
+  // Lighting-Option: aus Bienes 5 Optionen die wählen, die zur Vision-
+  // Licht-Richtung passt. So bekommen wir Brand-Konsistenz + Reel-Treue.
+  const chosenLighting = pickLightingOption(
+    dishDescription.lightDirection,
+    style.lightingOptions
+  );
+
+  // Jan's Hero-Prompt #4 mit erweiterter Vision-Description. KEINE
+  // Defensive-Klauseln im Positive-Prompt. Vessel kommt aus Vision.
   //
-  // Brand-DNA (cameraAesthetic, heroElement) bleibt als Identitaets-Slot.
+  // Reihenfolge: scene → hero element → light → DETAILLIERTE
+  // Gericht-Beschreibung (das Herzstück) → camera-specs.
   const positivePrompt = [
-    `${recipe.title}, shown in a ${spec.servingVessel}, ${angle} view, placed on ${spec.sceneContext}.`,
+    `A ${angle} view of ${recipe.title}, placed on ${spec.sceneContext}.`,
     `${spec.heroElement}, styled deliberately as part of the scene.`,
-    `${spec.lightingMood}.`,
+    `${chosenLighting}.`,
     "",
-    `The dish itself (render exactly as described, this IS the dish to render — do not improvise the dish design):`,
-    `${dishDescription.compose}`,
+    `The dish itself (render exactly as described — this IS the dish, do not improvise):`,
+    `Form: ${dishDescription.form}`,
+    `Colors: ${dishDescription.exactDishColors}`,
+    `Vessel: ${dishDescription.vesselDescription}${dishDescription.vesselSize ? ` (${dishDescription.vesselSize})` : ""}.`,
+    dishDescription.layering ? `Layering: ${dishDescription.layering}` : "",
+    dishDescription.toppings && dishDescription.toppings !== "None visible"
+      ? `Toppings: ${dishDescription.toppings}`
+      : "",
+    dishDescription.spatialArrangement
+      ? `Arrangement: ${dishDescription.spatialArrangement}`
+      : "",
+    `Textures: ${dishDescription.textures}`,
+    dishDescription.cuttingPlaneVisible
+      ? `Cross-section: ${dishDescription.cuttingPlaneVisible}`
+      : "",
+    "",
+    `Compose: ${dishDescription.compose}`,
     "",
     `Shot on Leica SL2 50mm lens at f/5.6, dish in sharp focus from edge to edge, background softly out of focus, cookbook-style Instagram food photograph, ${tone} tones, homemade imperfect character${steam}.`,
-  ].join(" ");
+  ]
+    .filter((s) => s.length > 0)
+    .join("\n");
 
-  // Jan's Original-Negative-Set (~18 Items), keine Defensive-Verdoppelung.
-  // Brand-negativeAddition kommt obendrauf.
+  // Jan's Original-Negative-Set (~18 Items) + Brand-negativeAddition.
   const baseNegative =
     "no text, no labels, no logos, no packaging, no cartons, no bottles, no jars with labels, no bags, no brand names, no watermark, no hands, no people, no faces, no rigid centering, no plastic-looking sauce, no unnatural gloss, no studio lighting, no white void background, no cool blue tones, no fluorescent lighting";
   const negativePrompt = style.negativeAddition
     ? `${baseNegative}, ${style.negativeAddition}`
     : baseNegative;
 
-  // ─── 7. Flux 2 Pro text-only call (KEIN input_image) ───────────────────
+  // ─── 7. Flux 2 Pro text-only call ───────────────────────────────────────
   const tFlux0 = Date.now();
   const result = await generateImage({
     prompt: positivePrompt,
     negativePrompt,
     model: "flux-2-pro",
     aspectRatio: "1:1",
-    width: 2048, // 2048 nativ — kein 1440-Hack mehr (Test-Branch)
+    width: 2048,
     height: 2048,
     outputFormat: "jpeg",
     safetyTolerance: 2,
-    // KEIN referenceImage — Vision-Description-Only ist der Test
   });
   const tFlux = Date.now() - tFlux0;
 
@@ -238,7 +252,7 @@ export async function POST(req: Request) {
     fileSizeLimit: 8 * 1024 * 1024,
     allowedMimeTypes: ["image/jpeg"],
   });
-  const filePath = `${body.recipeSlug}-${Date.now()}.jpg`;
+  const filePath = `${body.recipeSlug}-v2-${Date.now()}.jpg`;
   const upload = await supabase.storage
     .from(TEST_BUCKET)
     .upload(filePath, processed, {
@@ -272,13 +286,15 @@ export async function POST(req: Request) {
     framesAnalyzedByVision: sampleFrames.length,
     fluxSeed: result.seed,
     spec: {
-      servingVessel: spec.servingVessel,
+      // Spec wird nur noch für scene/heroElement/angle/tone genutzt,
+      // Vessel kommt ALLEINE aus Vision.
       heroElement: spec.heroElement,
       sceneContext: spec.sceneContext,
-      lightingMood: spec.lightingMood,
       dishShape: spec.dishShape,
       dishColorTone: spec.dishColorTone,
       angle,
+      chosenLightingFromVision: chosenLighting,
+      ignoredSpecVessel: spec.servingVessel,
     },
     dishDescription,
     positivePrompt,

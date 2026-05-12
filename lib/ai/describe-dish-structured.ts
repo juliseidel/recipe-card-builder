@@ -3,49 +3,65 @@ import type { ExtractedFrame } from "./extract-video-frames";
 
 // Multi-Frame strukturierte Vision-Description fuer den text-only Hero-Path.
 //
-// Ziel: aus 3-5 sauberen Frames eine ausreichend detaillierte Beschreibung
-// des fertigen Gerichts bauen, damit Flux 2 Pro **ohne** Reference-Image
-// trotzdem dasselbe Gericht rendert. Vorteile gegenueber Image-to-Image:
-//   - keine Text/Hand/Watermark-Uebernahme aus dem Reel
-//   - voller Style-Kontrolle (Brand-DNA setzt sich durch)
-//   - kein "Reel-Cover-Look" — eigenes Bild im eigenen Stil
+// V2 (2026-05-12): Schema deutlich erweitert auf 16 Felder, damit Flux 2 Pro
+// genug Prompt-Substanz hat. Lessons aus V1-Test:
+//   - "muffin tin" aus Spec vs "ceramic plate" aus Vision = Konflikt → Vision
+//     muss das Vessel ALLEINE bestimmen, keine Spec-Konkurrenz
+//   - Counter war zu generisch → Surface-Material + Farbton + Textur einzeln
+//   - Wärme-Mismatch zum Reel → Licht-Richtung + Wärme-Level aus Vision
+//   - Garnish wurde übersehen → eigenes präzises Feld
 //
-// Trade-off: keine 1:1 Pixel-Treue. Die Description ist verlustbehaftet —
-// Flux interpretiert sie. Form/Farbe/Vessel/Layering/Toppings kommen sehr
-// gut rueber; sehr originelle Twists und exakte Komponenten-Zahlen sind
-// 70-85% Trefferquote.
-//
-// Multi-Frame statt Single-Frame: Gemini sieht das Gericht in mehreren
-// Stadien/Winkeln und konvergiert auf eine konsistente Beschreibung,
-// nicht eine "Frame-Snapshot"-Interpretation.
+// Ziel: Flux soll aus dieser Description ein Bild rendern, das auch ohne
+// Reference-Image visuell stimmig zum Original-Reel-Look ist — gleicher
+// Vessel-Typ, gleiche Plating-Anordnung, gleiche Schichten/Farben, gleiche
+// Licht-Stimmung. Brand-DNA (Counter-Stil, Hero-Element) bleibt darüber
+// liegen für den eigenen Look.
 
 export type StructuredDishDescription = {
-  /** Grundform / Geometrie. Ein Satz. Beispiel: "Five small clear glass cups
-   *  in a loose row, each about 4cm wide and 5cm tall." */
+  /** Grundform / Geometrie. Beispiel: "Five small circular frozen dessert
+   *  cups in a loose row, each about 4cm wide and 5cm tall." */
   form: string;
-  /** Dominante Farbtoene. Konkret, nicht abstrakt. Beispiel: "Bright pink-red
-   *  strawberry top, creamy off-white coconut base." */
+  /** Konkrete dominante Farbtöne, nicht abstrakt. */
   dominantColors: string;
-  /** Vessel/Behaelter (Material, Form, Groesse). Beispiel: "Clear smooth
-   *  glass cups, no pattern, no rim." */
-  vessel: string;
-  /** Schichten oder Aufbau von unten nach oben. Leer wenn nicht zutreffend.
-   *  Beispiel: "Bottom two-thirds creamy white coconut, top third strawberry
-   *  puree, finely chopped strawberry pieces scattered on top." */
+  /** Spezifische dish-Farbe(n) mit Nuancen. Beispiel: "Bright magenta-pink
+   *  top fading to deeper red at the edges, creamy off-white pure coconut base." */
+  exactDishColors: string;
+  /** Vessel-Material (ceramic / stoneware / glass / wood / metal / none). */
+  vesselMaterial: string;
+  /** Vessel-Form + Farbe + visuelle Eigenschaften, ein Satz. */
+  vesselDescription: string;
+  /** Vessel-Größe relativ zum Gericht. Beispiel: "The plate extends about
+   *  3cm beyond the cups on each side." Leer wenn nicht ableitbar. */
+  vesselSize: string;
+  /** Aufbau / Schichten von unten nach oben. Leer wenn nicht relevant. */
   layering: string;
-  /** Garnitur und Toppings. Beispiel: "Chopped fresh strawberry pieces
-   *  scattered on the surface. No herbs." */
+  /** Toppings + Garnitur, einzeln aufgezählt mit Anordnung. Beispiel:
+   *  "Three whole strawberry slices fanned on top, scattered chia seeds,
+   *  a sprig of mint to one side." 'None visible' wenn nichts. */
   toppings: string;
-  /** Texturen. Beispiel: "Frozen, slight frost on surface, glossy seam
-   *  where strawberry meets coconut." */
+  /** Texturen + Oberflächen-Qualität. */
   textures: string;
-  /** Optionaler Komponenten-Count wenn relevant (5 Cups, 4 Pancakes, 1
-   *  Cake). Leerer String wenn nicht relevant. */
+  /** Anzahl Komponenten wenn relevant. Format: "five [items]". */
   componentCount: string;
-  /** Fluessige englische Cookbook-Beschreibung des Gerichts, die direkt in
-   *  den Flux-Prompt einfliessen kann. Konzentriertes Compose-Feld — alle
-   *  obigen Aspekte in einem schoenen Absatz. Cookbook-Stil, kein "I see"
-   *  oder "The image shows". */
+  /** Sichtbarer Schnitt / Querschnitt? Beispiel: "Cross-section visible
+   *  showing clean layer separation." Leer wenn nicht. */
+  cuttingPlaneVisible: string;
+  /** Licht-Richtung. Beispiele: "from the left", "from above", "from
+   *  behind", "from the right side". */
+  lightDirection: string;
+  /** Licht-Wärme: "very warm" | "warm" | "neutral" | "cool". */
+  lightWarmth: string;
+  /** Counter / Surface-Material im Reel. Hint nur, Brand-DNA kann das
+   *  überschreiben. */
+  surfaceMaterial: string;
+  /** Spatial Arrangement — wie sind mehrere Komponenten angeordnet?
+   *  Beispiel: "Cups arranged in a loose triangular cluster, slightly
+   *  off-center to the right." Leer wenn nur 1 Komponente. */
+  spatialArrangement: string;
+  /** Fließende englische Cookbook-Beschreibung des FERTIGEN Gerichts,
+   *  8-10 dichte Sätze. Integriert alle obigen Aspekte. Cookbook-Stil,
+   *  kein "I see" oder "The image shows". Diese Beschreibung fließt 1:1
+   *  in den Flux-Prompt — sie ist der zentrale Anker für die Generation. */
   compose: string;
 };
 
@@ -55,79 +71,135 @@ const RESPONSE_SCHEMA = {
     form: {
       type: "string",
       description:
-        "Grundform/Geometrie des fertigen Gerichts in EINEM englischen Satz mit konkreten Mass-Angaben wenn moeglich. Beispiele: 'Five small clear glass cups in a loose row, each about 4cm wide', 'A circular layered cake about 18cm in diameter, 6cm tall', 'A large shallow bowl filled with mixed salad ingredients'.",
+        "Grundform/Geometrie des fertigen Gerichts in einem englischen Satz mit konkreten Maß-Angaben wenn ableitbar. Beispiele: 'Five small circular frozen dessert cups in a loose row, each about 4cm wide', 'A circular layered cake about 18cm in diameter, 6cm tall'.",
     },
     dominantColors: {
       type: "string",
       description:
-        "Konkrete dominante Farben des Gerichts auf Englisch, knapp und praezise. Nicht abstrakt ('warm'), sondern konkret ('bright pink-red on top, creamy off-white below'). Maximal 2 Saetze.",
+        "Dominante Farben des Gerichts auf Englisch, knapp und konkret. Maximal 2 Sätze. Nicht abstrakt ('warm') sondern konkret ('bright pink-red top, creamy off-white bottom').",
     },
-    vessel: {
+    exactDishColors: {
       type: "string",
       description:
-        "Vessel/Behaelter: Material, Form, optional Groesse. Englisch, knapp. Beispiele: 'clear smooth glass cups, no pattern', 'a deep rustic ceramic bowl with subtle blue glaze', 'a round white porcelain plate with raised rim'.",
+        "PRÄZISE Farbnuancen mit Adjektiven wie magenta-pink, charcoal-grey, golden-amber, deep-burgundy. Englisch, 1-2 Sätze. Wenn das Gericht aus mehreren Komponenten besteht, nenne sie einzeln.",
+    },
+    vesselMaterial: {
+      type: "string",
+      description:
+        "Material des Servier-Gefäßes: ceramic, stoneware, glass, wood, metal, none. WICHTIG: das SERVIER-Gefäß, nicht die Backform aus der Zubereitung. Wenn das Gericht ohne Vessel auf der Surface liegt: 'none'.",
+    },
+    vesselDescription: {
+      type: "string",
+      description:
+        "Englische Beschreibung des Servier-Gefäßes in einem Satz: Form + Farbe + visuelle Eigenschaften. Beispiele: 'a dark charcoal-grey matte ceramic plate with a slightly raised uneven rim', 'small clear smooth glass cups, no pattern', 'a deep rustic stoneware bowl with subtle blue glaze'.",
+    },
+    vesselSize: {
+      type: "string",
+      description:
+        "Größe des Vessels relativ zum Gericht oder Maß. Englisch, knapp. Leer wenn nicht ableitbar.",
     },
     layering: {
       type: "string",
       description:
-        "Aufbau/Schichten von unten nach oben in einem Satz auf Englisch — nur fuer Gerichte mit klaren Schichten (Kuchen, Cups, Lasagne, Parfaits). Bei Bowls/Salaten: 'No layering, ingredients mixed together'. Bei einfachen Gerichten: leer.",
+        "Schichten/Aufbau von unten nach oben in einem Satz auf Englisch — nur für Gerichte mit klaren Schichten (Cups, Lasagne, Parfaits, Torten). Bei Bowls/Salaten: 'No layering, ingredients mixed together'. Bei einfachen Gerichten: leer.",
     },
     toppings: {
       type: "string",
       description:
-        "Toppings + Garnitur. Englisch, knapp. Beispiele: 'Chopped fresh strawberry pieces scattered on the surface', 'Drizzled chocolate sauce and toasted almonds', 'A sprig of fresh basil and grated parmesan'. 'None visible' wenn nichts.",
+        "Toppings + Garnitur EINZELN aufgezählt mit Anordnung. Englisch. Beispiele: 'Three whole strawberry slices fanned on top, scattered chia seeds, a sprig of mint to one side', 'Drizzled chocolate sauce and toasted slivered almonds'. 'None visible' wenn nichts.",
     },
     textures: {
       type: "string",
       description:
-        "Sichtbare Texturen + Oberflaechen-Qualitaeten auf Englisch. Beispiele: 'Frozen with slight frost, glossy seam between layers', 'Crispy golden crust, soft creamy interior', 'Fluffy moist crumb, slightly caramelized top'.",
+        "Sichtbare Texturen + Oberflächen-Qualitäten auf Englisch. Beispiele: 'Frozen with slight frost, glossy seam where layers meet', 'Crispy golden crust, soft creamy interior visible at edges'.",
     },
     componentCount: {
       type: "string",
       description:
-        "Anzahl Komponenten wenn relevant (z.B. 5 Cups, 4 Pancakes, 12 Cookies). Format: 'five [items]'. Leer wenn nicht zutreffend (einzelne Schale, ein Kuchen).",
+        "Anzahl Komponenten wenn relevant. Format: 'five cups', 'four pancakes', 'twelve cookies'. Leer wenn nur ein Stück (Kuchen, Auflauf).",
+    },
+    cuttingPlaneVisible: {
+      type: "string",
+      description:
+        "Englisch beschreiben wenn ein Schnitt/Querschnitt zu sehen ist (clean layer separation, raw cut edges). Leer wenn nicht sichtbar.",
+    },
+    lightDirection: {
+      type: "string",
+      description:
+        "Aus welcher Richtung kommt das Licht im Bild? 'from the left', 'from the right', 'from above', 'from behind', 'from the right and above', 'diffuse from multiple directions'.",
+    },
+    lightWarmth: {
+      type: "string",
+      enum: ["very warm", "warm", "neutral", "cool"],
+      description:
+        "Wärme-Charakteristik des Lichts. 'very warm' = goldene Stunde / amber. 'warm' = morgendliches gelbes Licht. 'neutral' = mittags / ausgeglichen. 'cool' = bedeckter Tag / bläulich.",
+    },
+    surfaceMaterial: {
+      type: "string",
+      description:
+        "Material der Surface/des Counters im Reel auf Englisch: 'pale grey concrete', 'warm walnut wood', 'white marble', 'dark slate', 'matte cream stone'. Leer wenn keine Surface sichtbar (Closeup auf Vessel).",
+    },
+    spatialArrangement: {
+      type: "string",
+      description:
+        "Englisch beschreiben wie mehrere Komponenten angeordnet sind: 'Cups arranged in a loose triangular cluster slightly off-center', 'pancakes stacked vertically with maple syrup running down', 'salad ingredients tossed loosely'. Leer wenn nur 1 Komponente.",
     },
     compose: {
       type: "string",
       description:
-        "Fluessige englische Cookbook-Beschreibung des Gerichts als 3-4 Saetze, die alle obigen Aspekte zusammenfuehren. Konzentriert, kein 'I see' oder 'The image shows'. Diese Beschreibung fliesst direkt in den Flux-Prompt — sie muss Flux genug Information geben um das Gericht aus dem Nichts zu rendern.",
+        "Fließende englische Cookbook-Beschreibung des FERTIGEN Gerichts als 8-10 dichte Sätze. Integriert ALLE obigen Aspekte: form + colors + vessel + layering + toppings + textures + count + arrangement. Diese Beschreibung fließt 1:1 in den Flux-Prompt. Konzentriert, kein 'I see' oder 'The image shows'.",
     },
   },
   required: [
     "form",
     "dominantColors",
-    "vessel",
+    "exactDishColors",
+    "vesselMaterial",
+    "vesselDescription",
+    "vesselSize",
     "layering",
     "toppings",
     "textures",
     "componentCount",
+    "cuttingPlaneVisible",
+    "lightDirection",
+    "lightWarmth",
+    "surfaceMaterial",
+    "spatialArrangement",
     "compose",
   ],
 };
 
-const SYSTEM_INSTRUCTION = `Du bekommst mehrere Frames aus einem Cooking-Reel und beschreibst das FERTIGE GERICHT (nicht die Zubereitungs-Stadien) strukturiert auf Englisch.
+const SYSTEM_INSTRUCTION = `Du bekommst mehrere Frames aus einem Cooking-Reel und beschreibst das FERTIG ANGERICHTETE GERICHT strukturiert auf Englisch.
 
-Ziel: deine Beschreibung wird direkt an ein Bild-Generierungs-Modell (Flux 2 Pro) gegeben. Das Modell soll aus deiner Beschreibung ALLEIN — ohne das Reel zu sehen — ein neues Bild des Gerichts rendern, das visuell stimmig zum Original ist.
+Ziel: deine Beschreibung wird DIREKT an Flux 2 Pro gegeben. Flux soll daraus — ohne das Reel selbst zu sehen — ein neues Bild rendern, das visuell stimmig zum Original-Reel ist. Du bist die einzige Informationsquelle über das Gericht.
 
-Was du tun musst:
-- Konzentriere dich auf die Frames mit dem FERTIG angerichteten Gericht (typischerweise gegen Ende des Reels). Ignoriere Zubereitungs-Stadien.
-- Sei KONKRET: nenne genaue Farben, Formen, Schichten, Mass-Angaben (in cm wenn ableitbar).
-- Sei MULTI-FRAME-KONSISTENT: wenn das Gericht in mehreren Frames erscheint, beschreibe was UEBER ALLE Frames konsistent ist (nicht ein zufaelliger Snapshot-Moment).
-- Cookbook-Stil, kein "I see" oder "The image shows" oder "In the video".
+KRITISCH wichtig:
+- Fokussiere auf Frames mit dem FERTIG angerichteten Gericht (typically gegen Ende). Ignoriere Zubereitungs-Stadien (Schneiden, Mixen, In-Form-Füllen).
+- Beschreibe das SERVIER-Vessel, nicht das Preparation-Vessel. Wenn Cups in Förmchen gefroren werden und dann auf einen Teller kommen → der Teller ist das Vessel.
+- Sei MULTI-FRAME-KONSISTENT: was über alle Frames stabil ist, nicht ein zufälliger Snapshot.
+- Sei KONKRET: nenne Farben mit Nuancen (magenta-pink, charcoal-grey), Maße in cm wenn ableitbar, Plating-Details einzeln.
+- Cookbook-Stil. Kein "I see" oder "The image shows" oder "In the video". Direkt beschreibend.
 
 Was du IGNORIEREN musst:
 - Text-Overlays, POV-Untertitel, Recipe-Step-Banner, Sticker, Watermarks
-- Haende, Finger, Arme, Personen — die kommen ins neue Bild NICHT rein
-- Hintergrund/Counter/Vessel-Position — der NEUE Hintergrund kommt von der Brand-DNA, nicht vom Reel. Du beschreibst NUR das GERICHT selbst.
+- Hände, Finger, Arme, Personen — keine Body-Parts beschreiben, sie kommen ins neue Bild NICHT rein
+- Kamera-Bewegung, Schnitte zwischen Frames
+- Wenn das Reel-Cover Werbe-Elemente hat, ignoriere diese komplett
 
-Antworte AUSSCHLIESSLICH im JSON-Schema mit allen Feldern befuellt.`;
+Was du ZUSÄTZLICH zum Gericht beschreibst (als Mood-Hint, nicht als Hard-Constraint):
+- Licht-Richtung im Reel
+- Licht-Wärme im Reel
+- Surface/Counter-Material im Reel
+Diese Felder helfen dem nachgelagerten System einen kohärenten Look zu wählen — der finale Hintergrund kommt aber von der Brand-DNA, nicht von dir.
+
+Antworte AUSSCHLIESSLICH im JSON-Schema mit ALLEN Feldern befüllt.`;
 
 export type DescribeDishOptions = {
-  /** 3-5 Frames mit dem fertig angerichteten Gericht (oder so nah wie
-   *  moeglich). Caller waehlt sie aus dem Frame-Stream. */
+  /** 5-10 Frames mit dem fertig angerichteten Gericht. */
   frames: ExtractedFrame[];
   recipeTitle: string;
-  /** Optionaler Caption-Auszug fuer Kontext. */
+  /** Optionaler Caption-Auszug für Kontext. */
   caption?: string;
 };
 
@@ -143,7 +215,7 @@ export async function describeDishStructured(
       ? `Caption excerpt (context only, do not copy from this):\n${opts.caption.slice(0, 800)}`
       : "",
     "",
-    `${opts.frames.length} frame(s) from the cooking reel follow, in time order:`,
+    `${opts.frames.length} frame(s) from the cooking reel follow, in time order. Focus on frames showing the finished plated dish:`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -163,24 +235,28 @@ export async function describeDishStructured(
       parts,
       schema: RESPONSE_SCHEMA,
       systemInstruction: SYSTEM_INSTRUCTION,
-      // Pro statt Flash: dish-detail-treue ist hier entscheidend. Pro
-      // erkennt Farb-Nuancen und Layering deutlich besser als Flash.
-      // Speed-Trade-off (~5-10s statt ~3s) ist akzeptabel weil das nur
-      // einmal pro Hero passiert.
       model: "pro",
       temperature: 0.3,
-      maxOutputTokens: 2048,
+      maxOutputTokens: 4096,
       retries: 1,
     });
 
     return {
       form: (result.form ?? "").trim(),
       dominantColors: (result.dominantColors ?? "").trim(),
-      vessel: (result.vessel ?? "").trim(),
+      exactDishColors: (result.exactDishColors ?? "").trim(),
+      vesselMaterial: (result.vesselMaterial ?? "").trim(),
+      vesselDescription: (result.vesselDescription ?? "").trim(),
+      vesselSize: (result.vesselSize ?? "").trim(),
       layering: (result.layering ?? "").trim(),
       toppings: (result.toppings ?? "").trim(),
       textures: (result.textures ?? "").trim(),
       componentCount: (result.componentCount ?? "").trim(),
+      cuttingPlaneVisible: (result.cuttingPlaneVisible ?? "").trim(),
+      lightDirection: (result.lightDirection ?? "").trim(),
+      lightWarmth: (result.lightWarmth ?? "").trim(),
+      surfaceMaterial: (result.surfaceMaterial ?? "").trim(),
+      spatialArrangement: (result.spatialArrangement ?? "").trim(),
       compose: (result.compose ?? "").trim(),
     };
   } catch (err) {
@@ -190,4 +266,32 @@ export async function describeDishStructured(
     );
     return null;
   }
+}
+
+// Map Vision-Light-Direction + Brand-Lighting-Options → die passendste
+// Brand-Option. Bienes 5 Optionen sind alle warm — wir matchen primär
+// auf RICHTUNG (left/right/above/back). Wenn keine matched, nimm Index 0
+// (default morning light).
+export function pickLightingOption(
+  visionDirection: string,
+  brandLightingOptions: string[]
+): string {
+  if (brandLightingOptions.length === 0) {
+    return "warm morning light streaming from the left with soft shadows";
+  }
+  const dir = visionDirection.toLowerCase();
+  const scored = brandLightingOptions.map((opt) => {
+    const o = opt.toLowerCase();
+    let score = 0;
+    if (dir.includes("left") && o.includes("left")) score += 3;
+    if (dir.includes("right") && o.includes("right")) score += 3;
+    if (dir.includes("above") && o.includes("above")) score += 3;
+    if (dir.includes("behind") && (o.includes("backlight") || o.includes("behind")))
+      score += 3;
+    if (dir.includes("diffuse") && (o.includes("diffused") || o.includes("soft")))
+      score += 2;
+    return { opt, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  return scored[0].score > 0 ? scored[0].opt : brandLightingOptions[0];
 }
