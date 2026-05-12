@@ -179,9 +179,12 @@ Generiere 10-20 Pack-Vorschlaege im JSON-Schema.`,
     systemInstruction: SYSTEM_INSTRUCTION,
     temperature: 0.5,
     maxOutputTokens: 16384,
-    thinkingBudget: 2048,
+    // Pro → Flash umgestellt (Mai 2026): Flash 2.5 mit moderatem Thinking-
+    // Budget liefert vergleichbare Pack-Konzepte fuer ein Drittel der
+    // Kosten. Ca. $0.10-0.15 statt $0.40-0.80 pro Onboarding.
+    thinkingBudget: 1024,
     retries: 1,
-    model: "pro",
+    model: "flash",
   });
 
   // Sicherheits-Filter: nur Suggestions mit existierenden reelIds + min

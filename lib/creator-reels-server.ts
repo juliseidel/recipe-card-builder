@@ -259,6 +259,45 @@ export async function countRecipeReelsForBrand(
   return count ?? 0;
 }
 
+// Zaehlt alle Reels mit classified_at != null fuer einen Brand. Wird vom
+// Library-Status-Banner genutzt, um den Klassifikations-Fortschritt
+// anzuzeigen ("150 von 498 klassifiziert"). Plus: Self-Healing-Trigger
+// in library-status route — wenn classifiedCount sich >60s nicht geaendert
+// hat, starten wir die Klassifikations-Pipeline erneut.
+export async function countClassifiedReelsForBrand(
+  brandSlug: string
+): Promise<number> {
+  if (!hasServerSupabase()) return 0;
+  const supabase = getServerSupabase();
+  const { count } = await supabase
+    .from("creator_reels")
+    .select("*", { count: "exact", head: true })
+    .eq("brand_slug", brandSlug)
+    .not("classified_at", "is", null);
+  return count ?? 0;
+}
+
+// Jüngster classified_at-Zeitstempel fuer einen Brand. Self-Healing-
+// Heuristik: wenn das Maximum >60s alt ist UND es noch unklassifizierte
+// Reels gibt, gehen wir davon aus dass die letzte Klassifikation-Lambda
+// terminated wurde, und triggern den Helper erneut. Returnt null wenn
+// noch nichts klassifiziert ist.
+export async function getLatestClassifiedAt(
+  brandSlug: string
+): Promise<string | null> {
+  if (!hasServerSupabase()) return null;
+  const supabase = getServerSupabase();
+  const { data } = await supabase
+    .from("creator_reels")
+    .select("classified_at")
+    .eq("brand_slug", brandSlug)
+    .not("classified_at", "is", null)
+    .order("classified_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data?.classified_at as string | null) ?? null;
+}
+
 // Holt unklassifizierte Reels eines Brands. Wird vom Klassifikations-
 // Worker im Webhook-Handler aufgerufen. limit=auf 50 default damit ein
 // Lambda das in einer Runde durchziehen kann.

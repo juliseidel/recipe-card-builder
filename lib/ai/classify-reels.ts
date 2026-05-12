@@ -237,26 +237,55 @@ function defaultMiss(): ReelClassification {
 // Top-Level: nimmt eine Liste Reels und klassifiziert sie in Batches.
 // Returnt Map: reel.id → ReelClassification. Caller persistiert die in
 // die DB (update_reel_classification).
+//
+// Parallelisierung: 5 Batches gleichzeitig (Promise.all). Gemini-Flash-
+// Rate-Limits sind grosszuegig (60 RPM bei Free-Tier, 1000 RPM bei Paid),
+// 5 parallele Calls liegen klar unter dem Limit. Speed-Gain: bei 50
+// Reels (5 Batches) Klassifikation von ~10s sequenziell auf ~2s parallel.
+const PARALLEL_BATCHES = 5;
+
 export async function classifyReels(
   reels: ReelRow[]
 ): Promise<Map<string, ReelClassification>> {
   const out = new Map<string, ReelClassification>();
+
+  // Alle Batches vorab erstellen
+  const batches: ReelRow[][] = [];
   for (let i = 0; i < reels.length; i += BATCH_SIZE) {
-    const batch = reels.slice(i, i + BATCH_SIZE);
-    try {
-      const batchOut = await classifyBatch(batch);
-      // Fuer jeden Reel, der nicht im Batch-Output ist → Fallback.
+    batches.push(reels.slice(i, i + BATCH_SIZE));
+  }
+
+  // Batches in Gruppen von PARALLEL_BATCHES parallel verarbeiten.
+  // Wenn ein einzelner Batch failed, betrifft das nur die 10 Reels darin
+  // (defaultMiss), die anderen 40 in der Gruppe gehen durch.
+  for (let g = 0; g < batches.length; g += PARALLEL_BATCHES) {
+    const groupBatches = batches.slice(g, g + PARALLEL_BATCHES);
+    const groupResults = await Promise.all(
+      groupBatches.map(async (batch, idx) => {
+        try {
+          const batchOut = await classifyBatch(batch);
+          return { batch, batchOut, error: null };
+        } catch (err) {
+          console.warn(
+            `[classify-reels] parallel batch ${g + idx} failed:`,
+            err instanceof Error ? err.message : err,
+            err instanceof GeminiError ? `(status=${err.status})` : ""
+          );
+          return { batch, batchOut: null, error: err };
+        }
+      })
+    );
+
+    for (const { batch, batchOut } of groupResults) {
       for (const r of batch) {
-        out.set(r.id, batchOut.get(r.id) ?? defaultMiss());
+        if (batchOut) {
+          out.set(r.id, batchOut.get(r.id) ?? defaultMiss());
+        } else {
+          out.set(r.id, defaultMiss());
+        }
       }
-    } catch (err) {
-      console.warn(
-        `[classify-reels] batch ${i}-${i + batch.length} failed:`,
-        err instanceof Error ? err.message : err,
-        err instanceof GeminiError ? `(status=${err.status})` : ""
-      );
-      for (const r of batch) out.set(r.id, defaultMiss());
     }
   }
+
   return out;
 }

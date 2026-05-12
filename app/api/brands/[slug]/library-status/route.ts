@@ -1,8 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import {
   getLatestScrapeForBrand,
   countReelsForBrand,
   countRecipeReelsForBrand,
+  countClassifiedReelsForBrand,
+  getLatestClassifiedAt,
   updateScrapeStatus,
 } from "@/lib/creator-reels-server";
 import { getApifyRunStatus } from "@/lib/integrations/apify";
@@ -10,26 +12,27 @@ import {
   processSucceededRun,
   tryClaimScrapeProcessing,
 } from "@/lib/reel-library/process-succeeded-run";
+import { runClassificationAndSuggestions } from "@/lib/reel-library/classify-and-suggest";
 
 // Status-Polling-Endpoint mit aggressivem Self-Healing.
 //
-// Aufruf: Frontend pollt alle ~4s solange ein Backfill laeuft. Bei jedem
-// Aufruf fragen wir aktiv bei Apify den Run-Status ab und reagieren:
+// Vier Healing-Branches:
 //
-//   - Apify SUCCEEDED + wir noch 'running' → Webhook ist verloren gegangen.
-//     Wir machen den Webhook-Pfad selbst nach (atomares Lock via
-//     tryClaimScrapeProcessing, dann processSucceededRun).
-//   - Apify FAILED/TIMED_OUT/ABORTED + wir 'running' → status='failed'.
-//   - Apify RUNNING → wir warten weiter.
-//
-// So funktioniert die Pipeline auch wenn der Apify-Webhook nie ankommt
-// (Vercel-Cold-Start, Preview-URL-Authentication, Network-Hiccup, ...).
-// Der einzige Trigger den wir wirklich brauchen ist UI-Polling.
+//   1. Apify SUCCEEDED + status='running' → Webhook-Pfad nachholen
+//      (Dataset fetchen, Reels upserten, Klassifikation kicken)
+//   2. Apify FAILED/TIMED_OUT/ABORTED + status='running' → status='failed'
+//   3. status='classifying' + letzte Klassifikation >60s her UND noch
+//      unklassifizierte Reels da → Klassifikations-Pipeline erneut
+//      anstoßen (Lambda-Timeout-Recovery). Klassifikation laeuft mit
+//      ~50 Reels/Aufruf parallel, bei 498 Reels brauchen wir 10 Aufrufe
+//      = ca. 40 Sekunden Pure-Klassifikation-Zeit. Da der after()-Hook
+//      nur die maxDuration der Caller-Route Headroom hat, brauchen wir
+//      mehrere Polls fuer komplette Klassifikation.
+//   4. RUNNING → weiter warten
 
 export const runtime = "nodejs";
-// 60s damit der Recovery-Pfad (Dataset-Fetch + Klassifikations-Kick-off
-// im after()-Hook) genug Headroom hat. Klassifikation selbst laeuft
-// weiter via after-Hook ueber die Response-Lifetime hinaus.
+// maxDuration 60s: nach Response laufen wir noch in after() weiter um die
+// Klassifikation in einem Lambda-Lifetime so weit wie moeglich zu treiben.
 export const maxDuration = 60;
 
 type RouteParams = { params: Promise<{ slug: string }> };
@@ -42,10 +45,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
     return NextResponse.json({ status: "none" });
   }
 
-  // ─── Self-Healing-Branch ────────────────────────────────────────────
-  // Bei 'running' aktiv den Apify-Status abfragen — egal wie lange der
-  // Run schon laeuft. Apify-Status-Call ist billig (~200ms), und wir
-  // koennen den Webhook-Pfad selbst nachholen wenn noetig.
+  // ─── Healing-Branch 1+2: status='running' ────────────────────────────
   if (scrape.status === "running" && scrape.apify_run_id) {
     try {
       const apifyStatus = await getApifyRunStatus(scrape.apify_run_id);
@@ -54,10 +54,6 @@ export async function GET(_req: Request, { params }: RouteParams) {
         apifyStatus.status === "SUCCEEDED" &&
         apifyStatus.defaultDatasetId
       ) {
-        // Webhook ist nicht angekommen oder hatte einen Fehler. Wir
-        // versuchen den Lock zu bekommen — gewinnt nur einer (Webhook
-        // oder Status-Route). Beim Lock-Verlust nehmen wir an, der
-        // Webhook ist gerade parallel dran und wir lassen ihn machen.
         const claimed = await tryClaimScrapeProcessing(scrape.id);
         if (claimed) {
           console.log(
@@ -93,11 +89,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
           error: `Apify-Run-Status: ${apifyStatus.status}`,
         });
       }
-      // RUNNING → keine Aktion, naechster Poll versucht's wieder.
     } catch (err) {
-      // Apify-Check failed — non-fatal, nur loggen. Wir antworten mit
-      // dem aktuellen DB-Status und der naechste Poll kann's nochmal
-      // probieren.
       console.warn(
         "[library-status] Apify-Status-Check failed",
         err instanceof Error ? err.message : err
@@ -105,12 +97,46 @@ export async function GET(_req: Request, { params }: RouteParams) {
     }
   }
 
+  // ─── Healing-Branch 3: status='classifying' resume ───────────────────
+  // Wenn Klassifikation stoppt (Lambda-Timeout im after-Hook), erkennen
+  // wir das an einem stale `classified_at`. Wir triggern dann die Pipeline
+  // erneut via after() — naechster Poll sieht weiteren Fortschritt.
+  if (scrape.status === "classifying") {
+    const totalReels = await countReelsForBrand(slug);
+    const classified = await countClassifiedReelsForBrand(slug);
+    if (classified < totalReels) {
+      const latest = await getLatestClassifiedAt(slug);
+      const lastMs = latest ? new Date(latest).getTime() : 0;
+      const ageSec = lastMs ? (Date.now() - lastMs) / 1000 : Infinity;
+      // >45s ohne neuen classified_at → Pipeline ist stuck. Resume.
+      if (ageSec > 45) {
+        console.log(
+          `[library-status] resuming classification for brand=${slug} (${classified}/${totalReels} done, last classified ${Math.round(ageSec)}s ago)`
+        );
+        after(async () => {
+          try {
+            await runClassificationAndSuggestions({
+              scrapeId: scrape.id,
+              brandSlug: scrape.brand_slug,
+            });
+          } catch (err) {
+            console.error(
+              "[library-status] classification resume failed",
+              err
+            );
+          }
+        });
+      }
+    }
+  }
+
   // Frische DB-Werte fuer die Response (kann durch Self-Healing oben
   // gerade geandert sein).
   const freshScrape = await getLatestScrapeForBrand(slug);
-  const [totalReels, recipeReels] = await Promise.all([
+  const [totalReels, recipeReels, classifiedReels] = await Promise.all([
     countReelsForBrand(slug),
     countRecipeReelsForBrand(slug),
+    countClassifiedReelsForBrand(slug),
   ]);
 
   return NextResponse.json({
@@ -120,6 +146,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
     finishedAt: freshScrape?.finished_at ?? scrape.finished_at,
     reelCount: totalReels,
     recipeCount: recipeReels,
+    classifiedCount: classifiedReels,
     suggestionCount:
       freshScrape?.suggestion_count ?? scrape.suggestion_count,
     error: freshScrape?.error ?? scrape.error,

@@ -20,6 +20,7 @@ type StatusResponse = {
   status: LibraryStatus;
   reelCount: number;
   recipeCount: number;
+  classifiedCount: number;
   suggestionCount: number;
   error: string | null;
   startedAt?: string;
@@ -180,7 +181,7 @@ export function LibraryStatusBanner({
                 ? `${status.reelCount} Reels geladen — Apify scrapt noch…`
                 : null}
               {isClassifying
-                ? `${status.recipeCount > 0 ? status.recipeCount : "…"} von ${status.reelCount} Reels klassifiziert`
+                ? `${status.classifiedCount ?? 0} von ${status.reelCount} Reels klassifiziert${status.recipeCount > 0 ? ` · ${status.recipeCount} Rezepte` : ""}`
                 : null}
               {isDone
                 ? `Reel-Library bereit · ${status.recipeCount} Rezepte erkannt${status.suggestionCount > 0 ? ` · ${status.suggestionCount} Pack-Vorschläge` : ""}`
