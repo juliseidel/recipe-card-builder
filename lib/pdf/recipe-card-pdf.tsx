@@ -392,7 +392,7 @@ function EditorialPage({
               marginBottom: 5,
             }}
           >
-            Bienes Story
+            {`${brand.name}s Story`}
           </Text>
           <Text
             style={{
@@ -916,7 +916,7 @@ function PatisseriePage({
                   >
                     {brand.signature}
                   </Text>
-                  <BeeIcon size={15} />
+                  <BeeIcon brandSlug={brand.slug} size={15} />
                 </View>
                 <Text
                   style={{
@@ -1772,7 +1772,7 @@ function MinimalPage({
                 >
                   {brand.signature}
                 </Text>
-                <BeeIcon size={14} />
+                <BeeIcon brandSlug={brand.slug} size={14} />
               </View>
               <Text
                 style={{
@@ -2205,7 +2205,7 @@ function SportPage({
               marginBottom: 4,
             }}
           >
-            Bienes Story
+            {`${brand.name}s Story`}
           </Text>
           <Text
             style={{
@@ -2898,7 +2898,7 @@ function DashboardPage({
               marginBottom: 5,
             }}
           >
-            Bienes Story
+            {`${brand.name}s Story`}
           </Text>
           <Text
             style={{
@@ -3309,7 +3309,7 @@ function VitalPage({
               marginBottom: 5,
             }}
           >
-            Bienes Story
+            {`${brand.name}s Story`}
           </Text>
           <Text
             style={{
@@ -3636,7 +3636,7 @@ function VitalPage({
           >
             {brand.signature}
           </Text>
-          <BeeIcon size={14} />
+          <BeeIcon brandSlug={brand.slug} size={14} />
           <Text
             style={{
               fontSize: 7,
@@ -4284,7 +4284,7 @@ function AmberPage({
               marginBottom: 5,
             }}
           >
-            Bienes Story
+            {`${brand.name}s Story`}
           </Text>
           <Text
             style={{
@@ -4572,7 +4572,7 @@ function AmberPage({
               >
                 {brand.signature}
               </Text>
-              <BeeIcon size={14} />
+              <BeeIcon brandSlug={brand.slug} size={14} />
             </View>
             <Text
               style={{
@@ -5283,7 +5283,7 @@ function CardFooter({
           >
             {brand.signature}
           </Text>
-          <BeeIcon size={14} />
+          <BeeIcon brandSlug={brand.slug} size={14} />
         </View>
 
         <Text

@@ -54,7 +54,7 @@ export function PackPdfDocument({
       title={`${pack.title} · ${brand.name}`}
       author={brand.fullName}
       subject={pack.tagline}
-      keywords={`${brand.handle},${pack.category},Bienesfitlife,Rezepte,High-Protein`}
+      keywords={`${brand.handle},${brand.name},${pack.category},Rezepte`}
       creator="Recipe Card Builder"
       producer="Recipe Card Builder · Wolf Family Office Test Week"
     >
@@ -237,7 +237,7 @@ function CoverPage({
               >
                 {brand.signature}
               </Text>
-              <BeeIcon size={13} />
+              <BeeIcon brandSlug={brand.slug} size={13} />
             </View>
             <Text style={{ fontSize: 10, color: t.inkSoft, opacity: 0.4 }}>·</Text>
             <Text style={{ fontSize: 10, color: t.inkSoft }}>{brand.handle}</Text>
@@ -614,7 +614,7 @@ function OutroPage({
           >
             {brand.signature}
           </Text>
-          <BeeIcon size={38} />
+          <BeeIcon brandSlug={brand.slug} size={38} />
         </View>
         <Text
           style={{
@@ -686,7 +686,7 @@ function PageFooter({
         >
           {brand.signature}
         </Text>
-        <BeeIcon size={13} />
+        <BeeIcon brandSlug={brand.slug} size={13} />
       </View>
       <Text
         style={{

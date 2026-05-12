@@ -23,7 +23,7 @@ export const layoutPresets: LayoutPreset[] = [
     id: "editorial",
     title: "Editorial (Klassisch)",
     description:
-      "Magazine-Look mit großem Hero-Bild und Mikronährstoff-Banner oben. Title-Section überschneidet das Foto, Stats in 4 Tiles, Pull-Quote für Bienes Story.",
+      "Magazine-Look mit großem Hero-Bild und Mikronährstoff-Banner oben. Title-Section überschneidet das Foto, Stats in 4 Tiles, Pull-Quote für die Creator-Story.",
     bestFor: "Älteres Hauptmahlzeiten-Layout — wir empfehlen Amber stattdessen",
   },
   {
@@ -37,7 +37,7 @@ export const layoutPresets: LayoutPreset[] = [
     id: "minimal",
     title: "Cookbook-Cover",
     description:
-      "Hero-Bild fuellt die obere Haelfte als Cookbook-Cover, Title als Mega-Display-Overlay, Bienes Avatar als Stempel rechts. Apple-Spec-Strip mit kcal/Macros/Zeit, Mikros als Capsule-Pills, Mint-getoenter QR-Stempel.",
+      "Hero-Bild fuellt die obere Haelfte als Cookbook-Cover, Title als Mega-Display-Overlay, Creator-Avatar als Stempel rechts. Apple-Spec-Strip mit kcal/Macros/Zeit, Mikros als Capsule-Pills, Mint-getoenter QR-Stempel.",
     bestFor: "Snacks, Showpiece-Rezepte, Karten mit starkem Hero-Bild",
   },
   {
@@ -79,7 +79,7 @@ export const moodPresets: MoodPreset[] = [
   {
     id: "lavender",
     label: "Lavender",
-    hint: "Weich, Patisserie-Vibe — wie Bienes Backwelt",
+    hint: "Weich, Patisserie-Vibe — perfekt für Backwaren",
     mood: {
       background: "#ddc9e8",
       accent: "#735090",
@@ -90,7 +90,7 @@ export const moodPresets: MoodPreset[] = [
   {
     id: "sage",
     label: "Sage Green",
-    hint: "Frisch, Volumen-fokus — wie Volumen-Wunder",
+    hint: "Frisch, Volumen-fokus — perfekt für Bowls",
     mood: {
       background: "#c8e2a8",
       accent: "#527a2c",
@@ -101,7 +101,7 @@ export const moodPresets: MoodPreset[] = [
   {
     id: "mint",
     label: "Mint",
-    hint: "Cool, Apple-Aesthetik — wie Bienes Snacks",
+    hint: "Cool, Apple-Aesthetik — perfekt für Snacks",
     mood: {
       background: "#b8dcc9",
       accent: "#3f7560",
@@ -112,7 +112,7 @@ export const moodPresets: MoodPreset[] = [
   {
     id: "sky",
     label: "Sky Blue",
-    hint: "Strukturiert, Notion-Vibe — wie Meal-Prep Heroes",
+    hint: "Strukturiert, Notion-Vibe — perfekt für Meal-Prep",
     mood: {
       background: "#b4cde4",
       accent: "#3a6090",
@@ -123,7 +123,7 @@ export const moodPresets: MoodPreset[] = [
   {
     id: "honey",
     label: "Honey",
-    hint: "Bienen-Signaturfarbe, Hauptmahlzeiten — wie Feierabend-Klassiker",
+    hint: "Warmer Honey-Ton — perfekt für Hauptmahlzeiten",
     mood: {
       background: "#f4d88d",
       accent: "#b07a2a",

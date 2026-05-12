@@ -199,7 +199,7 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
         // looking complete without forcing the user to fill 5 fields.
         subtitle: subtitle.trim() || category.trim() || "Eigenes Konzept",
         category: category.trim() || "Eigenes Konzept",
-        tagline: tagline.trim() || `${title.trim()} — Bienes neue Sammlung`,
+        tagline: tagline.trim() || `${title.trim()} — ${brand.name}s neue Sammlung`,
         description:
           description.trim() ||
           `Eigene Sammlung in ${brand.name}s Welt. Karten kannst du im Editor erstellen, jede mit ihrem eigenen Layout.`,

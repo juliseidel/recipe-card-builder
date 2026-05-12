@@ -885,7 +885,7 @@ function PatisserieLayout({
                 style={{ color: pack.mood.ink }}
               >
                 {brand.signature}
-                <BeeIcon size={16} />
+                <BeeIcon brandSlug={brand.slug} size={16} />
               </span>
               <span
                 className="text-[10px] font-semibold uppercase tracking-[0.18em]"
@@ -1424,7 +1424,7 @@ function MinimalLayout({
               style={{ color: pack.mood.ink }}
             >
               {brand.signature}
-              <BeeIcon size={16} />
+              <BeeIcon brandSlug={brand.slug} size={16} />
             </span>
             <span
               className="text-[10px] font-semibold uppercase tracking-[0.18em]"
@@ -2334,7 +2334,7 @@ function VitalLayout({
             style={{ color: pack.mood.ink }}
           >
             {brand.signature}
-            <BeeIcon size={17} />
+            <BeeIcon brandSlug={brand.slug} size={17} />
           </span>
           <span
             className="text-[10px] font-bold uppercase tracking-[0.18em]"
@@ -2809,7 +2809,7 @@ function AmberLayout({
               style={{ color: pack.mood.ink }}
             >
               {brand.signature}
-              <BeeIcon size={17} />
+              <BeeIcon brandSlug={brand.slug} size={17} />
             </span>
             <span
               className="text-[10px] font-bold uppercase tracking-[0.18em]"
@@ -3486,7 +3486,7 @@ function CardFooter({
           style={{ color: brand.tokens.ink }}
         >
           {brand.signature}
-          <BeeIcon size={22} />
+          <BeeIcon brandSlug={brand.slug} size={22} />
         </span>
 
       <div className="flex flex-wrap items-center gap-3">

@@ -44,7 +44,7 @@ export function HeroSkeleton({
 
       {/* Caption — Fraunces italic, like a captioned photo waiting to develop */}
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
-        <BeeIcon color={pack.mood.accent} />
+        <BeeIcon color={pack.mood.accent} brandSlug={pack.brandSlug} />
         <span
           className="font-display text-[14px] italic leading-tight"
           style={{ color: pack.mood.ink }}
@@ -252,7 +252,11 @@ function BannerRowSkeleton({ pack, delay }: { pack: Pack; delay: number }) {
   );
 }
 
-function BeeIcon({ color }: { color: string }) {
+// Lokaler Loading-Indicator wahrend KI-Bild generiert wird. Nur fuer Biene —
+// andere Brands bekommen einfach keinen Indicator (Skeleton + Caption reichen),
+// damit die Biene nicht auf Julias oder anderen Karten landet.
+function BeeIcon({ color, brandSlug }: { color: string; brandSlug: string }) {
+  if (brandSlug !== "biene") return null;
   return (
     <svg
       width="22"

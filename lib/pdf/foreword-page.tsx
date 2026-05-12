@@ -138,7 +138,7 @@ function AuthorStrip({
           >
             {brand.signature}
           </Text>
-          <BeeIcon size={18} />
+          <BeeIcon brandSlug={brand.slug} size={18} />
         </View>
       ) : null}
     </View>

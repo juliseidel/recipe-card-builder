@@ -4,7 +4,16 @@ import { Svg, Path, Circle, Ellipse } from "@react-pdf/renderer";
 // — gerendert über @react-pdf/renderer Primitives, weil das PDF kein
 // inline HTML-SVG aufnehmen kann. Größe wird per `size` prop skaliert.
 
-export function BeeIcon({ size = 14 }: { size?: number }) {
+// Brand-Slug ist Pflicht-Prop — Icon erscheint nur fuer Biene. Andere Creator
+// (Julia etc.) bekommen kein Bee-Icon im PDF, die Signature steht allein.
+export function BeeIcon({
+  size = 14,
+  brandSlug,
+}: {
+  size?: number;
+  brandSlug: string;
+}) {
+  if (brandSlug !== "biene") return null;
   return (
     <Svg viewBox="0 0 64 64" width={size} height={size}>
       <Path

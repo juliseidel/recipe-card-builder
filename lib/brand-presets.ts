@@ -18,7 +18,7 @@ export const brandMoodPresets: BrandMoodPreset[] = [
   {
     id: "cream",
     label: "Cream & Honey",
-    hint: "Warm, einladend — wie Bienes Pilot-Workspace",
+    hint: "Warm, einladend — Cream-Patisserie-Vibe",
     tokens: {
       background: "#fbf7f0",
       surface: "#ffffff",

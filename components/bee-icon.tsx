@@ -7,9 +7,16 @@ type Props = {
   size?: number;
   className?: string;
   style?: React.CSSProperties;
+  /** Brand-Slug — Icon erscheint NUR fuer Biene, weil's ihr Personal-
+   *  Wappen ist ("Deine Biene 🐝"). Alle anderen Creator (Julia etc.) bekommen
+   *  kein Bee-Icon — die Signature steht dann allein, mit ihrer eigenen
+   *  Brand-Identitaet. Pflicht-Prop, damit niemand das versehentlich vergisst
+   *  und die Biene auf einer fremden Karte landet. */
+  brandSlug: string;
 };
 
-export function BeeIcon({ size = 16, className, style }: Props) {
+export function BeeIcon({ size = 16, className, style, brandSlug }: Props) {
+  if (brandSlug !== "biene") return null;
   return (
     <svg
       viewBox="0 0 64 64"
