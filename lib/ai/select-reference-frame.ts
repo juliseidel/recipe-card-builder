@@ -32,34 +32,29 @@ export type ReferenceFrameSelection = {
   reasoning: string;
 };
 
+// Schema bewusst SIMPEL ohne enum — Gemini Flash hat manchmal Schema-
+// Probleme bei enum + multi-image. Wir nehmen Strings + post-validieren.
 const RESPONSE_SCHEMA = {
   type: "object",
   properties: {
     chosenIndex: {
       type: "integer",
       description:
-        "0-basierter Index des besten Frames in der übergebenen Liste. Der Frame mit dem klarsten, prominentesten Gericht UND der wenigsten Text/Hand-Belastung. Bei Gleichstand: späterer Frame bevorzugen (zeigt fertiges Gericht). -1 wenn ALLE Frames so verschmutzt sind, dass keiner als Reference taugt.",
+        "0-basierter Index des besten Frames. -1 wenn alle Frames zu schmutzig sind.",
     },
     cropMode: {
       type: "string",
-      enum: [
-        "center_square",
-        "top_square",
-        "bottom_square",
-        "uncroppable",
-      ],
       description:
-        "Wie der Frame zu einem 1:1 Quadrat gecropt werden soll, sodass NUR das Gericht drin ist und KEIN Text/Hand/Sticker. 'center_square'=mittiger quadratischer Crop (Standard wenn Text nur oben+unten ist). 'top_square'=oberer quadratischer Crop (wenn Text unten). 'bottom_square'=unterer quadratischer Crop (wenn Text oben). 'uncroppable'=Text oder Hand ist mittig drüber, kein clean crop möglich.",
+        "Eines von: 'center_square' (mittiger Crop, Text nur oben/unten), 'top_square' (oberer Crop, Text nur unten), 'bottom_square' (unterer Crop, Text nur oben), 'uncroppable' (Text mittig drüber, kein clean crop möglich).",
     },
     cleanEnough: {
       type: "boolean",
       description:
-        "true wenn nach dem Crop ein sauberer Frame zum Reference-Image-Use für Flux entsteht (kein sichtbarer Text, keine Hand, keine Sticker). false wenn cropMode='uncroppable' ODER chosenIndex=-1 ODER der beste verfügbare Frame trotz Crop noch Schmutz hat.",
+        "true wenn nach Crop ein sauberer Reference-Frame entsteht. false wenn cropMode='uncroppable' oder chosenIndex=-1.",
     },
     reasoning: {
       type: "string",
-      description:
-        "Ein deutscher Satz: warum dieser Frame gewählt wurde + welcher Crop angesetzt wird + ob clean enough.",
+      description: "Ein deutscher Satz Begründung.",
     },
   },
   required: ["chosenIndex", "cropMode", "cleanEnough", "reasoning"],
@@ -110,26 +105,50 @@ export async function selectReferenceFrame(
   }
 
   try {
-    const result = await callGeminiMultimodal<ReferenceFrameSelection>({
+    const result = await callGeminiMultimodal<{
+      chosenIndex: number;
+      cropMode: string;
+      cleanEnough: boolean;
+      reasoning: string;
+    }>({
       parts,
       schema: RESPONSE_SCHEMA,
       systemInstruction: SYSTEM_INSTRUCTION,
-      model: "pro",
+      // Flash statt Pro — bei multi-image Schema-Calls oft stabiler.
+      model: "flash",
       temperature: 0.2,
       maxOutputTokens: 512,
+      thinkingBudget: 0,
       retries: 1,
     });
 
+    const rawMode = (result.cropMode ?? "").toLowerCase().trim();
+    const validModes: CropMode[] = [
+      "center_square",
+      "top_square",
+      "bottom_square",
+      "uncroppable",
+    ];
+    const cropMode: CropMode = validModes.includes(rawMode as CropMode)
+      ? (rawMode as CropMode)
+      : "uncroppable";
+
+    console.log(
+      `[select-reference-frame] index=${result.chosenIndex} mode=${cropMode} clean=${result.cleanEnough} — ${(result.reasoning ?? "").slice(0, 150)}`
+    );
+
     return {
       chosenIndex: result.chosenIndex ?? -1,
-      cropMode: result.cropMode ?? "uncroppable",
+      cropMode,
       cleanEnough: Boolean(result.cleanEnough),
       reasoning: (result.reasoning ?? "").trim(),
     };
   } catch (err) {
-    console.warn(
+    console.error(
       "[select-reference-frame] failed:",
-      err instanceof Error ? err.message : err
+      err instanceof Error
+        ? `${err.name}: ${err.message}`
+        : String(err)
     );
     return null;
   }
