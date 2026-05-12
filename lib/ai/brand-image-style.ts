@@ -137,72 +137,69 @@ export const BIENE_STYLE: BrandImageStyle = {
 };
 
 // ─── Julia · @juliabreitenfeld (DB-Brand-Slug: "julia") ─────────────────────
-// Calibrated against 5 IG-Feed + Reel-Cover-Screenshots vom User (2026-05-12).
-// Observed signature elements (Hero-applicable — i.e. WITHOUT hands/people,
-// per HERO_BASE_NEGATIVE which bans Korperteile universell):
-//   - counter is bone-grey concrete with subtle striations — slightly rougher
-//     and more raw-looking than Bienes pale-grey, almost outdoor-terrace feel
-//   - HARSH outdoor sunlight with crisp defined shadow edges (NOT soft warm
-//     morning like Biene; this is the biggest visual differentiator)
-//   - clear glass oven dishes / glass bowls als typical vessel
-//   - WHOLE loose ingredients scattered casually around the dish — NEVER in a
-//     bowl, NEVER on a cutting board (that's Bienes signature). Things like
-//     whole strawberries, halved lemons, herb sprigs, whole tomatoes etc.
-//   - aesthetic: iPhone-Insta-real outdoor moment, NOT cookbook editorial
+// V2 (2026-05-12): radikaler Revert von v1. Die erste Iteration war "zu
+// hart gepromptet" und produzierte schlechte Bilder — gleiche Lesson wie
+// Biene v9.1/9.2/9.3: zuviele NEVER/NOT/no-X-Klauseln sagen Flux indirekt
+// "render cleaner" und der homemade-Reel-Look stirbt. Ihr Brand IST der
+// homemade-Reel-Look, also weniger Constraints, nicht mehr.
 //
-// Was wir EXPLIZIT nicht aus ihren echten Reel-Covers uebernehmen:
-//   - hand-held POV with manicured hand visible — das ist ihr Reel-Cover-Stil,
-//     aber HERO_BASE_NEGATIVE verbietet hands/people/faces universell. Hero-
-//     Bilder sind reine Food-Photography, kein Creator im Bild.
+// Beobachtete Signature aus 5 IG-Screenshots (Hero-applicable):
+//   - bone-grey/light concrete counter (nicht Marmor, nicht Holz)
+//   - bright natural daylight, leicht contrasty (NICHT "harsh midday sun"
+//     wie v1 gesagt hat — das war ueberzeichnet)
+//   - whole loose ingredients casually around the dish — IHR Signature-
+//     Element, analog zu Bienes cutting-board-mit-bowl
+//
+// Was wir explizit NICHT uebernehmen (HERO_BASE_NEGATIVE bannt es eh):
+//   - hand-held POV mit manikuerter Hand — Reel-Cover-Stil, nicht Hero
 export const JULIA_STYLE: BrandImageStyle = {
   brandSlug: "julia",
-  // Five lighting strings — harsh, contrasty, outdoor-feel. Bewusst gegen
-  // Bienes warm-soft kalibriert; Julias echte Posts haben crisp hard shadows,
-  // nicht weiches Morgen-Diffus.
+  // Bright daylight, leicht contrasty — Mix statt 5x "harsh". Bienes
+  // Pattern: simple positive Beschreibungen ohne "NOT X".
   lightingOptions: [
-    "bright direct sunlight from the upper right, crisp hard shadows on the surface",
-    "harsh midday outdoor sun overhead, defined sharp shadow edges",
-    "natural outdoor daylight, contrasty with strong dark shadow lines",
-    "bright daylight streaming through a large window, hard unfiltered light catching the dish edges",
-    "high-contrast Instagram-natural daylight, sharp clean shadows on the counter",
+    "bright natural daylight from a kitchen window with clean shadows",
+    "warm afternoon light from the side, modern home-kitchen feel",
+    "bright daylight catching the dish edges, slight contrast",
+    "natural Instagram-real daylight, crisp clean shadows",
+    "clean bright daylight from above with soft directional shadows",
   ],
-  // Five scene options, alle Variationen auf bone-grey concrete mit scattered
-  // loose ingredients. Wichtig: KEIN cutting board, KEIN bowl mit ingredients
-  // im Background — das ist Bienes Signatur und wuerde Julia falsch lesen.
+  // Scene-Optionen NUR der Counter, keine "scattered ingredients" mehr.
+  // Das war v1's Doppel-Mention bug — ingredients gehoeren in den
+  // heroElement-Slot, nicht zusaetzlich auch in den scene-Slot.
   sceneOptions: [
-    "a bone-grey concrete counter with subtle striations, whole loose ingredients scattered casually around",
-    "a light neutral stone surface with raw whole ingredients tossed around the edges",
-    "a rough bone-grey concrete surface dotted with whole main-ingredient pieces nearby",
-    "a minimal pale-grey concrete with fresh whole ingredients scattered around the dish",
-    "a neutral grey concrete surface with main-ingredient items casually placed alongside",
+    "a bone-grey concrete kitchen counter",
+    "a light neutral stone countertop",
+    "a rough concrete surface near a window",
+    "a minimal pale-grey concrete counter",
+    "a bone-grey stone work surface with subtle texture",
   ],
   styleSuffix: "",
-  // Brand-spezifische Negatives. Wir negieren explizit Bienes Signature-
-  // Elemente (cutting board + bowl) und Editorial-Styling — Julias Look ist
-  // bewusst Insta-real, nicht Cookbook-precious.
+  // Schlank gehalten — 4 Items wie Bienes 3. Wir negieren ihre echten
+  // Anti-Patterns (Cutting-Board, Bowl, Marmor) ohne Flux mit 11+ "no X"
+  // zu ueberregulieren.
   negativeAddition:
-    "no wooden cutting board, no ceramic bowl of ingredients in background, no editorial styling, no soft studio lighting, no rigid centered plating, no professional cookbook composition, no marble counter, no warm cozy magazine look, no white tablecloth, no linen napkin",
-  // Camera/Aesthetic-Anker — ersetzt Jan's "Leica SL2 cookbook" mit iPhone-
-  // Insta-real. Auf den Reel-Covers ist deutlich erkennbar: die Schatten der
-  // Hand sind sichtbar (= ein Profi-Fotograf haette die wegretuschiert), die
-  // Kamera ist nah dran, das Licht ist hart-natuerlich. Das wollen wir.
+    "no wooden cutting board, no ceramic bowl of ingredients in background, no marble counter, no white tablecloth",
+  // Kurz und positiv — Bienes Pattern: eine Hauptaussage statt drei
+  // Negationen. v1 hatte 3x "NOT X" + "no studio look" — zuviel.
   cameraAesthetic:
-    "iPhone food-snap aesthetic, natural unposed Instagram-real moment with harsh outdoor daylight — NOT studio cookbook style, NOT magazine editorial, NOT precious composition. Bright crisp daylight reality, real-life feel.",
-  // Julias Signature-Framing: WHOLE loose ingredients verstreut. NIE in bowl,
-  // NIE auf cutting board. Beispiele aus den Screenshots: Schoko-Kuss mit
-  // losen Erdbeeren + Zitrone + Minze daneben (nicht arrangiert, einfach
-  // hingelegt). Diese "casually tossed there"-Qualitaet ist der Punkt.
+    "natural Instagram-real food photograph, smartphone-snap feel, no studio look",
+  // Julias Signature: lose ganze Zutaten verstreut. Schlanker formuliert
+  // (kein 3x NEVER mehr). Flux liest "casually placed" als hint, nicht
+  // als hard rule — das ist okay, lieber natuerlich aussehende Bilder
+  // als ueber-precise-platzierte.
   heroElementGuidance:
-    "Scattered loose WHOLE ingredients casually placed around the dish — e.g. whole strawberries, lemon halves, fresh herb sprigs, whole tomatoes, raw vegetables, fruit pieces. NEVER arranged in a bowl, NEVER on a cutting board, NEVER staged or composed. Should look like ingredients were casually tossed there straight from the fridge moments before the shot.",
-  // Per-shape angle overrides. Julias plated Shots (Pasta-Salat, Carbonara,
-  // Caesar-Salat, Lasagne in Glas-Auflaufform) sind ueberwiegend top-down
-  // mit Glas-Vessel sichtbar; layered/tall dishes 30-45° three-quarter.
+    "Whole loose ingredients placed casually around the dish — fresh strawberries, lemon halves, herb sprigs, or whole tomatoes/peppers depending on the recipe. Naturally placed nearby, not arranged on a board or in a bowl.",
+  // Angles: NUR Winkel + leichter Schatten-Hint. KEIN Vessel-Hardcode
+  // mehr — das war v1's groesster Bug, weil Vessel von der Reference
+  // kommt und der Hardcode dagegen kaempfte. Strukturell wie Bienes
+  // defaultAngles, ohne Background-Prop weil Julias scattered ingredients
+  // schon im heroElement-Slot abgedeckt sind.
   defaultAngles: {
-    flat: "from a high overhead angle (about 75-85°), with the dish often in a clear glass oven dish or glass bowl, whole loose ingredients scattered around the rim on the bone-grey concrete",
-    mixed: "from a slight 30-45° tilt-down angle on bone-grey concrete, harsh shadows visible, whole loose ingredients scattered casually nearby",
-    layered: "from a close-up 30-35° side angle, harsh outdoor light catching the texture edges, loose ingredients visible in the background",
-    tall: "from an eye-level or 45° angle, dish standing on bone-grey concrete with whole ingredients scattered in the foreground",
-    liquid: "from a 30-45° angle into a clear glass bowl on concrete, surface texture and natural light reflection visible",
+    flat: "from a high overhead angle (about 75-80°, slightly tilted not strict 90°)",
+    mixed: "from a 30-45° three-quarter angle, slight natural shadows on the counter",
+    layered: "from a 30° three-quarter angle so the layers of the dish are visible",
+    tall: "from a 45° eye-level angle that shows the dish's full height",
+    liquid: "from a 30° three-quarter angle so the surface texture is visible",
   },
 };
 
