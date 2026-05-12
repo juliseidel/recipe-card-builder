@@ -6,25 +6,32 @@ import {
 } from "@/lib/integrations/apify";
 import { extractVideoFrames } from "@/lib/ai/extract-video-frames";
 import { describeDishStructured } from "@/lib/ai/describe-dish-structured";
+import {
+  selectReferenceFrame,
+  type CropMode,
+} from "@/lib/ai/select-reference-frame";
 import { generateImageSpec } from "@/lib/ai/recipe-image-spec";
 import { getBrandImageStyle } from "@/lib/ai/brand-image-style";
 import { generateImage, downloadImage } from "@/lib/ai/bfl-flux";
 import { recipes } from "@/lib/recipes";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 
-// V3 Test-Endpoint — Lighting + Color-Tone kommen DIREKT aus Vision (keine
-// Mapping mehr auf Brand-DNA-Fixed-Set). Smartphone-Camera-Aesthetic statt
-// Leica-Cookbook. Anti-Studio Negatives.
+// V7 — Hybrid: Vision-Description + Reference-Image (cropped) für echte
+// Farbe. Reference-Pfad nur wenn ein cleaner Frame existiert; sonst
+// V6-Fallback (Text-Only mit Vision-Description).
 //
-// Begründung V2-Fail: V2-Bild sah zu sehr nach Studio aus, Farben zu warm.
-// Root Cause:
-//   1. Jan's "Shot on Leica SL2 50mm f/5.6, cookbook-style" → Studio-Look
-//   2. Bienes Brand-DNA hat NUR warm-amber Lighting-Optionen → falsche Wärme
-//   3. dishColorTone "colorful" → toneWord "vibrant warm" → ungewollt warm
+// Pipeline:
+//   1. Apify scrape + 25 Frames extrahieren
+//   2. PARALLEL: describeDishStructured (last 8) + selectReferenceFrame (last 15)
+//   3. Wenn Frame-Selection cleanEnough=true:
+//      a. Sharp crop basierend auf cropMode (center_square/top/bottom)
+//      b. Safety-Check: Gemini Vision schaut cropped Frame nochmal
+//      c. Wenn sauber → Flux mit input_image
+//      d. Wenn schmutzig → V6-Fallback
+//   4. Wenn Frame-Selection cleanEnough=false → V6-Fallback direkt
 //
-// V3-Fix: Vision liefert COMPLETE lightingDescription + colorToneWord direkt.
-// Smartphone-Look statt Cookbook. Brand-DNA bleibt für heroElement + scene
-// + angles + negativeAddition.
+// V6-Fallback = identisch zu V6: nur Vision-compose + lightingDescription
+// + minimaler smartphone hint. Kein Reference-Image.
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -33,6 +40,92 @@ const TEST_BUCKET = "test-vision-hero";
 
 function steamSuffix(temp: string): string {
   return temp === "hot" ? ", with subtle steam rising" : "";
+}
+
+// Sharp Crop: nimmt 9:16-Frame (1080x1920 typisch) und cropt 1:1.
+async function cropFrame(
+  dataUri: string,
+  mode: CropMode
+): Promise<string | null> {
+  if (mode === "uncroppable") return null;
+  const base64 = dataUri.split(",")[1] ?? "";
+  if (!base64) return null;
+  const buf = Buffer.from(base64, "base64");
+
+  const img = sharp(buf);
+  const meta = await img.metadata();
+  const width = meta.width ?? 0;
+  const height = meta.height ?? 0;
+  if (width === 0 || height === 0) return null;
+
+  // Quadrat-Größe = kleinere Dimension (typically 1080 wenn 1080x1920)
+  const sq = Math.min(width, height);
+
+  let top = 0;
+  const left = Math.floor((width - sq) / 2); // immer horizontal mittig
+
+  if (height > sq) {
+    // portrait — wir können vertikal cropen
+    if (mode === "center_square") {
+      top = Math.floor((height - sq) / 2);
+    } else if (mode === "top_square") {
+      top = 0;
+    } else if (mode === "bottom_square") {
+      top = height - sq;
+    }
+  }
+
+  const cropped = await img
+    .extract({ left, top, width: sq, height: sq })
+    .jpeg({ quality: 92, mozjpeg: true })
+    .toBuffer();
+  return `data:image/jpeg;base64,${cropped.toString("base64")}`;
+}
+
+// Safety-Check: lade cropped frame als blob URL → temp upload → vision check.
+// Einfacher: data URI direkt an describeInstagramDish — aber das Helper-File
+// erwartet eine URL. Wir machen einen Inline-Vision-Call.
+async function verifyCroppedFrameClean(dataUri: string): Promise<{
+  clean: boolean;
+  reason: string;
+} | null> {
+  const base64 = dataUri.split(",")[1] ?? "";
+  if (!base64) return null;
+  try {
+    const { callGeminiMultimodal } = await import("@/lib/ai/gemini");
+    const result = await callGeminiMultimodal<{
+      clean: boolean;
+      reason: string;
+    }>({
+      parts: [
+        {
+          text: "Prüfe ob dieses Bild als Reference-Image für ein KI-Bild-Generierungs-System taugt. Es muss SAUBER sein: kein sichtbarer Text/Buchstaben/Schrift/Banner/Sticker/Watermark, keine Hand/Finger/Personen/Körperteile, kein Logo. Wenn auch nur ein kleines Stück Text/Hand sichtbar ist → clean=false.",
+        },
+        {
+          inlineData: { mimeType: "image/jpeg", data: base64 },
+        },
+      ],
+      schema: {
+        type: "object",
+        properties: {
+          clean: { type: "boolean" },
+          reason: { type: "string" },
+        },
+        required: ["clean", "reason"],
+      },
+      systemInstruction:
+        "Du bist ein strikter Quality-Auditor. Antworte ehrlich: ist dieses Bild komplett frei von Text, Schrift, Banner, Stickern, Watermarks, Logos, Händen, Personen, Körperteilen? Bei Zweifel: clean=false.",
+      model: "flash",
+      temperature: 0.1,
+      maxOutputTokens: 256,
+      thinkingBudget: 0,
+      retries: 1,
+    });
+    return { clean: Boolean(result.clean), reason: (result.reason ?? "").trim() };
+  } catch (err) {
+    console.warn("[verifyCroppedFrameClean] failed:", err);
+    return null;
+  }
 }
 
 export async function POST(req: Request) {
@@ -106,10 +199,7 @@ export async function POST(req: Request) {
 
   if (!post.videoUrl) {
     return NextResponse.json(
-      {
-        error:
-          "Reel has no videoUrl — test endpoint requires a video Reel for now",
-      },
+      { error: "Reel has no videoUrl" },
       { status: 422 }
     );
   }
@@ -121,7 +211,6 @@ export async function POST(req: Request) {
     maxFrames: 25,
   });
   const tFrames = Date.now() - tFrames0;
-
   if (frames.length === 0) {
     return NextResponse.json(
       { error: "No frames extracted from video" },
@@ -129,16 +218,18 @@ export async function POST(req: Request) {
     );
   }
 
-  // ─── 3. Letzten 8 Frames an Gemini Pro ─────────────────────────────────
-  const sampleFrames = frames.slice(-8);
-
-  // ─── 4. Strukturierte Multi-Frame Vision-Description ────────────────────
+  // ─── 3. Parallel: Description (last 8) + Reference-Selection (last 15) ─
+  const visionSample = frames.slice(-8);
+  const selectionSample = frames.slice(-15);
   const tVision0 = Date.now();
-  const dishDescription = await describeDishStructured({
-    frames: sampleFrames,
-    recipeTitle: recipe.title,
-    caption: post.caption,
-  });
+  const [dishDescription, refSelection] = await Promise.all([
+    describeDishStructured({
+      frames: visionSample,
+      recipeTitle: recipe.title,
+      caption: post.caption,
+    }),
+    selectReferenceFrame(selectionSample),
+  ]);
   const tVision = Date.now() - tVision0;
 
   if (!dishDescription) {
@@ -148,23 +239,44 @@ export async function POST(req: Request) {
     );
   }
 
-  // ─── 5. Image-Spec NUR für steam-Hint (servingTemperature) ──────────────
-  // V6: Spec liefert NICHT mehr scene/heroElement/angle/tone. Alles aus
-  // Vision. Spec wird nur noch für den steamSuffix gebraucht (hot dish =
-  // Steam-Aufstieg, Jan-Übernahme).
+  // ─── 4. Spec für steam ──────────────────────────────────────────────────
   const tSpec0 = Date.now();
   const spec = await generateImageSpec(recipe, brandSlug);
   const tSpec = Date.now() - tSpec0;
   const steam = steamSuffix(spec.servingTemperature);
 
-  // ─── 6. V6-Prompt: Vision ist BOSS ──────────────────────────────────────
-  // Alle Wärme-/HDR-/Lived-in-Filter raus. Brand-DNA sceneContext +
-  // heroElement raus (Vision compose deckt das ab). Tone-Tail raus.
-  //
-  // Das einzige was wir adden: smartphone-hint (sonst rendert Flux
-  // Cookbook-Default) + steam für hot dishes (Jan).
-  //
-  // Vision compose = der zentrale Anker. lightingDescription = Licht-Wahrheit.
+  // ─── 5. Reference-Pfad-Entscheidung ─────────────────────────────────────
+  let referenceImage: string | null = null;
+  let referencePath: "cropped" | "fallback" | "no-selection" = "no-selection";
+  let safetyReason = "";
+
+  if (refSelection && refSelection.cleanEnough && refSelection.chosenIndex >= 0) {
+    const sourceFrame = selectionSample[refSelection.chosenIndex];
+    if (sourceFrame) {
+      const cropped = await cropFrame(sourceFrame.dataUri, refSelection.cropMode);
+      if (cropped) {
+        // Safety-Check auf cropped Frame
+        const verify = await verifyCroppedFrameClean(cropped);
+        if (verify && verify.clean) {
+          referenceImage = cropped;
+          referencePath = "cropped";
+          safetyReason = verify.reason;
+        } else {
+          referencePath = "fallback";
+          safetyReason = verify
+            ? `Safety-Check failed: ${verify.reason}`
+            : "Safety-Check call failed";
+        }
+      }
+    }
+  } else {
+    referencePath = "fallback";
+    safetyReason = refSelection
+      ? `Vision-Selector: cleanEnough=false (${refSelection.reasoning})`
+      : "Vision-Selector returned null";
+  }
+
+  // ─── 6. Prompt bauen — identisch zu V6 ──────────────────────────────────
   const positivePrompt = [
     `${recipe.title}, a casual home-cooking snapshot.`,
     "",
@@ -177,9 +289,6 @@ export async function POST(req: Request) {
     .filter((s) => s.length > 0)
     .join("\n");
 
-  // V6-Negatives: minimal. Nur die essentiellen 10 Items. Brand-
-  // negativeAddition wenn vorhanden (für sehr brand-spezifische no-
-  // gos wie "no parsley" für Biene).
   const baseNegative =
     "no text, no labels, no logos, no packaging, no watermark, no hands, no people, no faces, no studio lighting, no white void background";
   const style = await getBrandImageStyle(brandSlug);
@@ -187,7 +296,7 @@ export async function POST(req: Request) {
     ? `${baseNegative}, ${style.negativeAddition}`
     : baseNegative;
 
-  // ─── 7. Flux 2 Pro text-only call ───────────────────────────────────────
+  // ─── 7. Flux 2 Pro Call (mit oder ohne Reference) ───────────────────────
   const tFlux0 = Date.now();
   const result = await generateImage({
     prompt: positivePrompt,
@@ -198,6 +307,7 @@ export async function POST(req: Request) {
     height: 2048,
     outputFormat: "jpeg",
     safetyTolerance: 2,
+    ...(referenceImage ? { referenceImage } : {}),
   });
   const tFlux = Date.now() - tFlux0;
 
@@ -216,7 +326,7 @@ export async function POST(req: Request) {
     fileSizeLimit: 8 * 1024 * 1024,
     allowedMimeTypes: ["image/jpeg"],
   });
-  const filePath = `${body.recipeSlug}-v6-${Date.now()}.jpg`;
+  const filePath = `${body.recipeSlug}-v7-${referencePath}-${Date.now()}.jpg`;
   const upload = await supabase.storage
     .from(TEST_BUCKET)
     .upload(filePath, processed, {
@@ -233,12 +343,37 @@ export async function POST(req: Request) {
   const { data } = supabase.storage.from(TEST_BUCKET).getPublicUrl(filePath);
   const publicUrl = `${data.publicUrl}?t=${Date.now()}`;
 
+  // Optional: cropped reference auch hochladen für Debug-Inspektion
+  let referenceImageUrl: string | null = null;
+  if (referenceImage) {
+    try {
+      const refBase64 = referenceImage.split(",")[1] ?? "";
+      const refBuf = Buffer.from(refBase64, "base64");
+      const refPath = `${body.recipeSlug}-v7-REFERENCE-${Date.now()}.jpg`;
+      const refUpload = await supabase.storage
+        .from(TEST_BUCKET)
+        .upload(refPath, refBuf, {
+          contentType: "image/jpeg",
+          upsert: true,
+        });
+      if (!refUpload.error) {
+        const { data: refData } = supabase.storage
+          .from(TEST_BUCKET)
+          .getPublicUrl(refPath);
+        referenceImageUrl = refData.publicUrl;
+      }
+    } catch (err) {
+      console.warn("[V7] reference debug upload failed:", err);
+    }
+  }
+
   const tTotal = Date.now() - t0;
 
   return NextResponse.json({
     ok: true,
-    version: "v6",
+    version: "v7",
     generatedUrl: publicUrl,
+    referenceImageUrl, // null wenn fallback path
     timings: {
       apifyMs: tApify,
       framesMs: tFrames,
@@ -248,12 +383,10 @@ export async function POST(req: Request) {
       totalMs: tTotal,
     },
     framesExtracted: frames.length,
-    framesAnalyzedByVision: sampleFrames.length,
+    referencePath,
+    referenceSelection: refSelection,
+    safetyReason,
     fluxSeed: result.seed,
-    promptInputs: {
-      steamFromSpec: steam,
-      visionIsBoss: true,
-    },
     dishDescription,
     positivePrompt,
     negativePrompt,
