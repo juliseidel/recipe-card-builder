@@ -51,6 +51,26 @@ export type StructuredDishDescription = {
   lightDirection: string;
   /** Licht-Wärme: "very warm" | "warm" | "neutral" | "cool". */
   lightWarmth: string;
+  /** KOMPLETTE englische Lighting-Beschreibung, ready to use im Flux-Prompt.
+   *  Vision liefert das direkt — KEIN Mapping mehr auf ein fixes Brand-Set
+   *  (das hat in V2 zu falscher Wärme geführt: Reel war neutral, aber Bienes
+   *  Brand-DNA hatte nur warm-amber-Optionen → Output war zu honey-toned).
+   *  Beispiele:
+   *    "bright natural daylight from above with soft even illumination, neutral white balance"
+   *    "warm morning light streaming from the left with golden honey tones"
+   *    "cool diffused daylight from a north-facing window, neutral colors" */
+  lightingDescription: string;
+  /** Color-Tone-Word für den finalen Prompt-Tail. Maßgeschneidert für das
+   *  Reel-Aussehen, NICHT aus dem festen ["warm golden"|"cool muted"|...]
+   *  Set abgeleitet (das hat in V2 immer "vibrant warm" gegeben, auch wenn
+   *  Vision-Wärme neutral war). Beispiele:
+   *    "bright natural"
+   *    "vibrant fresh and true to life"
+   *    "warm golden"
+   *    "cool clean"
+   *    "rich amber"
+   *  1-3 Worte, English. */
+  colorToneWord: string;
   /** Counter / Surface-Material im Reel. Hint nur, Brand-DNA kann das
    *  überschreiben. */
   surfaceMaterial: string;
@@ -134,6 +154,16 @@ const RESPONSE_SCHEMA = {
       description:
         "Wärme-Charakteristik des Lichts. 'very warm' = goldene Stunde / amber. 'warm' = morgendliches gelbes Licht. 'neutral' = mittags / ausgeglichen. 'cool' = bedeckter Tag / bläulich.",
     },
+    lightingDescription: {
+      type: "string",
+      description:
+        "KOMPLETTE englische Lighting-Phrase, fertig für den Flux-Prompt. Maßgeschneidert für DIESES Reel. Beispiele: 'bright natural daylight from above with soft even illumination, neutral white balance, true colors', 'warm morning light streaming from the left with long gentle shadows and golden honey tones', 'cool diffused daylight from a side window, neutral white balance, clean editorial feel'. KEINE generischen Phrases — beschreibe was du WIRKLICH im Reel siehst.",
+    },
+    colorToneWord: {
+      type: "string",
+      description:
+        "1-3 englische Adjektive für den Farbton des Bildes. Maßgeschneidert für das Reel-Aussehen. Beispiele: 'bright natural', 'vibrant fresh and true to life', 'warm golden', 'cool clean', 'rich amber', 'soft pastel'. KEINE Generic-Defaults — wenn das Reel hell/neutral aussieht: 'bright natural'. Wenn warm-golden: 'warm golden'. Wenn kühl: 'cool clean'.",
+    },
     surfaceMaterial: {
       type: "string",
       description:
@@ -164,6 +194,8 @@ const RESPONSE_SCHEMA = {
     "cuttingPlaneVisible",
     "lightDirection",
     "lightWarmth",
+    "lightingDescription",
+    "colorToneWord",
     "surfaceMaterial",
     "spatialArrangement",
     "compose",
@@ -255,6 +287,8 @@ export async function describeDishStructured(
       cuttingPlaneVisible: (result.cuttingPlaneVisible ?? "").trim(),
       lightDirection: (result.lightDirection ?? "").trim(),
       lightWarmth: (result.lightWarmth ?? "").trim(),
+      lightingDescription: (result.lightingDescription ?? "").trim(),
+      colorToneWord: (result.colorToneWord ?? "").trim(),
       surfaceMaterial: (result.surfaceMaterial ?? "").trim(),
       spatialArrangement: (result.spatialArrangement ?? "").trim(),
       compose: (result.compose ?? "").trim(),
