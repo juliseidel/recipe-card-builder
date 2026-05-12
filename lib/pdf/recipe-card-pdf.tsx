@@ -4992,35 +4992,32 @@ function StepsList({
               key={item.index}
               style={{
                 flexDirection: "row",
-                marginBottom: stepMarginBottom,
+                // Mehr Vertikal-Abstand zwischen den Steps, damit jeder
+                // Step optisch "atmet" und die Number-Glyph nicht von der
+                // naechsten Step-Zeile bedraengt wirkt. User-Feedback war:
+                // "lass zwischen den Zahlen mehr Platz".
+                marginBottom: stepMarginBottom + 4,
                 gap: 10,
-                // EXAKT das IngredientRow-Pattern: alignItems "flex-start"
-                // (NICHT center). Das ist der entscheidende Unterschied —
-                // alignItems center zentriert die Boxen vertikal, was bei
-                // unterschiedlichen Glyph-Metriken zwischen Fraunces
-                // (Number) und Inter (Body) zu sichtbaren Offsets fuehrt.
-                // flex-start aligned die Boxen oben, und paddingTop unten
-                // auf der Number-Spalte kompensiert die Font-Metric-Drift —
-                // genauso wie bei der amount-Spalte in IngredientRow.
                 alignItems: "flex-start",
               }}
             >
+              {/* Number rendert in DERSELBEN Font wie der Body-Text (Inter),
+                  nur Italic + Bold + Akzent-Farbe fuer visuelle Prominenz.
+                  Damit sind die Glyph-Metriken (Cap-Height, x-Height,
+                  Baseline-Position innerhalb der Line-Box) IDENTISCH zur
+                  Body-Text-Spalte — und Yoga aligned beide Baselines
+                  garantiert auf derselben Y-Linie. Vorher in Fraunces:
+                  Fraunces-Italic-Numerals und Inter-Regular-Letters haben
+                  unterschiedliche Y-Position innerhalb der gleich hohen
+                  Box, was zu sichtbarem Offset gefuehrt hat. */}
               <Text
                 style={{
-                  fontFamily: "Fraunces",
                   fontSize: stepFontSize,
                   fontStyle: "italic",
                   fontWeight: 700,
                   color: theme.accent,
                   width: 22,
                   lineHeight: 1.45,
-                  // Magic paddingTop wie bei IngredientRow's amount-Spalte —
-                  // verschiebt die Fraunces-Italic-Glyph leicht nach unten,
-                  // damit ihre Baseline auf der Inter-Baseline des Bodys
-                  // sitzt. 1 pt ist der Wert der bei IngredientRow erprobt
-                  // funktioniert und auch hier die Fraunces-vs-Inter-Drift
-                  // ausgleicht.
-                  paddingTop: 1,
                 }}
               >
                 {item.index + 1}
