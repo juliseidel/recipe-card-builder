@@ -687,21 +687,10 @@ function MinimalForewordPage({
           </View>
         </View>
 
-        {/* AuthorStrip mit eigenem Horizontal- + Bottom-Padding fuer Atemraum.
-            Vorher rendered der Strip full-bleed ohne padding, was den Avatar
-            und die Signature optisch eingequetscht erscheinen lies. */}
-        <View
-          style={{
-            paddingHorizontal: 56,
-            paddingBottom: 36,
-          }}
-        >
-          <AuthorStrip
-            brand={brand}
-            pack={pack}
-            avatarDataUri={avatarDataUri}
-          />
-        </View>
+        {/* (AuthorStrip entfernt — Hero-Bild zeigt schon Avatar als Stempel
+            rechts unten, die explizite Author-Zeile am Seitenende war
+            redundant und hat das Vorwort auf zwei Seiten gedrueckt.
+            User-Feedback: weglassen.) */}
       </View>
     </Page>
   );

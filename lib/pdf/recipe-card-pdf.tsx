@@ -1306,16 +1306,22 @@ function MinimalPage({
   const time = totalTime(recipe);
   const pl = recipe.servings === 1 ? "Portion" : "Stücke";
   const stueckSing = recipe.servings === 1 ? "Portion" : "Stück";
-  // Bei vielen Steps (>=6) override auf compact-density, sonst ueberlaufen
-  // lange Step-Texte den verfuegbaren Body-Slot — z.B. Solero-Tiramisu im
-  // Sweet-Moments-Pack hat 7 Schritte, von denen mehrere 3-4 Zeilen
-  // Anweisungstext haben. In compact-density bekommt jeder Step kleinere
-  // Schrift + weniger marginBottom, was sauber auf eine A4-Seite passt
-  // ohne Step-Ueberlappung.
+  // Bei vielen Steps (>=6) override auf compact-density. Bei sehr vielen
+  // Steps (>=7) zusaetzlich noch enger — sonst ueberlaufen lange Step-Texte
+  // den verfuegbaren Body-Slot. Solero-Tiramisu (7 Schritte mit 3-4 Zeilen
+  // Anweisungstext) ist der Worst-Case.
   const baseDensity = getDensity(recipe);
-  const density =
-    (recipe.steps?.length ?? 0) >= 6 ? "compact" : baseDensity;
-  const d = MINIMAL_DENSITY[density];
+  const stepCount = recipe.steps?.length ?? 0;
+  const density = stepCount >= 6 ? "compact" : baseDensity;
+  const dBase = MINIMAL_DENSITY[density];
+  const d =
+    stepCount >= 7
+      ? {
+          ...dBase,
+          stepMarginBottom: Math.max(3, dBase.stepMarginBottom - 2),
+          stepFontSize: dBase.stepFontSize - 0.5,
+        }
+      : dBase;
   const grouped = groupIngredients(recipe.ingredients);
 
   // Hero-Title-Skala: Bold Inter-Tight, weiss auf Hero-Bild. Schmale
@@ -1372,52 +1378,13 @@ function MinimalPage({
             />
           ) : null}
 
-          {/* Dunkler Gradient unten — echter SVG linear-gradient damit
-              der Uebergang weich ist, statt einer harten Trennlinie wie
-              bei einem semi-transparent Rechteck. Das @react-pdf
-              backgroundColor unterstuetzt keinen CSS-gradient, deshalb
-              nutzen wir hier Svg+LinearGradient. Der Gradient laeuft von
-              0.62 Opacity unten zu 0 Opacity bei 60% — Title sitzt im
-              starken Bereich, der Hero-Bildinhalt darueber bleibt klar
-              sichtbar. */}
-          <View
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: HERO_HEIGHT,
-            }}
-          >
-            <Svg
-              width="595"
-              height={HERO_HEIGHT}
-              viewBox={`0 0 595 ${HERO_HEIGHT}`}
-            >
-              <Defs>
-                <LinearGradient
-                  id="heroGrad"
-                  x1="0"
-                  y1={HERO_HEIGHT}
-                  x2="0"
-                  y2="0"
-                >
-                  <Stop offset="0" stopColor="#000" stopOpacity={0.62} />
-                  <Stop offset="0.45" stopColor="#000" stopOpacity={0.18} />
-                  <Stop offset="1" stopColor="#000" stopOpacity={0} />
-                </LinearGradient>
-              </Defs>
-              <Rect
-                x="0"
-                y="0"
-                width="595"
-                height={HERO_HEIGHT}
-                fill="url(#heroGrad)"
-              />
-            </Svg>
-          </View>
+          {/* (Dunkler Gradient entfernt — wurde fuer weisse Title-Overlay
+              gebraucht. Title rendert jetzt in t.ink (schwarz), das auf
+              den meisten Foto-Hintergruenden lesbarer ist als weiss und
+              den Gradient ueberfluessig macht.) */}
 
-          {/* Top strip — Pack-Caption + Recipe-Number, weiss */}
+          {/* Top strip — Pack-Caption + Recipe-Number in t.ink fuer
+              Lesbarkeit auf hellem Foto-Hintergrund. */}
           <View
             style={{
               position: "absolute",
@@ -1434,7 +1401,7 @@ function MinimalPage({
                 fontSize: 8.5,
                 fontWeight: 700,
                 letterSpacing: 2.2,
-                color: "#ffffff",
+                color: t.ink,
                 textTransform: "uppercase",
               }}
             >
@@ -1446,7 +1413,7 @@ function MinimalPage({
                   fontSize: 9,
                   fontWeight: 600,
                   letterSpacing: 1.4,
-                  color: "#ffffff",
+                  color: t.ink,
                   textTransform: "uppercase",
                 }}
               >
@@ -1478,10 +1445,9 @@ function MinimalPage({
             </View>
           ) : null}
 
-          {/* Title overlay unten links — Pack-Accent-Farbe (rosa/honey/etc.)
-              statt vorher weiss. User wollte den Rezeptnamen in Akzent-Farbe
-              haben, das gibt der Hero-Komposition mehr Brand-Identitaet als
-              ein neutrales Weiss auf jedem Foto. */}
+          {/* Title overlay unten links — t.ink (schwarz) statt vorher Accent.
+              User-Feedback: schwarz ist auf den meisten Fotos besser
+              lesbar als Akzent-Farbe und macht den Title klar dominant. */}
           <View
             style={{
               position: "absolute",
@@ -1497,7 +1463,7 @@ function MinimalPage({
                 fontWeight: 700,
                 letterSpacing: -0.6,
                 lineHeight: 1.02,
-                color: t.accent,
+                color: t.ink,
                 textTransform: "none",
               }}
             >
@@ -1508,8 +1474,8 @@ function MinimalPage({
                 fontFamily: "Fraunces",
                 fontStyle: "italic",
                 fontSize: 12,
-                color: t.accent,
-                opacity: 0.95,
+                color: t.ink,
+                opacity: 0.85,
                 marginTop: 6,
                 lineHeight: 1.35,
               }}
