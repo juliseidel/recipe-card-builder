@@ -1,43 +1,23 @@
 import { callGeminiMultimodal } from "./gemini";
 
 // Vision-Layer fuer die Hero-Pipeline: Gemini 2.5 Flash schaut sich das
-// Reel-Cover-Bild von Instagram an und liefert (a) eine Beschreibung des
-// Gerichts und (b) zwei Risk-Flags: hat das Bild Text-Overlay oder eine
-// Person/Hand drin?
-//
-// Die Flags sind essenziell fuer den Reference-First-Pfad. Wenn die
-// Reference Text-Overlays hat (typischer Reel-Cover-Stil mit Recipe-Titel),
-// dann uebernimmt Flux das in den Output — selbst mit verschaerftem
-// Negative-Prompt. Loesung: bei hasTextOverlay/hasPerson skippen wir
-// die Reference, gehen zu text-only Flux und nutzen die description als
-// visuellen Anker.
+// Reel-Cover-Bild von Instagram an und beschreibt das Gericht in einem
+// fluessigen englischen Satz. Diese Beschreibung wird dann zusammen mit
+// dem Reel-Cover als Reference-Image an Flux Kontext Pro gegeben.
 
-export type DishVisionResult = {
-  /** Fluessige englische Beschreibung des Gerichts (Cookbook-Stil).
-   *  Leer wenn das Bild kein Gericht zeigt. */
-  description: string;
-  /** True wenn das Bild Text-Overlays, Recipe-Titel, Untertitel, Sticker
-   *  oder ein Reel-Cover-Layout mit Schrift enthaelt. */
-  hasTextOverlay: boolean;
-  /** True wenn ein Mensch, Hand, Finger, Arm oder Gesicht im Bild ist. */
-  hasPerson: boolean;
-};
+const SYSTEM_INSTRUCTION = `Du bist ein Food-Photograph. Vor dir liegt ein Reel-Cover-Bild und du beschreibst es einem Image-Generator, der das gleiche Gericht spaeter clean (ohne Werbe-Elemente) nachstellen soll.
 
-const SYSTEM_INSTRUCTION = `Du bist ein Food-Photograph + Image-Risk-Auditor. Vor dir liegt ein Reel-Cover-Bild und du lieferst dem nachgelagerten Image-Generator zwei Sachen:
+Schreib eine ehrliche, detaillierte englische Beschreibung des Gerichts — so wie du es einem Kollegen beschreiben wuerdest, der das Bild nie gesehen hat und es trotzdem genau nachstellen koennen muss. Erwaehne alles was relevant ist: die genauen Farben (welche Toene, wie viele, wo verteilt), Form und Aufbau, Anzahl der Komponenten, Textur, Topping und wie es verteilt ist, das Servier-Gefaess, alle visuellen Details die ein Foodphotograph einfangen wuerde. Wie viel du schreibst entscheidest du selbst — was es zu sagen gibt, sag.
 
-(1) DISH-DESCRIPTION — eine ehrliche, detaillierte englische Beschreibung des Gerichts (so wie du es einem Kollegen beschreiben wuerdest, der das Bild nie gesehen hat und es trotzdem nachstellen koennen muss). Erwaehne genaue Farben, Form/Aufbau, Anzahl der Komponenten, Textur, Topping-Verteilung, Servier-Gefaess. Wie viel du schreibst entscheidest du selbst — was es zu sagen gibt, sag.
+Sei besonders aufmerksam bei der FORM des Gerichts — Image-Generatoren neigen dazu, Recipe-Titel falsch zu interpretieren (z.B. "Cups" wird zu Cupcakes, "Bowl" wird zu Smoothie-Schale). Beschreibe deshalb sehr klar wie das Gericht im echten Bild aussieht: ist es flach oder hoch, dick oder duenn, einzeln oder gestapelt, klassisch oder ungewoehnlich geformt? Vergleiche notfalls mit was es NICHT ist ("flat round frozen discs, not cupcakes"; "tall layered glass dessert, not a bowl"; "ripped torn pieces, not whole pancakes").
 
-Sei besonders aufmerksam bei der FORM des Gerichts — Image-Generatoren neigen dazu, Recipe-Titel falsch zu interpretieren (z.B. "Cups" wird zu Cupcakes, "Bowl" wird zu Smoothie-Schale). Beschreibe deshalb sehr klar wie das Gericht im echten Bild aussieht. Wenn das Reel mehrere Anrichtungen zeigt, beschreibe NUR die fertige Servier-Variante.
+Wenn das Reel mehrere Anrichtungen zeigt (typisches Pattern: Backform plus plattiert daneben, ganzes plus angeschnittenes Demo-Stueck), beschreibe NUR die fertige Servier-Variante, nie beide kombiniert. Wenn das Topping natuerlich verstreut ist, schreib das so — nicht "one per piece", weil Image-Generatoren das sonst symmetrisch nachstellen.
 
-Ignoriere alles, was nicht das Gericht selbst ist (Text-Overlays, Sticker, Personen, Haende, Hintergrund). Antworte auf Englisch, fluessig formuliert wie eine Kochbuch-Bildunterschrift, KEIN "I see..." oder "The image shows...". Wenn das Bild kein Gericht zeigt: leerer String.
+Ignoriere alles, was nicht das Gericht selbst ist: Text-Overlays, Sticker, Werbe-Stempel, Personen, Haende, Hintergrund-Kuechen-Setup, Lichtstimmung. Die Umgebung wird neu gestagt — du beschreibst nur das Essen.
 
-(2) ZWEI RISK-FLAGS:
+Antworte auf Englisch, fluessig formuliert wie eine Kochbuch-Bildunterschrift, KEIN "I see..." oder "The image shows...".
 
-hasTextOverlay (boolean): true wenn das Bild text-artige Elemente enthaelt — Recipe-Titel als ueberlagerte Schrift, Caption-Banner, Sticker mit Worten, "Vorher/Nachher"-Labels, prominente Markennamen, Werbe-Stempel. Faustregel: wenn Image-Generatoren diese Schrift unbeabsichtigt nachstellen koennten, ist es true. Subtile Wasserzeichen oder ausgewogene Mini-Logos koennen false sein, aber sei lieber vorsichtig — true ist die sichere Wahl. Bei reinem Food-Shot ohne jede Schrift: false.
-
-hasPerson (boolean): true wenn ein Mensch, ein Gesicht, eine Hand, ein Finger, ein Arm, eine Schulter oder ein Torso sichtbar ist (auch teilweise oder am Rand). Bei reinem Food-Shot ohne Koerper: false.
-
-Antworte AUSSCHLIESSLICH im JSON-Schema.`;
+Wenn das Bild kein Gericht zeigt (reiner Talking-Head, reines Werbe-Cover ohne Essen): gib einen leeren String zurueck.`;
 
 const SCHEMA = {
   type: "object",
@@ -45,25 +25,15 @@ const SCHEMA = {
     dishDescription: {
       type: "string",
       description:
-        "Englische Beschreibung des Gerichts (Cookbook-Stil) oder leer wenn kein Gericht erkennbar.",
-    },
-    hasTextOverlay: {
-      type: "boolean",
-      description:
-        "true wenn das Bild Text-Overlays, Recipe-Titel, Sticker oder Caption-Banner enthaelt, die ein Image-Generator unbeabsichtigt nachstellen koennte.",
-    },
-    hasPerson: {
-      type: "boolean",
-      description:
-        "true wenn Hand, Finger, Arm, Gesicht oder andere Koerperteile im Bild sichtbar sind.",
+        "Eine fluessige englische Beschreibung des Gerichts — Laenge so wie du es brauchst um das Bild treu zu beschreiben (Farben, Form, Anzahl, Garnish, Vessel, alle relevanten Details). Leer wenn das Bild kein Gericht zeigt.",
     },
   },
-  required: ["dishDescription", "hasTextOverlay", "hasPerson"],
+  required: ["dishDescription"],
 };
 
 export async function describeInstagramDish(
   imageUrl: string
-): Promise<DishVisionResult | null> {
+): Promise<string | null> {
   const res = await fetch(imageUrl, {
     headers: {
       "User-Agent":
@@ -82,14 +52,10 @@ export async function describeInstagramDish(
     res.headers.get("content-type")?.split(";")[0]?.trim() || "image/jpeg";
 
   try {
-    const raw = await callGeminiMultimodal<{
-      dishDescription: string;
-      hasTextOverlay: boolean;
-      hasPerson: boolean;
-    }>({
+    const raw = await callGeminiMultimodal<{ dishDescription: string }>({
       parts: [
         {
-          text: "Beschreibe das Gericht und liefere die Risk-Flags. Folge der System-Instruction strikt.",
+          text: "Beschreibe das Gericht auf diesem Reel-Cover-Bild. Folge der System-Instruction strikt.",
         },
         {
           inlineData: {
@@ -103,15 +69,16 @@ export async function describeInstagramDish(
       // Bewusst Flash (nicht Pro) — Kosten + Speed. Pro brachte detail-
       // reichere Descriptions, aber die ueberforderten Flux Kontext und
       // machten Bilder schlechter, nicht besser.
-      temperature: 0.2,
+      temperature: 0.3,
+      // Kein maxOutputTokens — Gemini entscheidet selbst, wie viel
+      // Beschreibung das Bild braucht. Vorher 200 Tokens Limit war
+      // selbst-imposed und zwang Gemini zu Verknappung.
       thinkingBudget: 0,
       retries: 1,
     });
-    return {
-      description: (raw.dishDescription ?? "").trim(),
-      hasTextOverlay: Boolean(raw.hasTextOverlay),
-      hasPerson: Boolean(raw.hasPerson),
-    };
+    const desc = (raw.dishDescription ?? "").trim();
+    if (!desc) return null;
+    return desc;
   } catch (err) {
     console.warn(
       "[describe-dish] vision call failed:",

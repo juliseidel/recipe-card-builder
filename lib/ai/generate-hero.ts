@@ -152,42 +152,17 @@ async function tryReferenceBasedHero(
       );
     }
 
-    // Stufe 2: displayUrl-Reference mit Vision-Pre-Check.
-    // Image-Posts haben oft Recipe-Titel als Cover-Overlay (Bienes Hummus-
-    // DIP hatte z.B. "Der genialste Hummus DIP!" als Schrift im Cover).
-    // Ohne Pre-Check uebernimmt Flux das. Loesung: Gemini Vision
-    // klassifiziert hasTextOverlay + hasPerson, bei Risiko skippen wir
-    // die Reference und gehen direkt zu text-only mit Vision-Description
-    // als visuellem Anker.
+    // 2b) Fallback: Reel-Cover (displayUrl). Image-Posts ohne Video, oder
+    // wenn die Video-Pipeline gescheitert ist (ffmpeg crash, Vision-Pick
+    // ungueltig).
     if (post.displayUrl) {
-      const { describeInstagramDish } = await import("./describe-instagram-dish");
-      const vision = await describeInstagramDish(post.displayUrl);
-
-      if (vision && !vision.hasTextOverlay && !vision.hasPerson) {
-        // Sauberes displayUrl → Reference-Pfad
-        const heroUrl = await uploadReferenceHero({
-          recipe: opts.recipe,
-          recipeId: opts.recipeId,
-          brandSlug: opts.brandSlug,
-          referenceImage: post.displayUrl,
-        });
-        if (heroUrl) return { heroUrl, source: "cover" };
-      } else if (vision) {
-        // Risiko-Bild (Text-Overlay oder Person sichtbar) → text-only
-        // Flux mit description als Anker statt Reference-Pfad.
-        console.log(
-          `[generate-hero] displayUrl risky for ${opts.recipeId}: hasTextOverlay=${vision.hasTextOverlay} hasPerson=${vision.hasPerson} → text-only with vision description`
-        );
-        const heroUrl = await uploadTextOnlyFluxHeroWithDescription(
-          opts.recipe,
-          opts.recipeId,
-          opts.brandSlug,
-          vision.description || null
-        );
-        if (heroUrl) return { heroUrl, source: "flux-text-only" };
-      }
-      // Vision-Call failed komplett → faellt durch zum default text-only
-      // im main entry-point (uploadTextOnlyFluxHero).
+      const heroUrl = await uploadReferenceHero({
+        recipe: opts.recipe,
+        recipeId: opts.recipeId,
+        brandSlug: opts.brandSlug,
+        referenceImage: post.displayUrl,
+      });
+      if (heroUrl) return { heroUrl, source: "cover" };
     }
 
     return null;
@@ -230,21 +205,13 @@ async function uploadKeyframeHero(opts: {
     return null;
   }
 
-  // 2) Gemini Vision waehlt besten Frame. Returnt null wenn ALLE Frames
-  // Text-Overlays oder Personen drin haben — dann Fallback zur naechsten
-  // Stufe (displayUrl mit Vision-Pre-Check oder text-only).
+  // 2) Gemini Vision waehlt besten Frame
   const { selectBestKeyframe } = await import("./select-keyframe");
   const selection = await selectBestKeyframe({
     frames,
     recipeTitle: recipe.title,
     caption,
   });
-  if (!selection) {
-    console.log(
-      `[generate-hero] keyframe ${recipeId}: no clean frame available, falling back`
-    );
-    return null;
-  }
   console.log(
     `[generate-hero] keyframe ${recipeId}: idx=${selection.index}, t=${selection.frame.timestampSeconds}s — ${selection.reasoning.slice(0, 120)}`
   );
@@ -365,8 +332,7 @@ async function uploadTextOnlyFluxHero(
           const { describeInstagramDish } = await import(
             "./describe-instagram-dish"
           );
-          const vision = await describeInstagramDish(post.displayUrl);
-          dishDescription = vision?.description || null;
+          dishDescription = await describeInstagramDish(post.displayUrl);
         }
       }
     } catch (err) {
@@ -375,29 +341,6 @@ async function uploadTextOnlyFluxHero(
         err instanceof Error ? err.message : err
       );
     }
-  }
-
-  return await uploadTextOnlyFluxHeroWithDescription(
-    recipe,
-    recipeId,
-    brandSlug,
-    dishDescription
-  );
-}
-
-// Variante, der die description schon mitgegeben wird (zB vom Vision-
-// Pre-Check in tryReferenceBasedHero, wo wir bereits Gemini fuer die
-// Risk-Flags angerufen haben — den Apify-Roundtrip wiederholen waere
-// pure Verschwendung).
-async function uploadTextOnlyFluxHeroWithDescription(
-  recipe: Recipe,
-  recipeId: string,
-  brandSlug: string,
-  dishDescription: string | null
-): Promise<string | null> {
-  if (!process.env.BFL_API_KEY) {
-    console.warn("[generate-hero] BFL_API_KEY missing — skipping");
-    return null;
   }
 
   const spec = await generateImageSpec(recipe, brandSlug);
