@@ -1709,7 +1709,7 @@ function MinimalPage({
                   textTransform: "uppercase",
                 }}
               >
-                Mikronährstoffe pro Portion · % Tagesbedarf
+                Mikronährstoffe {nutritionBasisInline(recipe.nutritionBasis)} · % Tagesbedarf
               </Text>
             </View>
             <View
@@ -4915,10 +4915,18 @@ function IngredientRow({
   // kollidieren wuerden.
   const padV = rowPadV ?? (compact ? 3.5 : 4.5);
   const amountFont = compact ? 7.5 : 8;
-  // amountW vergrossert auf 56/66 (vorher 46/54), damit "nach Geschmack"
-  // in einer Zeile passt statt auf zwei umzubrechen. Bei 8 pt Inter:
-  // "nach Geschmack" (14 Zeichen) braucht ~62 pt — 66 gibt einen Puffer.
-  const amountW = compact ? 56 : 66;
+  // amountW zurueck auf 46/54 — "nach Geschmack" darf bewusst auf zwei
+  // Zeilen wrappen ("Nach \n Geschmack"), das sieht eleganter aus als
+  // einzeilig durchgezogen. alignItems "flex-start" stellt sicher, dass
+  // die Border-Bottom-Linie sauber unter dem ganzen Row liegt (nicht
+  // zwischen "Nach" und "Geschmack").
+  const amountW = compact ? 46 : 54;
+  // Capitalize-First fuer text-only amounts ("nach Geschmack" -> "Nach
+  // Geschmack", "etwas" -> "Etwas"). Numeric amounts ("1", "15 g") bleiben
+  // unveraendert.
+  const displayAmount = ing.amount
+    ? ing.amount.charAt(0).toUpperCase() + ing.amount.slice(1)
+    : ing.amount;
   const nameFont = nameFontSize ?? (compact ? 9 : 9.5);
   const noteFont = noteFontSize ?? (compact ? 7 : 7.5);
   // Name + Note werden in EINEM Text-Element gerendert mit nested
@@ -4950,7 +4958,7 @@ function IngredientRow({
           paddingTop: 1,
         }}
       >
-        {ing.amount}
+        {displayAmount}
       </Text>
       <Text
         style={{

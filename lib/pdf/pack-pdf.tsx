@@ -639,8 +639,11 @@ function OutroPage({
 }
 
 // ─── REUSABLE PAGE FOOTER ────────────────────────────────────────────────────
+// Genutzt von IndexPage (Inhaltsverzeichnis) + NutritionOverviewPage. Zeigt
+// nur "{pageLabel} · {pack.title}" — brand.signature ("Deine Julia") + BeeIcon
+// entfernt, das stand sonst auf mehreren Seiten redundant.
 function PageFooter({
-  brand,
+  brand: _brand,
   pack,
   pageLabel,
 }: {
@@ -657,7 +660,7 @@ function PageFooter({
         left: 0,
         right: 0,
         flexDirection: "row",
-        justifyContent: "space-between",
+        justifyContent: "flex-end",
         alignItems: "center",
         borderTopWidth: 1,
         borderTopColor: t.divider,
@@ -667,24 +670,12 @@ function PageFooter({
       }}
       fixed
     >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-        <Text
-          style={{
-            fontFamily: "Fraunces",
-            fontSize: 12,
-            color: brand.tokens.ink,
-          }}
-        >
-          {brand.signature}
-        </Text>
-        <BeeIcon brandSlug={brand.slug} size={13} />
-      </View>
       <Text
         style={{
           fontSize: 7.5,
           fontWeight: 500,
           letterSpacing: 1.4,
-          color: brand.tokens.inkMuted,
+          color: t.inkSoft,
           textTransform: "uppercase",
         }}
       >
