@@ -4985,58 +4985,48 @@ function StepsList({
               {group.name}
             </Text>
           ) : null}
-          {group.items.map((item) => {
-            // Number-marginTop: schiebt die Number-Glyph nach unten,
-            // damit ihre Top-Edge mit der Text-Glyph-Top-Edge aligned
-            // ist. Math: Text rendert in lineHeight 1.45 → Glyph hat
-            // ~ (textLineHeight - textFontSize) / 2 Padding-Top in der
-            // Line-Box. Number rendert in lineHeight 1 → Glyph
-            // startet bei 0 (top der Line-Box). Damit beide Glyph-Tops
-            // gleich sind, brauchen wir marginTop = textPadding-top
-            // auf der Number. Funktioniert fuer single-line UND
-            // multi-line steps (Top-Edges aligned heisst Number sitzt
-            // immer auf der ersten Text-Zeile).
-            const numberMarginTop =
-              (stepFontSize * 1.45 - stepFontSize) / 2;
-            return (
-              <View
-                key={item.index}
+          {group.items.map((item) => (
+            <View
+              key={item.index}
+              style={{
+                flexDirection: "row",
+                marginBottom: stepMarginBottom,
+                gap: 10,
+                // alignItems "center": Number und Text-Block vertikal
+                // mittig zueinander. Bei single-line: Number-Center =
+                // Text-Center. Bei multi-line: Number-Center = Mitte
+                // des Text-Blocks. Immer mittig — keine Math, keine
+                // Padding-Tricks.
+                alignItems: "center",
+              }}
+            >
+              <Text
                 style={{
-                  flexDirection: "row",
-                  marginBottom: stepMarginBottom,
-                  gap: 10,
-                  alignItems: "flex-start",
+                  fontFamily: "Fraunces",
+                  fontSize: stepNumFontSize,
+                  fontWeight: bold ? 700 : 400,
+                  color: theme.accent,
+                  width: 22,
+                  lineHeight: 1,
                 }}
               >
-                <Text
-                  style={{
-                    fontFamily: "Fraunces",
-                    fontSize: stepNumFontSize,
-                    fontWeight: bold ? 700 : 400,
-                    color: theme.accent,
-                    width: 22,
-                    lineHeight: 1,
-                    marginTop: numberMarginTop,
-                  }}
-                >
-                  {item.index + 1}
-                </Text>
-                <Text
-                  style={{
-                    flex: 1,
-                    fontSize: stepFontSize,
-                    lineHeight: 1.45,
-                    color: theme.ink,
-                  }}
-                >
-                  {checklist ? (
-                    <Text style={{ color: theme.inkSubtle }}>☐ </Text>
-                  ) : null}
-                  {item.text}
-                </Text>
-              </View>
-            );
-          })}
+                {item.index + 1}
+              </Text>
+              <Text
+                style={{
+                  flex: 1,
+                  fontSize: stepFontSize,
+                  lineHeight: 1.45,
+                  color: theme.ink,
+                }}
+              >
+                {checklist ? (
+                  <Text style={{ color: theme.inkSubtle }}>☐ </Text>
+                ) : null}
+                {item.text}
+              </Text>
+            </View>
+          ))}
         </View>
       ))}
     </View>
