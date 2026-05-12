@@ -29,6 +29,14 @@ const PUBLIC_PATHS = [
   // /api/admin/* checked Auth selber via Bearer-Token mit SUPABASE_SERVICE_ROLE_KEY.
   // Wird nur fuer einmalige Bulk-Operationen (z. B. Hero-Reseed) gebraucht.
   "/api/admin",
+  // Apify-Webhook: Apify ruft uns nach Backfill-Run-Ende auf, hat kein
+  // Supabase-Auth-Cookie. Der Endpoint validiert sich selbst via
+  // apify_run_id-Matching gegen die creator_scrapes-Tabelle (+ optional
+  // APIFY_WEBHOOK_SECRET-Query-Param).
+  "/api/apify-webhook",
+  // Vercel-Cron-Handler: Vercel feuert das ohne User-Session, validiert
+  // sich via Authorization: Bearer <CRON_SECRET>.
+  "/api/cron",
   "/icon.svg",
   "/apple-icon",
 ];
