@@ -148,89 +148,44 @@ export async function POST(req: Request) {
     );
   }
 
-  // ─── 5. Image-Spec für dishShape + heroElement + scene + steam ────────
-  // NICHT mehr für vessel (V2-fix), NICHT mehr für lighting (V3-fix),
-  // NICHT mehr für tone (V3-fix). Diese kommen direkt aus Vision.
+  // ─── 5. Image-Spec NUR für steam-Hint (servingTemperature) ──────────────
+  // V6: Spec liefert NICHT mehr scene/heroElement/angle/tone. Alles aus
+  // Vision. Spec wird nur noch für den steamSuffix gebraucht (hot dish =
+  // Steam-Aufstieg, Jan-Übernahme).
   const tSpec0 = Date.now();
   const spec = await generateImageSpec(recipe, brandSlug);
   const tSpec = Date.now() - tSpec0;
-
-  // ─── 6. Prompt bauen ────────────────────────────────────────────────────
-  const style = await getBrandImageStyle(brandSlug);
-  const angle =
-    style.defaultAngles?.[spec.dishShape] ??
-    (spec.dishShape === "flat"
-      ? "top-down 90°"
-      : spec.dishShape === "tall"
-        ? "45° eye-level"
-        : "30° three-quarter");
   const steam = steamSuffix(spec.servingTemperature);
 
-  // V3-Kern: Vision liefert komplette Lighting + ColorTone-Phrase direkt.
-  // Kein Mapping mehr auf Brand-Set. Fallback nur wenn Vision leer.
-  const lightingPhrase =
-    dishDescription.lightingDescription ||
-    "bright natural daylight with soft even illumination";
-  const toneWord = dishDescription.colorToneWord || "natural";
-
-  // V5: Smartphone-HDR mit Wärme + Lived-in-Feel. V4 war zu clinical/clean
-  // weil "bright natural" + "neutral white balance" + "edge-to-edge sharp"
-  // = Studio-Look mit iPhone-Etikett. Echte Reels haben iPhone-HDR mit
-  // Auto-Warmth-Drift, leichte Sättigung, lived-in Küchen-Vibe.
-  const cameraSpecs = [
-    "Shot on iPhone 15 Pro with Smart HDR enabled",
-    "natural smartphone food photograph with subtle warm undertones typical of indoor home cooking",
-    "slight color richness and saturation pop characteristic of iPhone color processing",
-    "everyday lived-in kitchen scene, not styled, casual home-cooking snapshot",
-    "slightly imperfect natural look, captured spontaneously",
-    "everything in focus (no shallow depth-of-field, no bokeh)",
-  ].join(", ");
-
-  // V5-Prompt: nur compose (V4-fix) + iPhone-HDR-Wärme + Lived-in-Feel.
-  // "styled deliberately" entfernt aus heroElement-Klausel (war zu Studio).
-  // Tone-Tail erweitert um warm-HDR-iPhone-Charakter.
+  // ─── 6. V6-Prompt: Vision ist BOSS ──────────────────────────────────────
+  // Alle Wärme-/HDR-/Lived-in-Filter raus. Brand-DNA sceneContext +
+  // heroElement raus (Vision compose deckt das ab). Tone-Tail raus.
+  //
+  // Das einzige was wir adden: smartphone-hint (sonst rendert Flux
+  // Cookbook-Default) + steam für hot dishes (Jan).
+  //
+  // Vision compose = der zentrale Anker. lightingDescription = Licht-Wahrheit.
   const positivePrompt = [
-    `A ${angle} view of ${recipe.title}, placed on ${spec.sceneContext}.`,
-    `${spec.heroElement}, naturally part of the scene.`,
-    `${lightingPhrase}.`,
+    `${recipe.title}, a casual home-cooking snapshot.`,
     "",
-    `The dish itself (render exactly as described — this IS the dish, do not improvise):`,
     dishDescription.compose,
     "",
-    `${cameraSpecs}.`,
-    `${toneWord} tones with iPhone HDR color processing, warm everyday-kitchen atmosphere${steam}.`,
+    dishDescription.lightingDescription,
+    "",
+    `Shot on iPhone, natural smartphone photograph, everything in sharp focus, slightly imperfect framing${steam}.`,
   ]
     .filter((s) => s.length > 0)
     .join("\n");
 
-  // V5 Negatives: Anti-Studio + Anti-Sterile + Anti-Editorial.
-  // Neu in V5: "no clinical", "no over-corrected", "no sterile editorial",
-  // "no commercial perfection" — gegen den TOO-CLEAN-Look von V4.
-  const antiStudio = [
-    "no professional studio photography",
-    "no cinematic depth-of-field",
-    "no commercial cookbook styling",
-    "no overly stylized food art",
-    "no Leica look",
-    "no DSLR aesthetic",
-    "no bokeh",
-    "no shallow focus",
-    "no advertising photography",
-    "no clinical lighting",
-    "no over-corrected white balance",
-    "no sterile editorial look",
-    "no commercial perfection",
-    "no magazine cover styling",
-  ].join(", ");
+  // V6-Negatives: minimal. Nur die essentiellen 10 Items. Brand-
+  // negativeAddition wenn vorhanden (für sehr brand-spezifische no-
+  // gos wie "no parsley" für Biene).
   const baseNegative =
-    "no text, no labels, no logos, no packaging, no cartons, no bottles, no jars with labels, no bags, no brand names, no watermark, no hands, no people, no faces, no rigid centering, no plastic-looking sauce, no unnatural gloss, no white void background, no fluorescent lighting";
-  const negativePrompt = [
-    baseNegative,
-    antiStudio,
-    style.negativeAddition || "",
-  ]
-    .filter(Boolean)
-    .join(", ");
+    "no text, no labels, no logos, no packaging, no watermark, no hands, no people, no faces, no studio lighting, no white void background";
+  const style = await getBrandImageStyle(brandSlug);
+  const negativePrompt = style.negativeAddition
+    ? `${baseNegative}, ${style.negativeAddition}`
+    : baseNegative;
 
   // ─── 7. Flux 2 Pro text-only call ───────────────────────────────────────
   const tFlux0 = Date.now();
@@ -261,7 +216,7 @@ export async function POST(req: Request) {
     fileSizeLimit: 8 * 1024 * 1024,
     allowedMimeTypes: ["image/jpeg"],
   });
-  const filePath = `${body.recipeSlug}-v5-${Date.now()}.jpg`;
+  const filePath = `${body.recipeSlug}-v6-${Date.now()}.jpg`;
   const upload = await supabase.storage
     .from(TEST_BUCKET)
     .upload(filePath, processed, {
@@ -282,7 +237,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     ok: true,
-    version: "v5",
+    version: "v6",
     generatedUrl: publicUrl,
     timings: {
       apifyMs: tApify,
@@ -296,12 +251,8 @@ export async function POST(req: Request) {
     framesAnalyzedByVision: sampleFrames.length,
     fluxSeed: result.seed,
     promptInputs: {
-      angle,
-      sceneContext: spec.sceneContext,
-      heroElement: spec.heroElement,
-      lightingPhraseFromVision: lightingPhrase,
-      toneWordFromVision: toneWord,
-      cameraSpecs,
+      steamFromSpec: steam,
+      visionIsBoss: true,
     },
     dishDescription,
     positivePrompt,
