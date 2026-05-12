@@ -173,36 +173,39 @@ export async function POST(req: Request) {
     "bright natural daylight with soft even illumination";
   const toneWord = dishDescription.colorToneWord || "natural";
 
-  // Smartphone-Aesthetic statt Leica-Cookbook. Jeder Recipe-Card-Builder-
-  // Hero soll wie ein iPhone-Snapshot aussehen — das ist der echte Look
-  // von Instagram-Reels, nicht durchgestyltes Studio.
+  // V5: Smartphone-HDR mit Wärme + Lived-in-Feel. V4 war zu clinical/clean
+  // weil "bright natural" + "neutral white balance" + "edge-to-edge sharp"
+  // = Studio-Look mit iPhone-Etikett. Echte Reels haben iPhone-HDR mit
+  // Auto-Warmth-Drift, leichte Sättigung, lived-in Küchen-Vibe.
   const cameraSpecs = [
-    "Shot on iPhone 15 Pro, natural smartphone food photograph",
-    "everything in sharp focus from edge to edge",
-    "no shallow depth-of-field, no bokeh",
-    "casual Instagram-Reel snapshot aesthetic",
-    "slightly imperfect framing, homemade and unstaged",
+    "Shot on iPhone 15 Pro with Smart HDR enabled",
+    "natural smartphone food photograph with subtle warm undertones typical of indoor home cooking",
+    "slight color richness and saturation pop characteristic of iPhone color processing",
+    "everyday lived-in kitchen scene, not styled, casual home-cooking snapshot",
+    "slightly imperfect natural look, captured spontaneously",
+    "everything in focus (no shallow depth-of-field, no bokeh)",
   ].join(", ");
 
-  // V4-Prompt-Struktur: NUR compose, keine Einzel-Felder mehr.
-  // compose ist Gemini's konsolidierte Beschreibung — alle Detail-Felder
-  // sind dort wortgleich integriert. Einzel-Felder im Prompt würden
-  // doppelte Farb-Signals geben (Hauptursache der V2/V3-Farbverschiebung).
+  // V5-Prompt: nur compose (V4-fix) + iPhone-HDR-Wärme + Lived-in-Feel.
+  // "styled deliberately" entfernt aus heroElement-Klausel (war zu Studio).
+  // Tone-Tail erweitert um warm-HDR-iPhone-Charakter.
   const positivePrompt = [
     `A ${angle} view of ${recipe.title}, placed on ${spec.sceneContext}.`,
-    `${spec.heroElement}, styled deliberately as part of the scene.`,
+    `${spec.heroElement}, naturally part of the scene.`,
     `${lightingPhrase}.`,
     "",
     `The dish itself (render exactly as described — this IS the dish, do not improvise):`,
     dishDescription.compose,
     "",
-    `${cameraSpecs}, ${toneWord} tones, true to life colors${steam}.`,
+    `${cameraSpecs}.`,
+    `${toneWord} tones with iPhone HDR color processing, warm everyday-kitchen atmosphere${steam}.`,
   ]
     .filter((s) => s.length > 0)
     .join("\n");
 
-  // V3 Negatives: Jan's Original 18 Items + Anti-Studio + Anti-Cookbook
-  // (gegen V2-Problem dass Bild zu professionell aussah)
+  // V5 Negatives: Anti-Studio + Anti-Sterile + Anti-Editorial.
+  // Neu in V5: "no clinical", "no over-corrected", "no sterile editorial",
+  // "no commercial perfection" — gegen den TOO-CLEAN-Look von V4.
   const antiStudio = [
     "no professional studio photography",
     "no cinematic depth-of-field",
@@ -213,6 +216,11 @@ export async function POST(req: Request) {
     "no bokeh",
     "no shallow focus",
     "no advertising photography",
+    "no clinical lighting",
+    "no over-corrected white balance",
+    "no sterile editorial look",
+    "no commercial perfection",
+    "no magazine cover styling",
   ].join(", ");
   const baseNegative =
     "no text, no labels, no logos, no packaging, no cartons, no bottles, no jars with labels, no bags, no brand names, no watermark, no hands, no people, no faces, no rigid centering, no plastic-looking sauce, no unnatural gloss, no white void background, no fluorescent lighting";
@@ -253,7 +261,7 @@ export async function POST(req: Request) {
     fileSizeLimit: 8 * 1024 * 1024,
     allowedMimeTypes: ["image/jpeg"],
   });
-  const filePath = `${body.recipeSlug}-v3-${Date.now()}.jpg`;
+  const filePath = `${body.recipeSlug}-v5-${Date.now()}.jpg`;
   const upload = await supabase.storage
     .from(TEST_BUCKET)
     .upload(filePath, processed, {
@@ -274,7 +282,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     ok: true,
-    version: "v3",
+    version: "v5",
     generatedUrl: publicUrl,
     timings: {
       apifyMs: tApify,
