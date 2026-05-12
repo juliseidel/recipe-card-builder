@@ -3,23 +3,34 @@ import { revalidatePath } from "next/cache";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 import { isCodeBrand } from "@/lib/brands";
 
-// Workspace-Delete-Endpoint. Loescht einen DB-Brand komplett — inklusive
-// aller verknuepften Daten: Recipes, Packs, Hidden-Recipes, Reel-Library,
-// Scrape-Jobs, Pack-Vorschlaege. Code-Brands (Biene) sind hardcoded in
-// lib/brands.ts und koennen nicht geloescht werden.
+// Workspace-Delete-Endpoint mit Daten-Erhaltung.
 //
-// Reihenfolge (wichtig wegen FK-Constraints und Auslesbarkeit):
-//   1. pack_suggestions   — KI-Vorschlaege, koennen alleinstehend weg
-//   2. creator_reels      — Reel-Library, blocked von nichts
-//   3. creator_scrapes    — Scrape-Jobs, blocked von nichts
-//   4. hidden_recipes     — Hide-Marker pro Brand
-//   5. recipes            — Custom-Rezepte (Heroes im Storage bleiben
-//      erstmal — die werden via TTL eh nach 1 Jahr aus dem Cache fallen)
-//   6. packs              — Custom-Packs
-//   7. brands             — die Brand-Row selbst
+// User-Wunsch (Mai 2026): Beim Loeschen eines Workspaces sollen die
+// wertvollen Daten (Reel-Library, Rezepte, Packs) NICHT verloren gehen
+// — falls der Creator spaeter neu angelegt wird (gleicher Handle/Slug),
+// sind die alten Daten automatisch wieder verfuegbar (via brand_slug-FK).
 //
-// RLS: alle drei Reel-Library-Tabellen haben open public-policy (internes
-// Team-Tool). brands/packs/recipes ebenfalls offen.
+// Was geloescht wird:
+//   - brands              — das Brand-Profil selbst
+//   - creator_scrapes     — Job-Tracker (rein technisch, kein Mehrwert)
+//   - pack_suggestions    — KI-Vorschlaege (werden bei Re-Onboard frisch
+//                           generiert; alte waren auf alte Reel-Library
+//                           kalibriert)
+//   - hidden_recipes      — UI-Hide-Marker pro Brand (nicht relevant ohne
+//                           Brand)
+//
+// Was BLEIBT (Daten-Erhaltung):
+//   - creator_reels       — die 200-500 gescrapten Reels mit Klassifikation
+//   - recipes             — fertige strukturierte Rezepte (Zutaten,
+//                           Schritte, Naehrwerte, Mikros, Hero-Bild-URLs)
+//   - packs               — kuratierte Recipe-Packs (z.B. "Top 10 Reels")
+//
+// Re-Activation-Flow: User legt im /new-brand-Wizard einen Brand mit dem
+// gleichen Handle/Slug neu an → addCustomBrand() schreibt eine neue
+// brands-Row → die bestehenden creator_reels/recipes/packs Rows mit
+// brand_slug-Match sind automatisch wieder sichtbar im Workspace.
+//
+// Code-Brands (Biene) sind hardcoded in lib/brands.ts und nicht loeschbar.
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -36,8 +47,6 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
     );
   }
 
-  // Schutz: Code-Brands (Biene) sind in lib/brands.ts hardcoded — die
-  // gibt es nicht in der DB und der Delete waere ein Bug.
   if (isCodeBrand(slug)) {
     return NextResponse.json(
       {
@@ -58,9 +67,6 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
   const supabase = getServerSupabase();
   const deleted: Record<string, number | "skipped" | "failed"> = {};
 
-  // Helper: Tabelle aufräumen, count zurückgeben. Bei Tabellen die noch
-  // nicht migriert sind (z.B. creator_reels ohne SQL-Run), wollen wir das
-  // ganze Delete nicht crashen lassen — wir markieren skipped.
   const cleanup = async (
     table: string,
     column: string = "brand_slug"
@@ -70,7 +76,6 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
       .delete({ count: "exact" })
       .eq(column, slug);
     if (error) {
-      // "relation does not exist" → Tabelle nicht migriert, kein Fehler.
       if (error.code === "42P01") return "skipped";
       console.warn(`[delete-brand] cleanup ${table} failed:`, error.message);
       return "failed";
@@ -78,15 +83,33 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
     return count ?? 0;
   };
 
+  // Nur tracking-Tabellen + Brand-Profil loeschen. Die wertvollen Daten
+  // (creator_reels, recipes, packs) bleiben — sie haengen via brand_slug
+  // und sind sofort wieder verfuegbar wenn ein Brand mit demselben Slug
+  // neu angelegt wird.
   deleted.pack_suggestions = await cleanup("pack_suggestions");
-  deleted.creator_reels = await cleanup("creator_reels");
   deleted.creator_scrapes = await cleanup("creator_scrapes");
   deleted.hidden_recipes = await cleanup("hidden_recipes");
-  deleted.recipes = await cleanup("recipes");
-  deleted.packs = await cleanup("packs");
 
-  // Brand-Row selbst — das ist der eigentliche Delete. Wenn das fehlschlaegt,
-  // ist der Workspace nicht weg, also geben wir einen klaren Fehler zurueck.
+  // Audit-Counts der ERHALTENEN Daten — zurück an UI, damit der User sieht
+  // wie viel weiterhin im "Cold-Storage" für Re-Activation liegt.
+  const [{ count: reelsKept }, { count: recipesKept }, { count: packsKept }] =
+    await Promise.all([
+      supabase
+        .from("creator_reels")
+        .select("*", { count: "exact", head: true })
+        .eq("brand_slug", slug),
+      supabase
+        .from("recipes")
+        .select("*", { count: "exact", head: true })
+        .eq("brand_slug", slug),
+      supabase
+        .from("packs")
+        .select("*", { count: "exact", head: true })
+        .eq("brand_slug", slug),
+    ]);
+
+  // Brand-Row als letztes loeschen.
   const { error: brandError } = await supabase
     .from("brands")
     .delete()
@@ -101,17 +124,21 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
     );
   }
 
-  // Cache-Invalidation: Hub + Workspace-Routen.
   try {
     revalidatePath("/");
     revalidatePath(`/${slug}`);
   } catch {
-    // revalidatePath kann in einigen Contexts werfen — non-fatal.
+    // non-fatal
   }
 
   return NextResponse.json({
     ok: true,
     slug,
     deleted,
+    kept: {
+      creator_reels: reelsKept ?? 0,
+      recipes: recipesKept ?? 0,
+      packs: packsKept ?? 0,
+    },
   });
 }

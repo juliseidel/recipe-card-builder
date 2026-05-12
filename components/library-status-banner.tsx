@@ -210,42 +210,28 @@ export function LibraryStatusBanner({
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          {!isFailed ? (
-            <div
-              className="flex items-center gap-4 text-[11px] font-mono uppercase tracking-[0.16em]"
-              style={{ color: brand.tokens.inkMuted }}
-            >
-              <span>{status.reelCount} Posts</span>
-              <span aria-hidden>·</span>
-              <span>{status.recipeCount} Rezepte</span>
-              {status.suggestionCount > 0 ? (
-                <>
-                  <span aria-hidden>·</span>
-                  <span>{status.suggestionCount} Pack-Ideen</span>
-                </>
-              ) : null}
-            </div>
-          ) : null}
-          {canRetry ? (
-            <button
-              type="button"
-              onClick={handleRetry}
-              disabled={retrying}
-              className="rounded-full px-4 py-1.5 text-[12px] font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              style={{
-                background: isError ? "#c53030" : brand.tokens.ink,
-                color: "white",
-              }}
-            >
-              {retrying
-                ? "Wird neu gestartet…"
-                : isStaleRunning
-                  ? "Neu starten"
-                  : "Erneut versuchen"}
-            </button>
-          ) : null}
-        </div>
+        {/* Counter aus dem Banner entfernt — sie ueberlappten mit dem
+            User-Dropdown rechts oben, und sind ohnehin im Hero-Block
+            unter dem Avatar prominent als Stats ("498 POSTS · 10 REZEPTE")
+            sichtbar. Banner zeigt jetzt nur noch die Statusmeldung links. */}
+        {canRetry ? (
+          <button
+            type="button"
+            onClick={handleRetry}
+            disabled={retrying}
+            className="self-start rounded-full px-4 py-1.5 text-[12px] font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
+            style={{
+              background: isError ? "#c53030" : brand.tokens.ink,
+              color: "white",
+            }}
+          >
+            {retrying
+              ? "Wird neu gestartet…"
+              : isStaleRunning
+                ? "Neu starten"
+                : "Erneut versuchen"}
+          </button>
+        ) : null}
       </div>
       {retryError ? (
         <div

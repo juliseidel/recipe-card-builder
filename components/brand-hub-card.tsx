@@ -295,13 +295,14 @@ export function BrandHubCard({ brand, packCount, recipeCount, badge }: Props) {
                   className="font-display text-[18px] leading-tight tracking-[-0.01em]"
                   style={{ color: brand.tokens.ink }}
                 >
-                  „{brand.name}" wirklich löschen?
+                  „{brand.name}" Workspace löschen?
                 </span>
                 <span
-                  className="max-w-[28ch] text-[12.5px] leading-snug"
+                  className="max-w-[30ch] text-[12.5px] leading-snug"
                   style={{ color: brand.tokens.inkMuted }}
                 >
-                  Alle Packs, Rezepte und die Reel-Library werden dauerhaft entfernt.
+                  Reel-Library und Rezepte bleiben erhalten — wenn du den
+                  Workspace später neu anlegst, sind sie automatisch wieder da.
                 </span>
               </div>
               {deleteError ? (

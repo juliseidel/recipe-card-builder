@@ -5,16 +5,20 @@ import { useRouter } from "next/navigation";
 import type { Brand } from "@/lib/brands";
 
 // Pack-Vorschlaege-Section im Workspace. Wird ueber "Aktive Packs"
-// angezeigt, solange pending-Vorschlaege existieren. Jede Card:
-//   - Title + Subtitle + Reasoning
-//   - Reel-Count Badge
-//   - "Annehmen" Button → triggert /api/pack-suggestions/[id]/accept,
-//     redirected zur frischen Pack-Page
-//   - "Verwerfen" Button → status='dismissed', Card verschwindet
+// angezeigt, solange pending-Vorschlaege existieren.
+//
+// Layout: horizontales Carousel mit snap-scroll (statt Grid in 2-3
+// Reihen). Jede Card hat:
+//   - Background-Image aus dem display_url des Top-Reels im Vorschlag —
+//     dunkler Gradient drueber damit der Text lesbar bleibt
+//   - Title + Subtitle + Reel-Count + Annehmen-Button
+//
+// Cover-Logik: API liefert previewImages[] (bis zu 3 display_urls). Wir
+// nehmen den ersten als Background. Bei fehlendem Cover: Mood-Gradient
+// als Fallback (Brand-Accent → Brand-Background).
 //
 // Polling: einmal beim Mount + nach Library-Banner status='done' (per
-// Refresh-Token-Prop). Kein dauerhaftes Polling — Vorschlaege aendern
-// sich nur durch User-Aktionen.
+// Refresh-Token-Prop).
 
 type Suggestion = {
   id: string;
@@ -26,6 +30,7 @@ type Suggestion = {
   reasoning: string;
   reelCount: number;
   score: number | null;
+  previewImages: string[];
 };
 
 export function PackSuggestionsSection({
@@ -77,11 +82,9 @@ export function PackSuggestionsSection({
       if (!res.ok) {
         throw new Error(json.error ?? "Annehmen fehlgeschlagen.");
       }
-      // Optimistic: aus der Liste entfernen.
       setSuggestions((prev) =>
         prev ? prev.filter((s) => s.id !== id) : prev
       );
-      // Hub-Cache invalidieren, dann zur frischen Pack-Page.
       router.push(`/${brand.slug}/${json.packSlug}`);
       router.refresh();
     } catch (err) {
@@ -98,14 +101,11 @@ export function PackSuggestionsSection({
   const handleDismiss = async (id: string) => {
     setBusyIds((prev) => ({ ...prev, [id]: "dismiss" }));
     setError(null);
-    // Optimistic — sofort aus der Liste raus, API-Call im Hintergrund.
     setSuggestions((prev) => (prev ? prev.filter((s) => s.id !== id) : prev));
     try {
       await fetch(`/api/pack-suggestions/${id}/dismiss`, { method: "POST" });
     } catch {
-      // Bei Fehler: leise — der Reel-Vorschlag ist immer noch in der DB
-      // pending, aber das stoert nicht (er wuerde beim naechsten Reload
-      // wieder auftauchen, was OK ist).
+      // leise
     } finally {
       setBusyIds((prev) => {
         const next = { ...prev };
@@ -115,9 +115,6 @@ export function PackSuggestionsSection({
     }
   };
 
-  // Loading state — wir wollen nichts flashen, daher show nothing waehrend
-  // initial-load (suggestions===null). Wenn null bleibt, ist Section
-  // unsichtbar.
   if (suggestions === null) return null;
   if (suggestions.length === 0) return null;
 
@@ -141,15 +138,16 @@ export function PackSuggestionsSection({
             Vorgeschlagene Packs
           </h2>
           <p
-            className="mt-1 text-[14px]"
+            className="mt-1 max-w-[60ch] text-[14px]"
             style={{ color: brand.tokens.inkMuted }}
           >
-            {suggestions.length} kuratierte Pack-Konzepte aus den letzten 2 Jahren {brand.name}-Reels. Annehmen
-            erstellt das Pack mit Karten + KI-generierten Hero-Bildern in einem Klick.
+            {suggestions.length} kuratierte Pack-Konzepte aus {brand.name}-Reels.
+            Annehmen erstellt das Pack mit Karten und KI-generierten Hero-Bildern
+            in einem Klick.
           </p>
         </div>
         <div
-          className="flex items-center gap-4 rounded-xl border px-4 py-2.5 text-[12px]"
+          className="flex items-center gap-3 self-start rounded-xl border px-4 py-2.5 text-[12px] sm:self-end"
           style={{
             borderColor: brand.tokens.line,
             background: brand.tokens.surface,
@@ -179,118 +177,130 @@ export function PackSuggestionsSection({
         </div>
       ) : null}
 
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Horizontal-Carousel: snap-scroll, eine Karte zeigt 1.1× sichtbar
+          damit man sieht "es gibt mehr rechts" und naturlich scrollen kann.
+          Auf Desktop: 3 sichtbar gleichzeitig. */}
+      <div
+        className="-mx-6 flex snap-x snap-mandatory gap-5 overflow-x-auto px-6 pb-3 lg:-mx-10 lg:px-10"
+        style={{
+          scrollbarWidth: "thin",
+        }}
+      >
         {suggestions.map((s) => {
           const busy = busyIds[s.id];
+          const coverUrl = s.previewImages[0] ?? null;
           return (
             <article
               key={s.id}
-              className="group flex flex-col gap-4 rounded-2xl border p-5 transition-shadow hover:shadow-[0_18px_40px_-22px_rgba(26,18,11,0.18)]"
+              className="group relative flex w-[320px] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border transition-all hover:-translate-y-1 hover:shadow-[0_28px_60px_-30px_rgba(26,18,11,0.32)] sm:w-[360px]"
               style={{
                 borderColor: brand.tokens.line,
                 background: brand.tokens.surface,
+                minHeight: 360,
               }}
             >
-              <header className="flex items-start justify-between gap-3">
-                <div className="flex flex-col gap-1.5">
+              {/* Background — Reel-Cover als Bild, mit dunklem Gradient
+                  Overlay fuer Text-Lesbarkeit. Bei fehlendem Cover:
+                  Mood-Gradient mit Brand-Akzent. */}
+              <div
+                className="absolute inset-0 bg-cover bg-center transition-transform duration-[700ms] group-hover:scale-[1.04]"
+                style={
+                  coverUrl
+                    ? { backgroundImage: `url("${coverUrl}")` }
+                    : {
+                        background: `linear-gradient(135deg, ${brand.tokens.accent}33 0%, ${brand.tokens.background} 70%)`,
+                      }
+                }
+                aria-hidden
+              />
+              {/* Dunkler Gradient — unten staerker, oben fast transparent.
+                  Macht Title + Buttons lesbar ohne Cover-Bild zu verstecken. */}
+              <div
+                className="absolute inset-0"
+                style={{
+                  background: coverUrl
+                    ? "linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.78) 100%)"
+                    : "linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.35) 100%)",
+                }}
+                aria-hidden
+              />
+
+              {/* Foreground content */}
+              <div className="relative flex h-full flex-col gap-3 p-5">
+                <header className="flex items-start justify-between gap-3">
                   <span
-                    className="text-[10.5px] font-semibold uppercase tracking-[0.18em]"
-                    style={{ color: brand.tokens.accent }}
+                    className="rounded-full px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.16em] backdrop-blur"
+                    style={{
+                      background: "rgba(255,255,255,0.18)",
+                      color: "white",
+                    }}
                   >
                     {s.category || "Pack-Konzept"}
                   </span>
-                  <h3
-                    className="font-display text-[22px] leading-[1.1] tracking-[-0.01em]"
-                    style={{ color: brand.tokens.ink }}
+                  <span
+                    className="rounded-full px-2.5 py-1 text-[10.5px] font-mono font-semibold uppercase tracking-[0.12em] backdrop-blur"
+                    style={{
+                      background: "rgba(255,255,255,0.18)",
+                      color: "white",
+                    }}
                   >
+                    {s.reelCount} Reels
+                  </span>
+                </header>
+
+                <div className="mt-auto flex flex-col gap-2.5">
+                  <h3 className="font-display text-[22px] leading-[1.08] tracking-[-0.01em] text-white">
                     {s.title}
                   </h3>
                   {s.subtitle ? (
-                    <p
-                      className="text-[12.5px]"
-                      style={{ color: brand.tokens.inkMuted }}
-                    >
+                    <p className="text-[12.5px] leading-relaxed text-white/85">
                       {s.subtitle}
                     </p>
                   ) : null}
+
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleAccept(s.id)}
+                      disabled={Boolean(busy)}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-[12.5px] font-semibold text-white transition-all hover:opacity-95 disabled:cursor-wait disabled:opacity-60"
+                      style={{ background: brand.tokens.accent }}
+                    >
+                      {busy === "accept" ? (
+                        <>
+                          <span className="size-3 animate-spin rounded-full border-[2px] border-white/30 border-t-white" />
+                          Erstelle Pack…
+                        </>
+                      ) : (
+                        <>
+                          Annehmen
+                          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden>
+                            <path
+                              d="M2.5 5.5h6m0 0L5.75 2.75M8.5 5.5l-2.75 2.75"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDismiss(s.id)}
+                      disabled={Boolean(busy)}
+                      className="rounded-full border px-3.5 py-2.5 text-[12px] font-medium text-white backdrop-blur transition-colors hover:bg-white/15 disabled:opacity-50"
+                      style={{
+                        borderColor: "rgba(255,255,255,0.3)",
+                        background: "rgba(255,255,255,0.08)",
+                      }}
+                      title="Verwerfen"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
-                <span
-                  className="shrink-0 rounded-full border px-2.5 py-1 text-[10.5px] font-mono font-semibold uppercase tracking-[0.12em]"
-                  style={{
-                    borderColor: brand.tokens.line,
-                    color: brand.tokens.inkMuted,
-                    background: brand.tokens.background,
-                  }}
-                >
-                  {s.reelCount} Reels
-                </span>
-              </header>
-
-              {s.tagline ? (
-                <p
-                  className="text-[13px] leading-relaxed"
-                  style={{ color: brand.tokens.ink }}
-                >
-                  {s.tagline}
-                </p>
-              ) : null}
-
-              {s.reasoning ? (
-                <div
-                  className="rounded-xl px-3 py-2.5 text-[11.5px] leading-snug"
-                  style={{
-                    background: brand.tokens.background,
-                    color: brand.tokens.inkMuted,
-                  }}
-                >
-                  <span className="font-semibold uppercase tracking-[0.14em] text-[10px]">
-                    Warum:
-                  </span>{" "}
-                  {s.reasoning}
-                </div>
-              ) : null}
-
-              <div className="mt-auto flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => void handleAccept(s.id)}
-                  disabled={Boolean(busy)}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-[12.5px] font-semibold text-white transition-all hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
-                  style={{ background: brand.tokens.accent }}
-                >
-                  {busy === "accept" ? (
-                    <>
-                      <span className="size-3 animate-spin rounded-full border-[2px] border-white/30 border-t-white" />
-                      Erstelle Pack…
-                    </>
-                  ) : (
-                    <>
-                      Annehmen & öffnen
-                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden>
-                        <path
-                          d="M2.5 5.5h6m0 0L5.75 2.75M8.5 5.5l-2.75 2.75"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleDismiss(s.id)}
-                  disabled={Boolean(busy)}
-                  className="rounded-full border px-3.5 py-2.5 text-[12px] font-medium transition-colors hover:bg-canvas-alt disabled:opacity-50"
-                  style={{
-                    borderColor: brand.tokens.line,
-                    color: brand.tokens.inkMuted,
-                  }}
-                  title="Verwerfen"
-                >
-                  Verwerfen
-                </button>
               </div>
             </article>
           );
