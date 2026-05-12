@@ -136,9 +136,80 @@ export const BIENE_STYLE: BrandImageStyle = {
   },
 };
 
+// ─── Julia Breitenfeld · @juliabreitenfeld ──────────────────────────────────
+// Calibrated against 5 IG-Feed + Reel-Cover-Screenshots vom User (2026-05-12).
+// Observed signature elements (Hero-applicable — i.e. WITHOUT hands/people,
+// per HERO_BASE_NEGATIVE which bans Korperteile universell):
+//   - counter is bone-grey concrete with subtle striations — slightly rougher
+//     and more raw-looking than Bienes pale-grey, almost outdoor-terrace feel
+//   - HARSH outdoor sunlight with crisp defined shadow edges (NOT soft warm
+//     morning like Biene; this is the biggest visual differentiator)
+//   - clear glass oven dishes / glass bowls als typical vessel
+//   - WHOLE loose ingredients scattered casually around the dish — NEVER in a
+//     bowl, NEVER on a cutting board (that's Bienes signature). Things like
+//     whole strawberries, halved lemons, herb sprigs, whole tomatoes etc.
+//   - aesthetic: iPhone-Insta-real outdoor moment, NOT cookbook editorial
+//
+// Was wir EXPLIZIT nicht aus ihren echten Reel-Covers uebernehmen:
+//   - hand-held POV with manicured hand visible — das ist ihr Reel-Cover-Stil,
+//     aber HERO_BASE_NEGATIVE verbietet hands/people/faces universell. Hero-
+//     Bilder sind reine Food-Photography, kein Creator im Bild.
+export const JULIA_STYLE: BrandImageStyle = {
+  brandSlug: "juliabreitenfeld",
+  // Five lighting strings — harsh, contrasty, outdoor-feel. Bewusst gegen
+  // Bienes warm-soft kalibriert; Julias echte Posts haben crisp hard shadows,
+  // nicht weiches Morgen-Diffus.
+  lightingOptions: [
+    "bright direct sunlight from the upper right, crisp hard shadows on the surface",
+    "harsh midday outdoor sun overhead, defined sharp shadow edges",
+    "natural outdoor daylight, contrasty with strong dark shadow lines",
+    "bright daylight streaming through a large window, hard unfiltered light catching the dish edges",
+    "high-contrast Instagram-natural daylight, sharp clean shadows on the counter",
+  ],
+  // Five scene options, alle Variationen auf bone-grey concrete mit scattered
+  // loose ingredients. Wichtig: KEIN cutting board, KEIN bowl mit ingredients
+  // im Background — das ist Bienes Signatur und wuerde Julia falsch lesen.
+  sceneOptions: [
+    "a bone-grey concrete counter with subtle striations, whole loose ingredients scattered casually around",
+    "a light neutral stone surface with raw whole ingredients tossed around the edges",
+    "a rough bone-grey concrete surface dotted with whole main-ingredient pieces nearby",
+    "a minimal pale-grey concrete with fresh whole ingredients scattered around the dish",
+    "a neutral grey concrete surface with main-ingredient items casually placed alongside",
+  ],
+  styleSuffix: "",
+  // Brand-spezifische Negatives. Wir negieren explizit Bienes Signature-
+  // Elemente (cutting board + bowl) und Editorial-Styling — Julias Look ist
+  // bewusst Insta-real, nicht Cookbook-precious.
+  negativeAddition:
+    "no wooden cutting board, no ceramic bowl of ingredients in background, no editorial styling, no soft studio lighting, no rigid centered plating, no professional cookbook composition, no marble counter, no warm cozy magazine look, no white tablecloth, no linen napkin",
+  // Camera/Aesthetic-Anker — ersetzt Jan's "Leica SL2 cookbook" mit iPhone-
+  // Insta-real. Auf den Reel-Covers ist deutlich erkennbar: die Schatten der
+  // Hand sind sichtbar (= ein Profi-Fotograf haette die wegretuschiert), die
+  // Kamera ist nah dran, das Licht ist hart-natuerlich. Das wollen wir.
+  cameraAesthetic:
+    "iPhone food-snap aesthetic, natural unposed Instagram-real moment with harsh outdoor daylight — NOT studio cookbook style, NOT magazine editorial, NOT precious composition. Bright crisp daylight reality, real-life feel.",
+  // Julias Signature-Framing: WHOLE loose ingredients verstreut. NIE in bowl,
+  // NIE auf cutting board. Beispiele aus den Screenshots: Schoko-Kuss mit
+  // losen Erdbeeren + Zitrone + Minze daneben (nicht arrangiert, einfach
+  // hingelegt). Diese "casually tossed there"-Qualitaet ist der Punkt.
+  heroElementGuidance:
+    "Scattered loose WHOLE ingredients casually placed around the dish — e.g. whole strawberries, lemon halves, fresh herb sprigs, whole tomatoes, raw vegetables, fruit pieces. NEVER arranged in a bowl, NEVER on a cutting board, NEVER staged or composed. Should look like ingredients were casually tossed there straight from the fridge moments before the shot.",
+  // Per-shape angle overrides. Julias plated Shots (Pasta-Salat, Carbonara,
+  // Caesar-Salat, Lasagne in Glas-Auflaufform) sind ueberwiegend top-down
+  // mit Glas-Vessel sichtbar; layered/tall dishes 30-45° three-quarter.
+  defaultAngles: {
+    flat: "from a high overhead angle (about 75-85°), with the dish often in a clear glass oven dish or glass bowl, whole loose ingredients scattered around the rim on the bone-grey concrete",
+    mixed: "from a slight 30-45° tilt-down angle on bone-grey concrete, harsh shadows visible, whole loose ingredients scattered casually nearby",
+    layered: "from a close-up 30-35° side angle, harsh outdoor light catching the texture edges, loose ingredients visible in the background",
+    tall: "from an eye-level or 45° angle, dish standing on bone-grey concrete with whole ingredients scattered in the foreground",
+    liquid: "from a 30-45° angle into a clear glass bowl on concrete, surface texture and natural light reflection visible",
+  },
+};
+
 // ─── Lookup by brand slug ────────────────────────────────────────────────────
 const STYLES: Record<string, BrandImageStyle> = {
   biene: BIENE_STYLE,
+  juliabreitenfeld: JULIA_STYLE,
 };
 
 // ─── Per-Run Style-Override (PR 16) ──────────────────────────────────────────
