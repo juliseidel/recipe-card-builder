@@ -22,6 +22,9 @@ type StatusResponse = {
   recipeCount: number;
   suggestionCount: number;
   error: string | null;
+  startedAt?: string;
+  apifyRunId?: string;
+  platform?: "instagram" | "tiktok";
 };
 
 const POLL_INTERVAL_MS = 4000;
@@ -38,6 +41,33 @@ export function LibraryStatusBanner({
 }) {
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [hidden, setHidden] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
+
+  const handleRetry = async () => {
+    if (retrying) return;
+    setRetrying(true);
+    setRetryError(null);
+    try {
+      const res = await fetch(
+        `/api/brands/${encodeURIComponent(brand.slug)}/retry-backfill`,
+        { method: "POST" }
+      );
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error ?? "Retry fehlgeschlagen.");
+      }
+      // Status zurücksetzen — der nächste Poll holt den frischen 'running'.
+      setStatus(null);
+      setHidden(false);
+    } catch (err) {
+      setRetryError(
+        err instanceof Error ? err.message : "Retry fehlgeschlagen."
+      );
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -104,6 +134,16 @@ export function LibraryStatusBanner({
   const isDone = status.status === "done";
   const isFailed = status.status === "failed";
 
+  // Stale-Detection: wenn 'running' laenger als 5 Min ohne Reel-Progress,
+  // bieten wir einen Retry-Button an. Self-Healing in der Status-Route
+  // sollte das normalerweise abfangen — aber als Sicherheitsnetz fuer
+  // den User, falls Apify wirklich haengt oder unsere Auto-Recovery
+  // failed.
+  const startedAt = status.startedAt ? new Date(status.startedAt).getTime() : 0;
+  const minutesRunning = startedAt ? (Date.now() - startedAt) / 60000 : 0;
+  const isStaleRunning = isRunning && minutesRunning > 5 && status.reelCount === 0;
+  const canRetry = isFailed || isStaleRunning;
+
   const isError = isFailed;
   const accentColor = isError ? "#c53030" : brand.tokens.accent;
   const bgColor = isError ? "#fff5f5" : brand.tokens.surface;
@@ -169,22 +209,55 @@ export function LibraryStatusBanner({
             </span>
           </div>
         </div>
-        {isFailed ? null : (
-          <div className="flex items-center gap-4 text-[11px] font-mono uppercase tracking-[0.16em]"
-            style={{ color: brand.tokens.inkMuted }}
-          >
-            <span>{status.reelCount} Posts</span>
-            <span aria-hidden>·</span>
-            <span>{status.recipeCount} Rezepte</span>
-            {status.suggestionCount > 0 ? (
-              <>
-                <span aria-hidden>·</span>
-                <span>{status.suggestionCount} Pack-Ideen</span>
-              </>
-            ) : null}
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {!isFailed ? (
+            <div
+              className="flex items-center gap-4 text-[11px] font-mono uppercase tracking-[0.16em]"
+              style={{ color: brand.tokens.inkMuted }}
+            >
+              <span>{status.reelCount} Posts</span>
+              <span aria-hidden>·</span>
+              <span>{status.recipeCount} Rezepte</span>
+              {status.suggestionCount > 0 ? (
+                <>
+                  <span aria-hidden>·</span>
+                  <span>{status.suggestionCount} Pack-Ideen</span>
+                </>
+              ) : null}
+            </div>
+          ) : null}
+          {canRetry ? (
+            <button
+              type="button"
+              onClick={handleRetry}
+              disabled={retrying}
+              className="rounded-full px-4 py-1.5 text-[12px] font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              style={{
+                background: isError ? "#c53030" : brand.tokens.ink,
+                color: "white",
+              }}
+            >
+              {retrying
+                ? "Wird neu gestartet…"
+                : isStaleRunning
+                  ? "Neu starten"
+                  : "Erneut versuchen"}
+            </button>
+          ) : null}
+        </div>
       </div>
+      {retryError ? (
+        <div
+          className="border-t px-6 py-2 text-[12px] lg:px-10"
+          style={{
+            borderColor: "rgba(197, 48, 48, 0.2)",
+            background: "#fff5f5",
+            color: "#9b2c2c",
+          }}
+        >
+          {retryError}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,13 +1,13 @@
-import { NextResponse, after } from "next/server";
-import { fetchApifyDataset, ApifyError } from "@/lib/integrations/apify";
-import { fetchTikTokDataset } from "@/lib/integrations/apify-tiktok";
+import { NextResponse } from "next/server";
+import { ApifyError } from "@/lib/integrations/apify";
 import {
   getScrapeByRunId,
   updateScrapeStatus,
-  upsertReels,
-  countReelsForBrand,
 } from "@/lib/creator-reels-server";
-import { runClassificationAndSuggestions } from "@/lib/reel-library/classify-and-suggest";
+import {
+  processSucceededRun,
+  tryClaimScrapeProcessing,
+} from "@/lib/reel-library/process-succeeded-run";
 
 // Apify-Webhook-Receiver. Apify ruft uns auf, sobald ein gestarteter
 // Backfill-Run fertig ist (SUCCEEDED / FAILED / TIMED_OUT / ABORTED).
@@ -92,45 +92,26 @@ export async function POST(req: Request) {
   }
 
   // SUCCEEDED: Dataset abrufen, Reels persistieren, Klassifikation kicken.
-  // Plattform-aware: scrape.platform entscheidet, welcher Dataset-Parser
-  // angesprochen wird. Falls Spalte noch nicht da (Bestands-Row vor der
-  // platform-extension Migration), default 'instagram'.
+  // Lock via tryClaimScrapeProcessing — falls die Status-Route gerade
+  // parallel Self-Healing macht (gleicher Webhook-Pfad), gewinnt nur ein
+  // Caller. Der andere sieht status='classifying' und gibt 200 zurueck.
   if (status.includes("SUCCEEDED") && datasetId) {
     const platform = scrape.platform ?? "instagram";
+
+    const claimed = await tryClaimScrapeProcessing(scrape.id);
+    if (!claimed) {
+      // Status war nicht mehr 'running' — andere Pipeline ist schon dran.
+      return NextResponse.json({ status: "already-processing" });
+    }
+
     try {
-      const reels =
-        platform === "tiktok"
-          ? await fetchTikTokDataset(datasetId)
-          : await fetchApifyDataset(datasetId);
-      const inserted = await upsertReels(scrape.brand_slug, reels, platform);
-      const total = await countReelsForBrand(scrape.brand_slug);
-      console.log(
-        `[apify-webhook] brand=${scrape.brand_slug} platform=${platform} inserted=${inserted} total=${total}`
-      );
-
-      // Status auf 'classifying' setzen — Frontend kann das im Banner
-      // anzeigen ("Klassifiziere 247 Reels..." statt "Lade...").
-      await updateScrapeStatus(scrape.id, "classifying", {
-        reelCount: total,
+      const { inserted, total } = await processSucceededRun({
+        scrapeId: scrape.id,
+        brandSlug: scrape.brand_slug,
+        datasetId,
+        platform,
       });
-
-      // Klassifikation + Pack-Vorschlaege im Hintergrund. after() laeuft
-      // weiter, nachdem die Response zurueckgegangen ist — Apify bekommt
-      // schnell ein 200 und retried nicht.
-      after(async () => {
-        try {
-          await runClassificationAndSuggestions({
-            scrapeId: scrape.id,
-            brandSlug: scrape.brand_slug,
-          });
-        } catch (err) {
-          console.error("[apify-webhook] classify-and-suggest failed", err);
-          await updateScrapeStatus(scrape.id, "failed", {
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      });
-
+      await updateScrapeStatus(scrape.id, "classifying", { reelCount: total });
       return NextResponse.json({ status: "processing", inserted });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
