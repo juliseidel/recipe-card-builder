@@ -1143,15 +1143,13 @@ function PatisseriePage({
             ))}
           </View>
 
-          {/* Story-Block — bei kurzen Recipes (spacious-Density), wo
-              Body-Hoehe Reserve hat. Konstante margin/padding fuer
-              Konsistenz zwischen allen Karten. */}
+          {/* Story-Block — Konstante padding/margin. Konsistenz first. */}
           {showStoryHere ? (
             <View
               style={{
-                marginTop: 18,
-                paddingTop: 12,
-                paddingBottom: 12,
+                marginTop: 22,
+                paddingTop: 14,
+                paddingBottom: 14,
                 paddingLeft: 14,
                 borderLeftWidth: 2,
                 borderLeftColor: t.accent,
@@ -1172,8 +1170,8 @@ function PatisseriePage({
             </View>
           ) : null}
 
-          {/* MAN NEHME — konstanter marginTop fuer Layout-Konsistenz */}
-          <View style={{ marginTop: 22 }}>
+          {/* MAN NEHME — konstanter, groesserer marginTop fuer Atmung */}
+          <View style={{ marginTop: 28 }}>
             <SectionHeader label="Man nehme" theme={t} italic />
             <IngredientsList
               grouped={grouped}
@@ -1184,8 +1182,8 @@ function PatisseriePage({
             />
           </View>
 
-          {/* ZUBEREITUNG — konstanter marginTop fuer Layout-Konsistenz */}
-          <View style={{ marginTop: 18 }}>
+          {/* ZUBEREITUNG — konstanter, groesserer marginTop fuer Atmung */}
+          <View style={{ marginTop: 24 }}>
             <SectionHeader label="Zubereitung" theme={t} italic />
             <StepsList
               steps={recipe.steps}
@@ -2029,10 +2027,13 @@ const PATISSERIE_DENSITY: Record<
     microsPadBottom: number;
   }
 > = {
-  // v3 (User-Feedback): paddingTop/Bottom angeglichen, damit Karten
-  // unabhaengig von Density visuell konsistent wirken. stepNumFontSize bei
-  // spacious von 24 auf 20 reduziert — bei kurzen Step-Texten wirkte die
-  // Riesen-"1" gegenueber dem Text vertikal verschoben.
+  // v4 (User-Feedback): kurze Karten sahen "halbleer" aus weil Content
+  // nur ~50% der A4-Hoehe fuellte. Spacious bekommt deutlich mehr Air
+  // pro Ingredient-Row und pro Step (ingRowPadV 5→9, stepMarginBottom
+  // 11→20) — dadurch fuellt das Content die Karte natuerlich ohne
+  // dass wir vertikales Zentrieren brauchen (das hatte die Konsistenz
+  // gebrochen). Step-Number-Sizes auf max 18 reduziert, damit die "1"
+  // visuell weniger gegenueber dem Step-Text "fett oben" wirkt.
   compact: {
     headPadTop: 22,
     headPadBottom: 12,
@@ -2040,12 +2041,12 @@ const PATISSERIE_DENSITY: Record<
     subtitleFontSize: 12,
     bodyPadTop: 30,
     bodyPadBottom: 28,
-    ingRowPadV: 2.5,
+    ingRowPadV: 3,
     ingFontSize: 9,
     ingNoteFontSize: 6.5,
-    stepMarginBottom: 7,
+    stepMarginBottom: 8,
     stepFontSize: 9,
-    stepNumFontSize: 16,
+    stepNumFontSize: 14,
     microsPadTop: 9,
     microsPadBottom: 10,
   },
@@ -2054,30 +2055,30 @@ const PATISSERIE_DENSITY: Record<
     headPadBottom: 16,
     titleFontSize: 36,
     subtitleFontSize: 14,
-    bodyPadTop: 32,
-    bodyPadBottom: 30,
-    ingRowPadV: 3.5,
+    bodyPadTop: 34,
+    bodyPadBottom: 32,
+    ingRowPadV: 5,
     ingFontSize: 9.5,
     ingNoteFontSize: 7,
-    stepMarginBottom: 9,
+    stepMarginBottom: 12,
     stepFontSize: 9.5,
-    stepNumFontSize: 18,
+    stepNumFontSize: 16,
     microsPadTop: 8,
     microsPadBottom: 9,
   },
   spacious: {
-    headPadTop: 32,
-    headPadBottom: 18,
+    headPadTop: 34,
+    headPadBottom: 20,
     titleFontSize: 40,
     subtitleFontSize: 15,
-    bodyPadTop: 34,
-    bodyPadBottom: 32,
-    ingRowPadV: 5,
+    bodyPadTop: 38,
+    bodyPadBottom: 36,
+    ingRowPadV: 9,
     ingFontSize: 10,
     ingNoteFontSize: 7.5,
-    stepMarginBottom: 11,
+    stepMarginBottom: 20,
     stepFontSize: 10,
-    stepNumFontSize: 20,
+    stepNumFontSize: 18,
     microsPadTop: 11,
     microsPadBottom: 12,
   },
@@ -4989,14 +4990,14 @@ function StepsList({
               key={item.index}
               style={{
                 flexDirection: "row",
-                // alignItems "baseline" sorgt dafuer dass die Step-Nummer
-                // und der Step-Text auf der typografischen Grundlinie
-                // ausgerichtet sind, statt am oberen Rand (was bei
-                // groesserer Nummer-FontSize visuell verschoben wirkte —
-                // "Drücke die Bananen" hing tiefer als die "1").
-                alignItems: "baseline",
+                // flex-start (default) — Number sitzt OBEN, neben der
+                // ersten Text-Zeile. alignItems "baseline" hat react-pdf
+                // bei multi-line Text auf die letzte Zeile gepinnt, was
+                // die Nummer fett nach unten verschob ("3" war Mitte des
+                // 3-Zeilen-Texts). Mit flex-start + lineHeight gematcht
+                // sitzen Number und erste Text-Zeile visuell aligned.
                 marginBottom: stepMarginBottom,
-                gap: 8,
+                gap: 10,
               }}
             >
               <Text
@@ -5005,8 +5006,12 @@ function StepsList({
                   fontSize: stepNumFontSize,
                   fontWeight: bold ? 700 : 400,
                   color: theme.accent,
-                  width: 18,
-                  lineHeight: 1,
+                  width: 20,
+                  // lineHeight 1.45 matched die Text-Spalte (stepFontSize *
+                  // 1.45). Damit haben Number-line-box und Text-line-box
+                  // exakt die gleiche Hoehe — Top-Edges aligned heisst
+                  // visuell Number sitzt auf der ersten Text-Zeile.
+                  lineHeight: 1.45,
                 }}
               >
                 {item.index + 1}
