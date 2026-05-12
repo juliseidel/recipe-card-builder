@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 import { startReelBackfill } from "@/lib/integrations/apify";
+import { startTikTokBackfill } from "@/lib/integrations/apify-tiktok";
 import {
   createScrape,
   updateScrapeRunId,
   updateScrapeStatus,
 } from "@/lib/creator-reels-server";
 import type { Brand } from "@/lib/brands";
+import type { SocialPlatform } from "@/lib/integrations/platform";
 
 // Daily-Refresh-Cron. Vercel feuert das alle 24h (siehe vercel.json),
 // dann scrapen wir fuer jeden DB-Brand die neuesten ~50 Posts der letzten
@@ -79,7 +81,10 @@ export async function GET(req: Request) {
       continue;
     }
 
-    const scrapeId = await createScrape(brand.slug);
+    // Plattform aus brand.platform — Default 'instagram' fuer Brands die
+    // vor der platform-extension Migration angelegt wurden.
+    const platform: SocialPlatform = brand.platform ?? "instagram";
+    const scrapeId = await createScrape(brand.slug, platform);
     if (!scrapeId) {
       results.push({
         brandSlug: brand.slug,
@@ -90,12 +95,20 @@ export async function GET(req: Request) {
     }
 
     try {
-      const { runId } = await startReelBackfill({
-        username: handle,
-        webhookUrl,
-        resultsLimit: 50,
-        onlyPostsNewerThanDays: 30,
-      });
+      const { runId } =
+        platform === "tiktok"
+          ? await startTikTokBackfill({
+              username: handle,
+              webhookUrl,
+              resultsLimit: 50,
+              onlyPostsNewerThanDays: 30,
+            })
+          : await startReelBackfill({
+              username: handle,
+              webhookUrl,
+              resultsLimit: 50,
+              onlyPostsNewerThanDays: 30,
+            });
       await updateScrapeRunId(scrapeId, runId);
       results.push({ brandSlug: brand.slug, status: "started", runId });
     } catch (err) {

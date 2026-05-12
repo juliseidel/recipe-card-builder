@@ -141,7 +141,9 @@ export function InstagramImportCard({
                 className="text-[12px] font-semibold uppercase tracking-[0.14em]"
                 style={{ color: pack.mood.accent }}
               >
-                Aus Instagram importiert
+                {importedSource.url.includes("tiktok")
+                  ? "Aus TikTok importiert"
+                  : "Aus Instagram importiert"}
                 {importedConfidence ? (
                   <span
                     className="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
@@ -174,7 +176,9 @@ export function InstagramImportCard({
               >
                 {importedSource.username
                   ? `@${importedSource.username}`
-                  : "Instagram-Post"}{" "}
+                  : importedSource.url.includes("tiktok")
+                    ? "TikTok-Video"
+                    : "Instagram-Post"}{" "}
                 ·{" "}
                 <a
                   href={importedSource.url}
@@ -265,14 +269,14 @@ export function InstagramImportCard({
             className="font-display text-[20px] leading-tight"
             style={{ color: pack.mood.ink }}
           >
-            Aus Instagram-Link erstellen
+            Aus Link erstellen
           </h2>
           <p
             className="text-[13px] leading-snug"
             style={{ color: pack.mood.inkSoft }}
           >
-            Reel- oder Post-URL einfügen — wir lesen Caption und Nährwerte
-            aus und füllen die Felder unten automatisch.
+            Instagram-Reel, TikTok-Video oder Post-URL einfügen — wir lesen
+            Caption und Nährwerte aus und füllen die Felder unten automatisch.
           </p>
         </div>
       </div>
@@ -298,7 +302,7 @@ export function InstagramImportCard({
               submit();
             }
           }}
-          placeholder="https://www.instagram.com/reel/..."
+          placeholder="https://www.instagram.com/reel/… oder https://www.tiktok.com/@…/video/…"
           disabled={isLoading}
           inputMode="url"
           autoComplete="off"
@@ -306,7 +310,7 @@ export function InstagramImportCard({
           spellCheck={false}
           className="min-w-0 flex-1 bg-transparent px-2 py-2 text-[14px] outline-none placeholder:text-ink-subtle disabled:opacity-50"
           style={{ color: pack.mood.ink }}
-          aria-label="Instagram-URL"
+          aria-label="Instagram- oder TikTok-URL"
         />
         <button
           type="button"

@@ -1,19 +1,27 @@
 import { NextResponse } from "next/server";
 import { startReelBackfill, ApifyError } from "@/lib/integrations/apify";
+import { startTikTokBackfill } from "@/lib/integrations/apify-tiktok";
 import {
   createScrape,
   updateScrapeRunId,
   updateScrapeStatus,
 } from "@/lib/creator-reels-server";
+import type { SocialPlatform } from "@/lib/integrations/platform";
 
 // Startet den 2-Jahres-Reel-Backfill fuer einen Brand. Wird vom Onboarding
 // nach erfolgreichem addCustomBrand() aufgerufen — fire-and-forget vom
 // Client, der User landet sofort im Workspace, der Banner zeigt den
 // Fortschritt.
 //
+// Plattform-aware: Body akzeptiert platform 'instagram' | 'tiktok'.
+// Default 'instagram' aus Backward-Compat. Wird in creator_scrapes.platform
+// persistiert, damit der Webhook-Receiver den richtigen Dataset-Parser
+// + die richtige Folge-Pipeline ansprechen kann.
+//
 // Flow:
-//   1. creator_scrapes-Row anlegen (status='running')
-//   2. Apify-Run async starten mit Webhook → unser /api/apify-webhook
+//   1. creator_scrapes-Row anlegen (status='running', platform=...)
+//   2. Apify-Run async starten (Instagram-Actor ODER TikTok-Actor) mit
+//      Webhook → unser /api/apify-webhook
 //   3. apify_run_id in die Scrape-Row schreiben
 //   4. Sofort 202 zurueck — der Webhook macht den Rest
 //
@@ -25,10 +33,12 @@ export const maxDuration = 30;
 type Body = {
   /** Slug des Brands, fuer den der Backfill laeuft (DB-Brand, kein Code-Brand). */
   brandSlug: string;
-  /** Instagram-Handle des Creators ohne @. */
+  /** Handle des Creators ohne @ (Instagram-Username oder TikTok-Username). */
   username: string;
   /** Optional: max Posts. Default 500 fuer ~2 Jahre. */
   resultsLimit?: number;
+  /** Plattform — default 'instagram' fuer Backward-Compat. */
+  platform?: SocialPlatform;
 };
 
 export async function POST(req: Request) {
@@ -52,18 +62,28 @@ export async function POST(req: Request) {
     );
   }
 
+  if (
+    body.platform !== undefined &&
+    body.platform !== "instagram" &&
+    body.platform !== "tiktok"
+  ) {
+    return NextResponse.json(
+      { error: "platform muss 'instagram' oder 'tiktok' sein." },
+      { status: 400 }
+    );
+  }
+  const platform: SocialPlatform = body.platform ?? "instagram";
+
   // 1. Scrape-Row anlegen, damit wir eine ID haben fuer Failure-Marker.
   // Wenn das null returnt, ist mit hoher Wahrscheinlichkeit die SQL-
-  // Migration (sql/creator-reels-table.sql) nicht ausgefuehrt worden.
-  // Wir geben dem Frontend einen klar erkennbaren `needsSetup`-Marker,
-  // damit der Banner eine konkrete Anweisung zeigen kann statt stumm
-  // zu failen.
-  const scrapeId = await createScrape(body.brandSlug);
+  // Migration (sql/creator-reels-table.sql + sql/platform-extension.sql)
+  // nicht ausgefuehrt worden.
+  const scrapeId = await createScrape(body.brandSlug, platform);
   if (!scrapeId) {
     return NextResponse.json(
       {
         error:
-          "Reel-Library-Tabellen fehlen in Supabase. Bitte sql/creator-reels-table.sql einmal im Supabase-SQL-Editor ausfuehren.",
+          "Reel-Library-Tabellen fehlen in Supabase oder platform-Spalte nicht vorhanden. Bitte sql/creator-reels-table.sql + sql/platform-extension.sql im Supabase-SQL-Editor ausfuehren.",
         needsSetup: true,
       },
       { status: 503 }
@@ -85,14 +105,25 @@ export async function POST(req: Request) {
     : `${origin}/api/apify-webhook`;
 
   try {
-    const { runId } = await startReelBackfill({
-      username: body.username,
-      webhookUrl,
-      resultsLimit: body.resultsLimit ?? 500,
-    });
+    // Route zum richtigen Apify-Actor je nach Plattform. Beide setzen
+    // Webhook auf den gleichen Endpoint; der Webhook liest die Plattform
+    // aus creator_scrapes.platform (NICHT aus dem Webhook-Payload — Apify
+    // hat keinen Custom-Metadata-Channel im Webhook-Body).
+    const { runId } =
+      platform === "tiktok"
+        ? await startTikTokBackfill({
+            username: body.username,
+            webhookUrl,
+            resultsLimit: body.resultsLimit ?? 500,
+          })
+        : await startReelBackfill({
+            username: body.username,
+            webhookUrl,
+            resultsLimit: body.resultsLimit ?? 500,
+          });
     await updateScrapeRunId(scrapeId, runId);
     return NextResponse.json(
-      { status: "started", scrapeId, runId },
+      { status: "started", scrapeId, runId, platform },
       { status: 202 }
     );
   } catch (err) {
@@ -102,6 +133,7 @@ export async function POST(req: Request) {
       {
         error: msg,
         stage: "apify-start",
+        platform,
       },
       {
         status: err instanceof ApifyError && err.status === 401 ? 500 : 422,

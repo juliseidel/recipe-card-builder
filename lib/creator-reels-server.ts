@@ -1,5 +1,6 @@
 import { getServerSupabase, hasServerSupabase } from "./supabase-server";
 import type { BackfillReel } from "./integrations/apify";
+import type { SocialPlatform } from "./integrations/platform";
 
 // Server-Side DB-Access fuer die Reel-Library + Scrape-Tracker +
 // Pack-Suggestions. Alle Schreibzugriffe gehen ueber den Service-Role-
@@ -21,6 +22,7 @@ export type ScrapeRow = {
   recipe_count: number;
   suggestion_count: number;
   error: string | null;
+  platform: SocialPlatform;
 };
 
 export type ReelClassification = {
@@ -58,6 +60,9 @@ export type ReelRow = {
   estimated_time_minutes: number | null;
   classified_at: string | null;
   scraped_at: string;
+  /** Quelle des Reels — gleicher Wert wie creator_scrapes.platform beim
+   *  ersten Insert. Default 'instagram' fuer Bestands-Rows. */
+  platform: SocialPlatform;
 };
 
 export type SuggestionStatus = "pending" | "accepted" | "dismissed";
@@ -85,12 +90,15 @@ export type SuggestionRow = {
 // der Caller fuer subsequent Updates braucht. apify_run_id wird gleich
 // danach via updateScrapeRunId gesetzt — wir splitten das, damit wir die
 // DB-Row schon haben, wenn der Apify-Call selber fehlschlaegt.
-export async function createScrape(brandSlug: string): Promise<string | null> {
+export async function createScrape(
+  brandSlug: string,
+  platform: SocialPlatform = "instagram"
+): Promise<string | null> {
   if (!hasServerSupabase()) return null;
   const supabase = getServerSupabase();
   const { data, error } = await supabase
     .from("creator_scrapes")
-    .insert({ brand_slug: brandSlug, status: "running" })
+    .insert({ brand_slug: brandSlug, status: "running", platform })
     .select("id")
     .single();
   if (error) {
@@ -183,7 +191,8 @@ export async function getLatestScrapeForBrand(
 // tatsaechlich eingefuegter Rows (also der NEUEN Reels).
 export async function upsertReels(
   brandSlug: string,
-  reels: BackfillReel[]
+  reels: BackfillReel[],
+  platform: SocialPlatform = "instagram"
 ): Promise<number> {
   if (!hasServerSupabase()) return 0;
   if (reels.length === 0) return 0;
@@ -209,6 +218,7 @@ export async function upsertReels(
       comment_count: r.commentCount,
       hashtags: r.hashtags,
       raw: r.raw,
+      platform,
     }));
     const { data, error } = await supabase
       .from("creator_reels")

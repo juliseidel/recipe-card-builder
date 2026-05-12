@@ -38,6 +38,25 @@ export type BrandImageStyleOverride = {
   >;
 };
 
+/** Plattform-Identifier — welche Quelle wird beim Reel-Backfill,
+ *  Recipe-Import und beim Daily-Refresh angesprochen. Code-Brands haben
+ *  das Feld leer (Default = Instagram fuer Backward-Compat). */
+export type BrandPlatform = "instagram" | "tiktok";
+
+/** Audience-Insights aus dem Gemini-Analyzer (lib/ai/analyze-audience.ts).
+ *  Wird im Onboarding generiert und im Workspace-Hero / spaeter im
+ *  Pack-Suggester als Steuersignal genutzt. */
+export type BrandAudienceAnalysis = {
+  primaryDemographic: string;
+  ageRange: string;
+  genderTendency: string;
+  interests: string[];
+  painPoints: string[];
+  contentStyle: string;
+  tonality: string;
+  summary: string;
+};
+
 export type Brand = {
   slug: string;
   name: string;
@@ -56,6 +75,13 @@ export type Brand = {
    *  liegt in lib/ai/brand-image-style.ts. Bei DB-Brands von der Vision-
    *  Analyse der letzten Reel-Covers generiert und hier persistiert. */
   imageStyle?: BrandImageStyleOverride;
+  /** Quelle des Creators — Instagram oder TikTok. Default 'instagram'
+   *  fuer Backward-Compat mit bestehenden Brands. */
+  platform?: BrandPlatform;
+  /** Audience-Insights aus dem KI-Analyzer beim Onboarding. Wird optional
+   *  in der Workspace-UI gezeigt und kann vom Pack-Suggester genutzt
+   *  werden, um Vorschlaege auf die echte Zielgruppe zu kalibrieren. */
+  audienceAnalysis?: BrandAudienceAnalysis;
 };
 
 export const brands: Brand[] = [

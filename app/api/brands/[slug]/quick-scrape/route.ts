@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { quickScrapeReels, ApifyError } from "@/lib/integrations/apify";
+import { quickScrapeTikTokReels } from "@/lib/integrations/apify-tiktok";
 import {
   upsertReels,
   getUnclassifiedReels,
@@ -7,6 +8,7 @@ import {
 } from "@/lib/creator-reels-server";
 import { classifyReels } from "@/lib/ai/classify-reels";
 import { loadBrand } from "@/lib/custom-brands-server";
+import type { SocialPlatform } from "@/lib/integrations/platform";
 
 // Quick-Scrape: holt SOFORT die letzten ~30 Posts eines Creators, klassi-
 // fiziert sie, und persistiert sie. Wird vom Auto-Pack-Tab genutzt, wenn:
@@ -56,25 +58,34 @@ export async function POST(req: Request, { params }: RouteParams) {
     return NextResponse.json(
       {
         error:
-          "Brand hat keinen Instagram-Handle gesetzt. Bitte im Brand-Setup nachpflegen.",
+          "Brand hat keinen Handle gesetzt. Bitte im Brand-Setup nachpflegen.",
       },
       { status: 422 }
     );
   }
+  const platform: SocialPlatform = brand.platform ?? "instagram";
 
-  // 1. Apify synchron pingen
+  // 1. Apify synchron pingen (plattform-spezifisch)
   let reels;
   try {
-    reels = await quickScrapeReels({
-      username,
-      resultsLimit: Math.max(10, Math.min(body.limit ?? 30, 60)),
-      onlyPostsNewerThanDays: Math.max(7, Math.min(body.days ?? 30, 90)),
-    });
+    reels =
+      platform === "tiktok"
+        ? await quickScrapeTikTokReels({
+            username,
+            resultsLimit: Math.max(10, Math.min(body.limit ?? 30, 60)),
+            onlyPostsNewerThanDays: Math.max(7, Math.min(body.days ?? 30, 90)),
+          })
+        : await quickScrapeReels({
+            username,
+            resultsLimit: Math.max(10, Math.min(body.limit ?? 30, 60)),
+            onlyPostsNewerThanDays: Math.max(7, Math.min(body.days ?? 30, 90)),
+          });
   } catch (err) {
     return NextResponse.json(
       {
         error: err instanceof Error ? err.message : "Apify-Scrape fehlgeschlagen.",
         stage: "scrape",
+        platform,
       },
       {
         status: err instanceof ApifyError && err.status === 401 ? 500 : 422,
@@ -85,7 +96,7 @@ export async function POST(req: Request, { params }: RouteParams) {
   // 2. Reels in DB persistieren (Upsert mit ig_id-Dedup → nur neue Rows).
   let inserted = 0;
   try {
-    inserted = await upsertReels(slug, reels);
+    inserted = await upsertReels(slug, reels, platform);
   } catch (err) {
     // Hochwahrscheinlich: SQL-Migration fehlt.
     const msg = err instanceof Error ? err.message : String(err);

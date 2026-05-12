@@ -932,8 +932,8 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                   pack={pack}
                 />
                 <ModeTab
-                  label="Aus Instagram-Link"
-                  description="Reel oder Post — KI füllt das Form"
+                  label="Aus Link"
+                  description="Instagram-Reel · TikTok-Video — KI füllt das Form"
                   icon="instagram"
                   active={mode === "instagram"}
                   onClick={() => setMode("instagram")}
@@ -1629,7 +1629,7 @@ export default function NewRecipePage({ params }: NewRecipePageProps) {
                     inputMode="url"
                     value={sourceUrl}
                     onChange={(e) => setSourceUrl(e.target.value)}
-                    placeholder="https://www.instagram.com/reel/…"
+                    placeholder="https://www.instagram.com/reel/… oder https://www.tiktok.com/@…"
                     className="flex-1 bg-transparent text-[14px] outline-none placeholder:text-ink-subtle"
                     style={{ color: pack.mood.ink }}
                   />

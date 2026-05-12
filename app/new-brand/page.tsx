@@ -4,7 +4,11 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import type { Brand } from "@/lib/brands";
+import type {
+  Brand,
+  BrandAudienceAnalysis,
+  BrandPlatform,
+} from "@/lib/brands";
 import {
   addCustomBrand,
   brandSlugTaken,
@@ -56,35 +60,43 @@ export default function NewBrandPage() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Instagram-Auto-Fill state. User tippt Handle → Apify scraped Profil →
-  // Gemini analysiert Identity → Server uploaded Avatar. Wir bekommen
-  // alle Form-Felder gleichzeitig zurueck und befuellen den State.
-  // latestPosts halten wir transient — PR 5 wird sie fuer die Brand-DNA-
-  // Vision-Analyse weiternutzen, ohne dass wir Apify nochmal anrufen
-  // muessen.
-  const [igHandle, setIgHandle] = useState("");
-  const [igLoading, setIgLoading] = useState(false);
-  const [igError, setIgError] = useState<string | null>(null);
-  const [igSuccess, setIgSuccess] = useState<string | null>(null);
+  // Auto-Fill-State. User waehlt Plattform (Instagram / TikTok), tippt
+  // Handle, KI scraped Profil + analysiert Identity + Audience. Wir
+  // bekommen alle Form-Felder + Audience-Insights in einem Rutsch zurueck.
+  const [platform, setPlatform] = useState<BrandPlatform>("instagram");
+  const [socialHandle, setSocialHandle] = useState("");
+  const [autoFillLoading, setAutoFillLoading] = useState(false);
+  const [autoFillError, setAutoFillError] = useState<string | null>(null);
+  const [autoFillSuccess, setAutoFillSuccess] = useState<string | null>(null);
+  // Audience-Insights aus dem KI-Analyzer. Wird im Onboarding direkt unter
+  // dem Schnellstart als Karte gerendert und beim Save in brand.audienceAnalysis
+  // persistiert. null = noch nichts analysiert oder Audience-Call failed.
+  const [detectedAudience, setDetectedAudience] =
+    useState<BrandAudienceAnalysis | null>(null);
+  const [followersCount, setFollowersCount] = useState<number | null>(null);
   // Style-Template-Auswahl ist deaktiviert (Mai 2026): jeder Creator
   // bekommt seine Brand-DNA als Code-Brand in lib/ai/brand-image-style.ts
   // hand-kalibriert. brand.imageStyle bleibt null im DB-Eintrag.
 
   const handleAutoFill = async () => {
-    if (!igHandle.trim() || igLoading) return;
-    setIgLoading(true);
-    setIgError(null);
-    setIgSuccess(null);
+    if (!socialHandle.trim() || autoFillLoading) return;
+    setAutoFillLoading(true);
+    setAutoFillError(null);
+    setAutoFillSuccess(null);
     try {
       const res = await fetch("/api/brands/analyze-instagram", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ handle: igHandle.trim() }),
+        body: JSON.stringify({
+          handle: socialHandle.trim(),
+          platform,
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
         throw new Error(
-          data?.error ?? "Konnte das Instagram-Profil nicht analysieren."
+          data?.error ??
+            `Konnte das ${platform === "tiktok" ? "TikTok" : "Instagram"}-Profil nicht analysieren.`
         );
       }
       // Identity-Felder uebernehmen — User kann jedes Feld trotzdem noch
@@ -113,25 +125,35 @@ export default function NewBrandPage() {
       if (data.avatarUrl) {
         setAvatarUrl(data.avatarUrl as string);
       }
-      // Follower-Count aus Apify-Profil. raw.followersCount ist eine Zahl
-      // (z.B. 247193) — wir formatieren das kompakt ("247K") und speichern
-      // den String fuer brand.stats.followers.
-      const followersCount = data.raw?.followersCount as number | undefined;
-      if (typeof followersCount === "number" && followersCount > 0) {
-        setFollowers(formatFollowersCompact(followersCount));
+      // Follower-Count aus dem Apify-Profil. Wir behalten sowohl die Zahl
+      // (fuer den Live-Preview unten + Audience-Karte) als auch den
+      // formatierten String fuer brand.stats.followers.
+      const rawFollowers = data.raw?.followersCount as number | undefined;
+      if (typeof rawFollowers === "number" && rawFollowers > 0) {
+        setFollowers(formatFollowersCompact(rawFollowers));
+        setFollowersCount(rawFollowers);
       }
-      // Style-Template-Selection ist deaktiviert — brand.imageStyle bleibt
-      // null, Brand-DNA wird per Code-Brand in lib/ai/brand-image-style.ts
-      // separat hand-kalibriert.
-      setIgSuccess(
-        `Profil @${data.raw?.handle ?? igHandle} importiert — bitte ueberpruefe die Felder unten.`
+      // Audience-Analyse: optional. Wenn der Gemini-Audience-Call failed,
+      // ist data.audience null — wir zeigen dann keine Audience-Karte,
+      // aber das Onboarding laeuft trotzdem normal weiter.
+      if (data.audience) {
+        setDetectedAudience(data.audience as BrandAudienceAnalysis);
+      } else {
+        setDetectedAudience(null);
+      }
+      const audienceNote = data.audience
+        ? " · Zielgruppe analysiert"
+        : "";
+      const platformLabel = platform === "tiktok" ? "TikTok" : "Instagram";
+      setAutoFillSuccess(
+        `${platformLabel}-Profil @${data.raw?.handle ?? socialHandle} importiert${audienceNote}.`
       );
     } catch (err) {
-      setIgError(
+      setAutoFillError(
         err instanceof Error ? err.message : "Auto-Fill fehlgeschlagen."
       );
     } finally {
-      setIgLoading(false);
+      setAutoFillLoading(false);
     }
   };
 
@@ -157,15 +179,16 @@ export default function NewBrandPage() {
       signature: name.trim() ? `Deine ${name.trim()}` : "Dein Creator",
       avatar: avatarUrl ?? "",
       stats: {
-        followers: "",
+        followers: followers.trim(),
         niche: niche.trim() || DEFAULT_BRAND_STATS.niche,
       },
       tokens: selectedMood,
       fonts: DEFAULT_BRAND_FONTS,
       packCount: 0,
       recipeCount: 0,
+      platform,
     }),
-    [name, fullName, handle, bio, tagline, niche, avatarUrl, selectedMood]
+    [name, fullName, handle, bio, tagline, niche, followers, avatarUrl, selectedMood, platform]
   );
 
   const requirements = [
@@ -232,6 +255,11 @@ export default function NewBrandPage() {
       fonts: DEFAULT_BRAND_FONTS,
       packCount: 0,
       recipeCount: 0,
+      // Plattform-Marker fuer Reel-Backfill, Recipe-Import + Daily-Refresh.
+      platform,
+      // Audience-Insights aus dem KI-Analyzer (optional — wenn der Audience-
+      // Call gescheitert ist, lassen wir das Feld weg).
+      ...(detectedAudience ? { audienceAnalysis: detectedAudience } : {}),
       // imageStyle wird bewusst NICHT gesetzt — Brand-DNA wird per
       // Code-Brand in lib/ai/brand-image-style.ts hand-kalibriert.
     };
@@ -270,6 +298,7 @@ export default function NewBrandPage() {
           body: JSON.stringify({
             brandSlug: saved.slug,
             username: cleanedUsername,
+            platform,
           }),
         });
         if (!backfillRes.ok) {
@@ -279,7 +308,7 @@ export default function NewBrandPage() {
             setError(
               "Workspace wurde angelegt, aber Reel-Library kann nicht starten: "
               + (errJson.error ?? "Setup unvollstaendig.")
-              + " Bitte sql/creator-reels-table.sql in Supabase ausfuehren und dann den Workspace nochmal aufrufen."
+              + " Bitte sql/creator-reels-table.sql + sql/platform-extension.sql in Supabase ausfuehren und dann den Workspace nochmal aufrufen."
             );
             // Workspace existiert schon — User kann jederzeit hin
             // navigieren. Wir blockieren nicht weiter.
@@ -332,66 +361,79 @@ export default function NewBrandPage() {
           <div className="flex flex-col gap-8">
             <header className="flex flex-col gap-2">
               <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
-                Schritt 3/3 — Hub-Onboarding
+                Recipe Card Builder · Neuer Workspace
               </span>
               <h1 className="font-display text-[40px] leading-[1.05] tracking-[-0.015em] text-ink">
                 Neuen Creator anlegen
               </h1>
               <p className="text-[14px] leading-relaxed text-ink-muted">
-                Avatar, Name, Handle, ein paar Sätze Bio und ein Mood — und der
-                Workspace ist betriebsbereit. Du landest danach automatisch
-                mit Welcome-Animation in der frischen Identität.
+                Plattform wählen, Profil importieren oder Felder manuell
+                füllen — der Workspace ist mit einem Klick betriebsbereit.
+                Inklusive automatischer Reel-Library, Zielgruppen-Analyse
+                und KI-Bild-Pipeline.
               </p>
             </header>
 
-            {/* Instagram Auto-Fill — Schnellstart */}
+            {/* Profil-Import — Schnellstart aus Instagram oder TikTok */}
             <section
-              className="editor-section flex flex-col gap-4 rounded-3xl border-2 p-6"
+              className="editor-section flex flex-col gap-5 rounded-3xl border-2 p-6"
               style={{
                 borderColor: "var(--color-line-strong)",
                 background:
                   "linear-gradient(135deg, var(--color-accent-soft) 0%, var(--color-canvas) 100%)",
               }}
             >
-              <div className="flex items-start gap-3">
-                <div
-                  className="grid size-9 shrink-0 place-items-center rounded-full"
-                  style={{
-                    background: "var(--color-accent)",
-                    color: "white",
-                  }}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                    <path
-                      d="M12 2L9 9l-7 .75 5.25 5L6 22l6-3.25L18 22l-1.25-7.25L22 9.75 15 9 12 2z"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <h2 className="font-display text-[20px] leading-tight text-ink">
-                    Schnellstart aus Instagram
-                  </h2>
-                  <p className="text-[12.5px] text-ink-muted">
-                    Tipp den Handle und lass die KI alles vorausfüllen — Bio,
-                    Tagline, Niche und Avatar.
-                  </p>
-                </div>
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display text-[22px] leading-tight tracking-[-0.01em] text-ink">
+                  Profil importieren
+                </h2>
+                <p className="text-[12.5px] leading-relaxed text-ink-muted">
+                  Wähle die Plattform und den Handle — die KI lädt Bio,
+                  Avatar, Follower-Zahl und analysiert direkt die Zielgruppe.
+                </p>
+              </div>
+
+              {/* PLATTFORM-TABS — Instagram + TikTok */}
+              <div
+                className="grid grid-cols-2 gap-2 rounded-2xl p-1.5"
+                role="tablist"
+                aria-label="Plattform"
+                style={{
+                  background: "rgba(255,255,255,0.55)",
+                  border: "1px solid var(--color-line)",
+                }}
+              >
+                <PlatformTab
+                  label="Instagram"
+                  hint="Reels · Posts · Carousels"
+                  icon="instagram"
+                  active={platform === "instagram"}
+                  onClick={() => setPlatform("instagram")}
+                />
+                <PlatformTab
+                  label="TikTok"
+                  hint="Videos · Captions"
+                  icon="tiktok"
+                  active={platform === "tiktok"}
+                  onClick={() => setPlatform("tiktok")}
+                />
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <div className="flex flex-1 flex-col gap-1.5">
                   <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-muted">
-                    Instagram-Handle
+                    {platform === "tiktok" ? "TikTok-Handle" : "Instagram-Handle"}
                   </label>
                   <input
                     className="editor-input"
                     type="text"
-                    placeholder="@bienesfitlife"
-                    value={igHandle}
-                    onChange={(e) => setIgHandle(e.target.value)}
+                    placeholder={
+                      platform === "tiktok"
+                        ? "@bienesfitlife"
+                        : "@bienesfitlife"
+                    }
+                    value={socialHandle}
+                    onChange={(e) => setSocialHandle(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -399,33 +441,38 @@ export default function NewBrandPage() {
                       }
                     }}
                     maxLength={50}
-                    disabled={igLoading}
+                    disabled={autoFillLoading}
                   />
                 </div>
                 <button
                   type="button"
                   onClick={handleAutoFill}
-                  disabled={!igHandle.trim() || igLoading}
+                  disabled={!socialHandle.trim() || autoFillLoading}
                   className="rounded-full bg-ink px-5 py-2.5 text-[13px] font-semibold text-white transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {igLoading ? "Lade Profil…" : "Aus Instagram laden"}
+                  {autoFillLoading
+                    ? "Lade Profil…"
+                    : platform === "tiktok"
+                      ? "TikTok importieren"
+                      : "Instagram importieren"}
                 </button>
               </div>
 
-              {igLoading ? (
-                <p className="text-[12px] text-ink-muted">
-                  Apify scraped das Profil, Gemini analysiert Identität, Avatar
-                  wird hochgeladen — kann 15–30 Sekunden dauern.
+              {autoFillLoading ? (
+                <p className="text-[12px] leading-relaxed text-ink-muted">
+                  Apify scraped das Profil, Gemini extrahiert Identität und
+                  analysiert die Zielgruppe parallel — kann 15–30 Sekunden
+                  dauern.
                 </p>
               ) : null}
 
-              {igError ? (
+              {autoFillError ? (
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-800">
-                  {igError}
+                  {autoFillError}
                 </div>
               ) : null}
 
-              {igSuccess ? (
+              {autoFillSuccess ? (
                 <div
                   className="rounded-xl border px-4 py-3 text-[13px]"
                   style={{
@@ -434,17 +481,116 @@ export default function NewBrandPage() {
                     color: "#166534",
                   }}
                 >
-                  ✓ {igSuccess}
+                  ✓ {autoFillSuccess}
                 </div>
               ) : null}
             </section>
+
+            {/* AUDIENCE-INSIGHTS — taucht nur auf, wenn der Audience-Analyzer
+                Daten geliefert hat. Zeigt Demografie, Interests, Pain Points
+                und die KI-Zusammenfassung. Wird beim Save in
+                brand.audienceAnalysis persistiert. */}
+            {detectedAudience ? (
+              <section className="editor-section editor-card flex flex-col gap-4">
+                <div className="flex items-baseline justify-between gap-3">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-muted">
+                      KI-Analyse · Zielgruppe
+                    </span>
+                    <h2 className="font-display text-[20px] leading-tight tracking-[-0.01em] text-ink">
+                      Audience-Profil
+                    </h2>
+                  </div>
+                  {followersCount !== null ? (
+                    <span className="text-[12px] font-medium tabular-nums text-ink-muted">
+                      {followersCount.toLocaleString("de-DE")} Follower
+                    </span>
+                  ) : null}
+                </div>
+
+                <p className="text-[14px] leading-relaxed text-ink">
+                  {detectedAudience.summary}
+                </p>
+
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <AudienceStat
+                    label="Demografie"
+                    value={detectedAudience.primaryDemographic}
+                  />
+                  <AudienceStat
+                    label="Alters-Range"
+                    value={detectedAudience.ageRange}
+                  />
+                  <AudienceStat
+                    label="Geschlecht"
+                    value={detectedAudience.genderTendency}
+                  />
+                  <AudienceStat
+                    label="Content-Style"
+                    value={detectedAudience.contentStyle}
+                  />
+                  <AudienceStat
+                    label="Tonalität"
+                    value={detectedAudience.tonality}
+                  />
+                </div>
+
+                {detectedAudience.interests.length > 0 ? (
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-muted">
+                      Interessen
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {detectedAudience.interests.map((interest) => (
+                        <span
+                          key={interest}
+                          className="rounded-full border px-2.5 py-1 text-[12px]"
+                          style={{
+                            borderColor: "rgba(26, 18, 11, 0.14)",
+                            background: "rgba(255,255,255,0.6)",
+                            color: "var(--color-ink)",
+                          }}
+                        >
+                          {interest}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {detectedAudience.painPoints.length > 0 ? (
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-muted">
+                      Bedürfnisse · Pain Points
+                    </span>
+                    <ul className="flex flex-col gap-1 text-[13px] leading-relaxed text-ink">
+                      {detectedAudience.painPoints.map((pp) => (
+                        <li key={pp} className="flex items-start gap-2">
+                          <span
+                            className="mt-2 size-1 shrink-0 rounded-full"
+                            style={{ background: "var(--color-ink-muted)" }}
+                          />
+                          {pp}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                <p className="text-[11px] leading-relaxed text-ink-subtle">
+                  Wird im Workspace gespeichert und vom Pack-Suggester
+                  genutzt, um Vorschläge auf die echte Zielgruppe zu
+                  kalibrieren.
+                </p>
+              </section>
+            ) : null}
 
             {/* Section 1 — Identity */}
             <section className="editor-section editor-card flex flex-col gap-5">
               <SectionHeader
                 num="01"
                 title="Identität"
-                hint="Wie heißt der Creator, unter welchem Handle ist er auf Instagram?"
+                hint="Wie heißt der Creator, unter welchem Handle erreichst du ihn?"
               />
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -470,7 +616,10 @@ export default function NewBrandPage() {
                 </Field>
               </div>
 
-              <Field label="Instagram-Handle" required>
+              <Field
+                label={platform === "tiktok" ? "TikTok-Handle" : "Instagram-Handle"}
+                required
+              >
                 <input
                   className="editor-input"
                   type="text"
@@ -485,7 +634,11 @@ export default function NewBrandPage() {
                 <input
                   className="editor-input"
                   type="text"
-                  placeholder='z. B. „Fitness · Food · 280K Instagram"'
+                  placeholder={
+                    platform === "tiktok"
+                      ? 'z. B. „Fitness · Food · 280K TikTok"'
+                      : 'z. B. „Fitness · Food · 280K Instagram"'
+                  }
                   value={niche}
                   onChange={(e) => setNiche(e.target.value)}
                   maxLength={80}
@@ -499,7 +652,7 @@ export default function NewBrandPage() {
               >
                 <textarea
                   className="editor-input min-h-[88px] resize-none"
-                  placeholder='z. B. „Healthy Food Creator, 280K auf Instagram, fokus auf Mealprep und High-Protein-Rezepte für Berufstätige."'
+                  placeholder='z. B. „Healthy Food Creator, Fokus auf Mealprep und High-Protein-Rezepte für Berufstätige."'
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   maxLength={240}
@@ -780,4 +933,113 @@ function normalizeHandle(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "";
   return trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
+}
+
+// ─── PlatformTab — Tab-Button fuer Instagram / TikTok-Wahl in der
+// Schnellstart-Section. Aktive Variante bekommt eine ink-Background-Fill
+// + weiße Schrift, inaktive ist transparent mit grauem Text.
+function PlatformTab({
+  label,
+  hint,
+  icon,
+  active,
+  onClick,
+}: {
+  label: string;
+  hint: string;
+  icon: "instagram" | "tiktok";
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      role="tab"
+      aria-selected={active}
+      className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-left transition-all"
+      style={{
+        background: active ? "var(--color-ink)" : "transparent",
+        color: active ? "white" : "var(--color-ink)",
+      }}
+    >
+      <span
+        className="grid size-7 shrink-0 place-items-center rounded-lg"
+        style={{
+          background: active ? "rgba(255,255,255,0.18)" : "rgba(26,18,11,0.06)",
+          color: active ? "white" : "var(--color-ink)",
+        }}
+      >
+        {icon === "instagram" ? <InstagramGlyph /> : <TikTokGlyph />}
+      </span>
+      <span className="flex flex-col leading-tight">
+        <span className="text-[14px] font-semibold">{label}</span>
+        <span
+          className="text-[11px] opacity-75"
+          style={{ color: active ? "rgba(255,255,255,0.8)" : "var(--color-ink-muted)" }}
+        >
+          {hint}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function InstagramGlyph() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect
+        x="3"
+        y="3"
+        width="18"
+        height="18"
+        rx="5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function TikTokGlyph() {
+  // Vereinfachtes TikTok-Markenzeichen: Musiknoten-Form mit dem markanten
+  // Doppel-Hook. Bewusst monochrom — die echte Brand-Farb-Tripel-Layered-
+  // Form wuerde im Tab-Switcher zu laut wirken.
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M14 4v9.5a3 3 0 1 1-3-3"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+      <path
+        d="M14 4c.6 2.2 2.4 3.7 5 3.7"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+// ─── AudienceStat — kleine Label/Wert-Karte in der Audience-Insights-
+// Section. Wird im Grid gerendert.
+function AudienceStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      className="flex flex-col gap-0.5 rounded-xl border px-3 py-2.5"
+      style={{
+        borderColor: "rgba(26, 18, 11, 0.10)",
+        background: "rgba(255,255,255,0.55)",
+      }}
+    >
+      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-muted">
+        {label}
+      </span>
+      <span className="text-[13px] leading-snug text-ink">{value}</span>
+    </div>
+  );
 }

@@ -2,8 +2,16 @@ import { NextResponse } from "next/server";
 import {
   ApifyError,
   scrapeInstagramProfile,
+  type InstagramProfile,
 } from "@/lib/integrations/apify";
+import { scrapeTikTokProfile } from "@/lib/integrations/apify-tiktok";
+import {
+  type SocialPlatform,
+  isValidHandle,
+  normalizeHandle,
+} from "@/lib/integrations/platform";
 import { analyzeCreatorIdentity } from "@/lib/ai/analyze-creator-identity";
+import { analyzeAudience } from "@/lib/ai/analyze-audience";
 // Style-Template-Selection ist bewusst deaktiviert (Mai 2026): jeder neue
 // Creator bekommt seine Brand-DNA hand-kalibriert als Code-Brand in
 // lib/ai/brand-image-style.ts. Automatische Template-Wahl produzierte
@@ -11,20 +19,21 @@ import { analyzeCreatorIdentity } from "@/lib/ai/analyze-creator-identity";
 // bessere Ergebnisse.
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 
-// Onboarding-Helper-Endpoint. Frontend tippt nur den Instagram-Handle,
+// Onboarding-Helper-Endpoint. Frontend tippt Handle + waehlt Plattform,
 // dieser Endpoint macht den Rest:
 //
-//   1. Apify scraped das Profil (Bio, Stats, Posts) + Avatar-URL
+//   1. Apify scraped das Profil (Instagram ODER TikTok je nach platform)
 //   2. Avatar wird server-side runtergeladen + in den brand-avatars-Bucket
 //      hochgeladen (sonst CORS-Probleme beim direkten Browser-Fetch)
-//   3. Gemini 2.5 Flash analysiert Bio + Posts → strukturierte Brand-Felder
-//   4. Response: { identity, avatarUrl, latestPosts } → Frontend befuellt
-//      die Form-Felder, latestPosts gehen in PR 5 weiter fuer die
-//      Brand-DNA-Vision-Analyse
+//   3. Gemini 2.5 Flash analysiert Bio + Posts → Brand-Identity (parallel:
+//      auch Audience-Analyse fuer Zielgruppen-Insights)
+//   4. Response: { identity, audience, avatarUrl, latestPosts, platform }
 //
-// Vercel-Lambda: Apify (~10-20s) + Gemini-Identity-Flash (~3-5s) +
-// Avatar-Upload (~2s) + Gemini-Text-Style-Flash (~3-5s) — parallel ~20-25s
-// typisch. 60s gibt Headroom (PR 11: Pivot weg von Vision).
+// Vercel-Lambda: Apify (~10-20s) + 2x Gemini-Flash parallel (~5s) +
+// Avatar-Upload (~2s) = ~20-30s typisch. 60s gibt Headroom.
+//
+// Route-Name bleibt "analyze-instagram" aus Backward-Compat-Gruenden —
+// die Datei wird jetzt aber generisch fuer beide Plattformen genutzt.
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -52,7 +61,7 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { handle?: string };
+  let body: { handle?: string; platform?: SocialPlatform };
   try {
     body = await req.json();
   } catch {
@@ -60,15 +69,37 @@ export async function POST(req: Request) {
   }
   if (!body.handle || typeof body.handle !== "string") {
     return NextResponse.json(
-      { error: "Bitte einen Instagram-Handle uebergeben." },
+      { error: "Bitte einen Handle uebergeben." },
+      { status: 400 }
+    );
+  }
+  if (!isValidHandle(body.handle)) {
+    return NextResponse.json(
+      { error: "Das ist kein gueltiger Handle. Erlaubt: Buchstaben, Zahlen, Punkte, Unterstriche." },
       { status: 400 }
     );
   }
 
-  // ─── 1. Profil scrapen ──────────────────────────────────────────────────
-  let profile;
+  // Plattform default 'instagram' fuer Backward-Compat — alte Clients
+  // schickten kein platform-Feld. Validierung ist explizit, damit ein
+  // tippfehler ("intagram") nicht stille zu Instagram-Default wird.
+  const rawPlatform = body.platform;
+  if (rawPlatform !== undefined && rawPlatform !== "instagram" && rawPlatform !== "tiktok") {
+    return NextResponse.json(
+      { error: "platform muss 'instagram' oder 'tiktok' sein." },
+      { status: 400 }
+    );
+  }
+  const platform: SocialPlatform = rawPlatform ?? "instagram";
+  const cleanedHandle = normalizeHandle(body.handle);
+
+  // ─── 1. Profil scrapen (plattform-spezifisch) ───────────────────────────
+  let profile: InstagramProfile;
   try {
-    profile = await scrapeInstagramProfile(body.handle);
+    profile =
+      platform === "tiktok"
+        ? await scrapeTikTokProfile(cleanedHandle)
+        : await scrapeInstagramProfile(cleanedHandle);
   } catch (err) {
     const status =
       err instanceof ApifyError && err.status === 401 ? 500 : 422;
@@ -77,7 +108,7 @@ export async function POST(req: Request) {
         error:
           err instanceof Error
             ? err.message
-            : "Konnte das Instagram-Profil nicht laden.",
+            : `Konnte das ${platform === "tiktok" ? "TikTok" : "Instagram"}-Profil nicht laden.`,
         stage: "scrape",
       },
       { status }
@@ -117,19 +148,21 @@ export async function POST(req: Request) {
     }
   }
 
-  // ─── 3. Identity-Analyse ────────────────────────────────────────────────
-  // Gemini Flash analysiert Bio + Captions → Brand-Felder (Name, Bio,
-  // Tagline, Niche, Signature). ~3-5s.
+  // ─── 3. Identity + Audience parallel ────────────────────────────────────
+  // Beide Gemini-Flash-Calls laufen unabhaengig — wir starten sie parallel
+  // damit der User die volle Insight-Karte in einem Rutsch bekommt. Wenn
+  // einer der beiden failed, gibt der andere trotzdem ein Ergebnis zurueck.
   //
-  // Style-Template-Selection wurde bewusst entfernt: jeder neue Creator
+  // Style-Template-Selection bleibt deaktiviert: jeder neue Creator
   // bekommt seine Brand-DNA als Code-Brand in lib/ai/brand-image-style.ts
-  // hand-kalibriert. imageStyle bleibt null im DB-Brand-Eintrag — die
-  // Hero-Pipeline nimmt dann den Code-Brand-Style (wenn vorhanden) oder
-  // den Per-Reel-Style-Fallback.
-  let identity;
-  try {
-    identity = await analyzeCreatorIdentity(profile);
-  } catch (err) {
+  // hand-kalibriert.
+  const [identityResult, audienceResult] = await Promise.allSettled([
+    analyzeCreatorIdentity(profile),
+    analyzeAudience(profile, platform),
+  ]);
+
+  if (identityResult.status === "rejected") {
+    const err = identityResult.reason;
     return NextResponse.json(
       {
         error:
@@ -148,10 +181,25 @@ export async function POST(req: Request) {
       { status: 422 }
     );
   }
+  const identity = identityResult.value;
+  // Audience-Analyse ist non-blocking: wenn sie failed, geben wir null
+  // zurueck und das Frontend rendert nur Identity. Der User kann den
+  // Brand trotzdem anlegen.
+  const audience = audienceResult.status === "fulfilled" ? audienceResult.value : null;
+  if (audienceResult.status === "rejected") {
+    console.warn(
+      "[analyze-instagram] audience analysis failed (non-fatal):",
+      audienceResult.reason instanceof Error
+        ? audienceResult.reason.message
+        : audienceResult.reason
+    );
+  }
 
   return NextResponse.json({
     ok: true,
+    platform,
     identity,
+    audience,
     avatarUrl,
     // imageStyle ist immer null — wird per Code-Brand in
     // lib/ai/brand-image-style.ts gesetzt, nicht via Onboarding.

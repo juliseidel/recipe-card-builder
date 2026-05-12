@@ -1,5 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { fetchApifyDataset, ApifyError } from "@/lib/integrations/apify";
+import { fetchTikTokDataset } from "@/lib/integrations/apify-tiktok";
 import {
   getScrapeByRunId,
   updateScrapeStatus,
@@ -91,13 +92,20 @@ export async function POST(req: Request) {
   }
 
   // SUCCEEDED: Dataset abrufen, Reels persistieren, Klassifikation kicken.
+  // Plattform-aware: scrape.platform entscheidet, welcher Dataset-Parser
+  // angesprochen wird. Falls Spalte noch nicht da (Bestands-Row vor der
+  // platform-extension Migration), default 'instagram'.
   if (status.includes("SUCCEEDED") && datasetId) {
+    const platform = scrape.platform ?? "instagram";
     try {
-      const reels = await fetchApifyDataset(datasetId);
-      const inserted = await upsertReels(scrape.brand_slug, reels);
+      const reels =
+        platform === "tiktok"
+          ? await fetchTikTokDataset(datasetId)
+          : await fetchApifyDataset(datasetId);
+      const inserted = await upsertReels(scrape.brand_slug, reels, platform);
       const total = await countReelsForBrand(scrape.brand_slug);
       console.log(
-        `[apify-webhook] brand=${scrape.brand_slug} inserted=${inserted} total=${total}`
+        `[apify-webhook] brand=${scrape.brand_slug} platform=${platform} inserted=${inserted} total=${total}`
       );
 
       // Status auf 'classifying' setzen — Frontend kann das im Banner
