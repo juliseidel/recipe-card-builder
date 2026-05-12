@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "Reel-Library-Tabellen fehlen in Supabase oder platform-Spalte nicht vorhanden. Bitte sql/creator-reels-table.sql + sql/platform-extension.sql im Supabase-SQL-Editor ausfuehren.",
+          "Reel-Library-Tabellen fehlen in Supabase oder die platform-Spalte ist nicht angelegt. Bitte sql/creator-reels-table.sql und sql/platform-extension.sql im Supabase-SQL-Editor ausführen.",
         needsSetup: true,
       },
       { status: 503 }

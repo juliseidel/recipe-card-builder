@@ -306,9 +306,9 @@ export default function NewBrandPage() {
           if (errJson.needsSetup) {
             setSaving(false);
             setError(
-              "Workspace wurde angelegt, aber Reel-Library kann nicht starten: "
-              + (errJson.error ?? "Setup unvollstaendig.")
-              + " Bitte sql/creator-reels-table.sql + sql/platform-extension.sql in Supabase ausfuehren und dann den Workspace nochmal aufrufen."
+              "Workspace wurde angelegt, aber die Reel-Library kann nicht starten: "
+              + (errJson.error ?? "Setup unvollständig.")
+              + " Nach dem Einspielen der SQL-Migration lege den Workspace erneut an."
             );
             // Workspace existiert schon — User kann jederzeit hin
             // navigieren. Wir blockieren nicht weiter.
