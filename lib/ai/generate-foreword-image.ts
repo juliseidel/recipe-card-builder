@@ -96,6 +96,81 @@ const FALLBACK_STYLE: ForewordImageStyle = {
   angle: "overhead 80° angle",
 };
 
+// Title-keyword heuristic fallback — fuer Custom-Packs ohne expliziten
+// PACK_STYLES-Eintrag. Matched gaengige Pack-Themen aus dem Titel, damit
+// der User nicht das generische "chopping board"-Bild bekommt wenn sein
+// Pack klar ein Thema hat (Airfryer, Snacks, Meal-Prep, Backen).
+function styleFromTitle(title: string): ForewordImageStyle | null {
+  const t = title.toLowerCase();
+  if (
+    t.includes("airfryer") ||
+    t.includes("heißluft") ||
+    t.includes("heisluft") ||
+    t.includes("fritteuse")
+  ) {
+    return {
+      subject:
+        "a sleek black airfryer with its basket pulled out slightly to reveal golden crispy potato wedges inside, a few extra wedges scattered on the surface beside it, one small bowl of ketchup, one folded linen kitchen towel",
+      surface: "pale grey concrete kitchen counter",
+      lighting:
+        "bright natural daylight from a side window, clean shadows, fresh kitchen feel",
+      colorCast: "warm amber-cream",
+      angle: "overhead 75° angle, slight editorial tilt",
+    };
+  }
+  if (t.includes("snack") || t.includes("naschen") || t.includes("bites")) {
+    return {
+      subject:
+        "a single small ceramic ramekin holding three perfect berries, one tiny silver spoon at rest beside it, a long simple white napkin folded flat",
+      surface: "smooth concrete-look matte ceramic surface",
+      lighting:
+        "soft indirect daylight, very even, almost no shadow",
+      colorCast: "mint-tinged near-white",
+      angle: "overhead 90°, lots of negative space around the subject",
+    };
+  }
+  if (t.includes("meal") || t.includes("prep") || t.includes("vorkoch")) {
+    return {
+      subject:
+        "three matching glass meal-prep containers in a neat row, each with a different prep visible — grains, roasted vegetables, a portion of protein — a small folded notebook with a pen sits at the edge of the frame",
+      surface: "pale grey concrete kitchen counter",
+      lighting:
+        "structured, even daylight, subtle shadow, organised feel",
+      colorCast: "sky-blue tinged cool cream",
+      angle: "30° angled overhead so containers show their layers",
+    };
+  }
+  if (
+    t.includes("backwelt") ||
+    t.includes("backen") ||
+    t.includes("backwaren") ||
+    t.includes("dessert") ||
+    t.includes("kuchen")
+  ) {
+    return {
+      subject:
+        "a vintage matte-cream cake tin tilted slightly on its side, a soft drift of flour on the surface beside it, three whole vanilla pods scattered, one small worn enamel measuring cup",
+      surface: "weathered pale-wood baker's table",
+      lighting:
+        "soft late-morning window light, gentle shadows, no harsh contrast",
+      colorCast: "warm cream",
+      angle: "overhead 75° angle, slight tilt for editorial energy",
+    };
+  }
+  if (t.includes("salat") || t.includes("bowl") || t.includes("veggie")) {
+    return {
+      subject:
+        "a generous cluster of fresh greens, half a cucumber, two whole limes, arranged loose around a deep ceramic bowl with a wooden serving spoon resting against its rim",
+      surface: "natural unbleached linen runner over a pale stone counter",
+      lighting:
+        "bright, high noon kitchen light, clean shadows, fresh feel",
+      colorCast: "sage-green tinged daylight white",
+      angle: "overhead 90° flat-lay",
+    };
+  }
+  return null;
+}
+
 // Universal negative prompt — these are the failure modes that turn
 // foreword still-lifes into something else entirely. We list them
 // explicitly because Flux otherwise drifts toward plated portions or
@@ -111,7 +186,8 @@ export type ForewordImageBuildResult = {
 // Builds the final Flux prompt from a pack's style recipe. Exposed so the
 // generation script can log/audit prompts before spending API credit.
 export function buildForewordImagePrompt(pack: Pack): ForewordImageBuildResult {
-  const style = PACK_STYLES[pack.slug] ?? FALLBACK_STYLE;
+  const style =
+    PACK_STYLES[pack.slug] ?? styleFromTitle(pack.title) ?? FALLBACK_STYLE;
   const prompt = [
     `An editorial still-life photograph for the opening page of a recipe booklet.`,
     `${style.subject}, sitting on ${style.surface}, photographed ${style.angle}.`,
