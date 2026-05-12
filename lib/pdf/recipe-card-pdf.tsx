@@ -883,17 +883,26 @@ function PatisseriePage({
               {avatarDataUri ? (
                 <View
                   style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
+                    width: 50,
+                    height: 50,
+                    borderRadius: 25,
                     overflow: "hidden",
                     borderWidth: 1.5,
                     borderColor: t.accent,
                   }}
                 >
+                  {/* objectPosition "center 25%": pinned to top so face/head
+                      stays visible in portrait avatars (Julias Original-
+                      Foto ist hochformatig, ohne den Pin wird der Scheitel
+                      gecroppt). Cover bleibt; nur Anchor verschoben. */}
                   <Image
                     src={avatarDataUri}
-                    style={{ width: 37, height: 37, objectFit: "cover" }}
+                    style={{
+                      width: 47,
+                      height: 47,
+                      objectFit: "cover",
+                      objectPosition: "center 25%",
+                    }}
                   />
                 </View>
               ) : null}
@@ -992,13 +1001,15 @@ function PatisseriePage({
         </View>
 
         {/* ─── RIGHT: CREAM BODY ───────────────────────────────────── */}
+        {/* paddingTop/Bottom density-aware: bei spacious deutlich mehr,
+            damit kurze Recipes nicht oben kleben + unten Weiss lassen. */}
         <View
           style={{
             flex: 1,
             backgroundColor: "#ffffff",
             paddingHorizontal: 32,
-            paddingTop: 32,
-            paddingBottom: 24,
+            paddingTop: d.bodyPadTop,
+            paddingBottom: d.bodyPadBottom,
           }}
         >
           {/* Top stats strip — identity-relevant numbers, on the body
@@ -1127,13 +1138,13 @@ function PatisseriePage({
             ))}
           </View>
 
-          {/* Bienes Story — nur bei wirklich kurzen Recipes (spacious-
+          {/* Story-Block — nur bei wirklich kurzen Recipes (spacious-
               Density), wo Body-Hoehe Reserve hat. Bei mittel+langen
               Recipes braucht der Body den Platz fuer Zutaten + Steps. */}
           {showStoryHere ? (
             <View
               style={{
-                marginTop: 14,
+                marginTop: density === "spacious" ? 22 : 14,
                 paddingTop: 12,
                 paddingBottom: 12,
                 paddingLeft: 14,
@@ -1157,7 +1168,7 @@ function PatisseriePage({
           ) : null}
 
           {/* MAN NEHME — full ingredients list with sub-group headers */}
-          <View style={{ marginTop: 18 }}>
+          <View style={{ marginTop: density === "spacious" ? 28 : 18 }}>
             <SectionHeader label="Man nehme" theme={t} italic />
             <IngredientsList
               grouped={grouped}
@@ -1169,7 +1180,7 @@ function PatisseriePage({
           </View>
 
           {/* ZUBEREITUNG — numbered steps */}
-          <View style={{ marginTop: 14 }}>
+          <View style={{ marginTop: density === "spacious" ? 24 : 14 }}>
             <SectionHeader label="Zubereitung" theme={t} italic />
             <StepsList
               steps={recipe.steps}
@@ -1451,7 +1462,7 @@ function MinimalPage({
             >
               <Image
                 src={avatarDataUri}
-                style={{ width: 51, height: 51, objectFit: "cover" }}
+                style={{ width: 51, height: 51, objectFit: "cover", objectPosition: "center 25%" }}
               />
             </View>
           ) : null}
@@ -1749,7 +1760,7 @@ function MinimalPage({
               >
                 <Image
                   src={avatarDataUri}
-                  style={{ width: 30, height: 30, objectFit: "cover" }}
+                  style={{ width: 30, height: 30, objectFit: "cover", objectPosition: "center 25%" }}
                 />
               </View>
             ) : null}
@@ -2048,23 +2059,25 @@ const PATISSERIE_DENSITY: Record<
     microsPadTop: 8,
     microsPadBottom: 9,
   },
-  // spacious — reserved for future short bake recipes; gives the body more
-  // air and a slightly larger title so the card doesn't look halbleer.
+  // spacious — fuer kurze Recipes (z.B. 5 Zutaten + 4 Steps). v2 (2026-05-12):
+  // Werte deutlich erhoeht weil das Body-Layout sonst nach 60% der Seite endet
+  // und unten viel Weiss bleibt. Mehr breathing room + groessere Steps lassen
+  // die Card auch bei wenig Content "intentional" wirken statt "halbleer".
   spacious: {
-    headPadTop: 34,
-    headPadBottom: 20,
-    titleFontSize: 40,
+    headPadTop: 38,
+    headPadBottom: 22,
+    titleFontSize: 42,
     subtitleFontSize: 15,
-    bodyPadTop: 22,
-    bodyPadBottom: 20,
-    ingRowPadV: 5,
-    ingFontSize: 10,
+    bodyPadTop: 44,
+    bodyPadBottom: 44,
+    ingRowPadV: 7,
+    ingFontSize: 10.5,
     ingNoteFontSize: 7.5,
-    stepMarginBottom: 10,
-    stepFontSize: 10,
-    stepNumFontSize: 20,
-    microsPadTop: 11,
-    microsPadBottom: 12,
+    stepMarginBottom: 16,
+    stepFontSize: 10.5,
+    stepNumFontSize: 24,
+    microsPadTop: 12,
+    microsPadBottom: 14,
   },
 };
 
@@ -3278,7 +3291,7 @@ function VitalPage({
             >
               <Image
                 src={avatarDataUri}
-                style={{ width: 48, height: 48, objectFit: "cover" }}
+                style={{ width: 48, height: 48, objectFit: "cover", objectPosition: "center 25%" }}
               />
             </View>
           </View>
@@ -4127,7 +4140,7 @@ function AmberPage({
               >
                 <Image
                   src={avatarDataUri}
-                  style={{ width: 42, height: 42, objectFit: "cover" }}
+                  style={{ width: 42, height: 42, objectFit: "cover", objectPosition: "center 25%" }}
                 />
               </View>
             </View>
@@ -4548,7 +4561,7 @@ function AmberPage({
               >
                 <Image
                   src={avatarDataUri}
-                  style={{ width: 21, height: 21, objectFit: "cover" }}
+                  style={{ width: 21, height: 21, objectFit: "cover", objectPosition: "center 25%" }}
                 />
               </View>
             </View>

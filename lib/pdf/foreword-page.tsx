@@ -97,7 +97,7 @@ function AuthorStrip({
           >
             <Image
               src={avatarDataUri}
-              style={{ width: 43, height: 43, objectFit: "cover" }}
+              style={{ width: 43, height: 43, objectFit: "cover", objectPosition: "center 25%" }}
             />
           </View>
         ) : null}
@@ -584,7 +584,7 @@ function MinimalForewordPage({
             >
               <Image
                 src={avatarDataUri}
-                style={{ width: 55, height: 55, objectFit: "cover" }}
+                style={{ width: 55, height: 55, objectFit: "cover", objectPosition: "center 25%" }}
               />
             </View>
           ) : null}
