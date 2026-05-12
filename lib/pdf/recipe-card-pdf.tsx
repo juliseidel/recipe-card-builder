@@ -4992,39 +4992,40 @@ function StepsList({
                 flexDirection: "row",
                 marginBottom: stepMarginBottom,
                 gap: 10,
-                // alignItems "center": Number und Text-Block vertikal
-                // mittig zueinander. Bei single-line: Number-Center =
-                // Text-Center. Bei multi-line: Number-Center = Mitte
-                // des Text-Blocks. Immer mittig — keine Math, keine
-                // Padding-Tricks.
+                // Number und Text jeweils in eigene Views packen
+                // (statt nackte Text-Elemente), damit react-pdf-yoga
+                // sauber alignen kann — Views haben klare Box-Heights,
+                // Text-Elemente werden manchmal anders behandelt.
                 alignItems: "center",
               }}
             >
-              <Text
-                style={{
-                  fontFamily: "Fraunces",
-                  fontSize: stepNumFontSize,
-                  fontWeight: bold ? 700 : 400,
-                  color: theme.accent,
-                  width: 22,
-                  lineHeight: 1,
-                }}
-              >
-                {item.index + 1}
-              </Text>
-              <Text
-                style={{
-                  flex: 1,
-                  fontSize: stepFontSize,
-                  lineHeight: 1.45,
-                  color: theme.ink,
-                }}
-              >
-                {checklist ? (
-                  <Text style={{ color: theme.inkSubtle }}>☐ </Text>
-                ) : null}
-                {item.text}
-              </Text>
+              <View style={{ width: 22 }}>
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontSize: stepNumFontSize,
+                    fontWeight: bold ? 700 : 400,
+                    color: theme.accent,
+                    lineHeight: 1,
+                  }}
+                >
+                  {item.index + 1}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: stepFontSize,
+                    lineHeight: 1.45,
+                    color: theme.ink,
+                  }}
+                >
+                  {checklist ? (
+                    <Text style={{ color: theme.inkSubtle }}>☐ </Text>
+                  ) : null}
+                  {item.text}
+                </Text>
+              </View>
             </View>
           ))}
         </View>
