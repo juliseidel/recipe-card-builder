@@ -52,7 +52,9 @@ export async function GET(_req: Request, { params }: RouteParams) {
       postUrl: r.post_url,
       type: r.type,
       caption: r.caption,
-      displayUrl: r.display_url,
+      // cover_storage_url bevorzugt (permanent, Supabase) — display_url
+      // ist Instagram-CDN mit ~1-3h Expiry.
+      displayUrl: r.cover_storage_url ?? r.display_url,
       postedAt: r.posted_at,
       likeCount: r.like_count,
       viewCount: r.view_count,

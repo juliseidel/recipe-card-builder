@@ -192,14 +192,16 @@ export async function buildPackFromReels(
     }
     seenSlugs.add(slug);
 
-    // Hero-Placeholder: Reel-Cover-URL als initialer hero, damit der User
-    // in der Pack-Detail-Ansicht sofort etwas sieht (Instagram-Cover oder
-    // TikTok-Thumbnail), waehrend der KI-Hero im Hintergrund generiert
-    // wird. Wenn die display_url fehlt, bleibt hero leer und das UI
-    // faellt auf pack.coverImage zurueck. /api/recipes/enrich erkennt
-    // einen Placeholder-Hero (Instagram/TikTok-CDN-URL) und ueberschreibt
-    // ihn mit dem frisch generierten Flux-Bild.
-    const heroPlaceholder = entry.reel.display_url ?? "";
+    // Hero-Placeholder: gecachte Reel-Cover-URL aus dem reel-covers
+    // Supabase-Storage-Bucket. Permanent verfuegbar (im Gegensatz zur
+    // display_url die nach ~1-3h expired). Wenn das Caching noch nicht
+    // durch ist (cover_storage_url ist null), nehmen wir die display_url
+    // als letzte Ausweg-Fallback. /api/recipes/enrich erkennt beide als
+    // Platzhalter und triggert die Flux-Hero-Generation.
+    const heroPlaceholder =
+      (entry.reel as { cover_storage_url?: string | null }).cover_storage_url ??
+      entry.reel.display_url ??
+      "";
 
     const recipe: Recipe = {
       slug,

@@ -63,6 +63,11 @@ export type ReelRow = {
   /** Quelle des Reels — gleicher Wert wie creator_scrapes.platform beim
    *  ersten Insert. Default 'instagram' fuer Bestands-Rows. */
   platform: SocialPlatform;
+  /** Permanente Cover-URL im Supabase Storage (reel-covers Bucket).
+   *  display_url ist Instagram-CDN mit ~1-3h Expiry, daher cachen wir
+   *  die Cover beim Backfill. null = noch nicht gecached. UI nutzt
+   *  cover_storage_url bevorzugt vor display_url. */
+  cover_storage_url: string | null;
 };
 
 export type SuggestionStatus = "pending" | "accepted" | "dismissed";

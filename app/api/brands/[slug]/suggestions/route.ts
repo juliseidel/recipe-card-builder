@@ -28,7 +28,9 @@ export async function GET(_req: Request, { params }: RouteParams) {
   if (allReelIds.length > 0) {
     const reels = await getReelsByIds(allReelIds);
     for (const r of reels) {
-      reelMap.set(r.id, r.display_url);
+      // cover_storage_url bevorzugt (permanent, Supabase Storage),
+      // display_url als Fallback (Instagram-CDN, kurzlebig).
+      reelMap.set(r.id, r.cover_storage_url ?? r.display_url);
     }
   }
 

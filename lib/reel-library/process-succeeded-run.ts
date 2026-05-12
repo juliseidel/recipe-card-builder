@@ -11,6 +11,7 @@ import {
   upsertReels,
 } from "@/lib/creator-reels-server";
 import { runClassificationAndSuggestions } from "./classify-and-suggest";
+import { cacheReelCovers } from "./cache-reel-covers";
 import type { SocialPlatform } from "@/lib/integrations/platform";
 
 // Gemeinsamer Helper, der einen erfolgreich gelaufenen Apify-Run in die
@@ -57,7 +58,22 @@ export async function processSucceededRun(opts: {
     `[process-succeeded-run] brand=${brandSlug} platform=${platform} datasetId=${datasetId} fetched=${reels.length} inserted=${inserted} total=${total}`
   );
 
-  // 3. Klassifikation + Vorschlaege async via after() — der Caller-
+  // 3a. Cover-Caching im Hintergrund — Instagram/TikTok-CDN-URLs sind
+  // ~1-3h gueltig, danach 403. Wir downloaden die Cover JETZT (noch
+  // gueltig) und legen sie in Supabase Storage ab. Spaeter zeigt das
+  // UI cover_storage_url (permanent) statt display_url (expired).
+  after(async () => {
+    try {
+      await cacheReelCovers({ brandSlug });
+    } catch (err) {
+      console.error(
+        "[process-succeeded-run] cache-reel-covers failed (non-fatal)",
+        err
+      );
+    }
+  });
+
+  // 3b. Klassifikation + Vorschlaege async via after() — der Caller-
   // Endpoint kann sofort antworten, die Pipeline laeuft im Background
   // bis maxDuration der Caller-Route. Bei Library-Status-Route ist das
   // 60s, das reicht fuer Klassifikation 50-100 Reels + Pack-Vorschlaege.

@@ -101,14 +101,14 @@ export async function POST(req: Request) {
     !recipe.nutrition?.micros || recipe.nutrition.micros.length === 0;
   const previousMicrosAttempt = Boolean(recipe.nutrition?.microsAttemptedAt);
   const needsMicros = microsEmpty && (!previousMicrosAttempt || body.force);
-  // Placeholder-Hero-Detection: Pack-Builder setzt initial reel.display_url
-  // als hero, damit der User sofort etwas im Pack-Detail sieht. Diese
-  // CDN-URLs (Instagram / TikTok / fbcdn) sind aber nur temporaere
-  // Platzhalter — der echte KI-Hero ueberschreibt sie. Wir erkennen sie
-  // an den CDN-Hostnames und triggern die Hero-Pipeline trotzdem.
+  // Placeholder-Hero-Detection: Pack-Builder setzt initial das gecachte
+  // Reel-Cover (Supabase reel-covers Bucket) als hero, damit der User
+  // sofort etwas sieht. Plus: Bestands-Recipes koennten noch das alte
+  // Instagram-CDN-URL-Format haben. Beide Patterns triggern Flux-Generation.
   const isPlaceholderHero = Boolean(
     recipe.hero &&
-      /cdninstagram\.com|fbcdn\.net|tiktokcdn|tiktok-domain/i.test(recipe.hero)
+      (/cdninstagram\.com|fbcdn\.net|tiktokcdn|tiktok-domain/i.test(recipe.hero) ||
+        /\/reel-covers\//i.test(recipe.hero))
   );
   const needsHero =
     !recipe.hero ||
