@@ -24,9 +24,9 @@ import { NewBrandCard } from "@/components/new-brand-card";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Workspace-Hub · Recipe Card Builder",
+  title: "Recipe Card Builder · Studio",
   description:
-    "Wähle einen Creator-Workspace oder lege einen neuen an. Internes Team-Tool für die Verwaltung mehrerer Recipe-Pack-Workspaces.",
+    "Recipe Card Builder — Multi-Tenant-Studio für Food-Creator. Recipe-Packs, KI-Bild-Pipeline und Brand-Management in einem Tool.",
 };
 
 export default async function HubPage() {
@@ -40,10 +40,6 @@ export default async function HubPage() {
   }
 
   const brands = await loadAllBrands();
-  const displayName =
-    (user.user_metadata?.display_name as string) ||
-    user.email?.split("@")[0] ||
-    "Team";
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
@@ -53,15 +49,15 @@ export default async function HubPage() {
         <section className="mx-auto max-w-[1200px] px-6 pt-24 pb-10 lg:px-10 lg:pt-32 lg:pb-14">
           <div className="flex flex-col gap-3">
             <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
-              Workspace-Hub
+              Recipe Card Builder
             </span>
             <h1 className="font-display text-[44px] leading-[1.04] tracking-[-0.015em] text-ink lg:text-[56px]">
-              Hi {displayName} — wähle einen Creator.
+              Creator-Workspaces.
             </h1>
             <p className="mt-3 max-w-[62ch] text-[15px] leading-relaxed text-ink-muted">
-              Jeder Creator hat seinen eigenen Workspace mit Recipe-Packs,
-              Karten und der vollen KI-Pipeline. Wähle einen Workspace zum
-              Arbeiten — oder leg einen neuen Creator an.
+              Jeder Workspace betreut eine eigene Brand mit eigener
+              Recipe-Library, KI-Bild-Pipeline und visueller Identität.
+              Öffne einen bestehenden Workspace oder lege einen neuen Creator an.
             </p>
           </div>
 
@@ -74,11 +70,9 @@ export default async function HubPage() {
               }}
             >
               <span className="size-1.5 rounded-full bg-honey" />
-              {brands.length}{" "}
-              {brands.length === 1 ? "Workspace" : "Workspaces"} verfügbar
+              {brands.length} aktive{" "}
+              {brands.length === 1 ? "Workspace" : "Workspaces"}
             </span>
-            <span aria-hidden>·</span>
-            <span>Klick einen Creator, um in seinen Workspace einzutreten.</span>
           </div>
         </section>
 

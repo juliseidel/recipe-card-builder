@@ -152,7 +152,7 @@ export function BrandHubCard({ brand, packCount, recipeCount, badge }: Props) {
       </div>
 
       <p
-        className="relative line-clamp-3 text-[14px] leading-relaxed"
+        className="relative line-clamp-2 text-[14px] leading-relaxed"
         style={{ color: brand.tokens.inkMuted }}
       >
         {brand.bio}
@@ -173,7 +173,7 @@ export function BrandHubCard({ brand, packCount, recipeCount, badge }: Props) {
               {recipeCount === 1 ? "Rezept" : "Rezepte"}
             </>
           ) : (
-            "Frischer Workspace"
+            "Workspace bereit"
           )}
         </span>
         <span
