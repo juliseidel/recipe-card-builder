@@ -518,7 +518,7 @@ function EditorialMicrosBanner({
             textTransform: "uppercase",
           }}
         >
-          Mikronährstoffe pro Portion · % Tagesbedarf
+          Mikronährstoffe {nutritionBasisInline(recipe?.nutritionBasis)} · % Tagesbedarf
         </Text>
       </View>
       <View style={{ flexDirection: "row", gap: 8 }}>
@@ -5490,7 +5490,7 @@ function MicrosStrip({
             textTransform: "uppercase",
           }}
         >
-          Mikronährstoffe pro Portion · % Tagesbedarf
+          Mikronährstoffe {nutritionBasisInline(recipe?.nutritionBasis)} · % Tagesbedarf
         </Text>
       </View>
       <View
