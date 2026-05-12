@@ -1304,8 +1304,33 @@ function MinimalPage({
 }: RecipeCardPdfProps) {
   const t = packTheme(pack);
   const time = totalTime(recipe);
-  const pl = recipe.servings === 1 ? "Portion" : "Stücke";
-  const stueckSing = recipe.servings === 1 ? "Portion" : "Stück";
+  // Singular + Plural-Label basis-aware (nicht mehr nur servings-basiert).
+  // Vorher waren Spec-Strip ("KCAL PRO STÜCK · 8 STÜCKE") und Subtitle
+  // ("190 kcal pro Portion") inkonsistent — der Strip nutzte
+  // servings-based "Stück", der Subtitle-Text "Portion". Jetzt folgt
+  // alles dem nutritionBasis-Feld: bei basis="portion" steht ueberall
+  // "Portion", bei basis="piece" ueberall "Stück".
+  const basis = recipe.nutritionBasis ?? "portion";
+  const stueckSing =
+    basis === "piece"
+      ? "Stück"
+      : basis === "per100g"
+        ? "100 g"
+        : basis === "total"
+          ? "gesamt"
+          : "Portion";
+  const pl =
+    basis === "piece"
+      ? recipe.servings === 1
+        ? "Stück"
+        : "Stücke"
+      : basis === "per100g"
+        ? "100 g"
+        : basis === "total"
+          ? "gesamt"
+          : recipe.servings === 1
+            ? "Portion"
+            : "Portionen";
   // Bei vielen Steps (>=6) override auf compact-density. Bei sehr vielen
   // Steps (>=7) zusaetzlich noch enger — sonst ueberlaufen lange Step-Texte
   // den verfuegbaren Body-Slot. Solero-Tiramisu (7 Schritte mit 3-4 Zeilen
