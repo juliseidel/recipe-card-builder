@@ -87,6 +87,57 @@ const RESPONSE_SCHEMA = {
             description:
               "Geschaetzte Zubereitungszeit in Minuten (5..240). 0 wenn unklar oder kein Rezept.",
           },
+          occasion: {
+            type: "string",
+            enum: [
+              "mealprep",
+              "quick-weeknight",
+              "cozy",
+              "gameday",
+              "brunch",
+              "family-dinner",
+              "date-night",
+              "summer-bbq",
+              "festive",
+              "sunday-baking",
+              "post-workout",
+              "lazy-morning",
+              "",
+            ],
+            description:
+              "Wann wuerde man dieses Rezept machen? Nur EIN Hauptanlass. Leerer String wenn unklar oder kein Rezept.",
+          },
+          season: {
+            type: "string",
+            enum: ["spring", "summer", "autumn", "winter", "year-round", ""],
+            description:
+              'Saison-Kontext. "year-round" = passt jederzeit. Leerer String wenn kein Rezept.',
+          },
+          skillLevel: {
+            type: "string",
+            enum: ["beginner", "intermediate", "advanced", ""],
+            description:
+              "Schwierigkeit: beginner = wenige Zutaten + simple Schritte, intermediate = mehrere Komponenten, advanced = Backen/Teig/Technik. Leer wenn unklar.",
+          },
+          vessel: {
+            type: "string",
+            enum: [
+              "bowl",
+              "pan",
+              "sheet",
+              "airfryer",
+              "mug",
+              "mixer",
+              "oven",
+              "pot",
+              "no-cook",
+              "grill",
+              "blender",
+              "",
+            ],
+            description:
+              "Hauptgefaess/Methode. bowl = Bowl/Schuessel-Gericht, sheet = Backblech, no-cook = ohne Kochen. Leer wenn unklar.",
+          },
         },
         required: [
           "index",
@@ -98,6 +149,10 @@ const RESPONSE_SCHEMA = {
           "mainIngredient",
           "dietary",
           "estimatedTimeMinutes",
+          "occasion",
+          "season",
+          "skillLevel",
+          "vessel",
         ],
       },
     },
@@ -130,16 +185,56 @@ mealType-Regeln:
 - drink: Smoothies, Shakes, Drinks
 - unknown: nicht eindeutig oder kein Rezept
 
-cuisine-Beispiele: "italian", "asian", "german", "mediterranean", "mexican", "indian", "healthy", "baking", "bbq", "fastfood-makeover". Sei nicht zu kreativ — wenn unklar, leerer String.
+cuisine-Werte (Controlled Vocabulary, exakt einer dieser Strings oder leer): "italian", "asian", "german", "mediterranean", "mexican", "indian", "american", "middle-eastern", "french", "healthy", "baking", "bbq", "fastfood-makeover", "comfort-food". Wenn unklar oder kein Rezept: leerer String. Sei NICHT zu kreativ — waehle den nahesten Bucket.
 
-dietary-Tags nur wenn aus der Caption ABLEITBAR (Hashtags zaehlen):
+mainIngredient-Buckets (Controlled Vocabulary): "chicken", "beef", "pork", "fish", "seafood", "tofu", "eggs", "oats", "pasta", "rice", "potato", "quark", "skyr", "chocolate", "berries", "apple", "banana", "vegetables", "legumes", "cheese", "bread", "nuts", "yogurt", "noodles", "flour-baking". Waehle den dominierenden Bucket. Leer wenn unklar.
+
+dietary-Tags nur wenn aus der Caption ABLEITBAR (Hashtags zaehlen). Mehrere moeglich, als Array:
 - "highprotein": Protein-Pulver, Quark, Skyr, hohe Protein-Werte angegeben
 - "lowcarb": ausdruecklich "low carb", "keto", kein Brot/Reis/Pasta
+- "lowcal": unter ~300 kcal pro Portion / "kalorienarm" / "light"
 - "vegan": kein tierisches Produkt sichtbar/genannt
 - "vegetarian": kein Fleisch/Fisch
-- "glutenfree": "gf", "glutenfrei" genannt, oder explizit ohne Mehl
+- "glutenfree": "gf", "glutenfrei", explizit ohne Mehl
+- "dairyfree": ohne Milchprodukte / "laktosefrei" (Skyr/Quark/Kaese disqualifizieren)
+- "sugarfree": "ohne Zucker", "zuckerfrei", nur natuerliche Suesse (Banane, Datteln)
+- "nutfree": explizit "nussfrei"
 
 estimatedTimeMinutes: realistische Gesamt-Zubereitungszeit. Pancakes ~15, Pasta ~25, Schmorgerichte ~90, Backwaren ~45. Bei null Info: 0.
+
+occasion-Regeln (waehle den BESTEN Hauptanlass, nicht mehrere):
+- mealprep: explizit "Mealprep", Schmorgerichte mit grosser Menge, "Sonntag vorbereiten", aufgeteilt in Boxen
+- quick-weeknight: 5-30 Min, Werktags-tauglich, ein-Topf, kein Aufwand ("Feierabend", "easy")
+- cozy: Suppe, Eintopf, Aufstrich, deftig-warm, Herbst/Winter-Vibes
+- gameday: Snacks, Dips, Wings, Loaded-Fries, fingerfood-style
+- brunch: Pancakes, Waffeln, French-Toast, Eggs Benedict, Aufstrich, Wochenend-Fruehstueck
+- family-dinner: groessere Mengen, klassisch (Pasta Bolognese, Lasagne, Auflaeufe)
+- date-night: aufwendiger, "Restaurant-Feeling", Steak, Pasta-Klassiker, Dessert
+- summer-bbq: Grill, Salate, frische Sommer-Bowls, Aussen-Cooking
+- festive: Weihnachten, Ostern, Geburtstag, Show-Off-Kuchen
+- sunday-baking: ruhiges Backen, Hefeteig, Kuchen, Cookies, Donuts
+- post-workout: explizit "nach dem Sport", high-protein shakes, recovery
+- lazy-morning: gemuetliche Fruehstuecke, Overnight-Oats, slow-vibes
+
+season: Pancakes / Bowls / Salate ohne expliziten Saison-Bezug = "year-round". Sommer-Salate, Eis, Smoothies = "summer". Suppen, Eintoepfe, Glueh-Drinks = "winter". Spargel, Rhabarber = "spring". Kuerbis, Apfel, Pflaumen, Pumpkin-Spice = "autumn".
+
+skillLevel:
+- beginner: <=6 Zutaten, simple Schritte (mischen, anbraten, ofen rein), keine Technik
+- intermediate: 7-15 Zutaten, mehrere Komponenten, mehrere Schritte
+- advanced: Hefeteig, Macarons, Patisserie, Sauce Hollandaise, Souffle, fortgeschrittene Technik
+
+vessel (Hauptgefaess waehrend der Hauptzubereitung):
+- bowl: Bowl/Schuessel-Gericht zum Servieren
+- pan: Pfanne (anbraten, schmoren)
+- sheet: Backblech (Sheet-Pan-Dinner, Ofengemuese)
+- airfryer: explizit Airfryer/Heissluft-Fritteuse
+- mug: Mug-Cake, Tasse als Gefaess
+- mixer: Standmixer (Hauptarbeit dort)
+- oven: Ofen (Aufläufe, Cheesecake, Brot, Pizza, Lasagne)
+- pot: Topf (Pasta-Wasser, Suppen, Schmorgerichte)
+- no-cook: keine Hitze ueberhaupt (Energy-Balls, Tartar, Bowls aus rohen Zutaten)
+- grill: Grill
+- blender: Smoothies, Shakes
 
 Antworte AUSSCHLIESSLICH im JSON-Schema. Reihenfolge im classifications-Array MUSS mit der Eingabe matchen (Index 0..n).`;
 
@@ -171,6 +266,10 @@ type BatchOut = {
     mainIngredient: string;
     dietary: string[];
     estimatedTimeMinutes: number;
+    occasion: string;
+    season: string;
+    skillLevel: string;
+    vessel: string;
   }>;
 };
 
@@ -211,6 +310,10 @@ async function classifyBatch(
         c.estimatedTimeMinutes > 0
           ? c.estimatedTimeMinutes
           : null,
+      occasion: c.occasion?.trim() || null,
+      season: c.season?.trim() || null,
+      skillLevel: c.skillLevel?.trim() || null,
+      vessel: c.vessel?.trim() || null,
     });
   }
   return map;
@@ -231,6 +334,10 @@ function defaultMiss(): ReelClassification {
     mainIngredient: null,
     dietary: [],
     estimatedTimeMinutes: null,
+    occasion: null,
+    season: null,
+    skillLevel: null,
+    vessel: null,
   };
 }
 

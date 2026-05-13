@@ -20,6 +20,13 @@ type Body = {
   toDate?: string;            // ISO yyyy-mm-dd inclusive
   mealTypes?: string[];
   cuisines?: string[];
+  mainIngredients?: string[];
+  dietaries?: string[];
+  occasions?: string[];
+  seasons?: string[];
+  skillLevels?: string[];
+  vessels?: string[];
+  maxTimeMinutes?: number;
   /** Welche Sortierung wenn mehr Reels passen als gewuenscht. Default 'engagement'
    *  (Likes+Views desc). Alternativ 'recent' (posted_at desc). */
   sortBy?: "engagement" | "recent";
@@ -85,6 +92,13 @@ export async function POST(req: Request) {
     toDate: body.toDate,
     mealTypes: body.mealTypes,
     cuisines: body.cuisines,
+    mainIngredients: body.mainIngredients,
+    dietaries: body.dietaries,
+    occasions: body.occasions,
+    seasons: body.seasons,
+    skillLevels: body.skillLevels,
+    vessels: body.vessels,
+    maxTimeMinutes: body.maxTimeMinutes,
     limit: Math.max(50, limit * 3),
     onlyRecipes: true,
   });

@@ -6,8 +6,14 @@ import Image from "next/image";
 import type { Brand } from "@/lib/brands";
 
 // Auto-Pack-Form fuer den /[brand]/new Auto-Tab. User waehlt Filter
-// (Timeframe + MealTypes + Limit + Sortierung), Live-Preview-Grid zeigt
-// die matchenden Reels, "Pack generieren" baut Pack + Recipes + Heroes.
+// (Timeframe + 8 Tag-Dimensionen + Limit + Sortierung), Live-Preview-Grid
+// zeigt die matchenden Reels, "Pack generieren" baut Pack + Recipes +
+// Heroes.
+//
+// Smart-Hide: Beim Mount laed't die UI Tag-Aggregates fuer den Brand und
+// zeigt nur die Chip-Werte die wirklich vorkommen. Counter pro Chip
+// ("Asia (12)") hilft dem User einzuschaetzen welche Filter sinnvoll
+// sind.
 
 type ReelPreview = {
   id: string;
@@ -17,8 +23,30 @@ type ReelPreview = {
   postedAt: string | null;
   mealType: string | null;
   cuisine: string | null;
+  mainIngredient: string | null;
+  dietary: string[];
+  occasion: string | null;
+  season: string | null;
+  skillLevel: string | null;
+  vessel: string | null;
+  estimatedTimeMinutes: number | null;
   likeCount: number | null;
   viewCount: number | null;
+};
+
+type TagBucket = { value: string; count: number };
+
+type ReelTagAggregates = {
+  total: number;
+  mealType: TagBucket[];
+  cuisine: TagBucket[];
+  mainIngredient: TagBucket[];
+  dietary: TagBucket[];
+  occasion: TagBucket[];
+  season: TagBucket[];
+  skillLevel: TagBucket[];
+  vessel: TagBucket[];
+  timeBuckets: TagBucket[];
 };
 
 const TIMEFRAME_PRESETS = [
@@ -29,14 +57,131 @@ const TIMEFRAME_PRESETS = [
   { id: "all", label: "Alle Zeit", days: 0 },
 ] as const;
 
-const MEAL_TYPES = [
-  { id: "breakfast", label: "Frühstück" },
-  { id: "lunch", label: "Mittag" },
-  { id: "dinner", label: "Abend" },
-  { id: "snack", label: "Snack" },
-  { id: "dessert", label: "Dessert" },
-  { id: "drink", label: "Drink" },
-] as const;
+// ─── Label-Maps (KI gibt englische enums, User sieht Deutsch) ────────────
+
+const MEAL_TYPE_LABELS: Record<string, string> = {
+  breakfast: "Frühstück",
+  lunch: "Mittag",
+  dinner: "Abend",
+  snack: "Snack",
+  dessert: "Dessert",
+  drink: "Drink",
+};
+
+const CUISINE_LABELS: Record<string, string> = {
+  italian: "Italienisch",
+  asian: "Asiatisch",
+  german: "Deutsch",
+  mediterranean: "Mediterran",
+  mexican: "Mexikanisch",
+  indian: "Indisch",
+  american: "Amerikanisch",
+  "middle-eastern": "Orientalisch",
+  french: "Französisch",
+  healthy: "Healthy",
+  baking: "Backen",
+  bbq: "BBQ",
+  "fastfood-makeover": "Fastfood-Makeover",
+  "comfort-food": "Comfort-Food",
+};
+
+const MAIN_INGREDIENT_LABELS: Record<string, string> = {
+  chicken: "Hähnchen",
+  beef: "Rind",
+  pork: "Schwein",
+  fish: "Fisch",
+  seafood: "Meeresfrüchte",
+  tofu: "Tofu",
+  eggs: "Eier",
+  oats: "Hafer",
+  pasta: "Pasta",
+  rice: "Reis",
+  potato: "Kartoffel",
+  quark: "Quark",
+  skyr: "Skyr",
+  chocolate: "Schokolade",
+  berries: "Beeren",
+  apple: "Apfel",
+  banana: "Banane",
+  vegetables: "Gemüse",
+  legumes: "Hülsenfrüchte",
+  cheese: "Käse",
+  bread: "Brot",
+  nuts: "Nüsse",
+  yogurt: "Joghurt",
+  noodles: "Nudeln",
+  "flour-baking": "Mehl-Backware",
+};
+
+const DIETARY_LABELS: Record<string, string> = {
+  highprotein: "High-Protein",
+  lowcarb: "Low-Carb",
+  lowcal: "Low-Cal",
+  vegan: "Vegan",
+  vegetarian: "Vegetarisch",
+  glutenfree: "Glutenfrei",
+  dairyfree: "Laktosefrei",
+  sugarfree: "Ohne Zucker",
+  nutfree: "Nussfrei",
+};
+
+const OCCASION_LABELS: Record<string, string> = {
+  mealprep: "Mealprep",
+  "quick-weeknight": "Schnell unter der Woche",
+  cozy: "Cozy & deftig",
+  gameday: "Gameday & Snacks",
+  brunch: "Brunch",
+  "family-dinner": "Familien-Dinner",
+  "date-night": "Date-Night",
+  "summer-bbq": "Sommer-BBQ",
+  festive: "Festlich",
+  "sunday-baking": "Sonntag-Backen",
+  "post-workout": "Nach dem Sport",
+  "lazy-morning": "Gemütliches Wochenende",
+};
+
+const SEASON_LABELS: Record<string, string> = {
+  spring: "Frühling",
+  summer: "Sommer",
+  autumn: "Herbst",
+  winter: "Winter",
+  "year-round": "Ganzjährig",
+};
+
+const SKILL_LABELS: Record<string, string> = {
+  beginner: "Anfänger",
+  intermediate: "Mittel",
+  advanced: "Fortgeschritten",
+};
+
+const VESSEL_LABELS: Record<string, string> = {
+  bowl: "Bowl",
+  pan: "Pfanne",
+  sheet: "Backblech",
+  airfryer: "Airfryer",
+  mug: "Tasse",
+  mixer: "Standmixer",
+  oven: "Ofen",
+  pot: "Topf",
+  "no-cook": "Ohne Kochen",
+  grill: "Grill",
+  blender: "Blender",
+};
+
+const TIME_LABELS: Record<string, string> = {
+  "<=15": "≤ 15 Min",
+  "<=30": "≤ 30 Min",
+  "<=60": "≤ 60 Min",
+  ">60": "> 60 Min",
+};
+
+// timeBucket → maxTimeMinutes-Cap fuer Backend-Query
+const TIME_BUCKET_TO_MAX: Record<string, number | undefined> = {
+  "<=15": 15,
+  "<=30": 30,
+  "<=60": 60,
+  ">60": undefined,
+};
 
 function isoDaysAgo(days: number): string {
   const d = new Date();
@@ -44,23 +189,74 @@ function isoDaysAgo(days: number): string {
   return d.toISOString();
 }
 
+function labelFor(map: Record<string, string>, value: string): string {
+  return map[value] ?? value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 export function AutoPackForm({ brand }: { brand: Brand }) {
   const router = useRouter();
   const [timeframe, setTimeframe] = useState<(typeof TIMEFRAME_PRESETS)[number]["id"]>("1m");
-  const [mealTypes, setMealTypes] = useState<string[]>([]);
   const [limit, setLimit] = useState(12);
   const [sortBy, setSortBy] = useState<"engagement" | "recent">("engagement");
+
+  // ─── Multi-Select Filter-State pro Dimension ───────────────────────────
+  const [mealTypes, setMealTypes] = useState<string[]>([]);
+  const [cuisines, setCuisines] = useState<string[]>([]);
+  const [mainIngredients, setMainIngredients] = useState<string[]>([]);
+  const [dietaries, setDietaries] = useState<string[]>([]);
+  const [occasions, setOccasions] = useState<string[]>([]);
+  const [seasons, setSeasons] = useState<string[]>([]);
+  const [skillLevels, setSkillLevels] = useState<string[]>([]);
+  const [vessels, setVessels] = useState<string[]>([]);
+  const [timeBucket, setTimeBucket] = useState<string | null>(null);
 
   const [reels, setReels] = useState<ReelPreview[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Smart-Hide: Tag-Aggregates beim Mount laden, damit nur vorkommende
+  // Werte als Chips gerendert werden. Counter pro Chip.
+  const [tags, setTags] = useState<ReelTagAggregates | null>(null);
+  const [tagsLoading, setTagsLoading] = useState(true);
+
   // Quick-Scrape-State: User klickt "Frisch von Instagram laden" wenn die
   // Library leer ist oder er aktuelle Daten will. Synchroner Apify-Run
   // (~30s) + Klassifikation, danach reloaden wir den Filter.
   const [scraping, setScraping] = useState(false);
   const [scrapeError, setScrapeError] = useState<string | null>(null);
   const [scrapeSuccess, setScrapeSuccess] = useState<string | null>(null);
+
+  const loadTags = useCallback(async () => {
+    setTagsLoading(true);
+    try {
+      const res = await fetch(
+        `/api/brands/${encodeURIComponent(brand.slug)}/reel-tags`,
+        { cache: "no-store" }
+      );
+      const json = (await res.json()) as ReelTagAggregates;
+      setTags(json);
+    } catch {
+      setTags({
+        total: 0,
+        mealType: [],
+        cuisine: [],
+        mainIngredient: [],
+        dietary: [],
+        occasion: [],
+        season: [],
+        skillLevel: [],
+        vessel: [],
+        timeBuckets: [],
+      });
+    } finally {
+      setTagsLoading(false);
+    }
+  }, [brand.slug]);
+
+  useEffect(() => {
+    void loadTags();
+  }, [loadTags]);
 
   // Aktive Filter-URL fuer das Reel-Preview-Endpoint. useMemo damit der
   // useEffect nur bei echten Aenderungen re-laed't.
@@ -70,12 +266,35 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
     if (tf && tf.days > 0) {
       params.set("from", isoDaysAgo(tf.days));
     }
-    if (mealTypes.length > 0) {
-      params.set("mealTypes", mealTypes.join(","));
+    if (mealTypes.length > 0) params.set("mealTypes", mealTypes.join(","));
+    if (cuisines.length > 0) params.set("cuisines", cuisines.join(","));
+    if (mainIngredients.length > 0)
+      params.set("mainIngredients", mainIngredients.join(","));
+    if (dietaries.length > 0) params.set("dietaries", dietaries.join(","));
+    if (occasions.length > 0) params.set("occasions", occasions.join(","));
+    if (seasons.length > 0) params.set("seasons", seasons.join(","));
+    if (skillLevels.length > 0)
+      params.set("skillLevels", skillLevels.join(","));
+    if (vessels.length > 0) params.set("vessels", vessels.join(","));
+    if (timeBucket) {
+      const max = TIME_BUCKET_TO_MAX[timeBucket];
+      if (typeof max === "number") params.set("maxMinutes", String(max));
     }
     params.set("limit", String(Math.max(50, limit * 3)));
     return params.toString();
-  }, [timeframe, mealTypes, limit]);
+  }, [
+    timeframe,
+    mealTypes,
+    cuisines,
+    mainIngredients,
+    dietaries,
+    occasions,
+    seasons,
+    skillLevels,
+    vessels,
+    timeBucket,
+    limit,
+  ]);
 
   const loadReels = useCallback(async () => {
     setLoading(true);
@@ -117,15 +336,44 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
     return () => clearTimeout(t);
   }, [loadReels]);
 
-  const toggleMealType = (id: string) => {
-    setMealTypes((prev) =>
-      prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]
+  // Multi-Select-Toggle-Helper. Funktioniert fuer jede Dimension.
+  function toggleIn(
+    setter: React.Dispatch<React.SetStateAction<string[]>>,
+    value: string
+  ) {
+    setter((prev) =>
+      prev.includes(value) ? prev.filter((m) => m !== value) : [...prev, value]
     );
+  }
+
+  // Total aktive Filter (alle Dimensionen). Wird fuer Reset-Button +
+  // "Filter aktiv"-Pill genutzt.
+  const activeFilterCount =
+    mealTypes.length +
+    cuisines.length +
+    mainIngredients.length +
+    dietaries.length +
+    occasions.length +
+    seasons.length +
+    skillLevels.length +
+    vessels.length +
+    (timeBucket ? 1 : 0);
+
+  const resetAllFilters = () => {
+    setMealTypes([]);
+    setCuisines([]);
+    setMainIngredients([]);
+    setDietaries([]);
+    setOccasions([]);
+    setSeasons([]);
+    setSkillLevels([]);
+    setVessels([]);
+    setTimeBucket(null);
   };
 
   // Quick-Scrape: triggert /api/brands/[slug]/quick-scrape mit dem
   // aktuellen Timeframe. Server scrapt Apify synchron, klassifiziert,
-  // returnt. Danach refreshen wir die Reel-Preview.
+  // returnt. Danach refreshen wir die Reel-Preview + Tag-Aggregates.
   const handleQuickScrape = async () => {
     setScraping(true);
     setScrapeError(null);
@@ -152,8 +400,8 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
       setScrapeSuccess(
         `${json.scraped} Posts gescrapt, ${json.classified} klassifiziert.`
       );
-      // Reels-Preview re-laden mit dem aktuellen Filter
-      await loadReels();
+      // Reels-Preview + Tags re-laden mit dem aktuellen Filter
+      await Promise.all([loadReels(), loadTags()]);
     } catch (err) {
       setScrapeError(
         err instanceof Error ? err.message : "Scrape fehlgeschlagen."
@@ -172,6 +420,9 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
     setError(null);
     try {
       const tf = TIMEFRAME_PRESETS.find((t) => t.id === timeframe);
+      const maxTimeMinutes = timeBucket
+        ? TIME_BUCKET_TO_MAX[timeBucket]
+        : undefined;
       const res = await fetch("/api/packs/generate-auto", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -179,6 +430,15 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
           brandSlug: brand.slug,
           fromDate: tf && tf.days > 0 ? isoDaysAgo(tf.days) : undefined,
           mealTypes: mealTypes.length > 0 ? mealTypes : undefined,
+          cuisines: cuisines.length > 0 ? cuisines : undefined,
+          mainIngredients:
+            mainIngredients.length > 0 ? mainIngredients : undefined,
+          dietaries: dietaries.length > 0 ? dietaries : undefined,
+          occasions: occasions.length > 0 ? occasions : undefined,
+          seasons: seasons.length > 0 ? seasons : undefined,
+          skillLevels: skillLevels.length > 0 ? skillLevels : undefined,
+          vessels: vessels.length > 0 ? vessels : undefined,
+          maxTimeMinutes,
           limit,
           sortBy,
         }),
@@ -217,9 +477,9 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
           className="text-[14px] leading-relaxed"
           style={{ color: brand.tokens.inkMuted }}
         >
-          Wähl einen Zeitraum, optionale Kategorien — die KI baut Pack-Titel,
-          Beschreibung und Karten aus der Reel-Library. Hero-Bilder werden
-          parallel im Hintergrund generiert.
+          Wähl Zeitraum + Kategorien — die KI baut Pack-Titel, Beschreibung
+          und Karten aus der Reel-Library. Hero-Bilder werden parallel im
+          Hintergrund generiert.
         </p>
       </header>
 
@@ -255,37 +515,145 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
         </div>
       </section>
 
-      {/* Section 2 — Mahlzeit-Typ */}
+      {/* Section 2 — Filter-Bar mit gruppierten Chip-Sektionen.
+          Smart-Hide: jede Gruppe rendert nur Chips fuer Werte die in der
+          Reel-Library wirklich vorkommen (count > 0). Counter im Chip. */}
       <section className="editor-section editor-card flex flex-col gap-5">
-        <SectionHeader
-          num="02"
-          title="Mahlzeit-Kategorien"
-          hint="Optional — wähle eine oder mehrere. Alles leer = jede Kategorie."
-          brand={brand}
-        />
-        <div className="flex flex-wrap gap-2">
-          {MEAL_TYPES.map((mt) => {
-            const active = mealTypes.includes(mt.id);
-            return (
-              <button
-                key={mt.id}
-                type="button"
-                onClick={() => toggleMealType(mt.id)}
-                className="rounded-full border-2 px-4 py-2 text-[12.5px] font-semibold transition-all"
-                style={{
-                  borderColor: active ? brand.tokens.accent : brand.tokens.line,
-                  background: active
-                    ? brand.tokens.accent + "12"
-                    : brand.tokens.surface,
-                  color: active ? brand.tokens.accent : brand.tokens.inkMuted,
-                }}
-              >
-                {active ? "✓ " : ""}
-                {mt.label}
-              </button>
-            );
-          })}
+        <div className="flex items-start justify-between gap-3">
+          <SectionHeader
+            num="02"
+            title="Kategorien & Filter"
+            hint={
+              tagsLoading
+                ? "Lade Tag-Library…"
+                : `${tags?.total ?? 0} klassifizierte Rezepte in der Library — kombiniere beliebig viele Filter.`
+            }
+            brand={brand}
+          />
+          {activeFilterCount > 0 ? (
+            <button
+              type="button"
+              onClick={resetAllFilters}
+              className="shrink-0 rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition-all hover:opacity-80"
+              style={{
+                borderColor: brand.tokens.line,
+                color: brand.tokens.inkMuted,
+                background: brand.tokens.surface,
+              }}
+            >
+              ✕ Alle Filter zurücksetzen ({activeFilterCount})
+            </button>
+          ) : null}
         </div>
+
+        {tagsLoading ? (
+          <div className="flex flex-col gap-3">
+            <div
+              className="h-3 w-1/3 animate-pulse rounded-full"
+              style={{ background: brand.tokens.line }}
+            />
+            <div className="flex flex-wrap gap-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-8 w-24 animate-pulse rounded-full"
+                  style={{ background: brand.tokens.line }}
+                />
+              ))}
+            </div>
+          </div>
+        ) : !tags || tags.total === 0 ? (
+          <div
+            className="rounded-2xl border border-dashed px-6 py-6 text-center text-[13px]"
+            style={{
+              borderColor: brand.tokens.line,
+              color: brand.tokens.inkMuted,
+              background: brand.tokens.surface,
+            }}
+          >
+            Noch keine klassifizierten Reels. Erst Library laden mit „Frisch
+            von Instagram laden" unten — danach erscheinen hier alle Filter.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-5">
+            <FilterGroup
+              title="Mahlzeit"
+              buckets={tags.mealType}
+              labels={MEAL_TYPE_LABELS}
+              selected={mealTypes}
+              onToggle={(v) => toggleIn(setMealTypes, v)}
+              brand={brand}
+            />
+            <FilterGroup
+              title="Anlass"
+              buckets={tags.occasion}
+              labels={OCCASION_LABELS}
+              selected={occasions}
+              onToggle={(v) => toggleIn(setOccasions, v)}
+              brand={brand}
+            />
+            <FilterGroup
+              title="Cuisine"
+              buckets={tags.cuisine}
+              labels={CUISINE_LABELS}
+              selected={cuisines}
+              onToggle={(v) => toggleIn(setCuisines, v)}
+              brand={brand}
+            />
+            <FilterGroup
+              title="Hauptzutat"
+              buckets={tags.mainIngredient}
+              labels={MAIN_INGREDIENT_LABELS}
+              selected={mainIngredients}
+              onToggle={(v) => toggleIn(setMainIngredients, v)}
+              brand={brand}
+              collapsible
+            />
+            <FilterGroup
+              title="Diät"
+              buckets={tags.dietary}
+              labels={DIETARY_LABELS}
+              selected={dietaries}
+              onToggle={(v) => toggleIn(setDietaries, v)}
+              brand={brand}
+            />
+            <TimeFilterGroup
+              buckets={tags.timeBuckets}
+              selected={timeBucket}
+              onSelect={(v) =>
+                setTimeBucket((prev) => (prev === v ? null : v))
+              }
+              brand={brand}
+            />
+            <FilterGroup
+              title="Saison"
+              buckets={tags.season}
+              labels={SEASON_LABELS}
+              selected={seasons}
+              onToggle={(v) => toggleIn(setSeasons, v)}
+              brand={brand}
+              collapsible
+            />
+            <FilterGroup
+              title="Schwierigkeit"
+              buckets={tags.skillLevel}
+              labels={SKILL_LABELS}
+              selected={skillLevels}
+              onToggle={(v) => toggleIn(setSkillLevels, v)}
+              brand={brand}
+              collapsible
+            />
+            <FilterGroup
+              title="Zubereitung in"
+              buckets={tags.vessel}
+              labels={VESSEL_LABELS}
+              selected={vessels}
+              onToggle={(v) => toggleIn(setVessels, v)}
+              brand={brand}
+              collapsible
+            />
+          </div>
+        )}
       </section>
 
       {/* Section 3 — Anzahl + Sortierung */}
@@ -380,7 +748,7 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
                 ? "Lade Reels…"
                 : reels && reels.length > 0
                   ? `Das werden die ${reels.length} ${reelWord} im Pack.`
-                  : "Keine Reels in der Library — frisch von Instagram laden:"
+                  : "Keine Reels gefunden — Filter lockern oder neu von Instagram laden:"
             }
             brand={brand}
           />
@@ -503,7 +871,7 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
                       className="absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white backdrop-blur"
                       style={{ background: "rgba(0,0,0,0.55)" }}
                     >
-                      {reel.mealType}
+                      {labelFor(MEAL_TYPE_LABELS, reel.mealType)}
                     </span>
                   ) : null}
                 </div>
@@ -555,44 +923,53 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
               className="max-w-[50ch] text-[13px] leading-relaxed"
               style={{ color: brand.tokens.ink }}
             >
-              <span className="font-semibold">Noch keine Reels in der Library.</span>{" "}
-              Lass mich die letzten {TIMEFRAME_PRESETS.find((t) => t.id === timeframe)?.days ?? 90} Tage von{" "}
-              <span className="font-mono">{brand.handle}</span> jetzt frisch scrapen — dauert ~20–30 Sek.
+              <span className="font-semibold">
+                {activeFilterCount > 0
+                  ? "Keine Reels matchen die aktuellen Filter."
+                  : "Noch keine Reels in der Library."}
+              </span>{" "}
+              {activeFilterCount > 0
+                ? "Versuch Filter zu lockern oder den Zeitraum zu erweitern."
+                : `Lass mich die letzten ${TIMEFRAME_PRESETS.find((t) => t.id === timeframe)?.days ?? 90} Tage von ${brand.handle} jetzt frisch scrapen — dauert ~20–30 Sek.`}
             </p>
-            <button
-              type="button"
-              onClick={() => void handleQuickScrape()}
-              disabled={scraping}
-              className="flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-semibold text-white transition-all hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
-              style={{ background: brand.tokens.accent }}
-            >
-              {scraping ? (
-                <>
-                  <span className="size-3 animate-spin rounded-full border-[2px] border-white/40 border-t-white" />
-                  Scrape laeuft…
-                </>
-              ) : (
-                <>
-                  Jetzt von Instagram laden
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
-                    <path
-                      d="M3 6h6m0 0L6.5 3.5M9 6L6.5 8.5"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </>
-              )}
-            </button>
-            <p
-              className="text-[11px]"
-              style={{ color: brand.tokens.inkMuted }}
-            >
-              Alternativ: erweitere den Zeitraum oben oder entferne Mahlzeit-Filter,
-              falls die Library schon gefuellt ist.
-            </p>
+            {activeFilterCount === 0 ? (
+              <button
+                type="button"
+                onClick={() => void handleQuickScrape()}
+                disabled={scraping}
+                className="flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-semibold text-white transition-all hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+                style={{ background: brand.tokens.accent }}
+              >
+                {scraping ? (
+                  <>
+                    <span className="size-3 animate-spin rounded-full border-[2px] border-white/40 border-t-white" />
+                    Scrape laeuft…
+                  </>
+                ) : (
+                  <>
+                    Jetzt von Instagram laden
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+                      <path
+                        d="M3 6h6m0 0L6.5 3.5M9 6L6.5 8.5"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={resetAllFilters}
+                className="flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-semibold text-white transition-all hover:opacity-90"
+                style={{ background: brand.tokens.accent }}
+              >
+                Alle Filter zurücksetzen
+              </button>
+            )}
           </div>
         )}
       </section>
@@ -616,7 +993,9 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
               className="text-[11px]"
               style={{ color: brand.tokens.inkMuted }}
             >
-              Pack-Titel, Beschreibung und Karten werden in ~30–60 Sek erstellt
+              {activeFilterCount > 0
+                ? `${activeFilterCount} Filter aktiv · Pack-Titel, Beschreibung & Karten in ~30–60 Sek`
+                : "Pack-Titel, Beschreibung & Karten werden in ~30–60 Sek erstellt"}
             </span>
           </div>
           <button
@@ -667,6 +1046,8 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
   );
 }
 
+// ─── Sub-Components ────────────────────────────────────────────────────────
+
 function SectionHeader({
   num,
   title,
@@ -691,6 +1072,207 @@ function SectionHeader({
         <p className="text-[12.5px]" style={{ color: brand.tokens.inkMuted }}>
           {hint}
         </p>
+      </div>
+    </div>
+  );
+}
+
+// FilterGroup — eine Chip-Reihe pro Tag-Dimension. Smart-Hide: rendert
+// nur Chips fuer Werte mit count > 0. Counter im Chip. Optional
+// collapsible (default-collapsed) fuer weniger wichtige Dimensionen.
+function FilterGroup({
+  title,
+  buckets,
+  labels,
+  selected,
+  onToggle,
+  brand,
+  collapsible = false,
+}: {
+  title: string;
+  buckets: TagBucket[];
+  labels: Record<string, string>;
+  selected: string[];
+  onToggle: (value: string) => void;
+  brand: Brand;
+  collapsible?: boolean;
+}) {
+  const [open, setOpen] = useState(!collapsible);
+  // Smart-Hide: leere Sektion komplett raus
+  if (buckets.length === 0) return null;
+
+  const activeCount = selected.length;
+
+  return (
+    <div className="flex flex-col gap-2">
+      {collapsible ? (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-center justify-between gap-2 text-left"
+        >
+          <span className="flex items-center gap-2">
+            <span
+              className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+              style={{ color: brand.tokens.inkMuted }}
+            >
+              {title}
+            </span>
+            {activeCount > 0 ? (
+              <span
+                className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                style={{
+                  background: brand.tokens.accent + "20",
+                  color: brand.tokens.accent,
+                }}
+              >
+                {activeCount} aktiv
+              </span>
+            ) : (
+              <span
+                className="text-[10.5px]"
+                style={{ color: brand.tokens.inkMuted }}
+              >
+                {buckets.length} Optionen
+              </span>
+            )}
+          </span>
+          <span
+            className="font-mono text-[10px] uppercase tracking-[0.16em]"
+            style={{ color: brand.tokens.inkMuted }}
+          >
+            {open ? "zuklappen" : "aufklappen"}
+          </span>
+        </button>
+      ) : (
+        <div className="flex items-center gap-2">
+          <span
+            className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+            style={{ color: brand.tokens.inkMuted }}
+          >
+            {title}
+          </span>
+          {activeCount > 0 ? (
+            <span
+              className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+              style={{
+                background: brand.tokens.accent + "20",
+                color: brand.tokens.accent,
+              }}
+            >
+              {activeCount} aktiv
+            </span>
+          ) : null}
+        </div>
+      )}
+
+      {open ? (
+        <div className="flex flex-wrap gap-2">
+          {buckets.map((b) => {
+            const active = selected.includes(b.value);
+            return (
+              <button
+                key={b.value}
+                type="button"
+                onClick={() => onToggle(b.value)}
+                className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all"
+                style={{
+                  borderColor: active
+                    ? brand.tokens.accent
+                    : brand.tokens.line,
+                  background: active
+                    ? brand.tokens.accent + "14"
+                    : brand.tokens.surface,
+                  color: active ? brand.tokens.accent : brand.tokens.ink,
+                }}
+              >
+                {active ? "✓ " : ""}
+                {labelFor(labels, b.value)}
+                <span
+                  className="font-mono text-[10px] opacity-60"
+                  style={{ color: active ? brand.tokens.accent : brand.tokens.inkMuted }}
+                >
+                  {b.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// TimeFilterGroup — Sonderfall: nur EIN Time-Bucket aktiv (kein Multi-
+// Select, weil "<=15" und "<=30" semantisch ueberlappen).
+function TimeFilterGroup({
+  buckets,
+  selected,
+  onSelect,
+  brand,
+}: {
+  buckets: TagBucket[];
+  selected: string | null;
+  onSelect: (value: string) => void;
+  brand: Brand;
+}) {
+  if (buckets.length === 0) return null;
+  // Stable sort by time-bucket-order, NICHT by count (count sortiert nach
+  // Haeufigkeit, aber Time-Buckets brauchen logische Reihenfolge).
+  const ORDER = ["<=15", "<=30", "<=60", ">60"];
+  const sorted = [...buckets].sort(
+    (a, b) => ORDER.indexOf(a.value) - ORDER.indexOf(b.value)
+  );
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <span
+          className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+          style={{ color: brand.tokens.inkMuted }}
+        >
+          Zubereitungszeit
+        </span>
+        {selected ? (
+          <span
+            className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+            style={{
+              background: brand.tokens.accent + "20",
+              color: brand.tokens.accent,
+            }}
+          >
+            1 aktiv
+          </span>
+        ) : null}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {sorted.map((b) => {
+          const active = selected === b.value;
+          return (
+            <button
+              key={b.value}
+              type="button"
+              onClick={() => onSelect(b.value)}
+              className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-all"
+              style={{
+                borderColor: active ? brand.tokens.accent : brand.tokens.line,
+                background: active
+                  ? brand.tokens.accent + "14"
+                  : brand.tokens.surface,
+                color: active ? brand.tokens.accent : brand.tokens.ink,
+              }}
+            >
+              {active ? "✓ " : ""}
+              {labelFor(TIME_LABELS, b.value)}
+              <span
+                className="font-mono text-[10px] opacity-60"
+                style={{ color: active ? brand.tokens.accent : brand.tokens.inkMuted }}
+              >
+                {b.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

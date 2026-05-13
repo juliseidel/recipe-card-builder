@@ -38,8 +38,15 @@ create table if not exists public.creator_reels (
   meal_type text,                           -- breakfast/lunch/dinner/snack/dessert/drink
   cuisine text,                             -- italian/asian/german/healthy/baking/...
   main_ingredient text,                     -- chicken/oats/pasta/eggs/...
-  dietary text[] not null default '{}',     -- highprotein/lowcarb/vegan/...
+  dietary text[] not null default '{}',     -- highprotein/lowcarb/vegan/glutenfree/dairyfree/sugarfree/nutfree/...
   estimated_time_minutes int,
+  -- Erweiterte Klassifikation (Phase 2b, Filter-Reichtum fuer Auto-Pack-UI).
+  -- Alle Felder sind nullable und werden vom Klassifikator nach bestem
+  -- Wissen gefuellt. UI filtert via Smart-Hide auf vorkommende Werte.
+  occasion text,                            -- mealprep/quick-weeknight/cozy/gameday/brunch/family-dinner/date-night/summer-bbq/festive/sunday-baking
+  season text,                              -- spring/summer/autumn/winter/year-round
+  skill_level text,                         -- beginner/intermediate/advanced
+  vessel text,                              -- bowl/pan/sheet/airfryer/mug/mixer/oven/pot/no-cook/grill
   classified_at timestamptz,
 
   -- Raw Apify-Response fuer Replay/Debug. Klein genug (typisch 2-5 KB
@@ -68,6 +75,27 @@ create index if not exists creator_reels_brand_recipe_idx
 create index if not exists creator_reels_brand_meal_type_idx
   on public.creator_reels (brand_slug, meal_type)
   where is_recipe = true;
+
+-- Phase 2b: Filter-Indizes fuer erweiterte Klassifikation. occasion
+-- und cuisine sind die wichtigsten, weil sie hohe Cardinality haben.
+create index if not exists creator_reels_brand_occasion_idx
+  on public.creator_reels (brand_slug, occasion)
+  where is_recipe = true and occasion is not null;
+
+create index if not exists creator_reels_brand_cuisine_idx
+  on public.creator_reels (brand_slug, cuisine)
+  where is_recipe = true and cuisine is not null;
+
+create index if not exists creator_reels_brand_main_ingredient_idx
+  on public.creator_reels (brand_slug, main_ingredient)
+  where is_recipe = true and main_ingredient is not null;
+
+-- Migration fuer existierende Datenbanken (idempotent):
+alter table public.creator_reels
+  add column if not exists occasion text,
+  add column if not exists season text,
+  add column if not exists skill_level text,
+  add column if not exists vessel text;
 
 -- ─── creator_scrapes ────────────────────────────────────────────────────────
 -- Job-Tracker fuer asynchrone Apify-Runs. Ein Backfill dauert 3-10 Min und

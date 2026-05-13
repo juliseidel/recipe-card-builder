@@ -34,6 +34,12 @@ export type ReelClassification = {
   mainIngredient: string | null;
   dietary: string[];
   estimatedTimeMinutes: number | null;
+  /** Phase 2b: erweiterte Klassifikation fuer Filter-Reichtum im Auto-Pack-
+   *  Builder. Alle nullable, Gemini fuellt nach bestem Wissen. */
+  occasion: string | null;
+  season: string | null;
+  skillLevel: string | null;
+  vessel: string | null;
 };
 
 export type ReelRow = {
@@ -58,6 +64,10 @@ export type ReelRow = {
   main_ingredient: string | null;
   dietary: string[];
   estimated_time_minutes: number | null;
+  occasion: string | null;
+  season: string | null;
+  skill_level: string | null;
+  vessel: string | null;
   classified_at: string | null;
   scraped_at: string;
   /** Quelle des Reels — gleicher Wert wie creator_scrapes.platform beim
@@ -368,14 +378,23 @@ export async function getReelsByIds(ids: string[]): Promise<ReelRow[]> {
   return (data as ReelRow[]) ?? [];
 }
 
-// Filter-Query fuer den Auto-Pack-Builder (Phase 4 UI). Timeframe als
-// ISO-Dates, Meal-Types als Array (OR-Match), Limit fuer max. Anzahl.
+// Filter-Query fuer den Auto-Pack-Builder. Multi-Select-OR-Match pro
+// Dimension, AND-Match zwischen Dimensionen. dietaries ist ein Array-
+// overlap (DB-Feld ist text[]), alles andere ist scalar IN-Match. maxTime
+// filtert auf estimated_time_minutes<=N (null wird excluded).
 export async function queryReelsForBrand(opts: {
   brandSlug: string;
   fromDate?: string;
   toDate?: string;
   mealTypes?: string[];
   cuisines?: string[];
+  mainIngredients?: string[];
+  dietaries?: string[];
+  maxTimeMinutes?: number;
+  occasions?: string[];
+  seasons?: string[];
+  skillLevels?: string[];
+  vessels?: string[];
   limit?: number;
   onlyRecipes?: boolean;
 }): Promise<ReelRow[]> {
@@ -394,6 +413,30 @@ export async function queryReelsForBrand(opts: {
   if (opts.cuisines && opts.cuisines.length > 0) {
     q = q.in("cuisine", opts.cuisines);
   }
+  if (opts.mainIngredients && opts.mainIngredients.length > 0) {
+    q = q.in("main_ingredient", opts.mainIngredients);
+  }
+  if (opts.occasions && opts.occasions.length > 0) {
+    q = q.in("occasion", opts.occasions);
+  }
+  if (opts.seasons && opts.seasons.length > 0) {
+    q = q.in("season", opts.seasons);
+  }
+  if (opts.skillLevels && opts.skillLevels.length > 0) {
+    q = q.in("skill_level", opts.skillLevels);
+  }
+  if (opts.vessels && opts.vessels.length > 0) {
+    q = q.in("vessel", opts.vessels);
+  }
+  if (opts.dietaries && opts.dietaries.length > 0) {
+    // text[] overlap: matches wenn EINER der Tags im Array enthalten ist.
+    // Wir bauen "{vegan,lowcarb}" als Postgres-array-literal.
+    q = q.overlaps("dietary", opts.dietaries);
+  }
+  if (typeof opts.maxTimeMinutes === "number" && opts.maxTimeMinutes > 0) {
+    q = q.lte("estimated_time_minutes", opts.maxTimeMinutes);
+    q = q.gt("estimated_time_minutes", 0); // null/0 ausschliessen
+  }
   q = q
     .order("like_count", { ascending: false, nullsFirst: false })
     .limit(opts.limit ?? 50);
@@ -403,6 +446,126 @@ export async function queryReelsForBrand(opts: {
     return [];
   }
   return (data as ReelRow[]) ?? [];
+}
+
+// ─── Tag-Aggregator (Smart-Hide-UI) ────────────────────────────────────────
+
+export type TagBucket = { value: string; count: number };
+
+export type ReelTagAggregates = {
+  total: number;
+  mealType: TagBucket[];
+  cuisine: TagBucket[];
+  mainIngredient: TagBucket[];
+  dietary: TagBucket[];
+  occasion: TagBucket[];
+  season: TagBucket[];
+  skillLevel: TagBucket[];
+  vessel: TagBucket[];
+  timeBuckets: TagBucket[]; // "<=15", "<=30", "<=60", ">60"
+};
+
+// Zaehlt pro Dimension die vorkommenden Werte + Anzahl Reels. Wird beim
+// Mounten des Auto-Pack-Forms einmal geladen, damit die UI nur die
+// wirklich vorkommenden Filter-Chips anzeigt (Smart-Hide). Server-side
+// Aggregation ware schoener (PG GROUP BY) — wir machen es client-side
+// per JS, weil Supabase's PostgREST keinen sauberen GROUP BY hat. Bei
+// ~500 Reels pro Brand ist das problemlos.
+export async function getReelTagAggregates(
+  brandSlug: string
+): Promise<ReelTagAggregates> {
+  const empty: ReelTagAggregates = {
+    total: 0,
+    mealType: [],
+    cuisine: [],
+    mainIngredient: [],
+    dietary: [],
+    occasion: [],
+    season: [],
+    skillLevel: [],
+    vessel: [],
+    timeBuckets: [],
+  };
+  if (!hasServerSupabase()) return empty;
+  const supabase = getServerSupabase();
+  const { data, error } = await supabase
+    .from("creator_reels")
+    .select(
+      "meal_type, cuisine, main_ingredient, dietary, estimated_time_minutes, occasion, season, skill_level, vessel"
+    )
+    .eq("brand_slug", brandSlug)
+    .eq("is_recipe", true);
+  if (error) {
+    console.error("[creator-reels] getReelTagAggregates failed", error);
+    return empty;
+  }
+  type Row = {
+    meal_type: string | null;
+    cuisine: string | null;
+    main_ingredient: string | null;
+    dietary: string[] | null;
+    estimated_time_minutes: number | null;
+    occasion: string | null;
+    season: string | null;
+    skill_level: string | null;
+    vessel: string | null;
+  };
+  const rows = (data as Row[]) ?? [];
+
+  const counts = {
+    mealType: new Map<string, number>(),
+    cuisine: new Map<string, number>(),
+    mainIngredient: new Map<string, number>(),
+    dietary: new Map<string, number>(),
+    occasion: new Map<string, number>(),
+    season: new Map<string, number>(),
+    skillLevel: new Map<string, number>(),
+    vessel: new Map<string, number>(),
+    time: new Map<string, number>(),
+  };
+
+  const bump = (m: Map<string, number>, key: string | null | undefined) => {
+    if (!key) return;
+    m.set(key, (m.get(key) ?? 0) + 1);
+  };
+
+  for (const r of rows) {
+    bump(counts.mealType, r.meal_type);
+    bump(counts.cuisine, r.cuisine);
+    bump(counts.mainIngredient, r.main_ingredient);
+    bump(counts.occasion, r.occasion);
+    bump(counts.season, r.season);
+    bump(counts.skillLevel, r.skill_level);
+    bump(counts.vessel, r.vessel);
+    if (Array.isArray(r.dietary)) {
+      for (const d of r.dietary) if (d) bump(counts.dietary, d);
+    }
+    const t = r.estimated_time_minutes;
+    if (typeof t === "number" && t > 0) {
+      if (t <= 15) bump(counts.time, "<=15");
+      else if (t <= 30) bump(counts.time, "<=30");
+      else if (t <= 60) bump(counts.time, "<=60");
+      else bump(counts.time, ">60");
+    }
+  }
+
+  const toBuckets = (m: Map<string, number>): TagBucket[] =>
+    [...m.entries()]
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) => b.count - a.count);
+
+  return {
+    total: rows.length,
+    mealType: toBuckets(counts.mealType),
+    cuisine: toBuckets(counts.cuisine),
+    mainIngredient: toBuckets(counts.mainIngredient),
+    dietary: toBuckets(counts.dietary),
+    occasion: toBuckets(counts.occasion),
+    season: toBuckets(counts.season),
+    skillLevel: toBuckets(counts.skillLevel),
+    vessel: toBuckets(counts.vessel),
+    timeBuckets: toBuckets(counts.time),
+  };
 }
 
 // Schreibt die Klassifikations-Felder eines einzelnen Reels in die DB.
@@ -424,6 +587,10 @@ export async function updateReelClassification(
       main_ingredient: c.mainIngredient,
       dietary: c.dietary,
       estimated_time_minutes: c.estimatedTimeMinutes,
+      occasion: c.occasion,
+      season: c.season,
+      skill_level: c.skillLevel,
+      vessel: c.vessel,
       classified_at: new Date().toISOString(),
     })
     .eq("id", id);
