@@ -1186,83 +1186,92 @@ function NewspaperForewordPage({
           </View>
         ) : null}
 
-        {/* Right column */}
-        <View style={{ flex: 1, justifyContent: "flex-start" }}>
-          {/* Italic Headline (greeting als Kurz-Headline) */}
-          <Text
-            style={{
-              fontFamily: "Fraunces",
-              fontSize: 26,
-              fontWeight: 700,
-              fontStyle: "italic",
-              color: t.ink,
-              lineHeight: 1.05,
-              letterSpacing: -0.3,
-              marginBottom: 10,
-            }}
-          >
-            {greeting}
-          </Text>
-          {/* Byline-Rule */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 12,
-            }}
-          >
-            <View
-              style={{ flex: 1, height: 0.5, backgroundColor: t.divider }}
-            />
-          </View>
-          {/* Story mit Drop-Cap */}
-          {story.length > 0 ? (
-            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-              <Text
-                style={{
-                  fontFamily: "Fraunces",
-                  fontSize: 44,
-                  fontWeight: 700,
-                  fontStyle: "italic",
-                  color: t.accent,
-                  lineHeight: 0.85,
-                  marginRight: 4,
-                  marginTop: -3,
-                  width: 32,
-                }}
-              >
-                {storyFirstChar}
-              </Text>
-              <Text
-                style={{
-                  flex: 1,
-                  fontFamily: "Fraunces",
-                  fontSize: 11,
-                  color: t.ink,
-                  lineHeight: 1.55,
-                  textAlign: "justify",
-                }}
-              >
-                {storyRest}
-              </Text>
-            </View>
-          ) : null}
-
-          {/* Signoff in Italic (Editorial-Style) */}
-          {signoff ? (
+        {/* Right column — vertikal verteilt: Headline oben, Signoff unten */}
+        <View style={{ flex: 1, justifyContent: "space-between" }}>
+          {/* Oberer Block: Headline + Rule + Story */}
+          <View>
+            {/* Italic Headline (greeting als Kurz-Headline) */}
             <Text
               style={{
                 fontFamily: "Fraunces",
-                fontSize: 11,
+                fontSize: 32,
+                fontWeight: 700,
                 fontStyle: "italic",
-                color: t.accent,
-                marginTop: 14,
-                lineHeight: 1.45,
+                color: t.ink,
+                lineHeight: 1.05,
+                letterSpacing: -0.4,
+                marginBottom: 14,
               }}
             >
-              {signoff}
+              {greeting}
             </Text>
+            {/* Byline-Rule */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 16,
+              }}
+            >
+              <View
+                style={{ flex: 1, height: 0.5, backgroundColor: t.divider }}
+              />
+            </View>
+            {/* Story mit Drop-Cap */}
+            {story.length > 0 ? (
+              <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontSize: 54,
+                    fontWeight: 700,
+                    fontStyle: "italic",
+                    color: t.accent,
+                    lineHeight: 0.85,
+                    marginRight: 6,
+                    marginTop: -4,
+                    width: 38,
+                  }}
+                >
+                  {storyFirstChar}
+                </Text>
+                <Text
+                  style={{
+                    flex: 1,
+                    fontFamily: "Fraunces",
+                    fontSize: 12.5,
+                    color: t.ink,
+                    lineHeight: 1.65,
+                    textAlign: "justify",
+                  }}
+                >
+                  {storyRest}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Signoff als Pull-Quote-Strip am unteren Rand der Spalte */}
+          {signoff ? (
+            <View style={{ marginTop: 18 }}>
+              <View
+                style={{ height: 0.5, backgroundColor: t.divider, marginBottom: 12 }}
+              />
+              <Text
+                style={{
+                  fontFamily: "Fraunces",
+                  fontSize: 14,
+                  fontStyle: "italic",
+                  fontWeight: 600,
+                  color: t.accent,
+                  lineHeight: 1.4,
+                  letterSpacing: -0.1,
+                }}
+              >
+                {signoff}
+              </Text>
+            </View>
           ) : null}
         </View>
       </View>

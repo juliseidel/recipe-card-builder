@@ -54,3 +54,16 @@ export function formatIngredientAmount(amount: string): string {
 export function isLongAmount(formattedAmount: string): boolean {
   return formattedAmount.length > 10;
 }
+
+/**
+ * True wenn der formattierte Amount KEINE Zahl enthält ("Nach Geschmack",
+ * "Nach Belieben", "Etwas"). Solche qualitativen Mengen sollen visuell
+ * zurückhaltend gerendert werden — sonst dominiert der lange Phrasen-
+ * Text die eigentliche Zutat in der schmalen Amount-Spalte. Layouts
+ * nutzen das Flag, um Schriftgröße/Gewicht/Farbe für diese Faelle
+ * anzupassen.
+ */
+export function isQualitativeAmount(formattedAmount: string): boolean {
+  if (!formattedAmount) return false;
+  return !/\d/.test(formattedAmount);
+}

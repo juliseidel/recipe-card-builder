@@ -30,7 +30,7 @@ import {
 } from "./helpers";
 import { packTheme, withAlpha, blendWithWhite, PAGE_PADDING } from "./theme";
 import { BeeIcon } from "./bee-icon";
-import { formatIngredientAmount } from "@/lib/format-ingredient";
+import { formatIngredientAmount, isQualitativeAmount } from "@/lib/format-ingredient";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public entry — returns a single A4 page rendered in the matching layout.
@@ -6674,13 +6674,13 @@ const NEWSPAPER_DENSITY: Record<
     ingredientFontSize: 9,
     ingredientRowPadV: 2.5,
     stepFontSize: 9,
-    stepMarginBottom: 5,
+    stepMarginBottom: 6,
     sectionLabelFontSize: 8,
     macrosLabelFontSize: 6.5,
-    macrosValueFontSize: 11.5,
+    macrosValueFontSize: 14,
     microsFontSize: 7,
     topPadding: 14,
-    sectionGap: 10,
+    sectionGap: 16,
   },
   balanced: {
     heroAspectRatio: 4 / 3,
@@ -6692,13 +6692,13 @@ const NEWSPAPER_DENSITY: Record<
     ingredientFontSize: 9.5,
     ingredientRowPadV: 4,
     stepFontSize: 9.5,
-    stepMarginBottom: 8,
+    stepMarginBottom: 9,
     sectionLabelFontSize: 8.5,
     macrosLabelFontSize: 7,
-    macrosValueFontSize: 13.5,
+    macrosValueFontSize: 17.5,
     microsFontSize: 7.5,
     topPadding: 22,
-    sectionGap: 14,
+    sectionGap: 22,
   },
   spacious: {
     heroAspectRatio: 4 / 3,
@@ -6710,13 +6710,13 @@ const NEWSPAPER_DENSITY: Record<
     ingredientFontSize: 10,
     ingredientRowPadV: 5.5,
     stepFontSize: 10,
-    stepMarginBottom: 10,
+    stepMarginBottom: 11,
     sectionLabelFontSize: 9,
     macrosLabelFontSize: 7.5,
-    macrosValueFontSize: 15,
+    macrosValueFontSize: 20,
     microsFontSize: 8,
     topPadding: 26,
-    sectionGap: 18,
+    sectionGap: 28,
   },
 };
 
@@ -6833,7 +6833,7 @@ function NewspaperPage({
         style={{
           flexDirection: "row",
           paddingHorizontal: PAGE_PADDING,
-          marginTop: 10,
+          marginTop: 14,
           gap: 16,
         }}
       >
@@ -6996,7 +6996,7 @@ function NewspaperPage({
       <View
         style={{
           paddingHorizontal: PAGE_PADDING,
-          marginTop: D.sectionGap + 4,
+          marginTop: D.sectionGap + 6,
         }}
       >
         <NewspaperSectionHeader
@@ -7010,7 +7010,7 @@ function NewspaperPage({
             {ingredientGroups.map((group, gIdx) => (
               <View
                 key={`g-${gIdx}`}
-                style={{ marginTop: gIdx > 0 ? 8 : 4 }}
+                style={{ marginTop: gIdx > 0 ? 10 : 4 }}
               >
                 {group.name ? (
                   <Text
@@ -7048,7 +7048,7 @@ function NewspaperPage({
       <View
         style={{
           paddingHorizontal: PAGE_PADDING,
-          marginTop: D.sectionGap + 2,
+          marginTop: D.sectionGap + 4,
         }}
       >
         <NewspaperSectionHeader
@@ -7107,23 +7107,45 @@ function NewspaperPage({
       >
         {/* Doppellinie ueber Spreadsheet (Newspaper-typisch) */}
         <View style={{ height: 1.5, backgroundColor: theme.ink, marginBottom: 1 }} />
-        <View style={{ height: 0.5, backgroundColor: theme.ink, marginBottom: 8 }} />
-        <Text
+        <View style={{ height: 0.5, backgroundColor: theme.ink, marginBottom: 10 }} />
+        {/* Master-Label + dezenter Basis-Hinweis rechts */}
+        <View
           style={{
-            fontFamily: "Inter",
-            fontSize: 7.5,
-            fontWeight: 700,
-            letterSpacing: 2,
-            color: theme.ink,
-            textTransform: "uppercase",
-            marginBottom: 8,
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            marginBottom: 10,
           }}
         >
-          Nährwerte {nutritionBasisInline(recipe.nutritionBasis)}
-        </Text>
-        <View style={{ flexDirection: "row", gap: 24 }}>
-          {/* Macros */}
-          <View style={{ flexDirection: "row", gap: 18, flex: 1 }}>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 8,
+              fontWeight: 700,
+              letterSpacing: 2.2,
+              color: theme.ink,
+              textTransform: "uppercase",
+            }}
+          >
+            Nährwerte {nutritionBasisInline(recipe.nutritionBasis)}
+          </Text>
+        </View>
+        {/* MAKROS — prominenter Block in eigener Sub-Zeile */}
+        <View style={{ marginBottom: topMicros.length > 0 ? 10 : 0 }}>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 6.5,
+              fontWeight: 700,
+              letterSpacing: 1.6,
+              color: theme.inkSubtle,
+              textTransform: "uppercase",
+              marginBottom: 5,
+            }}
+          >
+            Makros
+          </Text>
+          <View style={{ flexDirection: "row", gap: 22 }}>
             <NewspaperMacroCell
               label="KCAL"
               value={String(Math.round(recipe.nutrition.kcal))}
@@ -7149,29 +7171,43 @@ function NewspaperPage({
               density={D}
             />
           </View>
-          {/* Mikros (rechts, vertikale Trennlinie davor) */}
-          {topMicros.length > 0 ? (
-            <>
-              <View
-                style={{
-                  width: 0.5,
-                  backgroundColor: theme.divider,
-                }}
-              />
-              <View style={{ flexDirection: "row", gap: 16, flex: 1 }}>
-                {topMicros.map((m: Micronutrient, i: number) => (
-                  <NewspaperMicroCell
-                    key={`${m.name}-${i}`}
-                    name={m.name}
-                    pct={m.pctDaily}
-                    theme={theme}
-                    density={D}
-                  />
-                ))}
-              </View>
-            </>
-          ) : null}
         </View>
+        {/* MIKROS — dezenter, kompakter Block darunter mit Trennlinie */}
+        {topMicros.length > 0 ? (
+          <View>
+            <View
+              style={{
+                height: 0.5,
+                backgroundColor: theme.divider,
+                marginBottom: 7,
+              }}
+            />
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 6.5,
+                fontWeight: 700,
+                letterSpacing: 1.6,
+                color: theme.inkSubtle,
+                textTransform: "uppercase",
+                marginBottom: 4,
+              }}
+            >
+              Mikros
+            </Text>
+            <View style={{ flexDirection: "row", gap: 22 }}>
+              {topMicros.map((m: Micronutrient, i: number) => (
+                <NewspaperMicroCell
+                  key={`${m.name}-${i}`}
+                  name={m.name}
+                  pct={m.pctDaily}
+                  theme={theme}
+                  density={D}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
       </View>
 
       {/* ── Footer mit QR-Code ── */}
@@ -7257,7 +7293,7 @@ function NewspaperSectionHeader({
           flexDirection: "row",
           alignItems: "center",
           gap: 8,
-          marginBottom: 6,
+          marginBottom: 11,
         }}
       >
         <Text
@@ -7343,6 +7379,12 @@ function NewspaperIngredientRow({
   density: (typeof NEWSPAPER_DENSITY)["balanced"];
 }) {
   const displayAmount = formatIngredientAmount(amount);
+  const isQualitative = isQualitativeAmount(displayAmount);
+  // Qualitative Phrasen wie "Nach Geschmack" sollen NICHT dominieren:
+  // kleinere Schrift, italic, normales Gewicht, dezente Farbe.
+  const amountFontSize = isQualitative
+    ? density.ingredientFontSize - 2
+    : density.ingredientFontSize;
   const amountIsLong = displayAmount.length > 10;
   return (
     <View
@@ -7357,13 +7399,14 @@ function NewspaperIngredientRow({
     >
       <Text
         style={{
-          fontFamily: "Inter",
-          fontSize: density.ingredientFontSize,
-          fontWeight: 700,
-          color: theme.accent,
+          fontFamily: isQualitative ? "Fraunces" : "Inter",
+          fontSize: amountFontSize,
+          fontStyle: isQualitative ? "italic" : "normal",
+          fontWeight: isQualitative ? 400 : 700,
+          color: isQualitative ? theme.inkSoft : theme.accent,
           width: 50,
           lineHeight: amountIsLong ? 1.3 : undefined,
-          paddingTop: amountIsLong ? 0 : 1,
+          paddingTop: amountIsLong ? (isQualitative ? 1 : 0) : 1,
         }}
       >
         {displayAmount}
@@ -7492,13 +7535,13 @@ function NewspaperMacroCell({
   density: (typeof NEWSPAPER_DENSITY)["balanced"];
 }) {
   return (
-    <View style={{ flexDirection: "column", gap: 1 }}>
+    <View style={{ flexDirection: "column", gap: 2, flex: 1 }}>
       <Text
         style={{
           fontFamily: "Inter",
           fontSize: density.macrosLabelFontSize,
           fontWeight: 600,
-          letterSpacing: 1.4,
+          letterSpacing: 1.6,
           color: theme.inkSoft,
           textTransform: "uppercase",
         }}
@@ -7511,6 +7554,8 @@ function NewspaperMacroCell({
           fontSize: density.macrosValueFontSize,
           fontWeight: 700,
           color: theme.ink,
+          letterSpacing: -0.3,
+          lineHeight: 1.05,
         }}
       >
         {value}
@@ -7519,6 +7564,7 @@ function NewspaperMacroCell({
   );
 }
 
+// Mikros: dezent, kompakt, einzeilig "Name 44%" — bewusst KEIN Macro-Look.
 function NewspaperMicroCell({
   name,
   pct,
@@ -7531,14 +7577,21 @@ function NewspaperMicroCell({
   density: (typeof NEWSPAPER_DENSITY)["balanced"];
 }) {
   return (
-    <View style={{ flexDirection: "column", gap: 1 }}>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "baseline",
+        gap: 6,
+        flex: 1,
+      }}
+    >
       <Text
         style={{
           fontFamily: "Inter",
-          fontSize: density.macrosLabelFontSize,
+          fontSize: density.microsFontSize,
           fontWeight: 600,
-          letterSpacing: 1.4,
-          color: theme.accent,
+          letterSpacing: 1.2,
+          color: theme.inkSoft,
           textTransform: "uppercase",
         }}
       >
@@ -7547,9 +7600,10 @@ function NewspaperMicroCell({
       <Text
         style={{
           fontFamily: "Fraunces",
-          fontSize: density.microsFontSize + 4,
+          fontSize: density.microsFontSize + 1,
           fontWeight: 700,
-          color: theme.ink,
+          fontStyle: "italic",
+          color: theme.accent,
         }}
       >
         {typeof pct === "number" ? `${pct}%` : "—"}
