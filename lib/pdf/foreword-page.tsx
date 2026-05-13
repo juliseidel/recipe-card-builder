@@ -2441,46 +2441,21 @@ function RestaurantForewordPage({
         }}
       >
         {story.length > 0 ? (
-          // Drop-Cap-Layout. Vorherige Versuche mit flex-row + alignItems
-          // flex-start hatten ein react-pdf-Limit: yoga positioniert den
-          // Glyph baseline-aligned innerhalb seiner Box, nicht cap-top.
-          // Bei unterschiedlichen fontSizes (W 30pt vs Body 11pt) wirkte
-          // das W damit mid-line statt klassisch oben sitzend.
-          //
-          // Robuste Loesung: W absolut links oben positionieren, Body
-          // bekommt konstant paddingLeft. Klassischer Editorial-Look —
-          // alle Body-Zeilen sind gleich eingerueckt, das W schwebt
-          // links daneben. Deterministisch, keine yoga-Quirks mehr.
-          <View style={{ position: "relative" }}>
-            <Text
-              style={{
-                position: "absolute",
-                top: -2,
-                left: 0,
-                fontFamily: "Fraunces",
-                fontSize: 32,
-                lineHeight: 1,
-                fontWeight: 700,
-                fontStyle: "italic",
-                color: RESTAURANT_FOREWORD_COLORS.gold,
-              }}
-            >
-              {storyFirstChar}
-            </Text>
-            <Text
-              style={{
-                paddingLeft: 28,
-                fontFamily: "Fraunces",
-                fontSize: 11,
-                color: RESTAURANT_FOREWORD_COLORS.ink,
-                lineHeight: 1.65,
-                textAlign: "justify",
-                letterSpacing: 0.2,
-              }}
-            >
-              {storyRest}
-            </Text>
-          </View>
+          // Drop-Cap aufgegeben — react-pdf bekommt das W positionierungs-
+          // technisch nicht sauber hin. Stattdessen: Story als normaler
+          // durchgehender Block mit erstem Buchstaben groß wie der Rest.
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: 11,
+              color: RESTAURANT_FOREWORD_COLORS.ink,
+              lineHeight: 1.65,
+              textAlign: "justify",
+              letterSpacing: 0.2,
+            }}
+          >
+            {story}
+          </Text>
         ) : null}
 
         {signoff ? (
