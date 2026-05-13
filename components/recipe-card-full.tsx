@@ -5487,7 +5487,7 @@ function RestaurantLayout({
           style={{ color: RESTAURANT_WEB.gold }}
         >
           {pack.category}
-          {`  ·  ${toRomanWeb(recipeIndex + 1)}. Plat`}
+          {`  ·  ${toRomanWeb(recipeIndex + 1)}. Gang`}
         </p>
         <h2
           className="mt-3 max-w-[520px] text-center font-display text-[40px] italic font-semibold leading-[1.08]"
@@ -5609,7 +5609,7 @@ function RestaurantLayout({
         </div>
       </section>
 
-      {/* ── Wine Notes (EIGENE Mikros-Position) ── */}
+      {/* ── Genussprofil (EIGENE Mikros-Position) ── */}
       {topMicros.length > 0 ? (
         <section className="px-12 pt-9">
           <div className="flex items-center gap-3 justify-center">
@@ -5622,7 +5622,7 @@ function RestaurantLayout({
               className="font-mono text-[10px] font-bold uppercase tracking-[0.32em]"
               style={{ color: RESTAURANT_WEB.gold }}
             >
-              Wine Notes
+              Genussprofil
             </span>
             <span style={{ color: RESTAURANT_WEB.gold, fontSize: "9px" }}>◇</span>
             <span
@@ -5713,11 +5713,11 @@ function RestaurantLayout({
             className="font-mono text-[10px] uppercase tracking-[0.18em] underline-offset-2 hover:underline"
             style={{ color: RESTAURANT_WEB.gold }}
           >
-            {recipe.sourceLabel ?? "Maison Original"} ↗
+            {recipe.sourceLabel ?? "Originalrezept"} ↗
           </a>
         ) : (
           <span className="font-mono text-[10px] uppercase tracking-[0.18em] opacity-70">
-            Maison Original
+            Originalrezept
           </span>
         )}
       </footer>

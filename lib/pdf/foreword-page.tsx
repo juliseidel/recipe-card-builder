@@ -1,4 +1,5 @@
 import { Page, View, Text, Image, Svg, Circle, Path } from "@react-pdf/renderer";
+import { GoldDiamond } from "./recipe-card-pdf";
 import type { Brand } from "@/lib/brands";
 import type { Pack, CardLayout } from "@/lib/packs";
 import type { PackForewordContent } from "@/lib/ai/generate-foreword";
@@ -2290,9 +2291,7 @@ function RestaurantForewordPage({
             marginTop: 8,
           }}
         >
-          <Text style={{ fontSize: 7, color: RESTAURANT_FOREWORD_COLORS.gold }}>
-            ◆
-          </Text>
+          <GoldDiamond size={6} color={RESTAURANT_FOREWORD_COLORS.gold} />
           <Text
             style={{
               fontFamily: "Fraunces",
@@ -2306,9 +2305,7 @@ function RestaurantForewordPage({
           >
             {brand.name}
           </Text>
-          <Text style={{ fontSize: 7, color: RESTAURANT_FOREWORD_COLORS.gold }}>
-            ◆
-          </Text>
+          <GoldDiamond size={6} color={RESTAURANT_FOREWORD_COLORS.gold} />
         </View>
         <Text
           style={{
@@ -2392,7 +2389,7 @@ function RestaurantForewordPage({
             textTransform: "uppercase",
           }}
         >
-          Préface · Bienvenue
+          Vorwort · Willkommen
         </Text>
         <Text
           style={{
@@ -2425,9 +2422,7 @@ function RestaurantForewordPage({
               backgroundColor: RESTAURANT_FOREWORD_COLORS.gold,
             }}
           />
-          <Text style={{ fontSize: 7, color: RESTAURANT_FOREWORD_COLORS.gold }}>
-            ◇
-          </Text>
+          <GoldDiamond size={6} outline color={RESTAURANT_FOREWORD_COLORS.gold} />
           <View
             style={{
               width: 36,
@@ -2582,9 +2577,7 @@ function RestaurantForewordPage({
               gap: 7,
             }}
           >
-            <Text style={{ fontSize: 7, color: RESTAURANT_FOREWORD_COLORS.gold }}>
-              ◆
-            </Text>
+            <GoldDiamond size={6} color={RESTAURANT_FOREWORD_COLORS.gold} />
             <Text
               style={{
                 fontFamily: "Inter",
@@ -2595,7 +2588,7 @@ function RestaurantForewordPage({
                 textTransform: "uppercase",
               }}
             >
-              Le Menu Commence
+              Das Menü beginnt
             </Text>
           </View>
         </View>

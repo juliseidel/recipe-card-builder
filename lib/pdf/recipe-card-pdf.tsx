@@ -9027,6 +9027,31 @@ const RESTAURANT_COLORS = {
   divider: "#d8cdb8",
 } as const;
 
+// Kleine Diamond-Glyph als SVG. Unicode ◆/◇ rendert in Fraunces/Inter
+// als Replacement-Char (Æ/ç), weil die Fonts keine Diamond-Glyphen haben.
+// SVG umgeht das komplett — pixelgenau, Druck-sicher, scaliert. Re-used
+// by foreword-page.tsx via named import — kein Duplikat noetig.
+export function GoldDiamond({
+  size = 6,
+  outline = false,
+  color = RESTAURANT_COLORS.gold,
+}: {
+  size?: number;
+  outline?: boolean;
+  color?: string;
+}) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 10 10">
+      <Path
+        d="M5 0 L10 5 L5 10 L0 5 Z"
+        fill={outline ? "none" : color}
+        stroke={outline ? color : "none"}
+        strokeWidth={outline ? 1.4 : 0}
+      />
+    </Svg>
+  );
+}
+
 const RESTAURANT_DENSITY: Record<
   Density,
   {
@@ -9046,55 +9071,67 @@ const RESTAURANT_DENSITY: Record<
     sectionGap: number;
   }
 > = {
+  // Compact: aggressive Kompaktheit fuer Recipes >= 14 Zutaten oder >= 8
+  // Schritten (Sweet-Balance "Donauwellen im Glas" mit 10 Zutaten + 9
+  // Schritten oder "Himbeer Tiramisu" mit 14 Zutaten + 6 Schritten muessen
+  // auf EINE A4-Seite passen — sonst rutscht Wine-Notes auf Page 2 und der
+  // Footer ueberlappt Steps).
   compact: {
-    heroSize: 140,
-    titleFontSize: 24,
-    eyebrowFontSize: 7.5,
-    subtitleFontSize: 9.5,
+    heroSize: 110,
+    titleFontSize: 22,
+    eyebrowFontSize: 7,
+    subtitleFontSize: 9,
     specFontSize: 8.5,
-    ingredientFontSize: 9,
-    ingredientRowPadV: 2.5,
+    ingredientFontSize: 8.5,
+    ingredientRowPadV: 1.8,
     ingredientNoteFontSize: 6.5,
-    stepFontSize: 9,
-    stepMarginBottom: 5,
+    stepFontSize: 8.5,
+    stepMarginBottom: 3.5,
     sectionLabelFontSize: 7.5,
-    wineNotesFontSize: 10,
-    topPadding: 14,
-    sectionGap: 10,
+    wineNotesFontSize: 9.5,
+    topPadding: 10,
+    sectionGap: 8,
   },
   balanced: {
-    heroSize: 168,
-    titleFontSize: 30,
-    eyebrowFontSize: 8,
-    subtitleFontSize: 10.5,
-    specFontSize: 9.5,
+    heroSize: 150,
+    titleFontSize: 28,
+    eyebrowFontSize: 7.5,
+    subtitleFontSize: 10,
+    specFontSize: 9,
     ingredientFontSize: 9.5,
-    ingredientRowPadV: 3.5,
+    ingredientRowPadV: 3,
     ingredientNoteFontSize: 7,
     stepFontSize: 9.5,
-    stepMarginBottom: 7,
+    stepMarginBottom: 6,
     sectionLabelFontSize: 8,
-    wineNotesFontSize: 11.5,
-    topPadding: 22,
-    sectionGap: 14,
+    wineNotesFontSize: 11,
+    topPadding: 18,
+    sectionGap: 12,
   },
   spacious: {
-    heroSize: 190,
-    titleFontSize: 34,
+    heroSize: 175,
+    titleFontSize: 32,
     eyebrowFontSize: 8.5,
-    subtitleFontSize: 11.5,
-    specFontSize: 10,
+    subtitleFontSize: 11,
+    specFontSize: 9.5,
     ingredientFontSize: 10,
-    ingredientRowPadV: 5,
+    ingredientRowPadV: 4.5,
     ingredientNoteFontSize: 7.5,
     stepFontSize: 10,
-    stepMarginBottom: 9,
+    stepMarginBottom: 8,
     sectionLabelFontSize: 8.5,
-    wineNotesFontSize: 13,
-    topPadding: 28,
-    sectionGap: 18,
+    wineNotesFontSize: 12.5,
+    topPadding: 24,
+    sectionGap: 16,
   },
 };
+
+// Fixed-Höhe für die Bottom-Stack (Wine-Notes + Footer). Content-Body
+// reserviert diesen Platz via paddingBottom, damit Zutaten/Steps NIE
+// unter die Wine-Notes laufen. Wert grosszuegig gewaehlt — bei 3 Mikros
+// + Beschreibungssatz ist Wine-Notes ca 50pt, Footer ca 40pt, plus 22
+// Bottom-Padding der Page.
+const RESTAURANT_BOTTOM_RESERVE = 130;
 
 // Roman-Numerals fuer Steps. Bis L (50) ist mehr als genug — kein Rezept
 // hat 50 Schritte. Format: "I", "II", "III", "IV", ... ohne Punkt
@@ -9245,7 +9282,7 @@ function RestaurantPage({
             }}
           />
         </View>
-        {/* Brand-Mark zwischen zwei Diamanten */}
+        {/* Brand-Mark zwischen zwei SVG-Diamanten */}
         <View
           style={{
             flexDirection: "row",
@@ -9254,7 +9291,7 @@ function RestaurantPage({
             marginTop: 8,
           }}
         >
-          <Text style={{ fontSize: 7, color: RESTAURANT_COLORS.gold }}>◆</Text>
+          <GoldDiamond size={6} />
           <Text
             style={{
               fontFamily: "Fraunces",
@@ -9268,7 +9305,7 @@ function RestaurantPage({
           >
             {brand.name}
           </Text>
-          <Text style={{ fontSize: 7, color: RESTAURANT_COLORS.gold }}>◆</Text>
+          <GoldDiamond size={6} />
         </View>
         {/* Pack-Title + Index als sehr feine Sub-Eyebrow */}
         <Text
@@ -9292,7 +9329,7 @@ function RestaurantPage({
       <View
         style={{
           alignItems: "center",
-          paddingTop: density === "compact" ? 12 : 20,
+          paddingTop: density === "compact" ? 6 : 14,
         }}
       >
         <View
@@ -9348,8 +9385,10 @@ function RestaurantPage({
       <View
         style={{
           alignItems: "center",
-          paddingHorizontal: 56,
-          paddingTop: density === "compact" ? 10 : 16,
+          paddingHorizontal: 56, // Title bleibt etwas eingerueckt fuer
+          // schoeneres center-aligned-Lesegefuehl; nur Content-Body
+          // unten nutzt full PAGE_PADDING fuer maximale Zeilenbreite.
+          paddingTop: density === "compact" ? 6 : 14,
         }}
       >
         {/* Eyebrow: Kategorie + Roman-Position */}
@@ -9365,7 +9404,7 @@ function RestaurantPage({
           }}
         >
           {pack.category}
-          {!hideRecipeIndex ? `  ·  ${toRoman(recipePosition)}. Plat` : ""}
+          {!hideRecipeIndex ? `  ·  ${toRoman(recipePosition)}. Gang` : ""}
         </Text>
         {/* Italic Title in serif */}
         <Text
@@ -9399,7 +9438,7 @@ function RestaurantPage({
               backgroundColor: RESTAURANT_COLORS.gold,
             }}
           />
-          <Text style={{ fontSize: 7, color: RESTAURANT_COLORS.gold }}>◇</Text>
+          <GoldDiamond size={6} outline />
           <View
             style={{
               width: 40,
@@ -9477,133 +9516,169 @@ function RestaurantPage({
         </View>
       </View>
 
-      {/* ── Zutaten mit Dot-Leader ── */}
+      {/* ── Content-Body: Zutaten + Zubereitung. paddingBottom reserviert
+            Platz fuer den fixed Wine-Notes+Footer-Stack damit Zutaten/
+            Steps NIE darunter laufen. paddingHorizontal von 56 zu
+            PAGE_PADDING (36) reduziert — mehr Breite fuer Zutaten-Dot-
+            Leader und 9+ Step-Texte ohne overflow. ── */}
       <View
         style={{
-          paddingHorizontal: 56,
-          marginTop: D.sectionGap + 6,
+          paddingHorizontal: PAGE_PADDING,
+          paddingBottom: RESTAURANT_BOTTOM_RESERVE,
         }}
       >
-        <RestaurantSectionHeader
-          label="Zutaten"
-          right={`${recipe.ingredients.length} ${recipe.ingredients.length === 1 ? "Zutat" : "Zutaten"}`}
-          density={D}
-        />
-        {ingredientGroups.length > 1 ? (
+        {/* Zutaten mit Dot-Leader */}
+        <View style={{ marginTop: D.sectionGap + 4 }}>
+          <RestaurantSectionHeader
+            label="Zutaten"
+            right={`${recipe.ingredients.length} ${recipe.ingredients.length === 1 ? "Zutat" : "Zutaten"}`}
+            density={D}
+          />
+          {ingredientGroups.length > 1 ? (
+            <View>
+              {ingredientGroups.map((group, gIdx) => (
+                <View key={`g-${gIdx}`} style={{ marginTop: gIdx > 0 ? 6 : 2 }}>
+                  {group.name ? (
+                    <Text
+                      style={{
+                        fontFamily: "Fraunces",
+                        fontSize: 8,
+                        fontStyle: "italic",
+                        letterSpacing: 1.4,
+                        color: RESTAURANT_COLORS.gold,
+                        textTransform: "uppercase",
+                        marginBottom: 3,
+                        marginTop: 2,
+                      }}
+                    >
+                      {restaurantGroupLabel(group.name)}
+                    </Text>
+                  ) : null}
+                  {group.items.map((ing, i) => (
+                    <RestaurantIngredientRow
+                      key={`gi-${gIdx}-${i}`}
+                      amount={ing.amount}
+                      name={ing.name}
+                      note={ing.note}
+                      density={D}
+                    />
+                  ))}
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View>
+              {flatIngredients.map((ing, i) => (
+                <RestaurantIngredientRow
+                  key={`fi-${i}`}
+                  amount={ing.amount}
+                  name={ing.name}
+                  note={ing.note}
+                  density={D}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Zubereitung mit Roman-Numerals */}
+        <View style={{ marginTop: D.sectionGap + 2 }}>
+          <RestaurantSectionHeader
+            label="Zubereitung"
+            right={`${flatSteps.length} ${flatSteps.length === 1 ? "Schritt" : "Schritte"}`}
+            density={D}
+          />
           <View>
-            {ingredientGroups.map((group, gIdx) => (
-              <View key={`g-${gIdx}`} style={{ marginTop: gIdx > 0 ? 8 : 4 }}>
-                {group.name ? (
-                  <Text
-                    style={{
-                      fontFamily: "Fraunces",
-                      fontSize: 8,
-                      fontStyle: "italic",
-                      letterSpacing: 1.4,
-                      color: RESTAURANT_COLORS.gold,
-                      textTransform: "uppercase",
-                      marginBottom: 4,
-                      marginTop: 2,
-                    }}
-                  >
-                    {restaurantGroupLabel(group.name)}
-                  </Text>
-                ) : null}
-                {group.items.map((ing, i) => (
-                  <RestaurantIngredientRow
-                    key={`gi-${gIdx}-${i}`}
-                    amount={ing.amount}
-                    name={ing.name}
-                    note={ing.note}
-                    density={D}
-                  />
-                ))}
+            {flatSteps.map((step) => (
+              <View
+                key={`s-${step.num}`}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  gap: 6,
+                  marginBottom: D.stepMarginBottom,
+                }}
+              >
+                {/* Roman-Numeral mit Glyph-Center-Lock §1 */}
+                <Text
+                  style={{
+                    fontSize: D.stepFontSize,
+                    lineHeight: 1.45,
+                    fontStyle: "italic",
+                    fontWeight: 600,
+                    color: RESTAURANT_COLORS.gold,
+                    width: romanWidth,
+                  }}
+                >
+                  {toRoman(step.num)}.
+                </Text>
+                <Text
+                  style={{
+                    flex: 1,
+                    fontFamily: "Fraunces",
+                    fontSize: D.stepFontSize,
+                    lineHeight: 1.45,
+                    color: RESTAURANT_COLORS.ink,
+                  }}
+                >
+                  {step.text}
+                </Text>
               </View>
             ))}
           </View>
-        ) : (
-          <View>
-            {flatIngredients.map((ing, i) => (
-              <RestaurantIngredientRow
-                key={`fi-${i}`}
-                amount={ing.amount}
-                name={ing.name}
-                note={ing.note}
-                density={D}
-              />
-            ))}
-          </View>
-        )}
-      </View>
+        </View>
 
-      {/* ── Zubereitung mit Roman-Numerals ── */}
-      <View
-        style={{
-          paddingHorizontal: 56,
-          marginTop: D.sectionGap + 4,
-        }}
-      >
-        <RestaurantSectionHeader
-          label="Zubereitung"
-          right={`${flatSteps.length} ${flatSteps.length === 1 ? "Schritt" : "Schritte"}`}
-          density={D}
-        />
-        <View>
-          {flatSteps.map((step) => (
-            <View
-              key={`s-${step.num}`}
+        {/* Sparse-Story-Block — NUR wenn KEINE Wine-Notes geplant sind.
+            Bei Wine-Notes-Block (topMicros.length > 0) wuerde der Story-
+            Pull-Quote sonst UNTER dem fixed Wine-Notes-Stack laufen
+            und ueberlappen mit Footer (siehe Sweet-Balance XXL-Cookie). */}
+        {showStory && topMicros.length === 0 ? (
+          <View
+            style={{
+              marginTop: D.sectionGap - 2,
+              borderLeftWidth: 1.5,
+              borderLeftColor: RESTAURANT_COLORS.gold,
+              paddingLeft: 10,
+              paddingVertical: 2,
+            }}
+          >
+            <Text
               style={{
-                flexDirection: "row",
-                alignItems: "flex-start",
-                gap: 6,
-                marginBottom: D.stepMarginBottom,
+                fontFamily: "Fraunces",
+                fontSize: 9.5,
+                fontStyle: "italic",
+                color: RESTAURANT_COLORS.inkSoft,
+                lineHeight: 1.45,
               }}
             >
-              {/* Roman-Numeral mit Glyph-Center-Lock §1 */}
-              <Text
-                style={{
-                  fontSize: D.stepFontSize,
-                  lineHeight: 1.5,
-                  fontStyle: "italic",
-                  fontWeight: 600,
-                  color: RESTAURANT_COLORS.gold,
-                  width: romanWidth,
-                }}
-              >
-                {toRoman(step.num)}.
-              </Text>
-              <Text
-                style={{
-                  flex: 1,
-                  fontFamily: "Fraunces",
-                  fontSize: D.stepFontSize,
-                  lineHeight: 1.5,
-                  color: RESTAURANT_COLORS.ink,
-                }}
-              >
-                {step.text}
-              </Text>
-            </View>
-          ))}
-        </View>
+              {recipe.description}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
-      {/* ── Wine Notes mit Mikros (EIGENE POSITION) ── */}
+      {/* ── Genussprofil (Mikronaehrstoffe) als FIXED bottom-stack.
+            Sitzt oberhalb vom Footer und unterhalb vom Content. Reserviert
+            durch RESTAURANT_BOTTOM_RESERVE-paddingBottom auf dem Content-
+            Wrapper, damit Zutaten/Steps nie hier reinlaufen. ── */}
       {topMicros.length > 0 ? (
         <View
           style={{
-            paddingHorizontal: 56,
-            marginTop: D.sectionGap + 4,
+            position: "absolute",
+            left: PAGE_PADDING,
+            right: PAGE_PADDING,
+            bottom: 72,
           }}
+          fixed
         >
-          {/* Ornamental Section-Header */}
+          {/* Ornamental Section-Header mit SVG-Diamond */}
           <View
             style={{
               flexDirection: "row",
               alignItems: "center",
               gap: 8,
               justifyContent: "center",
-              marginBottom: 8,
+              marginBottom: 6,
             }}
           >
             <View
@@ -9613,7 +9688,7 @@ function RestaurantPage({
                 backgroundColor: RESTAURANT_COLORS.gold,
               }}
             />
-            <Text style={{ fontSize: 7, color: RESTAURANT_COLORS.gold }}>◇</Text>
+            <GoldDiamond size={6} outline />
             <Text
               style={{
                 fontFamily: "Inter",
@@ -9624,9 +9699,9 @@ function RestaurantPage({
                 textTransform: "uppercase",
               }}
             >
-              Wine Notes
+              Genussprofil
             </Text>
-            <Text style={{ fontSize: 7, color: RESTAURANT_COLORS.gold }}>◇</Text>
+            <GoldDiamond size={6} outline />
             <View
               style={{
                 flex: 1,
@@ -9642,9 +9717,9 @@ function RestaurantPage({
               fontStyle: "italic",
               color: RESTAURANT_COLORS.ink,
               textAlign: "center",
-              lineHeight: 1.5,
+              lineHeight: 1.4,
               letterSpacing: 0.2,
-              marginBottom: 8,
+              marginBottom: 6,
             }}
           >
             {wineNotes}
@@ -9713,42 +9788,11 @@ function RestaurantPage({
               color: RESTAURANT_COLORS.inkSubtle,
               textTransform: "uppercase",
               textAlign: "center",
-              marginTop: 4,
+              marginTop: 3,
             }}
           >
             {nutritionBasisInline(recipe.nutritionBasis)}
           </Text>
-        </View>
-      ) : null}
-
-      {/* ── Sparse-Story-Block (≤10 Zutaten + Story) ── */}
-      {showStory ? (
-        <View
-          style={{
-            paddingHorizontal: 56,
-            marginTop: D.sectionGap - 2,
-          }}
-        >
-          <View
-            style={{
-              borderLeftWidth: 1.5,
-              borderLeftColor: RESTAURANT_COLORS.gold,
-              paddingLeft: 10,
-              paddingVertical: 2,
-            }}
-          >
-            <Text
-              style={{
-                fontFamily: "Fraunces",
-                fontSize: 9.5,
-                fontStyle: "italic",
-                color: RESTAURANT_COLORS.inkSoft,
-                lineHeight: 1.45,
-              }}
-            >
-              {recipe.description}
-            </Text>
-          </View>
         </View>
       ) : null}
 
@@ -9770,7 +9814,7 @@ function RestaurantPage({
         fixed
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Text style={{ fontSize: 9, color: RESTAURANT_COLORS.gold }}>◆</Text>
+          <GoldDiamond size={8} />
           <Text
             style={{
               fontFamily: "Inter",
@@ -9810,7 +9854,7 @@ function RestaurantPage({
               textTransform: "uppercase",
             }}
           >
-            {recipe.sourceLabel ?? "Maison Original"}
+            {recipe.sourceLabel ?? "Originalrezept"}
           </Text>
         )}
       </View>
