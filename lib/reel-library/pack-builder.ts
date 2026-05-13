@@ -274,6 +274,129 @@ export async function buildPackFromReels(
   };
 }
 
+// Erkennt fehlende Enrichments in einem existierenden Pack und triggert
+// nur die noetigen Calls — Safety-Net fuer Packs die bei der Erstellung
+// nicht vollstaendig durchgelaufen sind (z.B. Lambda-Timeout, transienter
+// Fehler in Flux/Gemini). Wird vom Pack-Detail-Server-Component
+// aufgerufen via after() — User-getriggert ist das "die Pack-Detail-Seite
+// oeffnen", was ein robuster, billiger Trigger ist (skipped wenn alles
+// schon enrich'd).
+//
+// Returnt das Trigger-Promise damit der Caller es awaiten kann in after().
+export async function detectAndTriggerEnrichGaps(
+  origin: string,
+  brandSlug: string,
+  packSlug: string
+): Promise<{
+  triggeredPackEnrich: boolean;
+  triggeredRecipeIds: string[];
+}> {
+  if (!hasServerSupabase()) {
+    return { triggeredPackEnrich: false, triggeredRecipeIds: [] };
+  }
+  const supabase = getServerSupabase();
+
+  // Pack-Row mit cover/foreword-Status laden
+  const { data: packRow } = await supabase
+    .from("packs")
+    .select("id, data")
+    .eq("brand_slug", brandSlug)
+    .eq("pack_slug", packSlug)
+    .eq("is_custom", true)
+    .maybeSingle();
+
+  if (!packRow) {
+    return { triggeredPackEnrich: false, triggeredRecipeIds: [] };
+  }
+
+  const pack = packRow.data as Pack;
+  // hasCover: zeigt der pack-covers-Bucket-Pfad? Suggestion-Covers (aus
+  // pack-suggestion-covers/) zaehlen auch als OK, das ist der Optimierung
+  // beim Pack-Suggestion-Accept geschuldet.
+  const cover = pack.coverImage ?? "";
+  const hasCover =
+    cover.includes("/pack-covers/") ||
+    cover.includes("/pack-suggestion-covers/") ||
+    cover.includes("/uploads/");
+  const hasForeword = Boolean(pack.foreword);
+  const hasForewordImage = Boolean(pack.forewordImage);
+  const needsPackEnrich = !hasCover || !hasForeword || !hasForewordImage;
+
+  // Recipe-Rows mit hero/micros-Status laden
+  const { data: recipeRows } = await supabase
+    .from("recipes")
+    .select("id, data")
+    .eq("brand_slug", brandSlug)
+    .eq("pack_slug", packSlug);
+
+  const recipeIdsToEnrich: string[] = [];
+  for (const row of recipeRows ?? []) {
+    const recipe = row.data as Recipe;
+    const hero = recipe.hero ?? "";
+    const isPlaceholderHero =
+      !hero ||
+      /cdninstagram\.com|fbcdn\.net|tiktokcdn|tiktok-domain/i.test(hero) ||
+      /\/reel-covers\//i.test(hero);
+    const microsEmpty =
+      !recipe.nutrition?.micros || recipe.nutrition.micros.length === 0;
+    const microsAttempted = Boolean(recipe.nutrition?.microsAttemptedAt);
+    // Trigger wenn:
+    //   - Hero fehlt/ist-Placeholder
+    //   - Mikros leer UND kein Failure-Marker (sonst retry forever)
+    if (isPlaceholderHero || (microsEmpty && !microsAttempted)) {
+      recipeIdsToEnrich.push(row.id as string);
+    }
+  }
+
+  if (!needsPackEnrich && recipeIdsToEnrich.length === 0) {
+    return { triggeredPackEnrich: false, triggeredRecipeIds: [] };
+  }
+
+  console.log(
+    `[pack-builder] gap-trigger for ${brandSlug}/${packSlug}: ` +
+      `pack-enrich=${needsPackEnrich}, recipe-enrich=${recipeIdsToEnrich.length}`
+  );
+
+  const internalToken = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const headers = {
+    "Content-Type": "application/json",
+    "x-internal-token": internalToken,
+  };
+
+  // fire-and-forget aber awaited damit die parent-Lambda alive bleibt bis
+  // die HTTP-Calls initiiert sind. allSettled damit ein fail die anderen
+  // nicht blockiert.
+  const calls: Promise<unknown>[] = [];
+  if (needsPackEnrich) {
+    calls.push(
+      fetch(`${origin}/api/packs/enrich`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ packId: packRow.id }),
+      }).catch((err) =>
+        console.warn("[pack-builder] gap pack-enrich failed", err)
+      )
+    );
+  }
+  for (const id of recipeIdsToEnrich) {
+    calls.push(
+      fetch(`${origin}/api/recipes/enrich`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ recipeId: id }),
+      }).catch((err) =>
+        console.warn("[pack-builder] gap recipe-enrich failed", err)
+      )
+    );
+  }
+  await Promise.allSettled(calls);
+
+  return {
+    triggeredPackEnrich: needsPackEnrich,
+    triggeredRecipeIds: recipeIdsToEnrich,
+  };
+}
+
 // Helper fuer die Caller-Routes: triggert /packs/enrich und /recipes/enrich
 // in einem after()-Hook. Stellt sicher dass die Lambda alive bleibt bis
 // alle fetch-Calls initiiert sind, NextJS terminate'd dann sauber.

@@ -1,5 +1,8 @@
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { after } from "next/server";
 import { loadBrand } from "@/lib/custom-brands-server";
+import { detectAndTriggerEnrichGaps } from "@/lib/reel-library/pack-builder";
 import {
   getPack,
   getPacksForBrand,
@@ -96,6 +99,29 @@ export default async function PackPage({ params }: PackPageProps) {
   const pack = merged.find((p) => p.slug === packSlug) ?? rawPack;
 
   const recipes = await getRecipesForPack(pack.slug);
+
+  // Safety-Net: bei jedem Pack-Detail-Visit pruefen wir ob Recipes ohne
+  // Hero/Mikros existieren oder das Pack-Cover fehlt — und triggern dann
+  // /packs/enrich + /recipes/enrich nach. Macht den Pack robust gegen
+  // Lambda-Timeouts oder transiente Flux/Gemini-Fails bei der initialen
+  // Erstellung. Sicheres "skip wenn schon enrich'd"-Verhalten ist in den
+  // Endpoints selbst (hasCover/needsHero/needsMicros). Custom-Packs only —
+  // statische Bienen-Packs sind code-only und haben ihren Content
+  // committed, brauchen keinen Enrich-Trigger.
+  if (customRow) {
+    const hdrs = await headers();
+    const origin =
+      hdrs.get("x-forwarded-proto") && hdrs.get("host")
+        ? `${hdrs.get("x-forwarded-proto")}://${hdrs.get("host")}`
+        : `https://${hdrs.get("host") ?? "clever-satoshi-22bf41.vercel.app"}`;
+    after(async () => {
+      try {
+        await detectAndTriggerEnrichGaps(origin, brandSlug, pack.slug);
+      } catch (err) {
+        console.error("[pack-detail] gap-trigger failed", err);
+      }
+    });
+  }
 
   // Live recipe count for the cover hero + the "Alle Rezeptkarten" badge:
   //   curated cards visible
