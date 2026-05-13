@@ -4045,15 +4045,15 @@ const AMBER_DENSITY: Record<
   }
 > = {
   compact: {
-    heroHeight: 110,
-    heroPadding: 6,
+    heroHeight: 100,
+    heroPadding: 5,
     titleFontSize: 22,
     subtitleFontSize: 10.5,
-    titleBlockPadding: 6,
-    statRibbonPadV: 7,
+    titleBlockPadding: 8,
+    statRibbonPadV: 9,
     statBigSize: 19,
     statRibbonGap: 12,
-    bodyGap: 8,
+    bodyGap: 10,
     ingRowPadV: 2,
     ingFontSize: 8.5,
     ingNoteFontSize: 6.5,
@@ -4063,15 +4063,15 @@ const AMBER_DENSITY: Record<
     microFontSize: 8,
   },
   balanced: {
-    heroHeight: 134,
-    heroPadding: 7,
-    titleFontSize: 28,
+    heroHeight: 124,
+    heroPadding: 6,
+    titleFontSize: 26,
     subtitleFontSize: 11.5,
-    titleBlockPadding: 8,
-    statRibbonPadV: 8,
-    statBigSize: 23,
+    titleBlockPadding: 10,
+    statRibbonPadV: 11,
+    statBigSize: 22,
     statRibbonGap: 16,
-    bodyGap: 11,
+    bodyGap: 14,
     ingRowPadV: 2.5,
     ingFontSize: 9,
     ingNoteFontSize: 7,
@@ -4081,20 +4081,20 @@ const AMBER_DENSITY: Record<
     microFontSize: 8.5,
   },
   spacious: {
-    heroHeight: 162,
-    heroPadding: 8,
-    titleFontSize: 34,
-    subtitleFontSize: 12.5,
+    heroHeight: 138,
+    heroPadding: 7,
+    titleFontSize: 30,
+    subtitleFontSize: 12,
     titleBlockPadding: 12,
-    statRibbonPadV: 10,
-    statBigSize: 27,
-    statRibbonGap: 20,
-    bodyGap: 14,
-    ingRowPadV: 3.5,
+    statRibbonPadV: 13,
+    statBigSize: 24,
+    statRibbonGap: 18,
+    bodyGap: 16,
+    ingRowPadV: 3,
     ingFontSize: 9.5,
     ingNoteFontSize: 7.5,
     stepFontSize: 9.5,
-    stepGap: 8,
+    stepGap: 7,
     microRowPadV: 2.5,
     microFontSize: 9,
   },
@@ -4318,7 +4318,8 @@ function AmberPage({
         </Text>
       </View>
 
-      {/* STAT-RIBBON — typografisch, ohne Boxes */}
+      {/* STAT-RIBBON — typografisch, ohne Boxes. marginTop fuer Luft zwischen
+          Title und Makros (sonst kleben sie aufeinander). */}
       <View
         style={{
           flexDirection: "row",
@@ -4331,6 +4332,7 @@ function AmberPage({
           borderBottomWidth: 0.7,
           borderTopColor: blendWithWhite(t.accent, 0.45),
           borderBottomColor: blendWithWhite(t.accent, 0.45),
+          marginTop: Math.round(d.bodyGap * 0.5),
           marginBottom: d.bodyGap,
         }}
         wrap={false}
@@ -4384,14 +4386,16 @@ function AmberPage({
       {/* BIENES STORY (sparse-only) — Honey-tinted Pull-Quote zwischen
           Stat-Ribbon und Body. Bei kurzen Feierabend-Klassikern (≤10
           Zutaten via shouldShowStory) sonst wirkt der Body unter dem
-          grosszuegigen Hero halbleer. Matche das Web-Amber-Pattern. */}
+          grosszuegigen Hero halbleer. Matche das Web-Amber-Pattern.
+          Paddings bewusst tight gehalten — sonst frisst die Story-Box
+          den Body-Space bei mittel-langen Rezepten. */}
       {shouldShowStory(recipe) ? (
         <View
           style={{
             paddingHorizontal: 14,
-            paddingTop: 12,
-            paddingBottom: 14,
-            marginBottom: 8,
+            paddingTop: 9,
+            paddingBottom: 10,
+            marginBottom: 6,
             backgroundColor: blendWithWhite(t.accent, 0.88),
             borderTopWidth: 0.6,
             borderBottomWidth: 0.6,
@@ -4407,7 +4411,7 @@ function AmberPage({
               letterSpacing: 1.8,
               color: t.accent,
               textTransform: "uppercase",
-              marginBottom: 5,
+              marginBottom: 4,
             }}
           >
             {`${brand.name}s Story`}
@@ -4416,11 +4420,11 @@ function AmberPage({
             style={{
               fontFamily: "Fraunces",
               fontStyle: "italic",
-              fontSize: 12,
-              lineHeight: 1.5,
+              fontSize: 11,
+              lineHeight: 1.45,
               color: t.ink,
               textAlign: "center",
-              maxWidth: 460,
+              maxWidth: 440,
             }}
           >
             {recipe.description}
@@ -4473,56 +4477,65 @@ function AmberPage({
                   {group.name}
                 </Text>
               ) : null}
-              {group.items.map((ing, ii) => (
-                <View
-                  key={ii}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "baseline",
-                    paddingVertical: d.ingRowPadV,
-                    gap: 10,
-                    borderBottomWidth: 0.4,
-                    borderBottomColor: blendWithWhite(t.accent, 0.4),
-                  }}
-                  wrap={false}
-                >
-                  <Text
+              {group.items.map((ing, ii) => {
+                const amountDisplay =
+                  formatIngredientAmount(ing.amount) || "Nach Geschmack";
+                const amountQualitative = isQualitativeAmount(amountDisplay);
+                return (
+                  <View
+                    key={ii}
                     style={{
-                      width: 48,
-                      fontSize: d.ingFontSize,
-                      fontWeight: 600,
-                      color: t.accent,
-                      letterSpacing: 0.2,
+                      flexDirection: "row",
+                      alignItems: "baseline",
+                      paddingVertical: d.ingRowPadV,
+                      gap: 10,
+                      borderBottomWidth: 0.4,
+                      borderBottomColor: blendWithWhite(t.accent, 0.4),
                     }}
+                    wrap={false}
                   >
-                    {formatIngredientAmount(ing.amount) || "Nach Geschmack"}
-                  </Text>
-                  <View style={{ flex: 1 }}>
                     <Text
                       style={{
-                        fontSize: d.ingFontSize,
-                        color: t.ink,
-                        lineHeight: 1.25,
+                        width: 48,
+                        fontFamily: amountQualitative ? "Fraunces" : "Inter",
+                        fontSize: amountQualitative
+                          ? d.ingFontSize - 1.5
+                          : d.ingFontSize,
+                        fontStyle: amountQualitative ? "italic" : "normal",
+                        fontWeight: amountQualitative ? 400 : 600,
+                        color: amountQualitative ? t.inkSoft : t.accent,
+                        letterSpacing: amountQualitative ? 0 : 0.2,
                       }}
                     >
-                      {ing.name}
+                      {amountDisplay}
                     </Text>
-                    {ing.note ? (
+                    <View style={{ flex: 1 }}>
                       <Text
                         style={{
-                          fontSize: d.ingNoteFontSize,
-                          fontStyle: "italic",
-                          color: t.inkSoft,
-                          lineHeight: 1.3,
-                          marginTop: 1,
+                          fontSize: d.ingFontSize,
+                          color: t.ink,
+                          lineHeight: 1.25,
                         }}
                       >
-                        {ing.note}
+                        {ing.name}
                       </Text>
-                    ) : null}
+                      {ing.note ? (
+                        <Text
+                          style={{
+                            fontSize: d.ingNoteFontSize,
+                            fontStyle: "italic",
+                            color: t.inkSoft,
+                            lineHeight: 1.3,
+                            marginTop: 1,
+                          }}
+                        >
+                          {ing.note}
+                        </Text>
+                      ) : null}
+                    </View>
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           ))}
         </View>

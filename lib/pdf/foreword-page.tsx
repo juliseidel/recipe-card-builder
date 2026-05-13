@@ -4,6 +4,22 @@ import type { Pack, CardLayout } from "@/lib/packs";
 import type { PackForewordContent } from "@/lib/ai/generate-foreword";
 import { packTheme, fontFamilyForPack, blendWithWhite } from "./theme";
 import { BeeIcon } from "./bee-icon";
+import { restoreGermanUmlauts } from "@/lib/restore-umlauts";
+
+// Render-time Umlaut-Restore als letzte Defense-Line: alte DB-Forewords,
+// die vor dem Umlaut-Fix-Commit generiert wurden, haben "fuer"/"schoen"
+// statt "fuer"/"schoen" gespeichert. Statt jeden Pack neu zu enrichen,
+// fixt der Renderer das beim PDF-Build automatisch.
+function fixUmlauts(content: PackForewordContent): PackForewordContent {
+  return {
+    greeting: restoreGermanUmlauts(content.greeting ?? ""),
+    story: restoreGermanUmlauts(content.story ?? ""),
+    signoff: restoreGermanUmlauts(content.signoff ?? ""),
+    outro: content.outro
+      ? restoreGermanUmlauts(content.outro)
+      : content.outro,
+  };
+}
 
 // Foreword page sits between cover and index. The booklet moment — what
 // turns a recipe collection into a published-feeling mini-cookbook.
@@ -59,7 +75,12 @@ const VARIANTS: Record<
 export function ForewordPage(props: ForewordPageProps) {
   const layout = props.pack.cardLayout;
   const Variant = VARIANTS[layout] ?? PatisserieForewordPage;
-  return <Variant {...props} />;
+  // Umlaut-Restore zentral — gilt fuer ALLE Layout-Variants.
+  const sanitized: ForewordPageProps = {
+    ...props,
+    content: fixUmlauts(props.content),
+  };
+  return <Variant {...sanitized} />;
 }
 
 // Shared bottom strip — small avatar + signature. Each variant lays the
@@ -71,11 +92,16 @@ function AuthorStrip({
   pack,
   avatarDataUri,
   align = "between",
+  hideSignature = false,
 }: {
   brand: Brand;
   pack: Pack;
   avatarDataUri: string | null;
   align?: "between" | "center";
+  /** Signature "Deine X" rechts ausblenden — fuer Vorwort-Pages, wo der
+   *  Story-Body bereits einen Signoff hat und die Signature redundant
+   *  wirkt (User-Feedback Julia 13.05.2026). */
+  hideSignature?: boolean;
 }) {
   const t = packTheme(pack);
   const justifyContent: "space-between" | "center" =
@@ -135,7 +161,7 @@ function AuthorStrip({
           </Text>
         </View>
       </View>
-      {align === "between" ? (
+      {align === "between" && !hideSignature ? (
         <View
           style={{
             flexDirection: "row",
@@ -1023,8 +1049,9 @@ function EditorialForewordPage({
       </View>
 
       {/* Author-Strip aussen unter der Card auf dem Pack-Mood-Background.
-          Mit eigenem padding fuer Atemraum (paddingHorizontal matched
-          mit Card margin damit Avatar nicht visuell raus-haengt). */}
+          hideSignature: "Deine X" rechts entfaellt — Avatar + Brand-Name
+          + Handle reichen als Signatur; der Signoff aus der Story-Bar
+          oben uebernimmt die persoenliche Note. */}
       <View
         style={{
           paddingHorizontal: 44,
@@ -1036,6 +1063,7 @@ function EditorialForewordPage({
           brand={brand}
           pack={pack}
           avatarDataUri={avatarDataUri}
+          hideSignature
         />
       </View>
     </Page>
