@@ -178,6 +178,22 @@ export async function POST(req: Request) {
     return { buffer, isCollage: false };
   }
 
+  // Recipe-Titel fuer generatePackForeword laden — gibt der KI konkrete
+  // Rezept-Namen die sie in der Story namentlich erwaehnen kann. Macht
+  // die Vorworte um Welten besser ("vom Curry Dattel Dip ueber den High
+  // Protein Schuettel Salat" statt "verschiedene Rezepte").
+  let recipeTitlesForForeword: string[] = [];
+  if (!hasForewordText) {
+    const { data: rRows } = await supabase
+      .from("recipes")
+      .select("data")
+      .eq("brand_slug", packRowBrandSlug)
+      .eq("pack_slug", pack.slug);
+    recipeTitlesForForeword = (rRows ?? [])
+      .map((r) => (r.data as Recipe).title?.trim() ?? "")
+      .filter(Boolean);
+  }
+
   after(async () => {
     // Three independent enrichment tasks. We use Promise.allSettled so a
     // failure in one (Gemini overloaded, Flux timeout) doesn't drop the
@@ -189,7 +205,7 @@ export async function POST(req: Request) {
           : generatePackCover({ pack }).then((r) => r.buffer),
         hasForewordText
           ? Promise.resolve(null)
-          : generatePackForeword(pack, brand),
+          : generatePackForeword(pack, brand, recipeTitlesForForeword),
         buildForewordImage(),
       ]);
 

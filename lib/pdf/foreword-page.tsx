@@ -1,4 +1,4 @@
-import { Page, View, Text, Image } from "@react-pdf/renderer";
+import { Page, View, Text, Image, Svg, Circle } from "@react-pdf/renderer";
 import type { Brand } from "@/lib/brands";
 import type { Pack, CardLayout } from "@/lib/packs";
 import type { PackForewordContent } from "@/lib/ai/generate-foreword";
@@ -39,15 +39,13 @@ const VARIANTS: Record<
   // Editorial-Foreword passt visuell — Honey-Mood, Stillleben in Frame,
   // Editorial-Magazine-Tonalitaet.
   amber: EditorialForewordPage,
-  // Vinyl-Layout reuses Editorial-Foreword als visuelle Bridge — der
-  // Vinyl-Look ist auf den Recipe-Cards selbst zu sehen, die Foreword-Page
-  // bleibt editorial-magazine. Dedizierte Vinyl-Foreword kann in einem
-  // spaeteren Schritt nachgereicht werden.
-  vinyl: EditorialForewordPage,
-  // Newspaper-Layout reuses Editorial-Foreword — beide sind Magazin-
-  // Editorial. Die Newspaper-Recipe-Cards selbst haben den Broadsheet-
-  // Look mit Drop-Cap + 3-Spalten, das hebt sich vom Vorwort ab.
-  newspaper: EditorialForewordPage,
+  // Vinyl-Foreword: dediziert. Album-Sleeve-Look mit Hero als grossem
+  // Cover + LP halb rausgezogen, Liner-Notes-Drop-Cap, "Pressed by"-
+  // Footer mit "Side B Coming Up"-Hinweis.
+  vinyl: VinylForewordPage,
+  // Newspaper-Foreword: dediziert. Broadsheet-Editorial mit Masthead,
+  // Doppellinien, italic Drop-Cap, Author-Box-Footer mit Avatar.
+  newspaper: NewspaperForewordPage,
 };
 
 export function ForewordPage(props: ForewordPageProps) {
@@ -1031,6 +1029,705 @@ function EditorialForewordPage({
           pack={pack}
           avatarDataUri={avatarDataUri}
         />
+      </View>
+    </Page>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Newspaper Broadsheet Foreword — Times/NYT-Editorial-Look
+// ═════════════════════════════════════════════════════════════════════════════
+// Komplett anderes Vorwort als die anderen Layouts: Print-Newspaper-
+// Editorial. Masthead, italic Drop-Cap, 2-Spalten Hero/Lead, Doppellinien.
+// Cream-Background für Print-Feel.
+
+function NewspaperForewordPage({
+  brand,
+  pack,
+  content,
+  imageDataUri,
+  avatarDataUri,
+}: ForewordPageProps) {
+  const t = packTheme(pack);
+  const newspaperBg = "#fafaf5";
+  const greeting = content.greeting?.trim() || "Vorwort";
+  const story = content.story?.trim() ?? "";
+  const signoff = content.signoff?.trim() ?? "";
+  const storyFirstChar = story.charAt(0);
+  const storyRest = story.slice(1);
+
+  return (
+    <Page
+      size="A4"
+      style={{
+        backgroundColor: newspaperBg,
+        fontFamily: "Fraunces",
+        color: t.ink,
+      }}
+    >
+      {/* Masthead */}
+      <View
+        style={{
+          paddingHorizontal: 36,
+          paddingTop: 30,
+          paddingBottom: 6,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            borderBottomWidth: 2,
+            borderBottomColor: t.ink,
+            paddingBottom: 5,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: 28,
+              fontWeight: 700,
+              fontStyle: "italic",
+              color: t.ink,
+              letterSpacing: -0.3,
+            }}
+          >
+            {brand.name} Times
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 8,
+              color: t.inkSoft,
+              letterSpacing: 1.8,
+              textTransform: "uppercase",
+            }}
+          >
+            Sonderausgabe · {pack.title}
+          </Text>
+        </View>
+        <View
+          style={{
+            height: 0.5,
+            backgroundColor: t.ink,
+            marginTop: 2,
+          }}
+        />
+      </View>
+
+      {/* Section-Label */}
+      <View
+        style={{
+          paddingHorizontal: 36,
+          paddingTop: 16,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: 8.5,
+            fontWeight: 700,
+            letterSpacing: 2.4,
+            color: t.accent,
+            textTransform: "uppercase",
+          }}
+        >
+          Vorwort · Von {brand.name}
+        </Text>
+      </View>
+
+      {/* 2-Col: Image left, Greeting + Lead right */}
+      <View
+        style={{
+          flexDirection: "row",
+          paddingHorizontal: 36,
+          marginTop: 12,
+          gap: 24,
+          flex: 1,
+        }}
+      >
+        {/* Hero-Image (Collage oder Stillleben) */}
+        {imageDataUri ? (
+          <View style={{ width: "50%" }}>
+            <View
+              style={{
+                width: "100%",
+                aspectRatio: 4 / 5,
+                overflow: "hidden",
+                backgroundColor: t.paper,
+              }}
+            >
+              <Image
+                src={imageDataUri}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            </View>
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: 8,
+                fontStyle: "italic",
+                color: t.inkSoft,
+                marginTop: 4,
+                lineHeight: 1.35,
+              }}
+            >
+              Rezepte aus {brand.name}s Küche, exklusiv für dieses Pack.
+            </Text>
+          </View>
+        ) : null}
+
+        {/* Right column */}
+        <View style={{ flex: 1, justifyContent: "flex-start" }}>
+          {/* Italic Headline (greeting als Kurz-Headline) */}
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: 26,
+              fontWeight: 700,
+              fontStyle: "italic",
+              color: t.ink,
+              lineHeight: 1.05,
+              letterSpacing: -0.3,
+              marginBottom: 10,
+            }}
+          >
+            {greeting}
+          </Text>
+          {/* Byline-Rule */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 12,
+            }}
+          >
+            <View
+              style={{ flex: 1, height: 0.5, backgroundColor: t.divider }}
+            />
+          </View>
+          {/* Story mit Drop-Cap */}
+          {story.length > 0 ? (
+            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+              <Text
+                style={{
+                  fontFamily: "Fraunces",
+                  fontSize: 44,
+                  fontWeight: 700,
+                  fontStyle: "italic",
+                  color: t.accent,
+                  lineHeight: 0.85,
+                  marginRight: 4,
+                  marginTop: -3,
+                  width: 32,
+                }}
+              >
+                {storyFirstChar}
+              </Text>
+              <Text
+                style={{
+                  flex: 1,
+                  fontFamily: "Fraunces",
+                  fontSize: 11,
+                  color: t.ink,
+                  lineHeight: 1.55,
+                  textAlign: "justify",
+                }}
+              >
+                {storyRest}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Signoff in Italic (Editorial-Style) */}
+          {signoff ? (
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: 11,
+                fontStyle: "italic",
+                color: t.accent,
+                marginTop: 14,
+                lineHeight: 1.45,
+              }}
+            >
+              {signoff}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+
+      {/* Footer-Strip mit Doppellinie + Avatar (Newspaper Author-Box) */}
+      <View
+        style={{
+          position: "absolute",
+          left: 36,
+          right: 36,
+          bottom: 30,
+        }}
+      >
+        <View style={{ height: 1.5, backgroundColor: t.ink, marginBottom: 1 }} />
+        <View style={{ height: 0.5, backgroundColor: t.ink, marginBottom: 14 }} />
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 14,
+          }}
+        >
+          {avatarDataUri ? (
+            <View
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 21,
+                overflow: "hidden",
+                borderWidth: 1.5,
+                borderColor: t.accent,
+              }}
+            >
+              <Image
+                src={avatarDataUri}
+                style={{
+                  width: 39,
+                  height: 39,
+                  objectFit: "cover",
+                  objectPosition: "center 25%",
+                }}
+              />
+            </View>
+          ) : null}
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: 13,
+                fontStyle: "italic",
+                color: t.ink,
+              }}
+            >
+              {brand.name}
+            </Text>
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 8,
+                color: t.inkSoft,
+                marginTop: 2,
+                letterSpacing: 1.4,
+                textTransform: "uppercase",
+              }}
+            >
+              {brand.handle} · Redaktion
+            </Text>
+          </View>
+        </View>
+      </View>
+    </Page>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Vinyl Album-Sleeve Foreword
+// ═════════════════════════════════════════════════════════════════════════════
+// Vinyl-Recipe-Cards haben den Album-Sleeve-Look. Das Vorwort soll diese
+// Design-Sprache fortsetzen: Hero als großes Album-Cover, schwarze
+// LP-Disc halb rausgezogen rechts, Greeting + Story als "Side A" Liner
+// Notes mit Drop-Cap, Footer "Pressed by Brand · Side B Coming Up".
+
+function VinylForewordPage({
+  brand,
+  pack,
+  content,
+  imageDataUri,
+  avatarDataUri,
+}: ForewordPageProps) {
+  const t = packTheme(pack);
+  const greeting = content.greeting?.trim() || "Vorwort";
+  const story = content.story?.trim() ?? "";
+  const signoff = content.signoff?.trim() ?? "";
+  const storyFirstChar = story.charAt(0);
+  const storyRest = story.slice(1);
+
+  // Pack-Mood als dezenter Hintergrund
+  return (
+    <Page
+      size="A4"
+      style={{ backgroundColor: t.bg, fontFamily: "Inter", color: t.ink }}
+    >
+      {/* Masthead */}
+      <View
+        style={{
+          paddingHorizontal: 36,
+          paddingTop: 30,
+          paddingBottom: 10,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Svg width={16} height={16} viewBox="0 0 16 16">
+              <Circle cx={8} cy={8} r={7.5} fill="#0a0a0a" />
+              <Circle cx={8} cy={8} r={2.5} fill={t.accent} />
+              <Circle cx={8} cy={8} r={0.8} fill="#fff" />
+            </Svg>
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: 2.4,
+                color: t.ink,
+                textTransform: "uppercase",
+              }}
+            >
+              Pressed by {brand.name}
+            </Text>
+          </View>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 8,
+              letterSpacing: 1.8,
+              color: t.inkSoft,
+              textTransform: "uppercase",
+            }}
+          >
+            {pack.title} · LP-Edition
+          </Text>
+        </View>
+        <View
+          style={{
+            height: 1.5,
+            backgroundColor: t.ink,
+            marginTop: 8,
+          }}
+        />
+      </View>
+
+      {/* Album-Sleeve mit LP halb rausgezogen */}
+      <View
+        style={{
+          alignItems: "center",
+          paddingTop: 14,
+        }}
+      >
+        <View
+          style={{
+            width: 290,
+            height: 220,
+            position: "relative",
+          }}
+        >
+          {/* LP-Disc rechts halb sichtbar */}
+          <View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 220 - 16,
+              width: 220,
+              height: 220,
+              backgroundColor: "#0a0a0a",
+              borderRadius: 110,
+            }}
+          />
+          {/* Grooves */}
+          <Svg
+            style={{ position: "absolute", top: 0, left: 220 - 16 }}
+            width={220}
+            height={220}
+          >
+            {[100, 88, 76, 64].map((r) => (
+              <Circle
+                key={r}
+                cx={110}
+                cy={110}
+                r={r}
+                fill="none"
+                stroke="#1a1a1a"
+                strokeWidth={0.5}
+              />
+            ))}
+          </Svg>
+          {/* Center Label */}
+          <View
+            style={{
+              position: "absolute",
+              top: 110 - 40,
+              left: 220 - 16 + 110 - 40,
+              width: 80,
+              height: 80,
+              backgroundColor: t.accent,
+              borderRadius: 40,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: 14,
+                fontWeight: 700,
+                fontStyle: "italic",
+                color: "#fafafa",
+              }}
+            >
+              {brand.name}
+            </Text>
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 7,
+                letterSpacing: 1.4,
+                color: "#fafafa",
+                marginTop: 3,
+                opacity: 0.85,
+              }}
+            >
+              SIDE A
+            </Text>
+          </View>
+          {/* Spindle hole */}
+          <View
+            style={{
+              position: "absolute",
+              top: 110 - 3,
+              left: 220 - 16 + 110 - 3,
+              width: 6,
+              height: 6,
+              backgroundColor: "#fafafa",
+              borderRadius: 3,
+            }}
+          />
+
+          {/* Album-Cover (Hero) */}
+          <View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: 220,
+              height: 220,
+              overflow: "hidden",
+              backgroundColor: t.paper,
+            }}
+          >
+            {imageDataUri ? (
+              <Image
+                src={imageDataUri}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: t.accent,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontSize: 80,
+                    fontWeight: 700,
+                    color: "#fafafa",
+                  }}
+                >
+                  {brand.name.charAt(0)}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Title + Side-Label */}
+      <View style={{ paddingHorizontal: 48, marginTop: 16 }}>
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: 8,
+            fontWeight: 700,
+            letterSpacing: 2.4,
+            color: t.accent,
+            textTransform: "uppercase",
+            textAlign: "center",
+          }}
+        >
+          Side A · Vorwort
+        </Text>
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontSize: 26,
+            fontWeight: 700,
+            color: t.ink,
+            textAlign: "center",
+            marginTop: 6,
+            lineHeight: 1.1,
+          }}
+        >
+          {greeting}
+        </Text>
+      </View>
+
+      {/* Story als Liner-Notes mit Drop-Cap */}
+      <View
+        style={{
+          paddingHorizontal: 56,
+          marginTop: 18,
+        }}
+      >
+        {story.length > 0 ? (
+          <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: 42,
+                fontWeight: 700,
+                fontStyle: "italic",
+                color: t.accent,
+                lineHeight: 0.85,
+                marginRight: 4,
+                marginTop: -3,
+                width: 30,
+              }}
+            >
+              {storyFirstChar}
+            </Text>
+            <Text
+              style={{
+                flex: 1,
+                fontFamily: "Fraunces",
+                fontSize: 11,
+                color: t.ink,
+                lineHeight: 1.55,
+                textAlign: "justify",
+              }}
+            >
+              {storyRest}
+            </Text>
+          </View>
+        ) : null}
+
+        {signoff ? (
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: 11,
+              fontStyle: "italic",
+              color: t.accent,
+              marginTop: 14,
+              textAlign: "center",
+            }}
+          >
+            {signoff}
+          </Text>
+        ) : null}
+      </View>
+
+      {/* Footer mit "Side B Coming Up" */}
+      <View
+        style={{
+          position: "absolute",
+          left: 36,
+          right: 36,
+          bottom: 30,
+        }}
+      >
+        <View
+          style={{
+            height: 0.5,
+            backgroundColor: t.divider,
+            marginBottom: 12,
+          }}
+        />
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 14,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
+            {avatarDataUri ? (
+              <View
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 19,
+                  overflow: "hidden",
+                  borderWidth: 1.5,
+                  borderColor: t.accent,
+                }}
+              >
+                <Image
+                  src={avatarDataUri}
+                  style={{
+                    width: 35,
+                    height: 35,
+                    objectFit: "cover",
+                    objectPosition: "center 25%",
+                  }}
+                />
+              </View>
+            ) : null}
+            <View>
+              <Text
+                style={{
+                  fontFamily: "Inter",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: 1.6,
+                  color: t.ink,
+                  textTransform: "uppercase",
+                }}
+              >
+                {brand.name}
+              </Text>
+              <Text
+                style={{
+                  fontFamily: "Inter",
+                  fontSize: 8,
+                  color: t.inkSoft,
+                  marginTop: 2,
+                  letterSpacing: 1.2,
+                }}
+              >
+                {brand.handle}
+              </Text>
+            </View>
+          </View>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 8,
+              fontWeight: 600,
+              letterSpacing: 1.8,
+              color: t.inkSoft,
+              textTransform: "uppercase",
+            }}
+          >
+            Side B · Coming Up
+          </Text>
+        </View>
       </View>
     </Page>
   );

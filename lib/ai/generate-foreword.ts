@@ -1,17 +1,15 @@
 import type { Pack } from "@/lib/packs";
 import type { Brand } from "@/lib/brands";
 import { callGemini } from "./gemini";
+import { restoreGermanUmlauts } from "@/lib/restore-umlauts";
 
 // Schema-driven Pack-Vorwort. Vier kurze Felder so der Renderer sie ohne
 // Parsing layouten kann:
 //   - greeting:  Anrede oben auf der Vorwort-Page
 //   - story:     Pack-spezifisches Vorwort im Body
-//   - signoff:   Kurzer Schluss-CTA UNTERHALB der story (auf der Vorwort-Page)
-//   - outro:     2-3 Saetze persoenliche Abschiedsworte auf der LETZTEN Seite
-//                des Packs (Outro-Page). Bezieht sich auf Pack-Inhalt UND ggf.
-//                Saison/Monat. Optional — Pre-existing Code-Brand-Forewords
-//                (Bienen-Packs in lib/pack-forewords.ts) haben kein outro;
-//                dann faellt der Renderer auf seinen Default-Text zurueck.
+//   - signoff:   Kurzer Schluss-CTA UNTERHALB der story (Vorwort-Page)
+//   - outro:     2-3 Sätze persönliche Abschiedsworte auf der LETZTEN
+//                Seite des Packs (Outro-Page)
 
 const RESPONSE_SCHEMA = {
   type: "object",
@@ -19,162 +17,179 @@ const RESPONSE_SCHEMA = {
     greeting: {
       type: "string",
       description:
-        "Direkte, persoenliche Anrede in der Stimme der Creatorin. 4-7 Woerter. Z.B. 'Hey, schoen dass du da bist.', 'Hi, ich bin <NAME>.'. KEINE Hashtags, KEINE Emojis, KEINE Anfuehrungszeichen.",
+        "Direkte, persönliche Anrede in der Stimme der Creatorin. 4-7 Wörter mit korrekten deutschen Umlauten (ä, ö, ü, ß). Z.B. 'Hey, schön dass du da bist.', 'Hi, ich bin <NAME>.'. KEINE Hashtags, KEINE Emojis, KEINE Anführungszeichen, KEINE Em-Dashes (—).",
     },
     story: {
       type: "string",
       description:
-        "Pack-spezifisches Vorwort, 3-5 kurze Saetze, max. 380 Zeichen. Erklaert persoenlich, warum dieses Pack besonders ist und fuer wen es gedacht ist. In der Stimme der Creatorin: warm, du-Form, sinnlich-konkret. Bezieht sich konkret auf die Pack-Inhalte (Rezept-Beispiele), nicht generisch. KEINE Werbesprache, KEINE Hashtags, KEINE Emojis, KEINE Anfuehrungszeichen.",
+        "Pack-spezifisches Vorwort, 3-5 kurze Sätze, max. 380 Zeichen. Erklärt persönlich, warum dieses Pack besonders ist und für wen es gedacht ist. In der Stimme der Creatorin: warm, du-Form, sinnlich-konkret. MUSS mindestens 2 konkrete Rezept-Namen aus dem Pack erwähnen (im Prompt aufgelistet). Mit korrekten deutschen Umlauten (ä, ö, ü, ß). KEINE Werbesprache, KEINE Hashtags, KEINE Emojis, KEINE Anführungszeichen, KEINE Em-Dashes (—).",
     },
     signoff: {
       type: "string",
       description:
-        "Kurzer Schluss-CTA fuer die Vorwort-Page, 4-9 Woerter. Laedt zum Stoebern/Backen/Probieren ein. KEIN 'Deine <NAME>' (das wird separat gerendert). KEINE Hashtags, KEINE Emojis.",
+        "Kurzer Schluss-CTA für die Vorwort-Page, 4-9 Wörter mit korrekten Umlauten. Lädt zum Stöbern/Backen/Probieren ein. KEIN 'Deine <NAME>'. KEINE Hashtags, KEINE Emojis, KEINE Em-Dashes.",
     },
     outro: {
       type: "string",
       description:
-        "2-3 Saetze persoenliche Abschiedsworte fuer die LETZTE Seite des Packs (NICHT die Vorwort-Page). In ICH-Form, persoenlich, warm. Bezieht sich auf 1-2 konkrete Rezepte aus dem Pack ODER Saison/Anlass wenn der Pack-Titel das nahelegt (z.B. 'Mai 2026' -> Fruehlings/Mai-Bezug). Max 280 Zeichen. KEIN 'Deine <NAME>' (wird separat gerendert). KEINE Hashtags, KEINE Emojis.",
+        "2-3 Sätze persönliche Abschiedsworte für die LETZTE Seite des Packs (NICHT die Vorwort-Page). In ICH-Form, persönlich, warm. MUSS auf mindestens 1 konkretes Rezept aus dem Pack ODER auf Saison/Anlass aus dem Pack-Titel beziehen. Mit korrekten deutschen Umlauten. Max 280 Zeichen. KEIN 'Deine <NAME>'. KEINE Hashtags, KEINE Emojis, KEINE Em-Dashes.",
     },
   },
   required: ["greeting", "story", "signoff", "outro"],
 };
 
 function systemInstructionFor(brand: Brand): string {
-  return `Du schreibst Pack-Vorworte fuer die Recipe-Cards von ${brand.name} (${brand.handle}).
+  return `Du schreibst Pack-Vorworte für die Recipe-Cards von ${brand.name} (${brand.handle}).
 
 Brand-Kontext:
 - Name: ${brand.name}
 - Handle: ${brand.handle}
 - Bio: ${brand.bio}
 - Tagline: ${brand.tagline}
-- Signature: "${brand.signature}" (wird separat gerendert — NICHT in deinen Texten erwaehnen)
 
-Tonalitaet (extrem wichtig):
-- Sprich in der ICH-Form, als ob ${brand.name} selbst spricht. Du-Form fuer die Leserin.
-- Warm, persoenlich, "wie zu einer Freundin am Kuechentisch".
-- KEINE Werbesprache, KEINE Floskeln ("genussvoll", "koestlich", "perfekt fuer jeden Anlass", "absolute Lieblinge", "angesagt").
-- KEINE Uebertreibungen ("absolut traumhaft", "unwiderstehlich", "sensationell").
-- KEINE Hashtags, KEINE Emojis, KEINE Anfuehrungszeichen.
-- Sinnlich-konkret statt abstrakt: nicht "lecker", sondern "schmilzt auf der Zunge", "knusprig aussen, fluffig innen", "in 15 Min auf dem Tisch".
-- Eine kleine persoenliche Note: "das ist mein Sonntagsritual", "ich back das mindestens einmal die Woche", "der Salat geht mit mir jeden Montag ins Buero".
+TONALITÄT (extrem wichtig):
+- Sprich in der ICH-Form, als ob ${brand.name} selbst spricht. Du-Form für die Leserin.
+- Warm, persönlich, "wie zu einer Freundin am Küchentisch".
+- KEINE Werbesprache, KEINE Floskeln ("genussvoll", "köstlich", "perfekt für jeden Anlass", "absolute Lieblinge", "angesagt").
+- KEINE Übertreibungen ("absolut traumhaft", "unwiderstehlich", "sensationell").
+- KEINE Hashtags, KEINE Emojis, KEINE Anführungszeichen.
+- Sinnlich-konkret statt abstrakt: nicht "lecker", sondern "schmilzt auf der Zunge", "knusprig außen, fluffig innen", "in 15 Min auf dem Tisch".
+- Eine kleine persönliche Note: "das ist mein Sonntagsritual", "ich back das mindestens einmal die Woche", "der Salat geht mit mir jeden Montag ins Büro".
 
-DEUTSCHE SCHREIBWEISE (kritisch):
-- Verwende ALLE deutschen Umlaute korrekt: ae, oe, ue → IMMER ä, ö, ü, ß. Beispiele: "für", "über", "gemütlich", "dünn", "Gemüse", "süß", "schön", "möchte".
-- ß bleibt ß (nicht ss). Beispiel: "süß", nicht "suess".
-- NIEMALS Woerter ohne Umlaut wo einer hin gehoert.
+DEUTSCHE SCHREIBWEISE (ABSOLUT KRITISCH — wichtigste Regel):
+Du MUSST alle deutschen Umlaute korrekt verwenden:
+- ä, Ä (NIEMALS ae, Ae) — Beispiele: "ähnlich", "Bäcker", "während", "Käse", "Hähnchen"
+- ö, Ö (NIEMALS oe, Oe) — Beispiele: "schön", "möchte", "öffnen", "Löffel", "Brötchen"
+- ü, Ü (NIEMALS ue, Ue) — Beispiele: "für", "über", "Küche", "Frühstück", "süß"
+- ß (NIEMALS ss bei langen Vokalen) — Beispiele: "süß", "heiß", "Fuß", "groß", "weiß"
 
-KEINE EM-DASHES / EN-DASHES (KI-TELL, kritisch!):
-- Verbotene Zeichen: "—" (Em-Dash) und "–" (En-Dash). Diese sind ein
-  KI-Tell und zerstoeren die authentische Stimme.
-- Stattdessen: nutze normale Satzzeichen — Komma, Doppelpunkt, Punkt.
-  Beispiel: NICHT "Hi, schoen dass du da bist — ich freu mich.",
-  SONDERN "Hi, schoen dass du da bist. Ich freu mich."
-- Bindestriche in Komposita ("low-carb", "Mama-Pause") sind OK, das
-  sind aber Hyphen-Minus (-), keine Em/En-Dashes.
+Verbotene falsche Schreibweisen (überprüfe JEDES Wort am Ende):
+"fuer" → "für" · "ueber" → "über" · "Kueche" → "Küche" · "schoen" → "schön"
+"glueck" → "glück" · "suess" → "süß" · "moegen" → "mögen" · "möchte" (richtig)
+"haehnchen" → "Hähnchen" · "naechste" → "nächste" · "spaeter" → "später"
+"vielfaeltig" → "vielfältig" · "gemuetlich" → "gemütlich" · "Stueck" → "Stück"
+"weiss" → "weiß" · "heiss" → "heiß" · "groesser" → "größer"
 
-Was ein Pack-Vorwort tun muss:
-- Den Pack-Charakter in 3-5 Saetzen einfangen
-- Konkrete Inhalte erwaehnen (Rezept-Beispiele aus dem Pack)
-- Sagen, fuer WEN/WANN das Pack gedacht ist (Sonntagvormittag, nach dem Training, fuers Buero)
-- Einladen zum Stoebern, ohne pushy zu sein
+KEINE EM-DASHES / EN-DASHES (KI-Tell!):
+- Verboten: "—" (Em-Dash) und "–" (En-Dash). Stattdessen Komma oder Punkt.
+- Hyphen-Minus (-) für Komposita ("low-carb", "Mama-Pause") sind OK.
 
-Was das outro-Feld tun muss:
-- Persoenliche Abschiedsworte, 2-3 Saetze in ICH-Form
-- Bezug auf den Pack-Charakter ODER Saison/Monat wenn der Titel das nahelegt
-  (Beispiel: Pack heisst "Top Reels Mai 2026" -> Mai-Bezug, Spargel-Zeit, Erdbeeren, Sonne)
-  (Beispiel: Pack heisst "Airfryer Lieblinge" -> Airfryer-Bezug, schnelle Abende)
-- Klingt wie eine handgeschriebene Notiz, kein Marketing-Outro
+PACK-VORWORT-STRUKTUR:
+- greeting: 4-7 Wörter, direkte Anrede
+- story: 3-5 Sätze. MUSS mindestens 2 konkrete Rezept-Namen aus dem Pack
+  erwähnen. Bezieht sich auf den Pack-Charakter, sagt für wen/wann das
+  Pack gedacht ist (Sonntagmorgen, nach dem Training, fürs Büro)
+- signoff: 4-9 Wörter, Einladung zum Stöbern
+- outro: 2-3 Sätze, persönliche Abschiedsworte. Bezieht sich konkret auf
+  1-2 Rezepte aus dem Pack ODER auf Saison/Monat wenn der Title das nahelegt
+  ("Top Reels Mai" → Mai-Bezug, Spargel-Zeit; "Airfryer Lieblinge" → schnelle
+  Abende). Klingt wie eine handgeschriebene Notiz, kein Marketing-Outro.
 
-Beispiele fuer GUTE Pack-Vorworte (nimm dir Stil, schreib aber pack-spezifisch neu):
+Beispiele für gute Vorworte (Stil übernehmen, neu schreiben):
 
-Greeting + Story (Backwelt-Style):
-"Backen ist meine Paradedisziplin. Hier sind meine liebsten Werke aus den Reels — Schoko-Biskuitrolle, Cheesecake, Erdbeer-Kuppeltorte. Alle ohne zugesetzten Zucker, alle so wie ich sie selbst in meiner Kueche backe."
+Greeting: "Hey, schön dass du da bist."
+Story (Backwelt): "Backen ist meine Paradedisziplin. Hier sind meine
+liebsten Werke aus den Reels, Schoko-Biskuitrolle, Cheesecake und
+Erdbeer-Kuppeltorte. Alle ohne zugesetzten Zucker, alle so wie ich sie
+selbst in meiner Küche backe."
 
-Greeting + Story (Mai-Top-Pack):
-"Hey, schoen dass du da bist. Hier sind die Rezepte, die diesen Monat bei euch am besten angekommen sind — vom Curry Dattel Dip ueber den High Protein Schuettel Salat bis zu den Pina Colada Energy Balls. Lass dich inspirieren."
+Story (Mai-Top-Pack): "Hey, schön dass du da bist. Hier sind die
+Rezepte, die diesen Monat bei euch am besten angekommen sind: vom Curry
+Dattel Dip über den High Protein Schüttel Salat bis zu den Pina Colada
+Energy Balls. Lass dich inspirieren."
 
-Outro-Beispiele (PERSOENLICH, KEIN Marketing):
-- "Ich hoffe, du findest in diesem Pack genau das, wonach du grade Lust hast. Wenn du eines der Rezepte nachkochst, schick mir gerne ein Foto bei Instagram — ich liebe es, eure Versionen zu sehen."
-- "Der Mai ist meine Lieblingszeit zum Kochen — alles wird leichter, frischer, lebendiger. Probier ein Rezept aus, das dir Lust macht, und schreib mir gerne wie es war."
+Outro-Beispiele:
+- "Ich hoffe, du findest in diesem Pack genau das, wonach du gerade Lust
+  hast. Wenn du eines der Rezepte nachkochst, schick mir gerne ein Foto
+  bei Instagram, ich liebe es eure Versionen zu sehen."
+- "Der Mai ist meine Lieblingszeit zum Kochen, alles wird leichter,
+  frischer, lebendiger. Probier ein Rezept aus, das dir Lust macht, und
+  schreib mir gerne wie es war."
 
-Beispiele SCHLECHTE Texte (nie so):
-- "Diese koestliche Rezeptauswahl bietet fuer jeden Geschmack das Richtige!" (Werbesprache)
+Niemals so:
+- "Diese köstliche Rezeptauswahl bietet für jeden Geschmack das Richtige!" (Werbesprache)
 - "🤍 Hier kommen meine Lieblinge 🥹" (Emoji)
-- "ABSOLUT GENIAL!!" (Uebertreibung)
-- "Das Pack ist eine Sammlung von Rezepten." (banal)
-- "Perfekt, um keine Trends zu verpassen." (Marketing)`;
+- "ABSOLUT GENIAL!!" (Übertreibung)
+- "Das Pack ist eine Sammlung von Rezepten." (banal)`;
 }
 
 export type PackForewordContent = {
   greeting: string;
   story: string;
   signoff: string;
-  /** Optionales Outro fuer die letzte Pack-Seite. Bei aelteren Forewords
-   *  (Bienen Code-Brand) kann das Feld fehlen — der Renderer faellt dann auf
-   *  seinen Default-Text zurueck. */
+  /** Optionales Outro für die letzte Pack-Seite. Bei älteren Forewords
+   *  (Bienen Code-Brand) kann das Feld fehlen — der Renderer fällt dann
+   *  auf seinen Default-Text zurück. */
   outro?: string;
 };
 
-function formatPackForPrompt(pack: Pack, brand: Brand): string {
-  return [
+function formatPackForPrompt(
+  pack: Pack,
+  brand: Brand,
+  recipeTitles: string[]
+): string {
+  const lines = [
     `Pack-Titel: ${pack.title}`,
     `Pack-Untertitel: ${pack.subtitle}`,
     `Tagline: ${pack.tagline}`,
     `Kategorie: ${pack.category}`,
     `Beschreibung: ${pack.description}`,
     pack.edgeCase ? `Pack-Charakter: ${pack.edgeCase}` : "",
-    ``,
-    `Brand: ${brand.name} (${brand.handle})`,
-    `Brand-Bio: ${brand.bio}`,
-    `Brand-Tagline: ${brand.tagline}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  ];
+  if (recipeTitles.length > 0) {
+    lines.push("");
+    lines.push(`REZEPTE in diesem Pack (MUSST du mindestens 2 davon namentlich erwähnen):`);
+    recipeTitles.forEach((t) => lines.push(`- ${t}`));
+  }
+  lines.push("");
+  lines.push(`Brand: ${brand.name} (${brand.handle})`);
+  lines.push(`Brand-Bio: ${brand.bio}`);
+  lines.push(`Brand-Tagline: ${brand.tagline}`);
+  return lines.filter(Boolean).join("\n");
 }
 
-// Generate a structured pack-foreword via Gemini. Throws on Gemini failure
-// — caller decides whether to fall back to a hardcoded default.
+/**
+ * Generate a structured pack-foreword via Gemini. recipeTitles ist optional
+ * aber sehr empfohlen — gibt der KI konkrete Anker für persönliche
+ * Texte. Throws on Gemini failure.
+ */
 export async function generatePackForeword(
   pack: Pack,
-  brand: Brand
+  brand: Brand,
+  recipeTitles: string[] = []
 ): Promise<PackForewordContent> {
   const prompt = [
-    `Schreibe ein persoenliches Pack-Vorwort fuer das folgende Recipe-Pack.`,
-    `Wichtig: Das Vorwort muss konkret zu diesem Pack passen (Inhalte, Stimmung, Einsatzkontext) — nicht generisch.`,
+    `Schreibe ein persönliches Pack-Vorwort für das folgende Recipe-Pack.`,
+    `Wichtig: Das Vorwort muss konkret zu diesem Pack passen (Inhalte, Stimmung, Einsatzkontext), nicht generisch.`,
+    `KRITISCH: Verwende deutsche Umlaute (ä, ö, ü, ß) NIEMALS als ae, oe, ue, ss umschreiben.`,
     ``,
-    formatPackForPrompt(pack, brand),
+    formatPackForPrompt(pack, brand, recipeTitles),
     ``,
-    `Antworte nur als JSON nach Schema, ohne Erklaerung.`,
+    `Antworte nur als JSON nach Schema, ohne Erklärung.`,
   ].join("\n");
 
   const result = await callGemini<PackForewordContent>({
     prompt,
     schema: RESPONSE_SCHEMA,
     systemInstruction: systemInstructionFor(brand),
-    // Higher temp than structured extraction (e.g. micros) — we want voice
-    // and personality. But not so high that we get nonsense or break the
-    // tonal rules in the system instruction.
-    temperature: 0.85,
+    // Etwas niedrigere Temp als zuvor (0.85 → 0.7) — Voice bleibt, aber
+    // weniger Drift zu falschen Umlauten oder Marketing-Wendungen.
+    temperature: 0.7,
     maxOutputTokens: 1024,
     thinkingBudget: 0,
     retries: 2,
   });
 
-  // Clean each field: trim, strip stray quotes, collapse whitespace,
-  // KILL Em-Dashes und En-Dashes (KI-Tells). Wenn Gemini trotzdem
-  // welche generiert (selten, aber moeglich), ersetzen wir sie hier
-  // mit einem Komma — das ist die natuerlichste Substitution.
-  const sanitize = (s: string, max: number): string => {
+  // Two-Stage-Cleanup: erst Umlaut-Restore (Wörterbuch-basiert), dann
+  // typografisches Cleanup (Em-Dashes, Quotes, Whitespace, Max-Length).
+  const cleanField = (s: string, max: number): string => {
     let out = (s ?? "").trim();
+    // Stage 1: Umlauts wiederherstellen
+    out = restoreGermanUmlauts(out);
+    // Stage 2: typografisch sauber
     out = out.replace(/^["'„«]+|["'"»]+$/g, "");
-    // Em-Dashes (—) und En-Dashes (–) → Komma + Leerzeichen. Hyphen-Minus
-    // (-) bleibt erhalten (fuer Komposita wie "low-carb"). Wenn der Dash
-    // schon von Leerzeichen umgeben war (typisches Em-Dash-Pattern), kein
-    // doppeltes Leerzeichen.
-    out = out.replace(/\s*[—–]\s*/g, ", ");
+    out = out.replace(/\s*[—–]\s*/g, ", "); // Em/En-Dashes → Komma
     out = out.replace(/\s+/g, " ");
-    // Doppel-Komma-Cleanup falls Em-Dash neben Komma stand
     out = out.replace(/,\s*,/g, ",");
     if (out.length > max) {
       const cut = out.slice(0, max);
@@ -189,9 +204,9 @@ export async function generatePackForeword(
   };
 
   return {
-    greeting: sanitize(result.greeting, 60),
-    story: sanitize(result.story, 420),
-    signoff: sanitize(result.signoff, 100),
-    outro: result.outro ? sanitize(result.outro, 320) : undefined,
+    greeting: cleanField(result.greeting, 60),
+    story: cleanField(result.story, 420),
+    signoff: cleanField(result.signoff, 100),
+    outro: result.outro ? cleanField(result.outro, 320) : undefined,
   };
 }
