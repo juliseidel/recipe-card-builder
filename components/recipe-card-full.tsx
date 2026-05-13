@@ -5442,7 +5442,7 @@ function RestaurantLayout({
           style={{ color: RESTAURANT_WEB.inkSubtle }}
         >
           {pack.title}
-          {`  ·  N° ${String(recipeIndex + 1).padStart(2, "0")} / ${String(totalRecipes).padStart(2, "0")}`}
+          {`  ·  ${String(recipeIndex + 1).padStart(2, "0")} / ${String(totalRecipes).padStart(2, "0")}`}
         </p>
       </header>
 
@@ -5529,6 +5529,26 @@ function RestaurantLayout({
           <span style={{ color: RESTAURANT_WEB.gold, fontSize: "9px" }}>·</span>
           <span className="font-mono text-[12px] font-bold uppercase tracking-[0.2em]">
             {recipe.servings === 1 ? "1 Portion" : `${recipe.servings} Portionen`}
+          </span>
+        </div>
+        {/* Sub-Spec-Strip mit den restlichen Makros — analog zum PDF. */}
+        <div
+          className="mt-2 flex flex-wrap items-baseline justify-center gap-2"
+          style={{ color: RESTAURANT_WEB.inkSoft }}
+        >
+          <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em]">
+            <span style={{ color: RESTAURANT_WEB.gold }}>Protein </span>
+            {recipe.nutrition.protein}g
+          </span>
+          <span style={{ color: RESTAURANT_WEB.gold, fontSize: "8px" }}>·</span>
+          <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em]">
+            <span style={{ color: RESTAURANT_WEB.gold }}>Kohlenh. </span>
+            {recipe.nutrition.carbs}g
+          </span>
+          <span style={{ color: RESTAURANT_WEB.gold, fontSize: "8px" }}>·</span>
+          <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em]">
+            <span style={{ color: RESTAURANT_WEB.gold }}>Fett </span>
+            {recipe.nutrition.fat}g
           </span>
         </div>
       </section>

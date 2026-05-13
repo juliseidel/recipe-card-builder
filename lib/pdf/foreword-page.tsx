@@ -2441,18 +2441,25 @@ function RestaurantForewordPage({
         }}
       >
         {story.length > 0 ? (
+          // Drop-Cap-Layout in react-pdf: das W als eigenes Text-Element
+          // links neben dem Body. Wichtige Werte um das W sauber oben
+          // aligned mit der ersten Body-Zeile zu bekommen (NICHT mid-line
+          // wie vorher): fontSize ~ 2× body-fontSize, lineHeight 1 (nicht
+          // 0.85 — das verkleinerte die Yoga-Box und yoga zentrierte den
+          // Glyph dann mid-line), marginTop 0, paddingTop angepasst sodass
+          // die Cap-Höhe an Body-Cap-Höhe ausgerichtet ist.
           <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
             <Text
               style={{
                 fontFamily: "Fraunces",
-                fontSize: 46,
+                fontSize: 30,
                 fontWeight: 700,
                 fontStyle: "italic",
                 color: RESTAURANT_FOREWORD_COLORS.gold,
-                lineHeight: 0.85,
+                lineHeight: 1,
                 marginRight: 6,
-                marginTop: -3,
-                width: 34,
+                paddingTop: 2,
+                width: 22,
               }}
             >
               {storyFirstChar}

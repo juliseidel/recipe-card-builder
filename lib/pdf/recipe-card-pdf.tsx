@@ -9029,57 +9029,57 @@ const RESTAURANT_DENSITY: Record<
   }
 > = {
   // Compact: aggressive Kompaktheit fuer Recipes >= 14 Zutaten oder >= 8
-  // Schritten (Sweet-Balance "Donauwellen im Glas" mit 10 Zutaten + 9
-  // Schritten oder "Himbeer Tiramisu" mit 14 Zutaten + 6 Schritten muessen
-  // auf EINE A4-Seite passen — sonst rutscht Wine-Notes auf Page 2 und der
-  // Footer ueberlappt Steps).
+  // Schritten. Sweet-Balance "Donauwellen im Glas" (10 Zutaten + 9
+  // Schritte) und "Himbeer Tiramisu" (14 Zutaten + 6 Schritte mit 3
+  // Gruppen) muessen mit dem 2-zeiligen Spec-Strip (incl. Makros) auf
+  // EINE A4-Seite passen.
   compact: {
-    heroSize: 110,
-    titleFontSize: 22,
+    heroSize: 95,
+    titleFontSize: 21,
     eyebrowFontSize: 7,
-    subtitleFontSize: 9,
-    specFontSize: 8.5,
+    subtitleFontSize: 8.5,
+    specFontSize: 8,
     ingredientFontSize: 8.5,
-    ingredientRowPadV: 1.8,
+    ingredientRowPadV: 1.4,
     ingredientNoteFontSize: 6.5,
     stepFontSize: 8.5,
-    stepMarginBottom: 3.5,
+    stepMarginBottom: 3,
     sectionLabelFontSize: 7.5,
-    wineNotesFontSize: 9.5,
-    topPadding: 10,
-    sectionGap: 8,
+    wineNotesFontSize: 9,
+    topPadding: 8,
+    sectionGap: 6,
   },
   balanced: {
-    heroSize: 150,
-    titleFontSize: 28,
+    heroSize: 140,
+    titleFontSize: 26,
     eyebrowFontSize: 7.5,
     subtitleFontSize: 10,
-    specFontSize: 9,
+    specFontSize: 8.5,
     ingredientFontSize: 9.5,
-    ingredientRowPadV: 3,
+    ingredientRowPadV: 2.5,
     ingredientNoteFontSize: 7,
     stepFontSize: 9.5,
-    stepMarginBottom: 6,
+    stepMarginBottom: 5,
     sectionLabelFontSize: 8,
-    wineNotesFontSize: 11,
-    topPadding: 18,
-    sectionGap: 12,
+    wineNotesFontSize: 10.5,
+    topPadding: 14,
+    sectionGap: 10,
   },
   spacious: {
-    heroSize: 175,
-    titleFontSize: 32,
-    eyebrowFontSize: 8.5,
+    heroSize: 165,
+    titleFontSize: 30,
+    eyebrowFontSize: 8,
     subtitleFontSize: 11,
-    specFontSize: 9.5,
+    specFontSize: 9,
     ingredientFontSize: 10,
-    ingredientRowPadV: 4.5,
+    ingredientRowPadV: 4,
     ingredientNoteFontSize: 7.5,
     stepFontSize: 10,
-    stepMarginBottom: 8,
+    stepMarginBottom: 7,
     sectionLabelFontSize: 8.5,
-    wineNotesFontSize: 12.5,
-    topPadding: 24,
-    sectionGap: 16,
+    wineNotesFontSize: 12,
+    topPadding: 20,
+    sectionGap: 14,
   },
 };
 
@@ -9264,20 +9264,22 @@ function RestaurantPage({
           </Text>
           <GoldDiamond size={6} />
         </View>
-        {/* Pack-Title + Index als sehr feine Sub-Eyebrow */}
+        {/* Pack-Title + Index als sehr feine Sub-Eyebrow. "N°"-Praefix
+            weg fuer kompakteren Header — die /-Separation macht die
+            Nummerierung schon klar genug. */}
         <Text
           style={{
             fontFamily: "Inter",
-            fontSize: 6.5,
+            fontSize: 6,
             letterSpacing: 1.6,
             color: RESTAURANT_COLORS.inkSubtle,
             textTransform: "uppercase",
-            marginTop: 3,
+            marginTop: 2,
           }}
         >
           {pack.title}
           {!hideRecipeIndex
-            ? `  ·  N° ${pad2(recipePosition)} / ${pad2(totalRecipes)}`
+            ? `  ·  ${pad2(recipePosition)} / ${pad2(totalRecipes)}`
             : ""}
         </Text>
       </View>
@@ -9345,7 +9347,7 @@ function RestaurantPage({
           paddingHorizontal: 56, // Title bleibt etwas eingerueckt fuer
           // schoeneres center-aligned-Lesegefuehl; nur Content-Body
           // unten nutzt full PAGE_PADDING fuer maximale Zeilenbreite.
-          paddingTop: density === "compact" ? 6 : 14,
+          paddingTop: density === "compact" ? 4 : 10,
         }}
       >
         {/* Eyebrow: Kategorie + Roman-Position */}
@@ -9357,7 +9359,7 @@ function RestaurantPage({
             letterSpacing: 3,
             color: RESTAURANT_COLORS.gold,
             textTransform: "uppercase",
-            marginBottom: 6,
+            marginBottom: density === "compact" ? 3 : 5,
           }}
         >
           {pack.category}
@@ -9384,8 +9386,8 @@ function RestaurantPage({
             flexDirection: "row",
             alignItems: "center",
             gap: 8,
-            marginTop: 8,
-            marginBottom: 8,
+            marginTop: density === "compact" ? 4 : 7,
+            marginBottom: density === "compact" ? 4 : 7,
           }}
         >
           <View
@@ -9419,13 +9421,18 @@ function RestaurantPage({
             {recipe.subtitle}
           </Text>
         ) : null}
-        {/* Spec-Strip: ZEIT · KCAL · PORTIONEN */}
+        {/* Spec-Strip — Zeile 1: ZEIT · KCAL · PORTIONEN. Zeile 2: die
+            drei verbleibenden Makros (Protein/KH/Fett). User-Feedback
+            Sweet-Balance-Review: Makros muessen sichtbar sein, nicht nur
+            in der Wine-Notes-Box unten. Aber alles soll auf eine Seite
+            passen — daher Zeile 2 etwas kleiner und mit kleinerem
+            marginTop. */}
         <View
           style={{
             flexDirection: "row",
             alignItems: "baseline",
             gap: 10,
-            marginTop: 10,
+            marginTop: 8,
             flexWrap: "wrap",
             justifyContent: "center",
           }}
@@ -9469,6 +9476,62 @@ function RestaurantPage({
             {recipe.servings === 1
               ? "1 Portion"
               : `${recipe.servings} Portionen`}
+          </Text>
+        </View>
+        {/* Spec-Strip Zeile 2: Makros (Protein/KH/Fett). Dezenter Farbton
+            (inkSoft statt ink), gleiche font-size — visuell als Sub-
+            Zeile lesbar. Werte als "18g · 24g · 5g" mit dezenten Labels
+            davor. */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "baseline",
+            gap: 8,
+            marginTop: 5,
+            flexWrap: "wrap",
+            justifyContent: "center",
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: D.specFontSize - 1,
+              fontWeight: 600,
+              letterSpacing: 1.6,
+              color: RESTAURANT_COLORS.inkSoft,
+              textTransform: "uppercase",
+            }}
+          >
+            <Text style={{ color: RESTAURANT_COLORS.gold }}>Protein </Text>
+            {recipe.nutrition.protein}g
+          </Text>
+          <Text style={{ fontSize: 6, color: RESTAURANT_COLORS.gold }}>·</Text>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: D.specFontSize - 1,
+              fontWeight: 600,
+              letterSpacing: 1.6,
+              color: RESTAURANT_COLORS.inkSoft,
+              textTransform: "uppercase",
+            }}
+          >
+            <Text style={{ color: RESTAURANT_COLORS.gold }}>Kohlenh. </Text>
+            {recipe.nutrition.carbs}g
+          </Text>
+          <Text style={{ fontSize: 6, color: RESTAURANT_COLORS.gold }}>·</Text>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: D.specFontSize - 1,
+              fontWeight: 600,
+              letterSpacing: 1.6,
+              color: RESTAURANT_COLORS.inkSoft,
+              textTransform: "uppercase",
+            }}
+          >
+            <Text style={{ color: RESTAURANT_COLORS.gold }}>Fett </Text>
+            {recipe.nutrition.fat}g
           </Text>
         </View>
       </View>
