@@ -1,7 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { queryReelsForBrand, type ReelRow } from "@/lib/creator-reels-server";
 import { generatePackMeta } from "@/lib/ai/generate-pack-meta";
-import { buildPackFromReels, pickMoodById } from "@/lib/reel-library/pack-builder";
+import {
+  buildPackFromReels,
+  pickMoodById,
+  triggerEnrichForBuiltPack,
+} from "@/lib/reel-library/pack-builder";
 import { loadBrand } from "@/lib/custom-brands-server";
 import type { Pack } from "@/lib/packs";
 
@@ -273,6 +277,23 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
+
+  // Enrich-Calls (Pack-Cover + Foreword + Recipe-Heroes/Stories) NACH der
+  // Response triggern. WICHTIG: after() statt fire-and-forget — sonst
+  // wuerde Vercel die Lambda terminate'n bevor die HTTP-Calls vollstaendig
+  // raus sind. Pack-Cover + alle Recipe-Heroes laufen dann in separaten
+  // Lambdas parallel weiter (jeweils mit eigener maxDuration=120s).
+  after(async () => {
+    try {
+      await triggerEnrichForBuiltPack(
+        origin,
+        result.packId,
+        result.insertedRecipeIds
+      );
+    } catch (err) {
+      console.error("[generate-auto] enrich trigger failed", err);
+    }
+  });
 
   return NextResponse.json({
     status: "created",

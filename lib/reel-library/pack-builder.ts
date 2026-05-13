@@ -49,6 +49,11 @@ export type BuildPackResult = {
   packSlug: string;
   recipeCount: number;
   parseFailures: number;
+  /** IDs der frisch angelegten Recipe-Rows. Caller muss die enrich-Calls
+   *  selbst in seinem after()-Hook triggern — sonst werden Hero/Story
+   *  fire-and-forget-Calls beim Lambda-Terminate abgewuergt (siehe
+   *  Lessons-Learned 2026-05-13). */
+  insertedRecipeIds: string[];
 };
 
 function slugifyRecipe(input: string): string {
@@ -252,35 +257,55 @@ export async function buildPackFromReels(
   }
 
   const recipeCount = insertedRecipes?.length ?? recipeRows.length;
+  const insertedRecipeIds = (insertedRecipes ?? []).map((r) => r.id as string);
 
-  // 5. Pack-Cover fire-and-forget. Existierender Endpoint /api/packs/enrich
-  // erwartet { packId } und macht Cover + Foreword.
-  void fetch(`${opts.origin}/api/packs/enrich`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ packId: packRow.id }),
-  }).catch(() => {
-    /* swallow — best-effort */
-  });
-
-  // 6. Recipe-Enrich fire-and-forget pro Recipe. Jeder eigener Lambda-Spawn
-  // → Hero-Generation laeuft parallel und nicht hintereinander.
-  if (insertedRecipes) {
-    for (const row of insertedRecipes) {
-      void fetch(`${opts.origin}/api/recipes/enrich`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recipeId: row.id }),
-      }).catch(() => {
-        /* swallow */
-      });
-    }
-  }
+  // WICHTIG: Hier KEINE fire-and-forget-fetch fuer enrich mehr!
+  // Vorher: `void fetch(...)` → Lambda terminate'd vor Send → Cover-Gen
+  // + Hero-Gen lief unzuverlaessig. Der Caller muss jetzt die enrich-
+  // Calls in seinem eigenen after()-Hook triggern (siehe
+  // /api/packs/generate-auto und /api/pack-suggestions/[id]/accept).
 
   return {
     packId: packRow.id,
     packSlug: packRow.pack_slug,
     recipeCount,
     parseFailures: failures,
+    insertedRecipeIds,
   };
+}
+
+// Helper fuer die Caller-Routes: triggert /packs/enrich und /recipes/enrich
+// in einem after()-Hook. Stellt sicher dass die Lambda alive bleibt bis
+// alle fetch-Calls initiiert sind, NextJS terminate'd dann sauber. Returnt
+// ein Promise das alle Calls awaited — Caller wrappt in after(() => ...).
+export async function triggerEnrichForBuiltPack(
+  origin: string,
+  packId: string,
+  recipeIds: string[]
+): Promise<void> {
+  console.log(
+    `[pack-builder] triggering enrich for packId=${packId} + ${recipeIds.length} recipes`
+  );
+  // Pack-Cover + Foreword parallel mit allen Recipe-Heroes. allSettled
+  // damit ein failing Call die anderen nicht blockiert.
+  const results = await Promise.allSettled([
+    fetch(`${origin}/api/packs/enrich`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ packId }),
+    }),
+    ...recipeIds.map((id) =>
+      fetch(`${origin}/api/recipes/enrich`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipeId: id }),
+      })
+    ),
+  ]);
+  const failedCount = results.filter((r) => r.status === "rejected").length;
+  if (failedCount > 0) {
+    console.warn(
+      `[pack-builder] ${failedCount}/${results.length} enrich-Calls failed to initiate`
+    );
+  }
 }

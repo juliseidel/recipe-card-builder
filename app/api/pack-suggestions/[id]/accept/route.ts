@@ -1,9 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import {
   getSuggestionById,
   updateSuggestionStatus,
 } from "@/lib/creator-reels-server";
-import { buildPackFromReels, pickMoodById } from "@/lib/reel-library/pack-builder";
+import {
+  buildPackFromReels,
+  pickMoodById,
+  triggerEnrichForBuiltPack,
+} from "@/lib/reel-library/pack-builder";
 import { brandMoodPresets } from "@/lib/brand-presets";
 import type { CardLayout } from "@/lib/packs";
 
@@ -173,6 +177,23 @@ export async function POST(req: Request, { params }: RouteParams) {
   }
 
   await updateSuggestionStatus(id, "accepted", result.packId);
+
+  // Enrich-Calls NACH der Response triggern. WICHTIG: after() statt
+  // fire-and-forget — sonst wuerde Vercel die Lambda terminate'n bevor
+  // die HTTP-Calls vollstaendig raus sind. Pack-Cover (wenn nicht
+  // presetCoverImage) + alle Recipe-Heroes laufen dann in separaten
+  // Lambdas parallel weiter.
+  after(async () => {
+    try {
+      await triggerEnrichForBuiltPack(
+        origin,
+        result.packId,
+        result.insertedRecipeIds
+      );
+    } catch (err) {
+      console.error("[pack-suggestions/accept] enrich trigger failed", err);
+    }
+  });
 
   return NextResponse.json({
     status: "accepted",
