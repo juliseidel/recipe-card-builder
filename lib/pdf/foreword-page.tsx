@@ -1064,6 +1064,19 @@ function NewspaperForewordPage({
   const storyFirstChar = story.charAt(0);
   const storyRest = story.slice(1);
 
+  // Adaptiv: kurze Texte bekommen großzügigere Typografie & Hero-Höhe,
+  // damit die Seite nie halbleer aussieht. Lange Texte werden kompakter
+  // damit nichts overflowed. Schwellenwert empirisch — knapp unterhalb
+  // eines durchschnittlichen Magazin-Editorials.
+  const storyLength = story.length;
+  const isShort = storyLength < 280;
+  const isLong = storyLength > 560;
+
+  const heroHeight = isShort ? 280 : isLong ? 200 : 240;
+  const bodyFontSize = isShort ? 13.5 : isLong ? 11.5 : 12.5;
+  const bodyLineHeight = isShort ? 1.7 : isLong ? 1.55 : 1.62;
+  const dropCapSize = isShort ? 60 : isLong ? 48 : 54;
+
   return (
     <Page
       size="A4"
@@ -1071,9 +1084,10 @@ function NewspaperForewordPage({
         backgroundColor: newspaperBg,
         fontFamily: "Fraunces",
         color: t.ink,
+        flexDirection: "column",
       }}
     >
-      {/* Masthead */}
+      {/* ── Masthead ───────────────────────────────────────────── */}
       <View
         style={{
           paddingHorizontal: 36,
@@ -1124,11 +1138,12 @@ function NewspaperForewordPage({
         />
       </View>
 
-      {/* Section-Label */}
+      {/* ── Eyebrow + Big Display Headline (full-width Editorial-Style) ── */}
       <View
         style={{
           paddingHorizontal: 36,
-          paddingTop: 16,
+          paddingTop: 18,
+          paddingBottom: 16,
         }}
       >
         <Text
@@ -1139,150 +1154,140 @@ function NewspaperForewordPage({
             letterSpacing: 2.4,
             color: t.accent,
             textTransform: "uppercase",
+            marginBottom: 10,
           }}
         >
           Vorwort · Von {brand.name}
         </Text>
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontSize: 38,
+            fontWeight: 700,
+            fontStyle: "italic",
+            color: t.ink,
+            lineHeight: 1.02,
+            letterSpacing: -0.6,
+          }}
+        >
+          {greeting}
+        </Text>
       </View>
 
-      {/* 2-Col: Image left, Greeting + Lead right */}
-      <View
-        style={{
-          flexDirection: "row",
-          paddingHorizontal: 36,
-          marginTop: 12,
-          gap: 24,
-          flex: 1,
-        }}
-      >
-        {/* Hero-Image (Collage oder Stillleben) */}
-        {imageDataUri ? (
-          <View style={{ width: "50%" }}>
-            <View
-              style={{
-                width: "100%",
-                aspectRatio: 4 / 5,
-                overflow: "hidden",
-                backgroundColor: t.paper,
-              }}
-            >
-              <Image
-                src={imageDataUri}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            </View>
-            <Text
-              style={{
-                fontFamily: "Fraunces",
-                fontSize: 8,
-                fontStyle: "italic",
-                color: t.inkSoft,
-                marginTop: 4,
-                lineHeight: 1.35,
-              }}
-            >
-              Rezepte aus {brand.name}s Küche, exklusiv für dieses Pack.
-            </Text>
+      {/* ── Hero-Bild als Banner über die volle Breite ─────────── */}
+      {imageDataUri ? (
+        <View style={{ paddingHorizontal: 36 }}>
+          <View
+            style={{
+              width: "100%",
+              height: heroHeight,
+              overflow: "hidden",
+              backgroundColor: t.paper,
+            }}
+          >
+            <Image
+              src={imageDataUri}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
           </View>
-        ) : null}
-
-        {/* Right column — vertikal verteilt: Headline oben, Signoff unten */}
-        <View style={{ flex: 1, justifyContent: "space-between" }}>
-          {/* Oberer Block: Headline + Rule + Story */}
-          <View>
-            {/* Italic Headline (greeting als Kurz-Headline) */}
-            <Text
-              style={{
-                fontFamily: "Fraunces",
-                fontSize: 32,
-                fontWeight: 700,
-                fontStyle: "italic",
-                color: t.ink,
-                lineHeight: 1.05,
-                letterSpacing: -0.4,
-                marginBottom: 14,
-              }}
-            >
-              {greeting}
-            </Text>
-            {/* Byline-Rule */}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 16,
-              }}
-            >
-              <View
-                style={{ flex: 1, height: 0.5, backgroundColor: t.divider }}
-              />
-            </View>
-            {/* Story mit Drop-Cap */}
-            {story.length > 0 ? (
-              <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-                <Text
-                  style={{
-                    fontFamily: "Fraunces",
-                    fontSize: 54,
-                    fontWeight: 700,
-                    fontStyle: "italic",
-                    color: t.accent,
-                    lineHeight: 0.85,
-                    marginRight: 6,
-                    marginTop: -4,
-                    width: 38,
-                  }}
-                >
-                  {storyFirstChar}
-                </Text>
-                <Text
-                  style={{
-                    flex: 1,
-                    fontFamily: "Fraunces",
-                    fontSize: 12.5,
-                    color: t.ink,
-                    lineHeight: 1.65,
-                    textAlign: "justify",
-                  }}
-                >
-                  {storyRest}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-
-          {/* Signoff als Pull-Quote-Strip am unteren Rand der Spalte */}
-          {signoff ? (
-            <View style={{ marginTop: 18 }}>
-              <View
-                style={{ height: 0.5, backgroundColor: t.divider, marginBottom: 12 }}
-              />
-              <Text
-                style={{
-                  fontFamily: "Fraunces",
-                  fontSize: 14,
-                  fontStyle: "italic",
-                  fontWeight: 600,
-                  color: t.accent,
-                  lineHeight: 1.4,
-                  letterSpacing: -0.1,
-                }}
-              >
-                {signoff}
-              </Text>
-            </View>
-          ) : null}
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: 8.5,
+              fontStyle: "italic",
+              color: t.inkSoft,
+              marginTop: 5,
+              lineHeight: 1.35,
+            }}
+          >
+            Rezepte aus {brand.name}s Küche, exklusiv für dieses Pack.
+          </Text>
         </View>
-      </View>
+      ) : null}
 
-      {/* Footer-Strip mit Doppellinie + Avatar (Newspaper Author-Box) */}
+      {/* ── Body mit Drop-Cap (einspaltig, eingerückt für Eleganz) ── */}
+      {story.length > 0 ? (
+        <View
+          style={{
+            paddingLeft: 60,
+            paddingRight: 80,
+            marginTop: 20,
+            flexDirection: "row",
+            alignItems: "flex-start",
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: dropCapSize,
+              fontWeight: 700,
+              fontStyle: "italic",
+              color: t.accent,
+              lineHeight: 0.85,
+              marginRight: 8,
+              marginTop: -6,
+              width: dropCapSize * 0.7,
+            }}
+          >
+            {storyFirstChar}
+          </Text>
+          <Text
+            style={{
+              flex: 1,
+              fontFamily: "Fraunces",
+              fontSize: bodyFontSize,
+              color: t.ink,
+              lineHeight: bodyLineHeight,
+              textAlign: "justify",
+            }}
+          >
+            {storyRest}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* ── Flex-Spacer: schiebt Signoff/Footer ans Seitenende ── */}
+      <View style={{ flex: 1, minHeight: 20 }} />
+
+      {/* ── Signoff als Pull-Quote, zentriert mit Linien ────── */}
+      {signoff ? (
+        <View
+          style={{
+            paddingHorizontal: 80,
+            marginBottom: 24,
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: 40,
+              height: 0.6,
+              backgroundColor: t.accent,
+              marginBottom: 12,
+            }}
+          />
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: 15,
+              fontStyle: "italic",
+              fontWeight: 600,
+              color: t.accent,
+              lineHeight: 1.4,
+              letterSpacing: -0.1,
+              textAlign: "center",
+            }}
+          >
+            {signoff}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* ── Footer-Strip mit Doppellinie + Avatar (Author-Box) ── */}
       <View
         style={{
-          position: "absolute",
-          left: 36,
-          right: 36,
-          bottom: 30,
+          marginHorizontal: 36,
+          marginBottom: 30,
         }}
       >
         <View style={{ height: 1.5, backgroundColor: t.ink, marginBottom: 1 }} />

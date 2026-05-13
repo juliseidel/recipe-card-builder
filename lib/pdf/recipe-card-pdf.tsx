@@ -6688,22 +6688,22 @@ const NEWSPAPER_DENSITY: Record<
   }
 > = {
   compact: {
-    heroAspectRatio: 4 / 3,
-    headlineFontSize: 24,
+    heroAspectRatio: 16 / 9,
+    headlineFontSize: 22,
     eyebrowFontSize: 7.5,
     bylineFontSize: 8.5,
     leadFontSize: 8.5,
-    leadDropCapSize: 28,
+    leadDropCapSize: 26,
     ingredientFontSize: 9,
-    ingredientRowPadV: 2.5,
+    ingredientRowPadV: 2,
     stepFontSize: 9,
-    stepMarginBottom: 6,
+    stepMarginBottom: 4,
     sectionLabelFontSize: 8,
     macrosLabelFontSize: 6.5,
-    macrosValueFontSize: 14,
+    macrosValueFontSize: 13,
     microsFontSize: 7,
     topPadding: 14,
-    sectionGap: 16,
+    sectionGap: 10,
   },
   balanced: {
     heroAspectRatio: 4 / 3,
@@ -6715,13 +6715,13 @@ const NEWSPAPER_DENSITY: Record<
     ingredientFontSize: 9.5,
     ingredientRowPadV: 4,
     stepFontSize: 9.5,
-    stepMarginBottom: 9,
+    stepMarginBottom: 8,
     sectionLabelFontSize: 8.5,
     macrosLabelFontSize: 7,
-    macrosValueFontSize: 17.5,
+    macrosValueFontSize: 16,
     microsFontSize: 7.5,
     topPadding: 22,
-    sectionGap: 22,
+    sectionGap: 18,
   },
   spacious: {
     heroAspectRatio: 4 / 3,
@@ -6733,13 +6733,13 @@ const NEWSPAPER_DENSITY: Record<
     ingredientFontSize: 10,
     ingredientRowPadV: 5.5,
     stepFontSize: 10,
-    stepMarginBottom: 11,
+    stepMarginBottom: 10,
     sectionLabelFontSize: 9,
     macrosLabelFontSize: 7.5,
-    macrosValueFontSize: 20,
+    macrosValueFontSize: 19,
     microsFontSize: 8,
     topPadding: 26,
-    sectionGap: 28,
+    sectionGap: 24,
   },
 };
 
@@ -6794,7 +6794,12 @@ function NewspaperPage({
   return (
     <Page
       size="A4"
-      style={{ backgroundColor: newspaperBg, fontFamily: "Fraunces", color: theme.ink }}
+      style={{
+        backgroundColor: newspaperBg,
+        fontFamily: "Fraunces",
+        color: theme.ink,
+        flexDirection: "column",
+      }}
     >
       {/* ── Masthead ── */}
       <View
@@ -7019,7 +7024,7 @@ function NewspaperPage({
       <View
         style={{
           paddingHorizontal: PAGE_PADDING,
-          marginTop: D.sectionGap + 6,
+          marginTop: D.sectionGap,
         }}
       >
         <NewspaperSectionHeader
@@ -7071,7 +7076,7 @@ function NewspaperPage({
       <View
         style={{
           paddingHorizontal: PAGE_PADDING,
-          marginTop: D.sectionGap + 4,
+          marginTop: D.sectionGap,
         }}
       >
         <NewspaperSectionHeader
@@ -7118,15 +7123,17 @@ function NewspaperPage({
         </View>
       ) : null}
 
-      {/* ── Spreadsheet-Footer mit Mikros (EIGENE POSITION) ── */}
+      {/* ── Flex-Spacer: schiebt Spreadsheet+Footer ans untere Seitenende. ── */}
+      {/* Bei kurzem Content waechst der Spacer, bei langem Content wird er 0. */}
+      {/* Verhindert Overlap mit dem Hauptcontent (vorher: position absolute). */}
+      <View style={{ flex: 1, minHeight: 14 }} />
+
+      {/* ── Spreadsheet-Nährwerte (im Flow, vor Footer) ── */}
       <View
         style={{
-          position: "absolute",
-          left: PAGE_PADDING,
-          right: PAGE_PADDING,
-          bottom: 70,
+          paddingHorizontal: PAGE_PADDING,
+          paddingBottom: 10,
         }}
-        fixed
       >
         {/* Doppellinie ueber Spreadsheet (Newspaper-typisch) */}
         <View style={{ height: 1.5, backgroundColor: theme.ink, marginBottom: 1 }} />
@@ -7233,13 +7240,11 @@ function NewspaperPage({
         ) : null}
       </View>
 
-      {/* ── Footer mit QR-Code ── */}
+      {/* ── Footer mit QR-Code (im Flow am unteren Rand) ── */}
       <View
         style={{
-          position: "absolute",
-          left: PAGE_PADDING,
-          right: PAGE_PADDING,
-          bottom: 22,
+          marginHorizontal: PAGE_PADDING,
+          marginBottom: 22,
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
@@ -7248,7 +7253,6 @@ function NewspaperPage({
           borderTopColor: theme.divider,
           gap: 12,
         }}
-        fixed
       >
         <Text
           style={{
@@ -7513,7 +7517,7 @@ function NewspaperStepColumn({
             flexDirection: "row",
             alignItems: "flex-start",
             gap: 8,
-            marginBottom: density.stepMarginBottom + 2,
+            marginBottom: density.stepMarginBottom,
           }}
         >
           {/* Step-Nummer — gleiche font/fontSize/lineHeight wie Body (§1) */}
