@@ -11,7 +11,7 @@ import {
   type NewSuggestion,
 } from "@/lib/creator-reels-server";
 import { loadBrand } from "@/lib/custom-brands-server";
-import { classifyReels } from "@/lib/ai/classify-reels";
+import { classifyReels, CLASSIFICATION_FAILED } from "@/lib/ai/classify-reels";
 import { suggestPacks } from "@/lib/ai/suggest-packs";
 import { generateSuggestionCovers } from "./generate-suggestion-covers";
 
@@ -44,22 +44,44 @@ export async function runClassificationAndSuggestions(opts: {
   // Call holt max 50 Stueck, eine 500er Library braucht also ~10 Loops.
   // Pro Loop ~10s (5 Batches a 10 Reels * 2s), total ~100s.
   let classifiedTotal = 0;
+  let consecutiveFailures = 0;
   while (true) {
     const batch = await getUnclassifiedReels(brandSlug, 50);
     if (batch.length === 0) break;
     const results = await classifyReels(batch);
-    // Persist parallel (alle 50 Updates gehen gleichzeitig raus).
+    // Per-Reel-Persist parallel. CLASSIFICATION_FAILED → SKIP, classified_at
+    // bleibt NULL, naechster Resume probiert es nochmal. Verhindert
+    // Datenzerstoerung bei Gemini-Failure (Bug-2026-05-13).
+    let batchFailures = 0;
     await Promise.all(
       batch.map((reel) => {
         const c = results.get(reel.id);
-        if (!c) return Promise.resolve();
+        if (!c || c === CLASSIFICATION_FAILED) {
+          batchFailures += 1;
+          return Promise.resolve();
+        }
         return updateReelClassification(reel.id, c);
       })
     );
-    classifiedTotal += batch.length;
+    const batchSuccesses = batch.length - batchFailures;
+    classifiedTotal += batchSuccesses;
     console.log(
-      `[classify-and-suggest] brand=${brandSlug} classified=${classifiedTotal}`
+      `[classify-and-suggest] brand=${brandSlug} classified=${classifiedTotal} (this batch: ${batchSuccesses}/${batch.length} ok, ${batchFailures} failed)`
     );
+    // Schutz vor Endlos-Loop: wenn nichts erfolgreich war, ist Gemini
+    // wahrscheinlich permanent gefailt (Schema-Bug, Quota, ...). Wir
+    // brechen ab statt die selben 50 Reels endlos zu retryen.
+    if (batchSuccesses === 0) {
+      consecutiveFailures += 1;
+      if (consecutiveFailures >= 2) {
+        console.error(
+          `[classify-and-suggest] brand=${brandSlug} aborting after 2 batches with 0 successes — Gemini likely broken`
+        );
+        break;
+      }
+    } else {
+      consecutiveFailures = 0;
+    }
   }
 
   const totalReels = await countReelsForBrand(brandSlug);

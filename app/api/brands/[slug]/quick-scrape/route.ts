@@ -121,15 +121,21 @@ export async function POST(req: Request, { params }: RouteParams) {
     // Quick-Scrape und passt in unsere maxDuration=90s).
     const unclassified = await getUnclassifiedReels(slug, 60);
     if (unclassified.length > 0) {
+      const { CLASSIFICATION_FAILED } = await import("@/lib/ai/classify-reels");
       const results = await classifyReels(unclassified);
+      let successCount = 0;
       await Promise.all(
         unclassified.map((reel) => {
           const c = results.get(reel.id);
-          if (!c) return Promise.resolve();
-          return updateReelClassification(reel.id, c);
+          if (c === undefined || c === CLASSIFICATION_FAILED) {
+            return Promise.resolve();
+          }
+          // c is narrowed to ReelClassification here
+          successCount += 1;
+          return updateReelClassification(reel.id, c as Exclude<typeof c, typeof CLASSIFICATION_FAILED>);
         })
       );
-      classified = unclassified.length;
+      classified = successCount;
     }
   } catch (err) {
     // Klassifikation nicht-kritisch: Reels sind in der DB, koennen

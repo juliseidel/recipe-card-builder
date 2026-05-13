@@ -89,54 +89,23 @@ const RESPONSE_SCHEMA = {
           },
           occasion: {
             type: "string",
-            enum: [
-              "mealprep",
-              "quick-weeknight",
-              "cozy",
-              "gameday",
-              "brunch",
-              "family-dinner",
-              "date-night",
-              "summer-bbq",
-              "festive",
-              "sunday-baking",
-              "post-workout",
-              "lazy-morning",
-              "",
-            ],
             description:
-              "Wann wuerde man dieses Rezept machen? Nur EIN Hauptanlass. Leerer String wenn unklar oder kein Rezept.",
+              'Wann wuerde man dieses Rezept machen? Nur EIN Hauptanlass aus: "mealprep", "quick-weeknight", "cozy", "gameday", "brunch", "family-dinner", "date-night", "summer-bbq", "festive", "sunday-baking", "post-workout", "lazy-morning". Leerer String wenn unklar oder kein Rezept.',
           },
           season: {
             type: "string",
-            enum: ["spring", "summer", "autumn", "winter", "year-round", ""],
             description:
-              'Saison-Kontext. "year-round" = passt jederzeit. Leerer String wenn kein Rezept.',
+              'Saison-Kontext, einer aus: "spring", "summer", "autumn", "winter", "year-round". "year-round" = passt jederzeit. Leerer String wenn kein Rezept.',
           },
           skillLevel: {
             type: "string",
-            enum: ["beginner", "intermediate", "advanced", ""],
             description:
-              "Schwierigkeit: beginner = wenige Zutaten + simple Schritte, intermediate = mehrere Komponenten, advanced = Backen/Teig/Technik. Leer wenn unklar.",
+              'Schwierigkeit, einer aus: "beginner", "intermediate", "advanced". beginner = wenige Zutaten + simple Schritte, intermediate = mehrere Komponenten, advanced = Backen/Teig/Technik. Leer wenn unklar.',
           },
           vessel: {
             type: "string",
-            enum: [
-              "bowl",
-              "pan",
-              "sheet",
-              "airfryer",
-              "mug",
-              "mixer",
-              "oven",
-              "pot",
-              "no-cook",
-              "grill",
-              "blender",
-              "",
-            ],
             description:
-              "Hauptgefaess/Methode. bowl = Bowl/Schuessel-Gericht, sheet = Backblech, no-cook = ohne Kochen. Leer wenn unklar.",
+              'Hauptgefaess/Methode, einer aus: "bowl", "pan", "sheet", "airfryer", "mug", "mixer", "oven", "pot", "no-cook", "grill", "blender". bowl = Bowl/Schuessel-Gericht, sheet = Backblech, no-cook = ohne Hitze. Leer wenn unklar.',
           },
         },
         required: [
@@ -149,10 +118,8 @@ const RESPONSE_SCHEMA = {
           "mainIngredient",
           "dietary",
           "estimatedTimeMinutes",
-          "occasion",
-          "season",
-          "skillLevel",
-          "vessel",
+          // occasion/season/skillLevel/vessel sind optional — Gemini darf
+          // sie weglassen wenn unklar. defaultMiss() bei Komplett-Fail.
         ],
       },
     },
@@ -286,7 +253,7 @@ async function classifyBatch(
     schema: RESPONSE_SCHEMA,
     systemInstruction: SYSTEM_INSTRUCTION,
     temperature: 0.2,
-    maxOutputTokens: 8192,
+    maxOutputTokens: 16384,
     thinkingBudget: 0,
     retries: 1,
     model: "flash",
@@ -319,27 +286,14 @@ async function classifyBatch(
   return map;
 }
 
-// Defensive Fallback-Klassifikation: bei Gemini-Fail markieren wir die
-// Reels nicht als is_recipe=null (dann wuerden sie immer wieder re-tried),
-// sondern als is_recipe=false mit recipeConfidence=0. Sie tauchen nicht in
-// Pack-Vorschlaegen auf, das ist OK fuer den Onboarding-Run. Manueller
-// Re-Classify-Trigger kann sie spaeter neu prozessieren.
-function defaultMiss(): ReelClassification {
-  return {
-    isRecipe: false,
-    recipeConfidence: 0,
-    recipeTitle: null,
-    mealType: null,
-    cuisine: null,
-    mainIngredient: null,
-    dietary: [],
-    estimatedTimeMinutes: null,
-    occasion: null,
-    season: null,
-    skillLevel: null,
-    vessel: null,
-  };
-}
+// Sentinel-Wert: signalisiert dem Caller dass ein Reel bei der Klassifikation
+// gefailt ist UND nicht in die DB geschrieben werden soll (classified_at
+// bleibt NULL, naechster Resume-Lauf probiert es erneut). Frueher haben wir
+// hier defaultMiss() mit is_recipe=false zurueckgegeben — bei Schema-Bug
+// 2026-05-13 wurden so 1004 Reels als "kein Rezept" markiert obwohl es
+// nur ein Gemini-Schema-Fehler war. Dieser Sentinel verhindert das.
+export const CLASSIFICATION_FAILED = Symbol("classification-failed");
+export type ClassificationResult = ReelClassification | typeof CLASSIFICATION_FAILED;
 
 // Top-Level: nimmt eine Liste Reels und klassifiziert sie in Batches.
 // Returnt Map: reel.id → ReelClassification. Caller persistiert die in
@@ -353,8 +307,8 @@ const PARALLEL_BATCHES = 5;
 
 export async function classifyReels(
   reels: ReelRow[]
-): Promise<Map<string, ReelClassification>> {
-  const out = new Map<string, ReelClassification>();
+): Promise<Map<string, ClassificationResult>> {
+  const out = new Map<string, ClassificationResult>();
 
   // Alle Batches vorab erstellen
   const batches: ReelRow[][] = [];
@@ -363,8 +317,9 @@ export async function classifyReels(
   }
 
   // Batches in Gruppen von PARALLEL_BATCHES parallel verarbeiten.
-  // Wenn ein einzelner Batch failed, betrifft das nur die 10 Reels darin
-  // (defaultMiss), die anderen 40 in der Gruppe gehen durch.
+  // Wenn ein einzelner Batch failed, markieren wir die 10 Reels als
+  // CLASSIFICATION_FAILED — der Caller schreibt sie NICHT in die DB, sie
+  // bleiben classified_at=NULL und werden beim naechsten Resume retried.
   for (let g = 0; g < batches.length; g += PARALLEL_BATCHES) {
     const groupBatches = batches.slice(g, g + PARALLEL_BATCHES);
     const groupResults = await Promise.all(
@@ -386,9 +341,13 @@ export async function classifyReels(
     for (const { batch, batchOut } of groupResults) {
       for (const r of batch) {
         if (batchOut) {
-          out.set(r.id, batchOut.get(r.id) ?? defaultMiss());
+          // Per-Reel-Lookup: wenn Gemini den Reel im response vergessen
+          // hat, markieren wir ihn als failed (retry next round).
+          const c = batchOut.get(r.id);
+          out.set(r.id, c ?? CLASSIFICATION_FAILED);
         } else {
-          out.set(r.id, defaultMiss());
+          // Ganzer Batch gefailt → alle 10 Reels failed.
+          out.set(r.id, CLASSIFICATION_FAILED);
         }
       }
     }
