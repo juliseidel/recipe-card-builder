@@ -2574,6 +2574,51 @@ function LayoutThumbnail({
         </>
       );
       break;
+    case "constellation":
+      // Dark-Sky: dunkler Background, Hero rund mit Halo, Planet-Column rechts,
+      // Trajectory unten mit Station-Markern
+      body = (
+        <>
+          {/* Dark-Sky Background override */}
+          <rect x="0" y="0" width="70" height="52" rx="4" fill="#0a0e1f" />
+          {/* Background-Sterne (deterministisch verteilt) */}
+          <circle cx="8" cy="6" r="0.5" fill="#fafaf5" opacity="0.7" />
+          <circle cx="18" cy="3" r="0.4" fill="#fafaf5" opacity="0.5" />
+          <circle cx="28" cy="8" r="0.4" fill="#fafaf5" opacity="0.6" />
+          <circle cx="44" cy="4" r="0.5" fill="#fafaf5" opacity="0.65" />
+          <circle cx="56" cy="10" r="0.4" fill="#fafaf5" opacity="0.55" />
+          <circle cx="62" cy="6" r="0.6" fill="#fafaf5" opacity="0.7" />
+          <circle cx="12" cy="40" r="0.4" fill="#fafaf5" opacity="0.5" />
+          <circle cx="58" cy="38" r="0.4" fill="#fafaf5" opacity="0.55" />
+          {/* Hero rund mit Glow-Halo (links) */}
+          <circle cx="14" cy="22" r="11" fill={accent} opacity="0.18" />
+          <circle cx="14" cy="22" r="8.5" fill={accent} opacity="0.0" stroke={accent} strokeWidth="0.5" />
+          <circle cx="14" cy="22" r="7" fill={accent} />
+          {/* Title-Block (Mitte) */}
+          <rect x="28" y="12" width="22" height="2.5" rx="0.5" fill={accent} />
+          <rect x="28" y="17" width="18" height="1.2" rx="0.3" fill="#e8e6dc" opacity="0.7" />
+          <rect x="28" y="20" width="20" height="1" rx="0.3" fill="#9b9bb0" opacity="0.6" />
+          {/* Audio-Spec Hint */}
+          <rect x="28" y="25" width="14" height="1.2" rx="0.3" fill="#e8e6dc" opacity="0.6" />
+          {/* Planet-Column rechts (3 Planeten mit Verbindungen) */}
+          <line x1="58" y1="10" x2="58" y2="32" stroke={accent} strokeWidth="0.3" opacity="0.4" />
+          <circle cx="58" cy="13" r="1.8" fill={accent} />
+          <circle cx="58" cy="22" r="1.8" fill={accent} />
+          <circle cx="58" cy="31" r="1.8" fill={accent} />
+          {/* Trajectory-Linie unten */}
+          <line x1="6" y1="42" x2="64" y2="42" stroke={accent} strokeWidth="0.4" opacity="0.55" />
+          <circle cx="10" cy="42" r="1.4" fill={accent} />
+          <circle cx="28" cy="42" r="1.4" fill={accent} />
+          <circle cx="46" cy="42" r="1.4" fill={accent} />
+          <circle cx="62" cy="42" r="1.4" fill={accent} />
+          {/* Step-Texte (Hints) */}
+          <rect x="6" y="46" width="10" height="0.8" rx="0.2" fill="#e8e6dc" opacity="0.5" />
+          <rect x="24" y="46" width="10" height="0.8" rx="0.2" fill="#e8e6dc" opacity="0.5" />
+          <rect x="42" y="46" width="10" height="0.8" rx="0.2" fill="#e8e6dc" opacity="0.5" />
+          <rect x="58" y="46" width="8" height="0.8" rx="0.2" fill="#e8e6dc" opacity="0.5" />
+        </>
+      );
+      break;
   }
   return (
     <svg

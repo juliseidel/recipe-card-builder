@@ -74,6 +74,7 @@ const LAYOUTS: Record<CardLayout, (p: RecipeCardPdfProps) => React.JSX.Element> 
   amber: AmberPage,
   vinyl: VinylPage,
   newspaper: NewspaperPage,
+  constellation: ConstellationPage,
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -7561,4 +7562,1289 @@ function newspaperGroupLabel(name: string): string {
   return /^(den|die|das)\s/i.test(name)
     ? `Für ${name.toLowerCase()}`
     : name;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// LAYOUT 10 (Phase C): CONSTELLATION — Sternkarten-Look
+// ═════════════════════════════════════════════════════════════════════════════
+// Komplett andere Design-Sprache als alle anderen 9 Layouts. Konzept:
+//
+//   ┌────────────────────────────────────────────────────────────────────┐
+//   │ ✦ · · ✦ Background-Sterne ·                                      ✦│
+//   │ ✦ CONSTELLATION ─── PASTA AL LIMONE ─── 03 / 07                    │
+//   │ ────────────────────────────────────────────────────────────────── │
+//   │                                                                     │
+//   │  ┌────────┐    Eyebrow             ──────────────                  │
+//   │  │ ◯ Hero │    PASTA AL LIMONE     ⊙ Vitamin C  44%               │
+//   │  │ (rund, │    (italic Fraunces)   │                               │
+//   │  │ Glow)  │    Subtitle italic     ⊙ Calcium    28%               │
+//   │  └────────┘                        │                               │
+//   │                                    ⊙ Eisen      23%                │
+//   │              ★ 300 KCAL · ⏱ 25 MIN · ✦ HIGH-PROTEIN                │
+//   │                                                                     │
+//   │  ✦ ZUTATEN ─────────────────────────────────────── 7 STERNE        │
+//   │                                                                     │
+//   │  ✦ 500g  Magerquark        ✦ 200ml  Creme Fine                     │
+//   │  ✦ 150g  Skyr              ✦ 150g   Frischkäse                     │
+//   │                                                                     │
+//   │  ◐ TRAJECTORY ──────────────────────────────────── 4 STATIONEN     │
+//   │                                                                     │
+//   │  ●─────●─────●─────●                                                │
+//   │  01    02    03    04                                               │
+//   │                                                                     │
+//   │  Magerq.   Mandari   Schicht   Pudding                              │
+//   │  verrüh-   unter     der Löf-  gleichm.                             │
+//   │  ren.      die Cre-  felbisk.  verteil.                             │
+//   │                                                                     │
+//   │  @handle · pack                                          [QR]       │
+//   └────────────────────────────────────────────────────────────────────┘
+//
+// Mikros in EIGENER Position vs allen anderen Layouts:
+//   - vinyl: Audio-Spec-Strip oben
+//   - editorial: Banner ueber dem Hero
+//   - patisserie: Vertikale Liste in Sidebar
+//   - vital: Pearl-Strip mittig
+//   - amber: Vertikale Bars rechts
+//   - minimal: Capsule-Pills horizontal
+//   - dashboard: Data-Rows mit Icons
+//   - sport: Macro-Bars mit Emojis
+//   - newspaper: Spreadsheet-Footer-Row mit Doppellinien
+//   - constellation: Planeten-Symbole als vertikale Liste rechts neben dem Hero
+//                     (kleine Akzent-Kreise mit %-Text, Connection-Line dazwischen)
+//
+// Background ist hardcoded `#0a0e1f` (dunkles Marineblau) statt theme.bg —
+// das Layout ist per Definition "Dark-Sky". theme.accent (mood-color) bleibt
+// als Stern-Akzent gegen den dunklen Hintergrund.
+//
+// Anti-Patterns aus LAYOUT_RULES.md alle adressiert.
+
+// Constellation-spezifische Farbpalette (override theme.bg, theme.ink etc.)
+const CONSTELLATION_COLORS = {
+  bg: "#0a0e1f",
+  inkPrimary: "#e8e6dc",
+  inkSoft: "#9b9bb0",
+  inkSubtle: "#5e6480",
+  divider: "#2a2e44",
+  star: "#fafaf5",
+} as const;
+
+const CONSTELLATION_DENSITY: Record<
+  Density,
+  {
+    /** Durchmesser des runden Hero-Disks. */
+    heroSize: number;
+    /** Glow-Halo extra-radius (= heroSize/2 + halo). */
+    halo: number;
+    titleFontSize: number;
+    eyebrowFontSize: number;
+    subtitleFontSize: number;
+    specFontSize: number;
+    ingredientFontSize: number;
+    ingredientRowPadV: number;
+    ingredientNoteFontSize: number;
+    stepFontSize: number;
+    stepMarginBottom: number;
+    sectionLabelFontSize: number;
+    planetSize: number;
+    planetGap: number;
+    topPadding: number;
+    sectionGap: number;
+  }
+> = {
+  compact: {
+    heroSize: 130,
+    halo: 12,
+    titleFontSize: 22,
+    eyebrowFontSize: 7.5,
+    subtitleFontSize: 9,
+    specFontSize: 8.5,
+    ingredientFontSize: 9,
+    ingredientRowPadV: 2.5,
+    ingredientNoteFontSize: 6.5,
+    stepFontSize: 8.5,
+    stepMarginBottom: 4,
+    sectionLabelFontSize: 7.5,
+    planetSize: 16,
+    planetGap: 10,
+    topPadding: 14,
+    sectionGap: 10,
+  },
+  balanced: {
+    heroSize: 160,
+    halo: 16,
+    titleFontSize: 28,
+    eyebrowFontSize: 8,
+    subtitleFontSize: 10,
+    specFontSize: 9.5,
+    ingredientFontSize: 9.5,
+    ingredientRowPadV: 4,
+    ingredientNoteFontSize: 7,
+    stepFontSize: 9,
+    stepMarginBottom: 6,
+    sectionLabelFontSize: 8,
+    planetSize: 18,
+    planetGap: 14,
+    topPadding: 20,
+    sectionGap: 14,
+  },
+  spacious: {
+    heroSize: 180,
+    halo: 20,
+    titleFontSize: 32,
+    eyebrowFontSize: 8.5,
+    subtitleFontSize: 11,
+    specFontSize: 10,
+    ingredientFontSize: 10,
+    ingredientRowPadV: 5.5,
+    ingredientNoteFontSize: 7.5,
+    stepFontSize: 9.5,
+    stepMarginBottom: 8,
+    sectionLabelFontSize: 8.5,
+    planetSize: 20,
+    planetGap: 18,
+    topPadding: 26,
+    sectionGap: 18,
+  },
+};
+
+function constellationKey(recipe: Recipe): string {
+  const tags = (recipe.tags ?? []).map((t) => t.toLowerCase());
+  if (tags.some((t) => t.includes("vegan"))) return "VEGAN";
+  if (tags.some((t) => t.includes("high-protein") || t.includes("protein")))
+    return "HIGH-PROTEIN";
+  if (tags.some((t) => t.includes("low-carb"))) return "LOW-CARB";
+  if (tags.some((t) => t.includes("vegetarisch"))) return "VEGETARISCH";
+  if (tags.some((t) => t.includes("dessert") || t.includes("kuchen")))
+    return "SÜSS";
+  if (tags.some((t) => t.includes("snack"))) return "SNACK";
+  if (tags.some((t) => t.includes("mealprep"))) return "MEALPREP";
+  return "STELLAR";
+}
+
+function ConstellationPage({
+  brand,
+  pack,
+  recipe,
+  totalRecipes,
+  heroDataUri,
+  qrDataUri,
+  hideRecipeIndex,
+}: RecipeCardPdfProps) {
+  const theme = packTheme(pack);
+  const density = getDensity(recipe);
+  const D = CONSTELLATION_DENSITY[density];
+  const showStory = shouldShowStory(recipe);
+  const recipePosition = recipe.number;
+  const titleSafe = softWrapTitle(recipe.title);
+
+  // Steps mit fortlaufender Nummer als Stationen entlang der Trajectory
+  const stepGroups = groupSteps(recipe.steps);
+  const flatSteps: { num: number; text: string }[] = [];
+  let runningStep = 0;
+  for (const g of stepGroups) {
+    for (const item of g.items) {
+      runningStep += 1;
+      flatSteps.push({ num: runningStep, text: item.text });
+    }
+  }
+
+  const ingredientGroups = groupIngredients(recipe.ingredients);
+  const flatIngredients = ingredientGroups.flatMap((g) => g.items);
+
+  // Top-3 Mikros als Planeten
+  const topMicros = (recipe.nutrition.micros ?? [])
+    .slice()
+    .sort(
+      (a: Micronutrient, b: Micronutrient) =>
+        (b.pctDaily ?? 0) - (a.pctDaily ?? 0)
+    )
+    .slice(0, 3);
+
+  const time = totalTime(recipe);
+  const constKey = constellationKey(recipe);
+
+  // Background-Sterne (deterministische Positionen damit reproducible)
+  const bgStars = buildConstellationStars(recipe.slug + recipe.title);
+
+  return (
+    <Page
+      size="A4"
+      style={{
+        backgroundColor: CONSTELLATION_COLORS.bg,
+        fontFamily: "Inter",
+        color: CONSTELLATION_COLORS.inkPrimary,
+      }}
+    >
+      {/* ── Background-Sterne (subtile Atmosphäre) ── */}
+      <Svg
+        width={595}
+        height={842}
+        style={{ position: "absolute", top: 0, left: 0 }}
+      >
+        {bgStars.map((s, i) => (
+          <Circle
+            key={`bg-${i}`}
+            cx={s.x}
+            cy={s.y}
+            r={s.r}
+            fill={CONSTELLATION_COLORS.star}
+            opacity={s.opacity}
+          />
+        ))}
+      </Svg>
+
+      {/* ── Masthead ── */}
+      <View
+        style={{
+          paddingHorizontal: PAGE_PADDING,
+          paddingTop: D.topPadding,
+          paddingBottom: 4,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            paddingBottom: 6,
+            borderBottomWidth: 0.5,
+            borderBottomColor: CONSTELLATION_COLORS.divider,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 8,
+              fontWeight: 700,
+              letterSpacing: 2.4,
+              color: theme.accent,
+              textTransform: "uppercase",
+            }}
+          >
+            ✦ Constellation
+          </Text>
+          <View
+            style={{
+              flex: 1,
+              height: 0.5,
+              backgroundColor: CONSTELLATION_COLORS.divider,
+            }}
+          />
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 7.5,
+              fontWeight: 600,
+              letterSpacing: 1.6,
+              color: CONSTELLATION_COLORS.inkSoft,
+              textTransform: "uppercase",
+            }}
+          >
+            {pack.title}
+          </Text>
+          {!hideRecipeIndex ? (
+            <>
+              <Text
+                style={{
+                  fontFamily: "Inter",
+                  fontSize: 7,
+                  color: CONSTELLATION_COLORS.inkSubtle,
+                }}
+              >
+                ·
+              </Text>
+              <Text
+                style={{
+                  fontFamily: "Inter",
+                  fontSize: 7.5,
+                  fontWeight: 600,
+                  letterSpacing: 1.6,
+                  color: CONSTELLATION_COLORS.inkSoft,
+                }}
+              >
+                {pad2(recipePosition)} / {pad2(totalRecipes)}
+              </Text>
+            </>
+          ) : null}
+        </View>
+      </View>
+
+      {/* ── Hero-Section: 3 Spalten (Hero | Title | Planeten) ── */}
+      <View
+        style={{
+          flexDirection: "row",
+          paddingHorizontal: PAGE_PADDING,
+          paddingTop: density === "compact" ? 12 : 18,
+          gap: 18,
+          alignItems: "flex-start",
+        }}
+      >
+        {/* Hero — rund mit Glow-Halo */}
+        <View
+          style={{
+            width: D.heroSize + D.halo * 2,
+            height: D.heroSize + D.halo * 2,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {/* Glow-Halo: konzentrische Kreise mit niedriger Opacity */}
+          <Svg
+            width={D.heroSize + D.halo * 2}
+            height={D.heroSize + D.halo * 2}
+            style={{ position: "absolute", top: 0, left: 0 }}
+          >
+            <Circle
+              cx={(D.heroSize + D.halo * 2) / 2}
+              cy={(D.heroSize + D.halo * 2) / 2}
+              r={D.heroSize / 2 + D.halo}
+              fill={theme.accent}
+              opacity={0.08}
+            />
+            <Circle
+              cx={(D.heroSize + D.halo * 2) / 2}
+              cy={(D.heroSize + D.halo * 2) / 2}
+              r={D.heroSize / 2 + D.halo * 0.55}
+              fill={theme.accent}
+              opacity={0.16}
+            />
+            <Circle
+              cx={(D.heroSize + D.halo * 2) / 2}
+              cy={(D.heroSize + D.halo * 2) / 2}
+              r={D.heroSize / 2 + 2}
+              fill="none"
+              stroke={theme.accent}
+              strokeWidth={0.75}
+              opacity={0.55}
+            />
+          </Svg>
+          {/* Hero-Bild rund clipped */}
+          <View
+            style={{
+              width: D.heroSize,
+              height: D.heroSize,
+              borderRadius: D.heroSize / 2,
+              overflow: "hidden",
+              backgroundColor: "#1a1d33",
+            }}
+          >
+            {heroDataUri ? (
+              <Image
+                src={heroDataUri}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  backgroundColor: theme.accent,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontSize: D.heroSize * 0.42,
+                    fontWeight: 700,
+                    fontStyle: "italic",
+                    color: CONSTELLATION_COLORS.star,
+                  }}
+                >
+                  {brand.name.charAt(0)}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Title-Block (Mitte) */}
+        <View style={{ flex: 1, paddingTop: 4 }}>
+          {/* Eyebrow */}
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: D.eyebrowFontSize,
+              fontWeight: 700,
+              letterSpacing: 2.2,
+              color: theme.accent,
+              textTransform: "uppercase",
+              marginBottom: 6,
+            }}
+          >
+            {pack.category}
+          </Text>
+          {/* Italic Headline */}
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: D.titleFontSize,
+              fontWeight: 700,
+              fontStyle: "italic",
+              color: CONSTELLATION_COLORS.inkPrimary,
+              lineHeight: 1.05,
+              letterSpacing: -0.4,
+              marginBottom: 8,
+            }}
+          >
+            {titleSafe}
+          </Text>
+          {recipe.subtitle ? (
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: D.subtitleFontSize,
+                fontStyle: "italic",
+                color: CONSTELLATION_COLORS.inkSoft,
+                lineHeight: 1.35,
+                marginBottom: 10,
+              }}
+            >
+              {recipe.subtitle}
+            </Text>
+          ) : null}
+          {/* Spec-Strip: KCAL · MIN · KEY mit Sternen-Glyphs */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "baseline",
+              gap: 8,
+              flexWrap: "wrap",
+              marginTop: 2,
+            }}
+          >
+            <ConstellationSpecCell
+              icon="★"
+              value={`${Math.round(recipe.nutrition.kcal)}`}
+              label="kcal"
+              density={D}
+              accent={theme.accent}
+            />
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: D.specFontSize,
+                color: CONSTELLATION_COLORS.divider,
+              }}
+            >
+              ·
+            </Text>
+            <ConstellationSpecCell
+              icon="✦"
+              value={`${time}`}
+              label="min"
+              density={D}
+              accent={theme.accent}
+            />
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: D.specFontSize,
+                color: CONSTELLATION_COLORS.divider,
+              }}
+            >
+              ·
+            </Text>
+            <ConstellationSpecCell
+              icon="✶"
+              value={constKey}
+              label=""
+              density={D}
+              accent={theme.accent}
+            />
+          </View>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 6.5,
+              letterSpacing: 1.4,
+              color: CONSTELLATION_COLORS.inkSubtle,
+              textTransform: "uppercase",
+              marginTop: 6,
+            }}
+          >
+            {nutritionBasisInline(recipe.nutritionBasis)}
+          </Text>
+        </View>
+
+        {/* Planet-Column (Mikros) — eigene Position */}
+        {topMicros.length > 0 ? (
+          <View
+            style={{
+              width: 96,
+              paddingTop: 4,
+              borderLeftWidth: 0.5,
+              borderLeftColor: CONSTELLATION_COLORS.divider,
+              paddingLeft: 10,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 6.5,
+                fontWeight: 700,
+                letterSpacing: 2,
+                color: CONSTELLATION_COLORS.inkSubtle,
+                textTransform: "uppercase",
+                marginBottom: 10,
+              }}
+            >
+              Planeten
+            </Text>
+            {topMicros.map((m: Micronutrient, i: number) => (
+              <ConstellationPlanetRow
+                key={`p-${i}`}
+                name={m.name}
+                pct={m.pctDaily}
+                accent={theme.accent}
+                density={D}
+                isLast={i === topMicros.length - 1}
+              />
+            ))}
+          </View>
+        ) : null}
+      </View>
+
+      {/* ── Zutaten-Section ── */}
+      <View
+        style={{
+          paddingHorizontal: PAGE_PADDING,
+          marginTop: D.sectionGap + 6,
+        }}
+      >
+        <ConstellationSectionHeader
+          label="Zutaten"
+          right={`${recipe.ingredients.length} ${recipe.ingredients.length === 1 ? "Stern" : "Sterne"}`}
+          accent={theme.accent}
+          density={D}
+        />
+        {ingredientGroups.length > 1 ? (
+          <View>
+            {ingredientGroups.map((group, gIdx) => (
+              <View key={`g-${gIdx}`} style={{ marginTop: gIdx > 0 ? 8 : 4 }}>
+                {group.name ? (
+                  <Text
+                    style={{
+                      fontFamily: "Inter",
+                      fontSize: 7.5,
+                      fontWeight: 600,
+                      letterSpacing: 1.4,
+                      color: CONSTELLATION_COLORS.inkSoft,
+                      textTransform: "uppercase",
+                      marginBottom: 4,
+                    }}
+                  >
+                    {constellationGroupLabel(group.name)}
+                  </Text>
+                ) : null}
+                <ConstellationIngredientGrid
+                  items={group.items}
+                  accent={theme.accent}
+                  density={D}
+                />
+              </View>
+            ))}
+          </View>
+        ) : (
+          <ConstellationIngredientGrid
+            items={flatIngredients}
+            accent={theme.accent}
+            density={D}
+          />
+        )}
+      </View>
+
+      {/* ── Trajectory (Steps) ── */}
+      <View
+        style={{
+          paddingHorizontal: PAGE_PADDING,
+          marginTop: D.sectionGap + 2,
+        }}
+      >
+        <ConstellationSectionHeader
+          label="◐ Trajectory"
+          right={`${flatSteps.length} ${flatSteps.length === 1 ? "Station" : "Stationen"}`}
+          accent={theme.accent}
+          density={D}
+        />
+        <ConstellationTrajectory
+          steps={flatSteps}
+          accent={theme.accent}
+          density={D}
+        />
+      </View>
+
+      {/* ── Sparse-Story-Block ── */}
+      {showStory ? (
+        <View
+          style={{
+            paddingHorizontal: PAGE_PADDING,
+            marginTop: D.sectionGap - 2,
+          }}
+        >
+          <View
+            style={{
+              borderLeftWidth: 2,
+              borderLeftColor: theme.accent,
+              paddingLeft: 10,
+              paddingVertical: 4,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: 9.5,
+                fontStyle: "italic",
+                color: CONSTELLATION_COLORS.inkPrimary,
+                lineHeight: 1.45,
+                opacity: 0.88,
+              }}
+            >
+              {recipe.description}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
+      {/* ── Footer mit QR-Code ── */}
+      <View
+        style={{
+          position: "absolute",
+          left: PAGE_PADDING,
+          right: PAGE_PADDING,
+          bottom: 22,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingTop: 8,
+          borderTopWidth: 0.5,
+          borderTopColor: CONSTELLATION_COLORS.divider,
+          gap: 12,
+        }}
+        fixed
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Svg width={12} height={12} viewBox="0 0 12 12">
+            <Path
+              d="M 6 0.5 L 7 4.5 L 11 5.5 L 7.5 7 L 8 11 L 6 8.5 L 4 11 L 4.5 7 L 1 5.5 L 5 4.5 Z"
+              fill={theme.accent}
+            />
+          </Svg>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 8,
+              fontWeight: 600,
+              letterSpacing: 1.4,
+              color: CONSTELLATION_COLORS.inkSoft,
+              textTransform: "uppercase",
+            }}
+          >
+            {brand.handle} · {pack.title}
+          </Text>
+        </View>
+        {qrDataUri ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 7,
+                letterSpacing: 1.2,
+                color: CONSTELLATION_COLORS.inkSubtle,
+                textTransform: "uppercase",
+                textAlign: "right",
+              }}
+            >
+              Scan{"\n"}für{"\n"}Original
+            </Text>
+            <View
+              style={{
+                padding: 3,
+                backgroundColor: CONSTELLATION_COLORS.star,
+                borderRadius: 2,
+              }}
+            >
+              <Image src={qrDataUri} style={{ width: 30, height: 30 }} />
+            </View>
+          </View>
+        ) : (
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 7.5,
+              letterSpacing: 1.4,
+              color: CONSTELLATION_COLORS.inkSubtle,
+              textTransform: "uppercase",
+            }}
+          >
+            {recipe.sourceLabel ?? "Original auf Instagram"}
+          </Text>
+        )}
+      </View>
+    </Page>
+  );
+}
+
+// ─── Constellation Sub-Components ─────────────────────────────────────────
+
+function ConstellationSectionHeader({
+  label,
+  right,
+  accent,
+  density,
+}: {
+  label: string;
+  right: string;
+  accent: string;
+  density: (typeof CONSTELLATION_DENSITY)["balanced"];
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 8,
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: "Inter",
+          fontSize: density.sectionLabelFontSize,
+          fontWeight: 700,
+          letterSpacing: 2.4,
+          color: accent,
+          textTransform: "uppercase",
+        }}
+      >
+        ✦ {label}
+      </Text>
+      <View
+        style={{
+          flex: 1,
+          height: 0.5,
+          backgroundColor: CONSTELLATION_COLORS.divider,
+        }}
+      />
+      <Text
+        style={{
+          fontFamily: "Inter",
+          fontSize: density.sectionLabelFontSize - 1,
+          letterSpacing: 1.6,
+          color: CONSTELLATION_COLORS.inkSoft,
+          textTransform: "uppercase",
+        }}
+      >
+        {right}
+      </Text>
+    </View>
+  );
+}
+
+function ConstellationSpecCell({
+  icon,
+  value,
+  label,
+  density,
+  accent,
+}: {
+  icon: string;
+  value: string;
+  label: string;
+  density: (typeof CONSTELLATION_DENSITY)["balanced"];
+  accent: string;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "baseline",
+        gap: 4,
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: "Inter",
+          fontSize: density.specFontSize - 1,
+          color: accent,
+        }}
+      >
+        {icon}
+      </Text>
+      <Text
+        style={{
+          fontFamily: "Inter",
+          fontSize: density.specFontSize,
+          fontWeight: 700,
+          letterSpacing: 1.4,
+          color: CONSTELLATION_COLORS.inkPrimary,
+          textTransform: "uppercase",
+        }}
+      >
+        {value}
+      </Text>
+      {label ? (
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: density.specFontSize - 1.5,
+            letterSpacing: 1.4,
+            color: CONSTELLATION_COLORS.inkSoft,
+            textTransform: "uppercase",
+          }}
+        >
+          {label}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function ConstellationPlanetRow({
+  name,
+  pct,
+  accent,
+  density,
+  isLast,
+}: {
+  name: string;
+  pct?: number;
+  accent: string;
+  density: (typeof CONSTELLATION_DENSITY)["balanced"];
+  isLast: boolean;
+}) {
+  return (
+    <View>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          paddingVertical: 2,
+        }}
+      >
+        {/* Planet-Symbol: kleiner Akzent-Kreis mit Innenpunkt */}
+        <Svg width={density.planetSize} height={density.planetSize}>
+          <Circle
+            cx={density.planetSize / 2}
+            cy={density.planetSize / 2}
+            r={density.planetSize / 2 - 1}
+            fill="none"
+            stroke={accent}
+            strokeWidth={0.8}
+            opacity={0.55}
+          />
+          <Circle
+            cx={density.planetSize / 2}
+            cy={density.planetSize / 2}
+            r={density.planetSize / 2 - 4}
+            fill={accent}
+          />
+        </Svg>
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 7,
+              fontWeight: 600,
+              letterSpacing: 1.4,
+              color: CONSTELLATION_COLORS.inkSoft,
+              textTransform: "uppercase",
+            }}
+          >
+            {name}
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: 11,
+              fontWeight: 700,
+              color: CONSTELLATION_COLORS.inkPrimary,
+              lineHeight: 1.0,
+              marginTop: 1,
+            }}
+          >
+            {typeof pct === "number" ? `${pct}%` : "—"}
+          </Text>
+        </View>
+      </View>
+      {/* Connection-Line zwischen Planeten */}
+      {!isLast ? (
+        <View
+          style={{
+            width: 1,
+            height: density.planetGap - 4,
+            backgroundColor: accent,
+            opacity: 0.35,
+            marginLeft: density.planetSize / 2,
+            marginVertical: 2,
+          }}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+function ConstellationIngredientGrid({
+  items,
+  accent,
+  density,
+}: {
+  items: IngredientGroup["items"];
+  accent: string;
+  density: (typeof CONSTELLATION_DENSITY)["balanced"];
+}) {
+  const useColumns = items.length >= 4;
+  if (!useColumns) {
+    return (
+      <View>
+        {items.map((ing, i) => (
+          <ConstellationIngredientRow
+            key={`gi-${i}`}
+            amount={ing.amount}
+            name={ing.name}
+            note={ing.note}
+            accent={accent}
+            density={density}
+          />
+        ))}
+      </View>
+    );
+  }
+  const half = Math.ceil(items.length / 2);
+  return (
+    <View style={{ flexDirection: "row", gap: 18 }}>
+      <View style={{ flex: 1 }}>
+        {items.slice(0, half).map((ing, i) => (
+          <ConstellationIngredientRow
+            key={`ca-${i}`}
+            amount={ing.amount}
+            name={ing.name}
+            note={ing.note}
+            accent={accent}
+            density={density}
+          />
+        ))}
+      </View>
+      <View style={{ flex: 1 }}>
+        {items.slice(half).map((ing, i) => (
+          <ConstellationIngredientRow
+            key={`cb-${i}`}
+            amount={ing.amount}
+            name={ing.name}
+            note={ing.note}
+            accent={accent}
+            density={density}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function ConstellationIngredientRow({
+  amount,
+  name,
+  note,
+  accent,
+  density,
+}: {
+  amount: string;
+  name: string;
+  note?: string;
+  accent: string;
+  density: (typeof CONSTELLATION_DENSITY)["balanced"];
+}) {
+  const displayAmount = formatIngredientAmount(amount);
+  const amountIsLong = displayAmount.length > 10;
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: amountIsLong ? "center" : "flex-start",
+        paddingVertical: density.ingredientRowPadV,
+        borderBottomWidth: 0.4,
+        borderBottomColor: CONSTELLATION_COLORS.divider,
+        gap: 6,
+      }}
+    >
+      {/* ✦ Stern-Bullet */}
+      <Text
+        style={{
+          fontFamily: "Inter",
+          fontSize: density.ingredientFontSize,
+          color: accent,
+          width: 10,
+          lineHeight: amountIsLong ? 1.3 : undefined,
+          paddingTop: amountIsLong ? 0 : 1,
+        }}
+      >
+        ✦
+      </Text>
+      <Text
+        style={{
+          fontFamily: "Inter",
+          fontSize: density.ingredientFontSize,
+          fontWeight: 700,
+          color: accent,
+          width: 50,
+          lineHeight: amountIsLong ? 1.3 : undefined,
+          paddingTop: amountIsLong ? 0 : 1,
+        }}
+      >
+        {displayAmount}
+      </Text>
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: density.ingredientFontSize,
+            color: CONSTELLATION_COLORS.inkPrimary,
+            lineHeight: 1.3,
+          }}
+        >
+          {name}
+        </Text>
+        {note ? (
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: density.ingredientNoteFontSize,
+              fontStyle: "italic",
+              color: CONSTELLATION_COLORS.inkSubtle,
+              marginTop: 1,
+            }}
+          >
+            {note}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function ConstellationTrajectory({
+  steps,
+  accent,
+  density,
+}: {
+  steps: { num: number; text: string }[];
+  accent: string;
+  density: (typeof CONSTELLATION_DENSITY)["balanced"];
+}) {
+  if (steps.length === 0) return null;
+  // Bei kompakten Layouts/vielen Schritten: 2-Spalten Grid statt einer Linie.
+  // Bei wenigen Schritten (≤4): horizontale Trajectory-Linie mit Stationen.
+  const useTrajectoryLine = steps.length <= 4;
+
+  if (useTrajectoryLine) {
+    return (
+      <View>
+        {/* Trajectory-Linie mit Station-Markern */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            marginVertical: 6,
+            paddingHorizontal: 4,
+          }}
+        >
+          {steps.map((step, i) => (
+            <View
+              key={`tr-${step.num}`}
+              style={{
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+              }}
+            >
+              {i > 0 ? (
+                <View
+                  style={{
+                    flex: 1,
+                    height: 0.75,
+                    backgroundColor: accent,
+                    opacity: 0.55,
+                  }}
+                />
+              ) : null}
+              <Svg width={10} height={10}>
+                <Circle cx={5} cy={5} r={4} fill={accent} />
+                <Circle
+                  cx={5}
+                  cy={5}
+                  r={4.6}
+                  fill="none"
+                  stroke={accent}
+                  strokeWidth={0.6}
+                  opacity={0.55}
+                />
+              </Svg>
+              {i < steps.length - 1 ? (
+                <View
+                  style={{
+                    flex: 1,
+                    height: 0.75,
+                    backgroundColor: accent,
+                    opacity: 0.55,
+                  }}
+                />
+              ) : null}
+            </View>
+          ))}
+        </View>
+        {/* Step-Inhalt in einer Row mit gleichen Spalten */}
+        <View
+          style={{
+            flexDirection: "row",
+            gap: 10,
+            marginTop: 4,
+          }}
+        >
+          {steps.map((step) => (
+            <View key={`txt-${step.num}`} style={{ flex: 1 }}>
+              {/* Number + Body: gleiche font/fontSize/lineHeight (§1) */}
+              <Text
+                style={{
+                  fontSize: density.stepFontSize,
+                  lineHeight: 1.45,
+                  fontStyle: "italic",
+                  fontWeight: 700,
+                  color: accent,
+                  marginBottom: 2,
+                }}
+              >
+                {pad2(step.num)}
+              </Text>
+              <Text
+                style={{
+                  fontSize: density.stepFontSize,
+                  lineHeight: 1.45,
+                  color: CONSTELLATION_COLORS.inkPrimary,
+                }}
+              >
+                {step.text}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
+  // Mehr als 4 Schritte: 2-Spalten Grid mit ●-Stations und italic Nummern (§1)
+  const half = Math.ceil(steps.length / 2);
+  const colA = steps.slice(0, half);
+  const colB = steps.slice(half);
+  return (
+    <View style={{ flexDirection: "row", gap: 20 }}>
+      <ConstellationStepColumn steps={colA} accent={accent} density={density} />
+      <View
+        style={{
+          width: 0.5,
+          backgroundColor: CONSTELLATION_COLORS.divider,
+          marginVertical: 4,
+        }}
+      />
+      {colB.length > 0 ? (
+        <ConstellationStepColumn
+          steps={colB}
+          accent={accent}
+          density={density}
+        />
+      ) : (
+        <View style={{ flex: 1 }} />
+      )}
+    </View>
+  );
+}
+
+function ConstellationStepColumn({
+  steps,
+  accent,
+  density,
+}: {
+  steps: { num: number; text: string }[];
+  accent: string;
+  density: (typeof CONSTELLATION_DENSITY)["balanced"];
+}) {
+  return (
+    <View style={{ flex: 1 }}>
+      {steps.map((step) => (
+        <View
+          key={`s-${step.num}`}
+          style={{
+            flexDirection: "row",
+            alignItems: "flex-start",
+            gap: 8,
+            marginBottom: density.stepMarginBottom + 2,
+          }}
+        >
+          {/* Step-Nummer mit Glyph-Center-Lock (§1) */}
+          <Text
+            style={{
+              fontSize: density.stepFontSize,
+              lineHeight: 1.45,
+              fontStyle: "italic",
+              fontWeight: 700,
+              color: accent,
+              width: 18,
+            }}
+          >
+            {pad2(step.num)}
+          </Text>
+          <Text
+            style={{
+              flex: 1,
+              fontSize: density.stepFontSize,
+              lineHeight: 1.45,
+              color: CONSTELLATION_COLORS.inkPrimary,
+            }}
+          >
+            {step.text}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// "Fuer" nur bei den/die/das — LAYOUT_RULES.md §5
+function constellationGroupLabel(name: string): string {
+  return /^(den|die|das)\s/i.test(name)
+    ? `Für ${name.toLowerCase()}`
+    : name;
+}
+
+// Deterministische Background-Sterne basierend auf Recipe-Slug-Hash.
+// LCG-PRNG damit dieselbe Karte beim Re-Render dieselben Sterne hat.
+function buildConstellationStars(seed: string): {
+  x: number;
+  y: number;
+  r: number;
+  opacity: number;
+}[] {
+  let s = 0;
+  for (let i = 0; i < seed.length; i++) {
+    s = (s * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  // Mulberry32-Variante als kleines PRNG
+  const rand = () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const stars: { x: number; y: number; r: number; opacity: number }[] = [];
+  // 80 Sterne über die ganze Seite
+  for (let i = 0; i < 80; i++) {
+    const x = rand() * 595;
+    const y = rand() * 842;
+    const r = 0.3 + rand() * 0.9;
+    const opacity = 0.18 + rand() * 0.45;
+    stars.push({ x, y, r, opacity });
+  }
+  return stars;
 }

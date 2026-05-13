@@ -77,6 +77,14 @@ export const layoutPresets: LayoutPreset[] = [
     bestFor:
       "Hochwertige Recipe-Kollektionen mit editorialem Anspruch, Magazin-Pack-Konzepte, Pack-Themen die Lese-Tiefe brauchen (Reiseküche, Saisonal, Sonntag-Recipes)",
   },
+  {
+    id: "constellation",
+    title: "Constellation",
+    description:
+      "Sternkarten-Look auf Dark-Sky-Background (Marineblau): Hero rund mit Glow-Halo, italic Fraunces-Title in cream-Weiß, Mikronährstoffe als Planeten-Symbole am rechten Rand (kleine Akzent-Kreise mit %-Wert, vertikal verbunden), Zutaten mit ✦-Stern-Bullets, Schritte als Trajectory (horizontale Linie mit Station-Markern bei ≤4 Steps, sonst 2-Spalten-Grid). Background-Sterne als Atmosphäre. Sehr eigenständige Premium-Optik.",
+    bestFor:
+      "Premium-Mealprep-Packs, Show-Off-Sammlungen, Dessert-Editions, Nacht- und Sunset-Themen, alles wo Dark-Mode-Pop gewünscht ist",
+  },
 ];
 
 // Mood presets — eight pre-tuned palettes that pass contrast checks and look

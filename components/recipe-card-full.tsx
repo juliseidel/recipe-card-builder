@@ -147,6 +147,8 @@ export function RecipeCardFull(props: RecipeCardFullProps) {
       return <VinylLayout {...props} />;
     case "newspaper":
       return <NewspaperLayout {...props} />;
+    case "constellation":
+      return <ConstellationLayout {...props} />;
   }
 }
 
@@ -4637,6 +4639,664 @@ function NewspaperMicroCellWeb({
 }
 
 function newspaperGroupLabelWeb(name: string): string {
+  return /^(den|die|das)\s/i.test(name)
+    ? `Für ${name.toLowerCase()}`
+    : name;
+}
+
+// ════════════════════════════════════════════════
+// CONSTELLATION — Sternkarten-Look (Phase C, neu)
+// ════════════════════════════════════════════════
+const CONSTELLATION_WEB = {
+  bg: "#0a0e1f",
+  inkPrimary: "#e8e6dc",
+  inkSoft: "#9b9bb0",
+  inkSubtle: "#5e6480",
+  divider: "#2a2e44",
+  star: "#fafaf5",
+} as const;
+
+function constellationKeyWeb(recipe: Recipe): string {
+  const tags = (recipe.tags ?? []).map((t) => t.toLowerCase());
+  if (tags.some((t) => t.includes("vegan"))) return "VEGAN";
+  if (tags.some((t) => t.includes("high-protein") || t.includes("protein")))
+    return "HIGH-PROTEIN";
+  if (tags.some((t) => t.includes("low-carb"))) return "LOW-CARB";
+  if (tags.some((t) => t.includes("vegetarisch"))) return "VEGETARISCH";
+  if (tags.some((t) => t.includes("dessert") || t.includes("kuchen")))
+    return "SÜSS";
+  if (tags.some((t) => t.includes("snack"))) return "SNACK";
+  if (tags.some((t) => t.includes("mealprep"))) return "MEALPREP";
+  return "STELLAR";
+}
+
+function buildConstellationStarsWeb(seed: string): {
+  x: number;
+  y: number;
+  r: number;
+  opacity: number;
+}[] {
+  let s = 0;
+  for (let i = 0; i < seed.length; i++) {
+    s = (s * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  const rand = () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const stars: { x: number; y: number; r: number; opacity: number }[] = [];
+  for (let i = 0; i < 90; i++) {
+    const x = rand() * 100;
+    const y = rand() * 100;
+    const r = 0.4 + rand() * 1.2;
+    const opacity = 0.2 + rand() * 0.5;
+    stars.push({ x, y, r, opacity });
+  }
+  return stars;
+}
+
+function ConstellationLayout({
+  brand,
+  pack,
+  recipe,
+  totalRecipes,
+}: RecipeCardFullProps) {
+  const recipeIndex = recipe.number - 1;
+  const grouped = groupIngredients(recipe.ingredients);
+  const flatIngredients = grouped.flatMap((g) => g.items);
+  const time = recipe.prepTime + (recipe.cookTime ?? 0);
+
+  const stepGroups = groupRecipeSteps(recipe.steps);
+  const flatSteps: { num: number; text: string }[] = [];
+  let running = 0;
+  for (const g of stepGroups) {
+    for (const item of g.items) {
+      running += 1;
+      flatSteps.push({ num: running, text: item.text });
+    }
+  }
+
+  const topMicros = (recipe.nutrition.micros ?? [])
+    .slice()
+    .sort((a, b) => (b.pctDaily ?? 0) - (a.pctDaily ?? 0))
+    .slice(0, 3);
+
+  const constKey = constellationKeyWeb(recipe);
+  const bgStars = buildConstellationStarsWeb(recipe.slug + recipe.title);
+  const showStory =
+    recipe.ingredients.length <= 10 && Boolean(recipe.description?.trim());
+  const useTrajectoryLine = flatSteps.length <= 4;
+
+  return (
+    <article
+      className="relative overflow-hidden rounded-[var(--radius-card)] border"
+      style={{
+        background: CONSTELLATION_WEB.bg,
+        color: CONSTELLATION_WEB.inkPrimary,
+        borderColor: CONSTELLATION_WEB.divider,
+      }}
+    >
+      {/* Background-Sterne */}
+      <svg
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        aria-hidden
+      >
+        {bgStars.map((s, i) => (
+          <circle
+            key={`bg-${i}`}
+            cx={s.x}
+            cy={s.y}
+            r={s.r * 0.18}
+            fill={CONSTELLATION_WEB.star}
+            opacity={s.opacity}
+          />
+        ))}
+      </svg>
+
+      <div className="relative">
+        {/* ── Masthead ── */}
+        <header className="flex items-center gap-3 border-b px-8 pt-7 pb-3"
+          style={{ borderColor: CONSTELLATION_WEB.divider }}
+        >
+          <span
+            className="font-mono text-[11px] font-bold uppercase tracking-[0.24em]"
+            style={{ color: pack.mood.accent }}
+          >
+            ✦ Constellation
+          </span>
+          <span
+            className="h-[1px] flex-1"
+            style={{ background: CONSTELLATION_WEB.divider }}
+          />
+          <span
+            className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em]"
+            style={{ color: CONSTELLATION_WEB.inkSoft }}
+          >
+            {pack.title}
+          </span>
+          <span
+            className="font-mono text-[10px] font-semibold tabular-nums uppercase tracking-[0.18em]"
+            style={{ color: CONSTELLATION_WEB.inkSoft }}
+          >
+            · {String(recipeIndex + 1).padStart(2, "0")} / {String(totalRecipes).padStart(2, "0")}
+          </span>
+        </header>
+
+        {/* ── Hero + Title + Planeten ── */}
+        <section className="grid gap-7 px-8 pt-8 md:grid-cols-[auto_1fr_auto] md:items-start">
+          {/* Hero rund mit Glow-Halo */}
+          <div className="relative mx-auto md:mx-0">
+            <div
+              className="absolute rounded-full blur-2xl"
+              style={{
+                inset: "-22px",
+                background: pack.mood.accent,
+                opacity: 0.18,
+              }}
+            />
+            <div
+              className="absolute rounded-full"
+              style={{
+                inset: "-6px",
+                border: `1px solid ${pack.mood.accent}`,
+                opacity: 0.5,
+              }}
+            />
+            <div
+              className="relative h-[200px] w-[200px] overflow-hidden rounded-full md:h-[220px] md:w-[220px]"
+              style={{ background: "#1a1d33" }}
+            >
+              {recipe.hero ? (
+                <Image
+                  src={recipe.hero}
+                  alt={recipe.title}
+                  fill
+                  sizes="220px"
+                  className="object-cover"
+                  quality={95}
+                  unoptimized={recipe.hero.startsWith("data:")}
+                />
+              ) : (
+                <div
+                  className="flex h-full w-full items-center justify-center font-display text-[88px] font-bold italic"
+                  style={{
+                    background: pack.mood.accent,
+                    color: CONSTELLATION_WEB.star,
+                  }}
+                >
+                  {brand.name.charAt(0)}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Title-Stack */}
+          <div className="pt-1">
+            <p
+              className="mb-2 font-mono text-[11px] font-bold uppercase tracking-[0.24em]"
+              style={{ color: pack.mood.accent }}
+            >
+              {pack.category}
+            </p>
+            <h2
+              className="font-display text-[36px] font-bold italic leading-[1.05] tracking-[-0.01em]"
+              style={{ color: CONSTELLATION_WEB.inkPrimary }}
+            >
+              {recipe.title}
+            </h2>
+            {recipe.subtitle ? (
+              <p
+                className="mt-2 font-display text-[14px] italic leading-snug"
+                style={{ color: CONSTELLATION_WEB.inkSoft }}
+              >
+                {recipe.subtitle}
+              </p>
+            ) : null}
+            <div
+              className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1"
+              style={{ color: CONSTELLATION_WEB.inkPrimary }}
+            >
+              <span
+                className="flex items-baseline gap-1 font-mono text-[12px] font-bold uppercase tracking-[0.16em]"
+              >
+                <span style={{ color: pack.mood.accent }}>★</span>
+                <span>{Math.round(recipe.nutrition.kcal)}</span>
+                <span
+                  className="text-[10px] font-semibold"
+                  style={{ color: CONSTELLATION_WEB.inkSoft }}
+                >
+                  kcal
+                </span>
+              </span>
+              <span style={{ color: CONSTELLATION_WEB.divider }}>·</span>
+              <span
+                className="flex items-baseline gap-1 font-mono text-[12px] font-bold uppercase tracking-[0.16em]"
+              >
+                <span style={{ color: pack.mood.accent }}>✦</span>
+                <span>{time}</span>
+                <span
+                  className="text-[10px] font-semibold"
+                  style={{ color: CONSTELLATION_WEB.inkSoft }}
+                >
+                  min
+                </span>
+              </span>
+              <span style={{ color: CONSTELLATION_WEB.divider }}>·</span>
+              <span
+                className="flex items-baseline gap-1 font-mono text-[12px] font-bold uppercase tracking-[0.16em]"
+              >
+                <span style={{ color: pack.mood.accent }}>✶</span>
+                <span>{constKey}</span>
+              </span>
+            </div>
+            <p
+              className="mt-3 font-mono text-[9px] uppercase tracking-[0.18em]"
+              style={{ color: CONSTELLATION_WEB.inkSubtle }}
+            >
+              {nutritionBasisInline(recipe.nutritionBasis)}
+            </p>
+          </div>
+
+          {/* Planet-Column */}
+          {topMicros.length > 0 ? (
+            <div
+              className="hidden w-[120px] border-l pl-4 md:block"
+              style={{ borderColor: CONSTELLATION_WEB.divider }}
+            >
+              <p
+                className="mb-3 font-mono text-[9px] font-bold uppercase tracking-[0.24em]"
+                style={{ color: CONSTELLATION_WEB.inkSubtle }}
+              >
+                Planeten
+              </p>
+              <div className="flex flex-col">
+                {topMicros.map((m, i) => (
+                  <div key={`p-${i}`}>
+                    <div className="flex items-center gap-2 py-1">
+                      <span
+                        className="block h-[14px] w-[14px] shrink-0 rounded-full"
+                        style={{
+                          background: pack.mood.accent,
+                          boxShadow: `0 0 0 1px ${pack.mood.accent}66`,
+                        }}
+                      />
+                      <div className="flex-1">
+                        <p
+                          className="font-mono text-[8px] font-semibold uppercase tracking-[0.16em]"
+                          style={{ color: CONSTELLATION_WEB.inkSoft }}
+                        >
+                          {m.name}
+                        </p>
+                        <p
+                          className="font-display text-[14px] font-bold leading-tight"
+                          style={{ color: CONSTELLATION_WEB.inkPrimary }}
+                        >
+                          {typeof m.pctDaily === "number" ? `${m.pctDaily}%` : "—"}
+                        </p>
+                      </div>
+                    </div>
+                    {i < topMicros.length - 1 ? (
+                      <div
+                        className="ml-[6px] h-3 w-[1px]"
+                        style={{ background: pack.mood.accent, opacity: 0.35 }}
+                      />
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Mobile-Planeten unter Title (md+ blendet sich obige ein) */}
+          {topMicros.length > 0 ? (
+            <div className="-mt-2 md:hidden">
+              <p
+                className="mb-2 font-mono text-[9px] font-bold uppercase tracking-[0.24em]"
+                style={{ color: CONSTELLATION_WEB.inkSubtle }}
+              >
+                Planeten
+              </p>
+              <div className="flex flex-wrap gap-4">
+                {topMicros.map((m, i) => (
+                  <div key={`pm-${i}`} className="flex items-center gap-2">
+                    <span
+                      className="block h-[14px] w-[14px] shrink-0 rounded-full"
+                      style={{
+                        background: pack.mood.accent,
+                        boxShadow: `0 0 0 1px ${pack.mood.accent}66`,
+                      }}
+                    />
+                    <div>
+                      <p
+                        className="font-mono text-[8px] font-semibold uppercase tracking-[0.16em]"
+                        style={{ color: CONSTELLATION_WEB.inkSoft }}
+                      >
+                        {m.name}
+                      </p>
+                      <p
+                        className="font-display text-[14px] font-bold leading-tight"
+                        style={{ color: CONSTELLATION_WEB.inkPrimary }}
+                      >
+                        {typeof m.pctDaily === "number" ? `${m.pctDaily}%` : "—"}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </section>
+
+        {/* ── Zutaten ── */}
+        <section className="px-8 pt-8">
+          <ConstellationSectionHeaderWeb
+            label="Zutaten"
+            right={`${recipe.ingredients.length} ${recipe.ingredients.length === 1 ? "Stern" : "Sterne"}`}
+            accent={pack.mood.accent}
+          />
+          {grouped.length > 1 ? (
+            <div className="mt-2 flex flex-col gap-4">
+              {grouped.map((group, gIdx) => (
+                <div key={`g-${gIdx}`}>
+                  {group.name ? (
+                    <h4
+                      className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.18em]"
+                      style={{ color: CONSTELLATION_WEB.inkSoft }}
+                    >
+                      {constellationGroupLabelWeb(group.name)}
+                    </h4>
+                  ) : null}
+                  <ConstellationIngredientGridWeb
+                    items={group.items}
+                    accent={pack.mood.accent}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <ConstellationIngredientGridWeb
+              items={flatIngredients}
+              accent={pack.mood.accent}
+            />
+          )}
+        </section>
+
+        {/* ── Trajectory (Steps) ── */}
+        <section className="px-8 pt-7">
+          <ConstellationSectionHeaderWeb
+            label="◐ Trajectory"
+            right={`${flatSteps.length} ${flatSteps.length === 1 ? "Station" : "Stationen"}`}
+            accent={pack.mood.accent}
+          />
+          {useTrajectoryLine ? (
+            <div className="mt-3">
+              <div className="flex items-center px-1">
+                {flatSteps.map((step, i) => (
+                  <div
+                    key={`tr-${step.num}`}
+                    className="flex flex-1 items-center"
+                  >
+                    {i > 0 ? (
+                      <span
+                        className="h-[1px] flex-1"
+                        style={{
+                          background: pack.mood.accent,
+                          opacity: 0.55,
+                        }}
+                      />
+                    ) : null}
+                    <span
+                      className="block h-[10px] w-[10px] rounded-full"
+                      style={{
+                        background: pack.mood.accent,
+                        boxShadow: `0 0 0 2px ${pack.mood.accent}66`,
+                      }}
+                    />
+                    {i < flatSteps.length - 1 ? (
+                      <span
+                        className="h-[1px] flex-1"
+                        style={{
+                          background: pack.mood.accent,
+                          opacity: 0.55,
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 grid gap-3" style={{ gridTemplateColumns: `repeat(${flatSteps.length}, minmax(0, 1fr))` }}>
+                {flatSteps.map((step) => (
+                  <div key={`txt-${step.num}`}>
+                    <p
+                      className="font-display text-[13px] italic font-bold leading-[1.45]"
+                      style={{ color: pack.mood.accent }}
+                    >
+                      {String(step.num).padStart(2, "0")}
+                    </p>
+                    <p
+                      className="mt-1 font-display text-[13px] leading-[1.45]"
+                      style={{ color: CONSTELLATION_WEB.inkPrimary }}
+                    >
+                      {step.text}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3 grid grid-cols-1 gap-x-6 sm:grid-cols-2">
+              <ConstellationStepColumnWeb
+                steps={flatSteps.slice(0, Math.ceil(flatSteps.length / 2))}
+                accent={pack.mood.accent}
+              />
+              {flatSteps.slice(Math.ceil(flatSteps.length / 2)).length > 0 ? (
+                <ConstellationStepColumnWeb
+                  steps={flatSteps.slice(Math.ceil(flatSteps.length / 2))}
+                  accent={pack.mood.accent}
+                />
+              ) : null}
+            </div>
+          )}
+        </section>
+
+        {/* ── Story-Block (sparse) ── */}
+        {showStory ? (
+          <section className="mt-7 px-8">
+            <blockquote
+              className="border-l-2 pl-4 font-display text-[15px] italic leading-relaxed"
+              style={{
+                borderColor: pack.mood.accent,
+                color: CONSTELLATION_WEB.inkPrimary,
+                opacity: 0.9,
+              }}
+            >
+              {recipe.description}
+            </blockquote>
+          </section>
+        ) : null}
+
+        {/* ── Footer ── */}
+        <footer
+          className="mt-8 flex items-center justify-between gap-4 border-t px-8 py-5"
+          style={{
+            borderColor: CONSTELLATION_WEB.divider,
+            color: CONSTELLATION_WEB.inkSoft,
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 12 12" aria-hidden>
+              <path
+                d="M 6 0.5 L 7 4.5 L 11 5.5 L 7.5 7 L 8 11 L 6 8.5 L 4 11 L 4.5 7 L 1 5.5 L 5 4.5 Z"
+                fill={pack.mood.accent}
+              />
+            </svg>
+            <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em]">
+              {brand.handle} · {pack.title}
+            </span>
+          </div>
+          {recipe.sourceUrl ? (
+            <a
+              href={recipe.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-[10px] uppercase tracking-[0.18em] underline-offset-2 hover:underline"
+              style={{ color: pack.mood.accent }}
+            >
+              {recipe.sourceLabel ?? "Original auf Instagram"} ↗
+            </a>
+          ) : (
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] opacity-70">
+              Stellar Edition
+            </span>
+          )}
+        </footer>
+      </div>
+    </article>
+  );
+}
+
+function ConstellationSectionHeaderWeb({
+  label,
+  right,
+  accent,
+}: {
+  label: string;
+  right: string;
+  accent: string;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className="font-mono text-[11px] font-bold uppercase tracking-[0.24em]"
+        style={{ color: accent }}
+      >
+        ✦ {label}
+      </span>
+      <span
+        className="h-[1px] flex-1"
+        style={{ background: CONSTELLATION_WEB.divider }}
+      />
+      <span
+        className="font-mono text-[10px] uppercase tracking-[0.18em]"
+        style={{ color: CONSTELLATION_WEB.inkSoft }}
+      >
+        {right}
+      </span>
+    </div>
+  );
+}
+
+function ConstellationIngredientGridWeb({
+  items,
+  accent,
+}: {
+  items: { amount: string; name: string; note?: string }[];
+  accent: string;
+}) {
+  return (
+    <div className="mt-2 grid grid-cols-1 gap-x-6 sm:grid-cols-2">
+      {items.map((ing, i) => (
+        <ConstellationIngredientRowWeb
+          key={`ci-${i}`}
+          amount={ing.amount}
+          name={ing.name}
+          note={ing.note}
+          accent={accent}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ConstellationIngredientRowWeb({
+  amount,
+  name,
+  note,
+  accent,
+}: {
+  amount: string;
+  name: string;
+  note?: string;
+  accent: string;
+}) {
+  const displayAmount = formatIngredientAmount(amount);
+  const amountIsLong = displayAmount.length > 10;
+  return (
+    <div
+      className={`flex gap-2 border-b py-2 last:border-b-0 ${amountIsLong ? "items-center" : "items-start"}`}
+      style={{ borderColor: CONSTELLATION_WEB.divider }}
+    >
+      <span
+        className="shrink-0 font-mono text-[13px] leading-[1.3]"
+        style={{ color: accent, width: "14px" }}
+      >
+        ✦
+      </span>
+      <span
+        className="shrink-0 font-mono text-[12px] font-bold tabular-nums leading-[1.3]"
+        style={{ color: accent, width: "58px" }}
+      >
+        {displayAmount}
+      </span>
+      <div className="flex-1">
+        <p
+          className="font-display text-[13px] leading-[1.3]"
+          style={{ color: CONSTELLATION_WEB.inkPrimary }}
+        >
+          {name}
+        </p>
+        {note ? (
+          <p
+            className="mt-0.5 font-display text-[11px] italic"
+            style={{ color: CONSTELLATION_WEB.inkSubtle }}
+          >
+            {note}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ConstellationStepColumnWeb({
+  steps,
+  accent,
+}: {
+  steps: { num: number; text: string }[];
+  accent: string;
+}) {
+  return (
+    <div>
+      {steps.map((step) => (
+        <div
+          key={`cs-${step.num}`}
+          className="mb-3 flex items-start gap-2 last:mb-0"
+        >
+          {/* Glyph-Center-Lock §1: gleiche font-size & line-height wie body */}
+          <span
+            className="shrink-0 font-mono text-[13px] italic font-bold leading-[1.45] tabular-nums"
+            style={{ color: accent, width: "22px" }}
+          >
+            {String(step.num).padStart(2, "0")}
+          </span>
+          <p
+            className="font-display text-[13px] leading-[1.45]"
+            style={{ color: CONSTELLATION_WEB.inkPrimary }}
+          >
+            {step.text}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function constellationGroupLabelWeb(name: string): string {
   return /^(den|die|das)\s/i.test(name)
     ? `Für ${name.toLowerCase()}`
     : name;

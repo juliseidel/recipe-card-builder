@@ -61,6 +61,11 @@ const LAYOUT_OPTIONS: { id: CardLayout; description: string }[] = [
     description:
       "Broadsheet-Editorial wie New York Times / Guardian. Italic Headline mit Drop-Cap im Lead-Paragraph, Byline 'Von [Brand]', Magazine-Hero mit Bildunterschrift. Zutaten in 3 Spalten (Newspaper-typisch), Schritte in 2 Spalten mit italic Nummern. Naehrwerte als Spreadsheet-Footer-Row mit Doppellinie. Mikros in EIGENER Position (unten als Daten-Zeile) statt seitlich/oben. Passt fuer hochwertige Recipe-Kollektionen mit editorialem Anspruch, Magazin-Pack-Konzepte, Reiseküche, Saisonal, Sonntag-Klassiker.",
   },
+  {
+    id: "constellation",
+    description:
+      "Sternkarten-Look auf Dark-Sky-Background (Marineblau, #0a0e1f). Hero rund mit Glow-Halo, italic Fraunces-Title in cream-Weiss, ✦-Stern-Bullets bei Zutaten, Schritte als Trajectory mit Station-Markern. Mikronaehrstoffe in EIGENER Position: als Planeten-Symbole vertikal am rechten Rand (kleine Akzent-Kreise mit %-Wert, durch Connection-Line verbunden). Background-Sterne als Atmosphaere. Sehr eigenstaendige Premium-Optik, Dark-Mode-Pop. Passt fuer Premium-Mealprep-Packs, Show-Off-Sammlungen, Dessert-Editions, Nacht- und Sunset-Themen, alles wo der Pack im Browser pop machen soll.",
+  },
 ];
 
 const MOOD_OPTIONS = [
@@ -114,7 +119,7 @@ const RESPONSE_SCHEMA = {
     layout: {
       type: "string",
       description:
-        'Empfohlenes Layout, einer aus: "amber", "editorial", "patisserie", "minimal", "vital", "dashboard", "sport".',
+        'Empfohlenes Layout, einer aus: "amber", "editorial", "patisserie", "minimal", "vital", "dashboard", "sport", "vinyl", "newspaper", "constellation".',
     },
     layoutReason: {
       type: "string",
@@ -245,6 +250,10 @@ PASSUNG sehr wichtig: Layout/Mood/Font sollen ZUR REZEPTAUSWAHL passen.
   Wochenstars) oder eine Show-Off-Sammlung → vinyl, cocoa/honey, fraunces.
   vinyl ist deutlich von allen anderen Layouts unterscheidbar (Schallplatten-
   Look) — gut wenn das Pack im Browser pop machen soll.
+- Wenn der User Dark-Mode-Optik / Premium-Show-Off / Nacht-Sunset-Themen
+  will (z.B. Date-Night-Desserts, Premium-Mealprep, "after dark"-Snacks) →
+  constellation, cocoa/honey/lavender, fraunces. Sehr eigenstaendige Dark-Sky-
+  Optik (dunkles Marineblau + Sternen-Background), Mikros als Planeten-Symbole.
 
 SURFACE-STYLE (Pack-Hintergrund) — sei mutig wo es passt:
 - DEFAULT: solid — wirkt clean, sicher, immer ok

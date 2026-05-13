@@ -1,4 +1,4 @@
-import { Page, View, Text, Image, Svg, Circle } from "@react-pdf/renderer";
+import { Page, View, Text, Image, Svg, Circle, Path } from "@react-pdf/renderer";
 import type { Brand } from "@/lib/brands";
 import type { Pack, CardLayout } from "@/lib/packs";
 import type { PackForewordContent } from "@/lib/ai/generate-foreword";
@@ -46,6 +46,10 @@ const VARIANTS: Record<
   // Newspaper-Foreword: dediziert. Broadsheet-Editorial mit Masthead,
   // Doppellinien, italic Drop-Cap, Author-Box-Footer mit Avatar.
   newspaper: NewspaperForewordPage,
+  // Constellation-Foreword: dediziert. Dark-Sky mit Background-Sternen,
+  // Hero rund mit Glow-Halo, italic Drop-Cap-Story in cream-Text, Planet-
+  // Akzent als kleiner Anker. Kein brand.signature (wie Vinyl/Newspaper).
+  constellation: ConstellationForewordPage,
 };
 
 export function ForewordPage(props: ForewordPageProps) {
@@ -1727,6 +1731,424 @@ function VinylForewordPage({
           >
             Side B · Coming Up
           </Text>
+        </View>
+      </View>
+    </Page>
+  );
+}
+
+// ─── CONSTELLATION — Sternkarten-Vorwort ────────────────────────────────────
+// Dark-Sky-Background, Hero rund mit Glow-Halo, italic Drop-Cap-Story in
+// cream-Text. Background-Sterne als Atmosphäre. Author-Box im Footer mit
+// Avatar + Brand (KEIN brand.signature — wie Vinyl/Newspaper).
+const CONSTELLATION_FOREWORD_COLORS = {
+  bg: "#0a0e1f",
+  inkPrimary: "#e8e6dc",
+  inkSoft: "#9b9bb0",
+  inkSubtle: "#5e6480",
+  divider: "#2a2e44",
+  star: "#fafaf5",
+} as const;
+
+function buildForewordStars(seed: string): {
+  x: number;
+  y: number;
+  r: number;
+  opacity: number;
+}[] {
+  let s = 0;
+  for (let i = 0; i < seed.length; i++) {
+    s = (s * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  const rand = () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const stars: { x: number; y: number; r: number; opacity: number }[] = [];
+  for (let i = 0; i < 110; i++) {
+    const x = rand() * 595;
+    const y = rand() * 842;
+    const r = 0.3 + rand() * 1.0;
+    const opacity = 0.2 + rand() * 0.55;
+    stars.push({ x, y, r, opacity });
+  }
+  return stars;
+}
+
+function ConstellationForewordPage({
+  brand,
+  pack,
+  content,
+  imageDataUri,
+  avatarDataUri,
+}: ForewordPageProps) {
+  const t = packTheme(pack);
+  const greeting = content.greeting?.trim() || "Vorwort";
+  const story = content.story?.trim() ?? "";
+  const signoff = content.signoff?.trim() ?? "";
+  const storyFirstChar = story.charAt(0);
+  const storyRest = story.slice(1);
+
+  const bgStars = buildForewordStars(pack.slug + greeting);
+
+  return (
+    <Page
+      size="A4"
+      style={{
+        backgroundColor: CONSTELLATION_FOREWORD_COLORS.bg,
+        fontFamily: "Inter",
+        color: CONSTELLATION_FOREWORD_COLORS.inkPrimary,
+      }}
+    >
+      {/* Background-Sterne */}
+      <Svg
+        width={595}
+        height={842}
+        style={{ position: "absolute", top: 0, left: 0 }}
+      >
+        {bgStars.map((s, i) => (
+          <Circle
+            key={`bg-${i}`}
+            cx={s.x}
+            cy={s.y}
+            r={s.r}
+            fill={CONSTELLATION_FOREWORD_COLORS.star}
+            opacity={s.opacity}
+          />
+        ))}
+      </Svg>
+
+      {/* Masthead */}
+      <View
+        style={{
+          paddingHorizontal: 36,
+          paddingTop: 30,
+          paddingBottom: 8,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            borderBottomWidth: 0.5,
+            borderBottomColor: CONSTELLATION_FOREWORD_COLORS.divider,
+            paddingBottom: 8,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Svg width={14} height={14} viewBox="0 0 14 14">
+              <Path
+                d="M 7 0.5 L 8.2 5.3 L 13 6.5 L 8.8 8.2 L 9.4 13 L 7 10 L 4.6 13 L 5.2 8.2 L 1 6.5 L 5.8 5.3 Z"
+                fill={t.accent}
+              />
+            </Svg>
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: 2.4,
+                color: CONSTELLATION_FOREWORD_COLORS.inkPrimary,
+                textTransform: "uppercase",
+              }}
+            >
+              ✦ Constellation · {brand.name}
+            </Text>
+          </View>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 8,
+              letterSpacing: 1.8,
+              color: CONSTELLATION_FOREWORD_COLORS.inkSoft,
+              textTransform: "uppercase",
+            }}
+          >
+            {pack.title} · Stellar-Edition
+          </Text>
+        </View>
+      </View>
+
+      {/* Hero rund mit Glow-Halo, zentriert */}
+      <View style={{ alignItems: "center", paddingTop: 22 }}>
+        <View
+          style={{
+            width: 226,
+            height: 226,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {/* Glow-Halo: konzentrische Akzent-Kreise */}
+          <Svg
+            width={226}
+            height={226}
+            style={{ position: "absolute", top: 0, left: 0 }}
+          >
+            <Circle
+              cx={113}
+              cy={113}
+              r={110}
+              fill={t.accent}
+              opacity={0.08}
+            />
+            <Circle
+              cx={113}
+              cy={113}
+              r={102}
+              fill={t.accent}
+              opacity={0.15}
+            />
+            <Circle
+              cx={113}
+              cy={113}
+              r={95}
+              fill="none"
+              stroke={t.accent}
+              strokeWidth={0.75}
+              opacity={0.55}
+            />
+          </Svg>
+          {/* Hero-Bild rund */}
+          <View
+            style={{
+              width: 180,
+              height: 180,
+              borderRadius: 90,
+              overflow: "hidden",
+              backgroundColor: "#1a1d33",
+            }}
+          >
+            {imageDataUri ? (
+              <Image
+                src={imageDataUri}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  backgroundColor: t.accent,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontSize: 80,
+                    fontWeight: 700,
+                    fontStyle: "italic",
+                    color: CONSTELLATION_FOREWORD_COLORS.star,
+                  }}
+                >
+                  {brand.name.charAt(0)}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Eyebrow + Greeting */}
+      <View style={{ paddingHorizontal: 56, marginTop: 18 }}>
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: 8,
+            fontWeight: 700,
+            letterSpacing: 2.6,
+            color: t.accent,
+            textTransform: "uppercase",
+            textAlign: "center",
+          }}
+        >
+          ✦ Vorwort · Stellar Map
+        </Text>
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontSize: 28,
+            fontWeight: 700,
+            fontStyle: "italic",
+            color: CONSTELLATION_FOREWORD_COLORS.inkPrimary,
+            textAlign: "center",
+            marginTop: 8,
+            lineHeight: 1.1,
+            letterSpacing: -0.3,
+          }}
+        >
+          {greeting}
+        </Text>
+      </View>
+
+      {/* Story als italic Drop-Cap-Block */}
+      <View
+        style={{
+          paddingHorizontal: 64,
+          marginTop: 20,
+        }}
+      >
+        {story.length > 0 ? (
+          <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: 44,
+                fontWeight: 700,
+                fontStyle: "italic",
+                color: t.accent,
+                lineHeight: 0.85,
+                marginRight: 6,
+                marginTop: -3,
+                width: 32,
+              }}
+            >
+              {storyFirstChar}
+            </Text>
+            <Text
+              style={{
+                flex: 1,
+                fontFamily: "Fraunces",
+                fontSize: 11,
+                color: CONSTELLATION_FOREWORD_COLORS.inkPrimary,
+                lineHeight: 1.6,
+                textAlign: "justify",
+                opacity: 0.92,
+              }}
+            >
+              {storyRest}
+            </Text>
+          </View>
+        ) : null}
+
+        {signoff ? (
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: 11,
+              fontStyle: "italic",
+              color: t.accent,
+              marginTop: 16,
+              textAlign: "center",
+            }}
+          >
+            {signoff}
+          </Text>
+        ) : null}
+      </View>
+
+      {/* Footer mit Author-Strip (KEIN brand.signature) */}
+      <View
+        style={{
+          position: "absolute",
+          left: 36,
+          right: 36,
+          bottom: 30,
+        }}
+      >
+        <View
+          style={{
+            height: 0.5,
+            backgroundColor: CONSTELLATION_FOREWORD_COLORS.divider,
+            marginBottom: 14,
+          }}
+        />
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 14,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
+            {avatarDataUri ? (
+              <View
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 19,
+                  overflow: "hidden",
+                  borderWidth: 1.5,
+                  borderColor: t.accent,
+                }}
+              >
+                <Image
+                  src={avatarDataUri}
+                  style={{
+                    width: 35,
+                    height: 35,
+                    objectFit: "cover",
+                    objectPosition: "center 25%",
+                  }}
+                />
+              </View>
+            ) : null}
+            <View>
+              <Text
+                style={{
+                  fontFamily: "Inter",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: 1.6,
+                  color: CONSTELLATION_FOREWORD_COLORS.inkPrimary,
+                  textTransform: "uppercase",
+                }}
+              >
+                {brand.name}
+              </Text>
+              <Text
+                style={{
+                  fontFamily: "Inter",
+                  fontSize: 8,
+                  color: CONSTELLATION_FOREWORD_COLORS.inkSoft,
+                  marginTop: 2,
+                  letterSpacing: 1.2,
+                }}
+              >
+                {brand.handle}
+              </Text>
+            </View>
+          </View>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <Svg width={12} height={12} viewBox="0 0 12 12">
+              <Path
+                d="M 6 0.5 L 7 4.5 L 11 5.5 L 7.5 7 L 8 11 L 6 8.5 L 4 11 L 4.5 7 L 1 5.5 L 5 4.5 Z"
+                fill={t.accent}
+              />
+            </Svg>
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 8,
+                fontWeight: 600,
+                letterSpacing: 1.8,
+                color: CONSTELLATION_FOREWORD_COLORS.inkSoft,
+                textTransform: "uppercase",
+              }}
+            >
+              Trajectory Beginnt
+            </Text>
+          </View>
         </View>
       </View>
     </Page>
