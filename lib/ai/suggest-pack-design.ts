@@ -82,6 +82,14 @@ export type PackDesignSuggestion = {
   subtitle: string;
   tagline: string;
   description: string;
+  /** Empfohlener Surface-Style (solid/gradient/pattern). Default solid
+   *  (klassischer Look). Pattern/Gradient nur wenn es zum Pack-Thema
+   *  passt (z.B. honeycomb fuer Biene-Patisserie, stripes fuer Sport,
+   *  marble fuer Premium-Dessert). */
+  surfaceType: "solid" | "gradient" | "pattern";
+  /** Bei pattern: ein patternId aus dem Katalog. Sonst "". */
+  patternId: string;
+  surfaceReason: string;
 };
 
 const RESPONSE_SCHEMA = {
@@ -136,6 +144,20 @@ const RESPONSE_SCHEMA = {
       description:
         "2-3 Sätze Pack-Beschreibung auf Deutsch — PERSÖNLICH in der Stimme der Creatorin, du-Form, NICHT Marketing. Bezieht sich konkret auf 1-2 Rezepte. KEINE Floskeln wie 'angesagteste', 'perfekte Sammlung', 'Trends nicht verpassen'. KEINE Anführungszeichen.",
     },
+    surfaceType: {
+      type: "string",
+      description:
+        'Surface-Style fuer den Pack-Hintergrund, einer aus: "solid" (klassische einfarbige Flaeche, sicherer Default), "gradient" (Farbverlauf, premium-feel fuer Premium-Themen), "pattern" (Texturmuster, signature-feel). Empfehlung: meistens solid; gradient bei Premium-Sunset-Themen / Brunch / Date-Night; pattern wenn Recipe-Auswahl ein klares Signature hat (Biene-Backwelt → honeycomb, Sport → stripes).',
+    },
+    patternId: {
+      type: "string",
+      description:
+        'Bei surfaceType=pattern: einer aus: "polka", "honeycomb", "crosshatch", "topo", "marble", "stripes", "grid", "confetti". Sonst leerer String. polka = leichtere Snacks/Dessert. honeycomb = Biene/Backen/Bowls. crosshatch = Editorial/Premium. topo = Outdoor/BBQ/Adventure. marble = Premium-Patisserie/Dessert. stripes = Sport/Energy/Bold. grid = Mealprep/Strukturiert. confetti = Festlich/Party.',
+    },
+    surfaceReason: {
+      type: "string",
+      description: "Kurze Begründung warum diese Surface-Wahl (max 80 chars).",
+    },
   },
   required: [
     "titles",
@@ -149,6 +171,9 @@ const RESPONSE_SCHEMA = {
     "subtitle",
     "tagline",
     "description",
+    "surfaceType",
+    "patternId",
+    "surfaceReason",
   ],
 };
 
@@ -207,6 +232,21 @@ PASSUNG sehr wichtig: Layout/Mood/Font sollen ZUR REZEPTAUSWAHL passen.
 - Wenn Snacks → minimal, mint/rose, fraunces
 - Wenn Comfort-Food/Hauptmahlzeiten → amber, honey, fraunces oder dm-serif
 
+SURFACE-STYLE (Pack-Hintergrund) — sei mutig wo es passt:
+- DEFAULT: solid — wirkt clean, sicher, immer ok
+- gradient: wenn die Recipe-Auswahl warm/premium/sunset-Vibe hat (Date-Night Pasta, Sommer-BBQ, Cocktails, Sunset-Brunch)
+- pattern: wenn die Auswahl ein klares Signature-Konzept hat
+  - honeycomb: Biene-Brand, Backwaren mit Honig, gesunder Honig-Vibe
+  - polka: Snacks, leichte Desserts, kindlich-cozy
+  - marble: Premium-Patisserie, edle Desserts, Tiramisu
+  - stripes: Sport/Energy, Workout-Snacks, Protein-Focused
+  - crosshatch: Editorial/Premium-Hauptmahlzeiten
+  - topo: Outdoor/BBQ/Adventure-Food
+  - grid: Mealprep, strukturierte Wochenplanung
+  - confetti: Festliche Packs, Geburtstagskuchen, Party-Snacks
+
+Wenn unsicher: solid. Sei nicht zwanghaft kreativ — solid sieht oft besser aus.
+
 Antworte AUSSCHLIESSLICH im JSON-Schema.`;
 }
 
@@ -255,6 +295,24 @@ export async function suggestPackDesign(
   const validLayout = LAYOUT_OPTIONS.find((l) => l.id === result.layout);
   const validMood = MOOD_OPTIONS.find((m) => m.id === result.moodId);
   const validFont = FONT_OPTIONS.find((f) => f.id === result.fontId);
+  const validSurface =
+    result.surfaceType === "solid" ||
+    result.surfaceType === "gradient" ||
+    result.surfaceType === "pattern";
+  const validPatterns = [
+    "polka",
+    "honeycomb",
+    "crosshatch",
+    "topo",
+    "marble",
+    "stripes",
+    "grid",
+    "confetti",
+  ];
+  const safePatternId =
+    result.surfaceType === "pattern" && validPatterns.includes(result.patternId)
+      ? result.patternId
+      : "";
 
   return {
     ...result,
@@ -264,5 +322,7 @@ export async function suggestPackDesign(
     fontId: validFont
       ? (result.fontId as "fraunces" | "dm-serif" | "inter-tight")
       : "fraunces",
+    surfaceType: validSurface ? result.surfaceType : "solid",
+    patternId: safePatternId,
   };
 }

@@ -50,6 +50,8 @@ type Body = {
     };
     layout?: string; // matched gegen CardLayout enum
     displayFont?: "fraunces" | "dm-serif" | "inter-tight";
+    /** Surface-Override fuer den Pack-Hintergrund (Phase B). */
+    surface?: import("@/lib/packs").PackSurface;
   };
 };
 
@@ -198,6 +200,12 @@ export async function POST(req: Request) {
       amber: "amber",
     }[meta.moodHint] ?? "honey";
     resolvedMood = pickMoodById(packMoodId);
+  }
+
+  // Surface-Override (Phase B): wenn der User explicit eine surface
+  // (gradient/pattern) gewaehlt hat, in resolvedMood reinmischen.
+  if (overrides.surface) {
+    resolvedMood = { ...resolvedMood, surface: overrides.surface };
   }
 
   // Layout: User-Override gewinnt, sonst Auto-Map nach moodHint.

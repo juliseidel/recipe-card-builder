@@ -1,11 +1,63 @@
 import type { PackForewordContent } from "./ai/generate-foreword";
 
+// Surface-Typen fuer den Pack-Hintergrund. solid = alter Default
+// (kompatibel zu allen Bestands-Packs), gradient = linear/radial Verlauf,
+// pattern = procedural SVG-Muster ueber base color.
+//
+// pattern-ids: polka (Punkte), honeycomb (Sechseck-Grid), crosshatch
+// (gekreuzte Linien), topo (Hoehenlinien), marble (organische Streifen),
+// stripes (diagonale Streifen), grid (Bento-Linien-Grid), confetti
+// (zufaellig verteilte Confetti-Striche).
+export type SolidSurface = { type: "solid"; color: string };
+export type GradientSurface = {
+  type: "gradient";
+  variant: "linear" | "radial";
+  /** 2-3 Color-Stops, position 0..1. */
+  stops: { color: string; position: number }[];
+  /** Nur fuer linear; Default 135. */
+  angle?: number;
+};
+export type PatternId =
+  | "polka"
+  | "honeycomb"
+  | "crosshatch"
+  | "topo"
+  | "marble"
+  | "stripes"
+  | "grid"
+  | "confetti";
+export type PatternSurface = {
+  type: "pattern";
+  patternId: PatternId;
+  baseColor: string;
+  accentColor: string;
+  /** 0.5..3, default 1. Skaliert die Pattern-Density. */
+  scale?: number;
+  /** 0..1, default 1. */
+  opacity?: number;
+};
+export type PackSurface = SolidSurface | GradientSurface | PatternSurface;
+
 export type PackMood = {
+  /** Alte Solid-Background-Farbe — bleibt fuer Backward-Compat fuer
+   *  Bestands-Packs. Bei neuen Packs wird `surface` priorisiert; falls
+   *  surface fehlt, wird `background` als solid color genutzt. */
   background: string;
+  /** Erweiterter Surface-Type. Optional — wenn null, wird background
+   *  als solid color verwendet. */
+  surface?: PackSurface;
   accent: string;
   ink: string;
   inkSoft: string;
 };
+
+/**
+ * Liefert die Surface-Definition eines Mood zurueck. Fallback auf
+ * solid+background fuer Bestands-Packs ohne explizite surface.
+ */
+export function resolveSurface(mood: PackMood): PackSurface {
+  return mood.surface ?? { type: "solid", color: mood.background };
+}
 
 export type CardLayout =
   | "editorial"

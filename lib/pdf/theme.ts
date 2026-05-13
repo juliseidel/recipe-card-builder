@@ -1,4 +1,6 @@
 import type { Pack } from "@/lib/packs";
+import { resolveSurface } from "@/lib/packs";
+import { surfaceToPdfColor } from "@/lib/pack-surface";
 
 // A4 in PDF points (1pt = 1/72 in). Render-time DPI is irrelevant for vector
 // content — text & shapes scale lossless. Embedded JPEGs at 1000–2000 px give
@@ -19,15 +21,21 @@ export type CardTheme = {
 };
 
 export function packTheme(pack: Pack): CardTheme {
+  // PDF respektiert den neuen surface-Type, faellt aber auf solid color
+  // zurueck. Gradient/Pattern werden vom PDF-Renderer als single color
+  // approximated (siehe surfaceToPdfColor) — die Live-Web-Cover zeigt das
+  // volle Pattern.
+  const surface = resolveSurface(pack.mood);
+  const flatBg = surfaceToPdfColor(surface);
   return {
-    bg: pack.mood.background,
+    bg: flatBg,
     surface: "#ffffff",
     ink: pack.mood.ink,
     inkSoft: pack.mood.inkSoft,
     inkSubtle: withAlpha(pack.mood.inkSoft, 0.6),
     accent: pack.mood.accent,
     accentSoft: withAlpha(pack.mood.accent, 0.18),
-    paper: blendWithWhite(pack.mood.background, 0.78),
+    paper: blendWithWhite(flatBg, 0.78),
     divider: withAlpha(pack.mood.ink, 0.12),
   };
 }

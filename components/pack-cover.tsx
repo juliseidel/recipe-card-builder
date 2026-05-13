@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
+import { resolveSurface } from "@/lib/packs";
+import { surfaceToCss } from "@/lib/pack-surface";
 import { PackCoverImage } from "./pack-cover-image";
 
 type PackCoverProps = {
@@ -28,11 +30,16 @@ export function PackCover({
   const fontClass = fontClassMap[pack.displayFont];
   const orderLabel = String(pack.number).padStart(2, "0");
 
+  // Surface-Renderer: nutzt surface (Gradient/Pattern) wenn gesetzt, sonst
+  // Fallback auf mood.background (solid color, Backward-Compat).
+  const surface = resolveSurface(pack.mood);
+  const backgroundCss = surfaceToCss(surface);
+
   return (
     <section
       className="relative overflow-hidden border-b"
       style={{
-        background: pack.mood.background,
+        background: backgroundCss,
         color: pack.mood.ink,
         borderColor: pack.mood.ink + "1a",
       }}

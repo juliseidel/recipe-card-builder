@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import type { Brand } from "@/lib/brands";
-import type { CardLayout, PackMood } from "@/lib/packs";
+import type { CardLayout, PackMood, PackSurface, PatternId } from "@/lib/packs";
 import { moodPresets, displayFontOptions, layoutPresets } from "@/lib/pack-presets";
+import { surfaceToCss, PATTERN_CATALOG, GRADIENT_PRESETS } from "@/lib/pack-surface";
 
 // Auto-Pack-Form fuer den /[brand]/new Auto-Tab. User waehlt Filter
 // (Timeframe + 8 Tag-Dimensionen + Limit + Sortierung), Live-Preview-Grid
@@ -52,6 +53,9 @@ type PackDesignSuggestion = {
   subtitle: string;
   tagline: string;
   description: string;
+  surfaceType: "solid" | "gradient" | "pattern";
+  patternId: string;
+  surfaceReason: string;
 };
 
 type ReelTagAggregates = {
@@ -268,6 +272,36 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
   const [aiError, setAiError] = useState<string | null>(null);
   const [showAlternativeTitles, setShowAlternativeTitles] = useState(false);
   const [showOptionalDetails, setShowOptionalDetails] = useState(false);
+
+  // Surface-State (Phase B): solid (default, undefined) | gradient | pattern
+  const [packSurfaceType, setPackSurfaceType] = useState<
+    "solid" | "gradient" | "pattern"
+  >("solid");
+  const [packGradient, setPackGradient] = useState<{
+    variant: "linear" | "radial";
+    stops: { color: string; position: number }[];
+    angle: number;
+  }>({
+    variant: "linear",
+    stops: [
+      { color: "#f4d88d", position: 0 },
+      { color: "#e8889b", position: 1 },
+    ],
+    angle: 135,
+  });
+  const [packPattern, setPackPattern] = useState<{
+    patternId: PatternId;
+    baseColor: string;
+    accentColor: string;
+    scale: number;
+    opacity: number;
+  }>({
+    patternId: "polka",
+    baseColor: "#f4d88d",
+    accentColor: "#b07a2a",
+    scale: 1,
+    opacity: 0.6,
+  });
 
   const loadTags = useCallback(async () => {
     setTagsLoading(true);
@@ -525,6 +559,35 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
       if (!packSubtitle && s.subtitle) setPackSubtitle(s.subtitle);
       if (!packTagline && s.tagline) setPackTagline(s.tagline);
       if (!packDescription && s.description) setPackDescription(s.description);
+      // Surface-Vorschlag uebernehmen: setze Type + bei pattern setze
+      // patternId; baseColor/accentColor leiten wir vom empfohlenen Mood ab.
+      if (s.surfaceType && s.surfaceType !== "solid") {
+        setPackSurfaceType(s.surfaceType);
+        if (s.surfaceType === "pattern" && s.patternId) {
+          const moodColors =
+            moodPresets.find((m) => m.id === s.moodId)?.mood ??
+            moodPresets[0].mood;
+          setPackPattern({
+            patternId: s.patternId as PatternId,
+            baseColor: moodColors.background,
+            accentColor: moodColors.accent,
+            scale: 1,
+            opacity: 0.6,
+          });
+        } else if (s.surfaceType === "gradient") {
+          const moodColors =
+            moodPresets.find((m) => m.id === s.moodId)?.mood ??
+            moodPresets[0].mood;
+          setPackGradient({
+            variant: "linear",
+            stops: [
+              { color: moodColors.background, position: 0 },
+              { color: moodColors.accent, position: 1 },
+            ],
+            angle: 135,
+          });
+        }
+      }
       setShowAlternativeTitles(false);
     } catch (err) {
       setAiError(
@@ -557,10 +620,34 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
     setPackMoodId(null);
     setPackCustomMood(null);
     setPackFont(null);
+    setPackSurfaceType("solid");
     setAiSuggestion(null);
     setShowAlternativeTitles(false);
     setShowOptionalDetails(false);
   };
+
+  // Berechnete Surface: gradient/pattern wenn ausgewaehlt, sonst null.
+  const resolvedSurface = useMemo<PackSurface | null>(() => {
+    if (packSurfaceType === "gradient") {
+      return {
+        type: "gradient",
+        variant: packGradient.variant,
+        stops: packGradient.stops,
+        angle: packGradient.angle,
+      };
+    }
+    if (packSurfaceType === "pattern") {
+      return {
+        type: "pattern",
+        patternId: packPattern.patternId,
+        baseColor: packPattern.baseColor,
+        accentColor: packPattern.accentColor,
+        scale: packPattern.scale,
+        opacity: packPattern.opacity,
+      };
+    }
+    return null;
+  }, [packSurfaceType, packGradient, packPattern]);
 
   const handleGenerate = async () => {
     if (!reels || reels.length < 3) {
@@ -583,6 +670,7 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
       if (packCustomMood) overrides.customMood = packCustomMood;
       else if (packMoodId) overrides.moodId = packMoodId;
       if (packFont) overrides.displayFont = packFont;
+      if (resolvedSurface) overrides.surface = resolvedSurface;
 
       const res = await fetch("/api/packs/generate-auto", {
         method: "POST",
@@ -620,6 +708,7 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
     !packMoodId &&
     !packCustomMood &&
     !packFont &&
+    packSurfaceType === "solid" &&
     !aiSuggestion;
 
   const recipeWord = limit === 1 ? "Rezept" : "Rezepte";
@@ -1629,6 +1718,331 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
           </div>
         </details>
 
+        {/* ── Hintergrund-Style (Surface) ── */}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <label
+              className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+              style={{ color: brand.tokens.inkMuted }}
+            >
+              Hintergrund-Style
+            </label>
+            {aiSuggestion ? (
+              <span
+                className="text-[10.5px]"
+                style={{ color: brand.tokens.inkMuted }}
+              >
+                ✨ Empfohlen:{" "}
+                <span style={{ color: brand.tokens.ink, fontWeight: 600 }}>
+                  {aiSuggestion.surfaceType === "pattern"
+                    ? `Pattern · ${PATTERN_CATALOG.find((p) => p.id === aiSuggestion.patternId)?.label ?? aiSuggestion.patternId}`
+                    : aiSuggestion.surfaceType === "gradient"
+                      ? "Farbverlauf"
+                      : "Solid (klassisch)"}
+                </span>
+                {aiSuggestion.surfaceReason
+                  ? ` — ${aiSuggestion.surfaceReason}`
+                  : null}
+              </span>
+            ) : null}
+          </div>
+          {/* Type-Tabs */}
+          <div className="flex gap-2">
+            {(
+              [
+                { id: "solid", label: "Solid", hint: "Klassisch & sauber" },
+                { id: "gradient", label: "Farbverlauf", hint: "Premium-Feel" },
+                { id: "pattern", label: "Muster", hint: "Signature-Look" },
+              ] as const
+            ).map((t) => {
+              const active = packSurfaceType === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setPackSurfaceType(t.id)}
+                  className="flex flex-1 flex-col items-start gap-0.5 rounded-xl border-2 px-3 py-2.5 text-left transition-all"
+                  style={{
+                    borderColor: active
+                      ? brand.tokens.accent
+                      : brand.tokens.line,
+                    background: active
+                      ? brand.tokens.accent + "12"
+                      : brand.tokens.surface,
+                  }}
+                >
+                  <span
+                    className="text-[13px] font-semibold"
+                    style={{
+                      color: active ? brand.tokens.accent : brand.tokens.ink,
+                    }}
+                  >
+                    {t.label}
+                  </span>
+                  <span
+                    className="text-[10.5px]"
+                    style={{ color: brand.tokens.inkMuted }}
+                  >
+                    {t.hint}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Gradient-Picker */}
+          {packSurfaceType === "gradient" ? (
+            <div
+              className="flex flex-col gap-3 rounded-xl border p-3"
+              style={{
+                borderColor: brand.tokens.line,
+                background: brand.tokens.surface,
+              }}
+            >
+              <div className="flex flex-wrap gap-2">
+                {GRADIENT_PRESETS.map((preset) => {
+                  const active =
+                    packGradient.stops[0]?.color === preset.stops[0] &&
+                    packGradient.stops[packGradient.stops.length - 1]?.color ===
+                      preset.stops[preset.stops.length - 1];
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() =>
+                        setPackGradient((g) => ({
+                          ...g,
+                          stops: preset.stops.map((color, i) => ({
+                            color,
+                            position: i / (preset.stops.length - 1),
+                          })),
+                        }))
+                      }
+                      className="flex flex-col items-stretch gap-1 rounded-lg border-2 p-2 transition-all"
+                      style={{
+                        borderColor: active
+                          ? brand.tokens.accent
+                          : brand.tokens.line,
+                        background: "white",
+                        minWidth: 90,
+                      }}
+                    >
+                      <div
+                        className="h-7 rounded"
+                        style={{
+                          background: `linear-gradient(135deg, ${preset.stops.join(", ")})`,
+                        }}
+                      />
+                      <span
+                        className="text-[10.5px] font-semibold"
+                        style={{ color: brand.tokens.ink }}
+                      >
+                        {preset.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-[11.5px]" style={{ color: brand.tokens.inkMuted }}>
+                  <span>Typ:</span>
+                  <select
+                    value={packGradient.variant}
+                    onChange={(e) =>
+                      setPackGradient((g) => ({
+                        ...g,
+                        variant: e.target.value as "linear" | "radial",
+                      }))
+                    }
+                    className="rounded border bg-white px-2 py-1 text-[11.5px]"
+                    style={{ borderColor: brand.tokens.line, color: brand.tokens.ink }}
+                  >
+                    <option value="linear">Linear</option>
+                    <option value="radial">Radial</option>
+                  </select>
+                </label>
+                {packGradient.variant === "linear" ? (
+                  <label className="flex items-center gap-2 text-[11.5px]" style={{ color: brand.tokens.inkMuted }}>
+                    <span>Winkel: {packGradient.angle}°</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={359}
+                      value={packGradient.angle}
+                      onChange={(e) =>
+                        setPackGradient((g) => ({
+                          ...g,
+                          angle: parseInt(e.target.value),
+                        }))
+                      }
+                      className="w-24"
+                      style={{ accentColor: brand.tokens.accent }}
+                    />
+                  </label>
+                ) : null}
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {packGradient.stops.map((stop, i) => (
+                  <ColorPickerInput
+                    key={i}
+                    label={`Stop ${i + 1}`}
+                    value={stop.color}
+                    onChange={(v) =>
+                      setPackGradient((g) => ({
+                        ...g,
+                        stops: g.stops.map((s, idx) =>
+                          idx === i ? { ...s, color: v } : s
+                        ),
+                      }))
+                    }
+                    brand={brand}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Pattern-Picker */}
+          {packSurfaceType === "pattern" ? (
+            <div
+              className="flex flex-col gap-3 rounded-xl border p-3"
+              style={{
+                borderColor: brand.tokens.line,
+                background: brand.tokens.surface,
+              }}
+            >
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {PATTERN_CATALOG.map((p) => {
+                  const active = packPattern.patternId === p.id;
+                  const recommended =
+                    aiSuggestion?.surfaceType === "pattern" &&
+                    aiSuggestion.patternId === p.id;
+                  const previewCss = surfaceToCss({
+                    type: "pattern",
+                    patternId: p.id,
+                    baseColor: packPattern.baseColor,
+                    accentColor: packPattern.accentColor,
+                    scale: 0.8,
+                    opacity: packPattern.opacity,
+                  });
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() =>
+                        setPackPattern((pp) => ({ ...pp, patternId: p.id }))
+                      }
+                      className="flex flex-col items-stretch gap-1 rounded-lg border-2 p-1.5 transition-all"
+                      style={{
+                        borderColor: active
+                          ? brand.tokens.accent
+                          : brand.tokens.line,
+                        background: "white",
+                      }}
+                      title={p.description}
+                    >
+                      <div
+                        className="h-10 rounded"
+                        style={{ background: previewCss }}
+                      />
+                      <div className="flex items-center justify-between gap-1">
+                        <span
+                          className="text-[10.5px] font-semibold"
+                          style={{
+                            color: active
+                              ? brand.tokens.accent
+                              : brand.tokens.ink,
+                          }}
+                        >
+                          {p.label}
+                        </span>
+                        {recommended && !active ? (
+                          <span
+                            className="font-mono text-[9px]"
+                            style={{ color: brand.tokens.accent }}
+                          >
+                            ✨
+                          </span>
+                        ) : null}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <ColorPickerInput
+                  label="Hintergrund"
+                  value={packPattern.baseColor}
+                  onChange={(v) =>
+                    setPackPattern((p) => ({ ...p, baseColor: v }))
+                  }
+                  brand={brand}
+                />
+                <ColorPickerInput
+                  label="Pattern-Farbe"
+                  value={packPattern.accentColor}
+                  onChange={(v) =>
+                    setPackPattern((p) => ({ ...p, accentColor: v }))
+                  }
+                  brand={brand}
+                />
+                <label className="flex flex-col gap-1">
+                  <span
+                    className="text-[10.5px] font-semibold uppercase tracking-[0.14em]"
+                    style={{ color: brand.tokens.inkMuted }}
+                  >
+                    Skalierung: {packPattern.scale.toFixed(1)}×
+                  </span>
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={2.5}
+                    step={0.1}
+                    value={packPattern.scale}
+                    onChange={(e) =>
+                      setPackPattern((p) => ({
+                        ...p,
+                        scale: parseFloat(e.target.value),
+                      }))
+                    }
+                    style={{ accentColor: brand.tokens.accent }}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span
+                    className="text-[10.5px] font-semibold uppercase tracking-[0.14em]"
+                    style={{ color: brand.tokens.inkMuted }}
+                  >
+                    Intensität: {Math.round(packPattern.opacity * 100)}%
+                  </span>
+                  <input
+                    type="range"
+                    min={0.2}
+                    max={1}
+                    step={0.05}
+                    value={packPattern.opacity}
+                    onChange={(e) =>
+                      setPackPattern((p) => ({
+                        ...p,
+                        opacity: parseFloat(e.target.value),
+                      }))
+                    }
+                    style={{ accentColor: brand.tokens.accent }}
+                  />
+                </label>
+              </div>
+              <p
+                className="text-[10.5px] leading-relaxed"
+                style={{ color: brand.tokens.inkMuted }}
+              >
+                Hinweis: Pattern wird im Web in voller Pracht angezeigt. PDF
+                fällt aus Print-Sicherheitsgründen auf die Hintergrund-Farbe
+                zurück — alles bleibt CMYK-tauglich.
+              </p>
+            </div>
+          ) : null}
+        </div>
+
         {/* ── Live Mood-Preview-Strip ── */}
         {resolvedMood ? (
           <div
@@ -1637,7 +2051,12 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
           >
             <div
               className="flex-1 px-3 py-2.5"
-              style={{ background: resolvedMood.background, color: resolvedMood.ink }}
+              style={{
+                background: resolvedSurface
+                  ? surfaceToCss(resolvedSurface)
+                  : resolvedMood.background,
+                color: resolvedMood.ink,
+              }}
             >
               <p className="text-[11px] uppercase tracking-[0.16em] opacity-70">
                 Live-Vorschau Pack-Cover-Mood
