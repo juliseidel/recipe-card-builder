@@ -7,6 +7,7 @@ import {
   nutritionBasisLabel,
   nutritionBasisLabelShort,
   nutritionBasisInline,
+  visibleMicros,
   type Recipe,
 } from "@/lib/recipes";
 import { formatIngredientAmount } from "@/lib/format-ingredient";
@@ -569,7 +570,7 @@ function EditorialNutrientBanner({
   recipe: Recipe;
   pack: Pack;
 }) {
-  const micros = recipe.nutrition.micros;
+  const micros = visibleMicros(recipe);
   if (!micros || micros.length === 0) return null;
   // Top 6 micros so the banner stays one tidy row of three columns × 2 rows
   const top = [...micros]
@@ -1983,7 +1984,7 @@ function VitalLayout({
     { label: "Kohlenh.", value: recipe.nutrition.carbs, max: 80, unit: "g" },
     { label: "Fett", value: recipe.nutrition.fat, max: 35, unit: "g" },
   ];
-  const micros = (recipe.nutrition.micros ?? []).slice(0, 8);
+  const micros = visibleMicros(recipe).slice(0, 8);
 
   const cardClass =
     "rounded-3xl border bg-white p-6 sm:p-7 shadow-[0_1px_0_rgba(43,31,25,0.04),0_22px_46px_-22px_rgba(43,31,25,0.18)]";
@@ -2491,7 +2492,7 @@ function AmberLayout({
   const normSteps = stepsArr.map((s) =>
     typeof s === "string" ? { text: s, group: undefined as string | undefined } : s
   );
-  const micros = (recipe.nutrition.micros ?? []).slice(0, 6);
+  const micros = visibleMicros(recipe).slice(0, 6);
   const stats = [
     { value: String(recipe.nutrition.kcal), label: "kcal" },
     { value: `${recipe.nutrition.protein}g`, label: "Eiweiß" },
@@ -3631,7 +3632,7 @@ function VinylLayout({
 
   const time = recipe.prepTime + (recipe.cookTime ?? 0);
   const audioKey = vinylAudioKeyWeb(recipe);
-  const topMicros = (recipe.nutrition.micros ?? [])
+  const topMicros = visibleMicros(recipe)
     .slice()
     .sort((a, b) => (b.pctDaily ?? 0) - (a.pctDaily ?? 0))
     .slice(0, 3);
@@ -4191,7 +4192,7 @@ function NewspaperLayout({
   const stepsA = flatSteps.slice(0, halfSteps);
   const stepsB = flatSteps.slice(halfSteps);
 
-  const topMicros = (recipe.nutrition.micros ?? [])
+  const topMicros = visibleMicros(recipe)
     .slice()
     .sort((a, b) => (b.pctDaily ?? 0) - (a.pctDaily ?? 0))
     .slice(0, 3);
@@ -4721,7 +4722,7 @@ function ConstellationLayout({
     }
   }
 
-  const topMicros = (recipe.nutrition.micros ?? [])
+  const topMicros = visibleMicros(recipe)
     .slice()
     .sort((a, b) => (b.pctDaily ?? 0) - (a.pctDaily ?? 0))
     .slice(0, 3);
@@ -5390,7 +5391,7 @@ function RestaurantLayout({
     }
   }
 
-  const topMicros = (recipe.nutrition.micros ?? [])
+  const topMicros = visibleMicros(recipe)
     .slice()
     .sort((a, b) => (b.pctDaily ?? 0) - (a.pctDaily ?? 0))
     .slice(0, 3);

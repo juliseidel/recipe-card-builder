@@ -17,6 +17,7 @@ import {
   nutritionBasisLabel,
   nutritionBasisLabelShort,
   nutritionBasisInline,
+  visibleMicros,
   type Recipe,
   type Micronutrient,
 } from "@/lib/recipes";
@@ -508,7 +509,7 @@ function EditorialMicrosBanner({
   theme: ReturnType<typeof packTheme>;
   density?: Density;
 }) {
-  const micros = recipe.nutrition.micros;
+  const micros = visibleMicros(recipe);
   if (!micros || micros.length === 0) return null;
   const top = [...micros]
     .sort((a, b) => (b.pctDaily ?? 0) - (a.pctDaily ?? 0))
@@ -1999,7 +2000,12 @@ export function softWrapTitle(title: string): string {
 // A recipe with 8 ingredients but only 4 steps (e.g. KI-Süßkartoffel-Muffins)
 // ends up sparse-feeling on A4 — the steps column runs out fast and leaves
 // half the page white. Score-based classification catches that.
+// recipe.tweaks.densityOverride wins over the score when the user has
+// manually picked a density in the editor.
 export function getDensity(recipe: Recipe): Density {
+  if (recipe.tweaks?.densityOverride) {
+    return recipe.tweaks.densityOverride;
+  }
   const score = recipe.ingredients.length + recipe.steps.length * 1.5;
   if (score >= 22) return "compact";
   if (score <= 14) return "spacious";
@@ -2012,11 +2018,28 @@ export function getDensity(recipe: Recipe): Density {
 // happens to fill the page. So it triggers on ingredient count alone, with
 // a generous threshold — anything with 10 or fewer ingredients gets the
 // story treatment so no card ever looks halbleer.
+// recipe.tweaks.hideStory always forces the block off when the user has
+// explicitly hidden it in the editor.
 export function shouldShowStory(recipe: Recipe): boolean {
+  if (recipe.tweaks?.hideStory) return false;
   return (
     recipe.ingredients.length <= 10 && Boolean(recipe.description?.trim())
   );
 }
+
+// Single source-of-truth for the title-scale tweak. Renderers add this to
+// their density-based titleFontSize before drawing. Range: -2..+2 pt.
+export function titleFontSizeOffset(recipe: Recipe): number {
+  return recipe.tweaks?.titleScale ?? 0;
+}
+
+// Whether the layout-specific micros block (Wine Notes, Planet Column,
+// Audio-Spec-Strip, Newspaper-Spreadsheet-Row, etc.) should be drawn at
+// all. Returns true by default; tweaks.hideMicros forces it off.
+export function shouldShowMicros(recipe: Recipe): boolean {
+  return !recipe.tweaks?.hideMicros;
+}
+
 
 const SPORT_DENSITY: Record<
   Density,
@@ -3199,7 +3222,7 @@ function VitalPage({
     { label: "Fett", value: recipe.nutrition.fat, max: 35, unit: "g" },
   ];
 
-  const micros = (recipe.nutrition.micros ?? []).slice(0, 8);
+  const micros = visibleMicros(recipe).slice(0, 8);
 
   // Card-Style: weiss auf Pack-Mood-BG, Sage-Akzent als duenne Border,
   // 2 px subtle outer Schatten via doppelter Border-Trick.
@@ -4094,7 +4117,7 @@ function AmberPage({
   const d = AMBER_DENSITY[density];
   const grouped = groupIngredients(recipe.ingredients);
   const stepGroups = groupSteps(recipe.steps ?? []);
-  const micros = (recipe.nutrition.micros ?? []).slice(0, 6);
+  const micros = visibleMicros(recipe).slice(0, 6);
 
   // Stat-Ribbon-Werte. Nur kcal + 3 Macros, alles inline.
   const stats = [
@@ -5766,7 +5789,7 @@ function VinylPage({
   // Audio-Spec
   const time = totalTime(recipe);
   const audioKey = vinylAudioKey(recipe);
-  const topMicros = (recipe.nutrition.micros ?? [])
+  const topMicros = visibleMicros(recipe)
     .slice()
     .sort(
       (a: Micronutrient, b: Micronutrient) =>
@@ -6750,7 +6773,7 @@ function NewspaperPage({
   }
 
   // Top-3 Mikros nach %-EU-Bedarf sortiert
-  const topMicros = (recipe.nutrition.micros ?? [])
+  const topMicros = visibleMicros(recipe)
     .slice()
     .sort(
       (a: Micronutrient, b: Micronutrient) =>
@@ -7807,7 +7830,7 @@ function ConstellationPage({
   const flatIngredients = ingredientGroups.flatMap((g) => g.items);
 
   // Top-3 Mikros als Planeten
-  const topMicros = (recipe.nutrition.micros ?? [])
+  const topMicros = visibleMicros(recipe)
     .slice()
     .sort(
       (a: Micronutrient, b: Micronutrient) =>
@@ -9139,7 +9162,7 @@ function RestaurantPage({
     }
   }
 
-  const topMicros = (recipe.nutrition.micros ?? [])
+  const topMicros = visibleMicros(recipe)
     .slice()
     .sort(
       (a: Micronutrient, b: Micronutrient) =>

@@ -294,6 +294,29 @@ export function CustomRecipeView({
     router.push(`/${brand.slug}/${pack.slug}`);
   };
 
+  const editAction = recipe ? (
+    <Link
+      href={`/${brand.slug}/${pack.slug}/${recipe.slug}/edit`}
+      className="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-canvas-alt"
+      style={{
+        borderColor: pack.mood.ink + "20",
+        color: pack.mood.ink,
+        background: "rgba(255,255,255,0.6)",
+      }}
+    >
+      <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden>
+        <path
+          d="M9.3 1.7l3 3L4.5 12.5H1.5V9.5z"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      Bearbeiten
+    </Link>
+  ) : null;
+
   const deleteAction = (
     <button
       type="button"
@@ -376,6 +399,7 @@ export function CustomRecipeView({
         previous={previous}
         next={next}
         isCustom
+        editAction={editAction}
         deleteAction={deleteAction}
         enriching={pending.hero || pending.micros ? pending : undefined}
       />

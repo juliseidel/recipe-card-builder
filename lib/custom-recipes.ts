@@ -148,6 +148,60 @@ export async function removeCustomRecipe(id: string): Promise<boolean> {
   return true;
 }
 
+// Update an existing custom recipe by id. The full Recipe object is written
+// to the `data` JSONB column (in-place replace, not partial-merge — the
+// editor always sends the full payload). slug + packSlug stay inside data
+// so the existing reader code keeps working unchanged. recipe.number is
+// preserved from the existing row to avoid renumbering side-effects (e.g.
+// the Minimal-Layout's mega-number jumping around when titles change).
+export async function updateCustomRecipe(
+  id: string,
+  recipe: Omit<CustomRecipe, "id" | "isCustom" | "createdAt">
+): Promise<CustomRecipe | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from("recipes")
+    .update({
+      recipe_slug: recipe.slug,
+      data: {
+        ...recipe,
+      } as Recipe,
+    })
+    .eq("id", id)
+    .eq("is_custom", true)
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("[recipes-db] updateCustomRecipe", error);
+    return null;
+  }
+  return rowToCustomRecipe(data);
+}
+
+// Fetch a single custom recipe by id — needed for the edit-page's initial
+// state hydration (the route has the recipe-slug but the editor wants the
+// db id for the UPDATE call).
+export async function getCustomRecipeById(
+  id: string
+): Promise<CustomRecipe | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("recipes")
+    .select("*")
+    .eq("id", id)
+    .eq("is_custom", true)
+    .maybeSingle();
+  if (error) {
+    console.error("[recipes-db] getCustomRecipeById", error);
+    return null;
+  }
+  return data ? rowToCustomRecipe(data) : null;
+}
+
 export function slugify(input: string): string {
   return input
     .toLowerCase()

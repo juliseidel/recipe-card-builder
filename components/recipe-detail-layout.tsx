@@ -21,6 +21,10 @@ type Props = {
   next: NavTarget;
   isCustom?: boolean;
   deleteAction?: React.ReactNode;
+  /** Render-slot for the "Bearbeiten" pill. Sits in the same toolbar row
+   *  as deleteAction + PDF-export. CustomRecipeView passes a Link to the
+   *  /edit route; static-recipe callers leave it undefined. */
+  editAction?: React.ReactNode;
   // Set while a custom recipe waits for Gemini micros + Flux hero. The card
   // swaps the matching slots for skeletons so the gap is visible.
   enriching?: EnrichingState;
@@ -40,6 +44,7 @@ export function RecipeDetailLayout({
   next,
   isCustom = false,
   deleteAction,
+  editAction,
   enriching,
   recipeId,
 }: Props) {
@@ -84,6 +89,7 @@ export function RecipeDetailLayout({
           </nav>
 
           <div className="flex flex-wrap items-center gap-2">
+            {editAction}
             {deleteAction}
             {recipeId ? (
               <HeroRerollButton

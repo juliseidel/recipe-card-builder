@@ -79,6 +79,33 @@ export type Recipe = {
    * Static curated recipes leave this undefined and inherit the pack layout.
    */
   cardLayout?: import("./packs").CardLayout;
+  /**
+   * Optional per-recipe layout fine-tuning ("Tweaks"). Set from the recipe
+   * editor when a card doesn't render quite right with the auto-picked
+   * density / story / micros decisions. Each field is independent — leaving
+   * one undefined keeps the auto-behavior. Renderers in lib/pdf/recipe-card-pdf.tsx
+   * and components/recipe-card-full.tsx read these and override the
+   * corresponding auto-decision before drawing.
+   */
+  tweaks?: {
+    /** Force a specific density tier. undefined = auto (getDensity scores by
+     *  ingredient + step count). Useful when a 5-ingredient recipe should
+     *  render "spacious" or a 12-ingredient one should be forced "compact"
+     *  to avoid line-break issues. */
+    densityOverride?: "compact" | "balanced" | "spacious";
+    /** Hide the sparse-card story-pull-quote block even if the recipe has
+     *  ≤10 ingredients + a description. Use when the description doubles
+     *  as the main body copy already (lead-paragraph in Newspaper, etc). */
+    hideStory?: boolean;
+    /** Hide the entire micronutrient block (where the layout puts it).
+     *  Some short recipes have weak micro data — hiding the block looks
+     *  cleaner than showing zeros. */
+    hideMicros?: boolean;
+    /** Nudge the recipe-title font-size up or down. Integer offset in pt:
+     *  -2 / -1 / 0 (default) / +1 / +2. Helps when a title wraps awkwardly
+     *  or looks too big on a short card. */
+    titleScale?: -2 | -1 | 0 | 1 | 2;
+  };
 };
 
 // Normalise a step entry (string or object) to the canonical RecipeStep shape.
@@ -87,6 +114,16 @@ export function normalizeStep(
   s: string | RecipeStep
 ): RecipeStep {
   return typeof s === "string" ? { text: s } : s;
+}
+
+// Returns the micros list a renderer should actually draw. recipe.tweaks.
+// hideMicros forces an empty array; otherwise the stored micros (or an
+// empty array fallback) are returned. Used by every layout that picks a
+// "topMicros" slice — pull from here so the hide-tweak fires uniformly
+// across all 11 layouts × 2 renderers without per-layout edits.
+export function visibleMicros(recipe: Recipe): Micronutrient[] {
+  if (recipe.tweaks?.hideMicros) return [];
+  return recipe.nutrition.micros ?? [];
 }
 
 // Returns the human-readable label for the nutrition basis. Used in headers
