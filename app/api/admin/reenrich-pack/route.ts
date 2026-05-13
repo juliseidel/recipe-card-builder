@@ -1,6 +1,5 @@
 import { NextResponse, after } from "next/server";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
-import { triggerEnrichForBuiltPack } from "@/lib/reel-library/pack-builder";
 
 // Bulk-Re-Enrich-Endpoint fuer existing Packs deren Cover/Hero nicht
 // generiert wurden (Bug-2026-05-13: Auth-Middleware blockte interne
@@ -63,11 +62,51 @@ async function handle(req: Request) {
   const recipeIds = (recipeRows ?? []).map((r) => r.id as string);
   const origin = url.origin;
 
+  // Query-Params: which parts to force-regenerate (default alle on, sodass
+  // ein nackter Aufruf "ALLES neu" macht — User-Wunsch beim Bulk-Repair).
+  const forceAll = url.searchParams.get("forceAll") !== "false";
+  const forceCover = forceAll || url.searchParams.get("cover") === "true";
+  const forceForewordText =
+    forceAll || url.searchParams.get("forewordText") === "true";
+  const forceForewordImage =
+    forceAll || url.searchParams.get("forewordImage") === "true";
+  const forceHero =
+    forceAll || url.searchParams.get("hero") === "true";
+
+  const internalToken = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const headers = {
+    "Content-Type": "application/json",
+    "x-internal-token": internalToken,
+  };
+
   after(async () => {
     try {
-      await triggerEnrichForBuiltPack(origin, packId, recipeIds);
+      // Pack-Enrich mit force-Flags
+      await fetch(`${origin}/api/packs/enrich`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          packId,
+          forceCover,
+          forceForewordText,
+          forceForewordImage,
+        }),
+      }).catch((err) =>
+        console.warn("[reenrich-pack] pack-enrich failed", err)
+      );
+
+      // Recipe-Enrich pro Recipe mit forceHero
+      await Promise.allSettled(
+        recipeIds.map((id) =>
+          fetch(`${origin}/api/recipes/enrich`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ recipeId: id, forceHero }),
+          })
+        )
+      );
       console.log(
-        `[reenrich-pack] triggered ${recipeIds.length} recipes + 1 pack-cover for packId=${packId}`
+        `[reenrich-pack] triggered ${recipeIds.length} recipes + pack-enrich for packId=${packId} (force: cover=${forceCover}, forewordText=${forceForewordText}, forewordImage=${forceForewordImage}, hero=${forceHero})`
       );
     } catch (err) {
       console.error("[reenrich-pack] failed", err);
