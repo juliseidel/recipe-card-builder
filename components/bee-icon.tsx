@@ -1,7 +1,12 @@
-// iOS-style bee icon — rendered as inline SVG so it looks identical on
-// every OS (Windows users were getting the flat system bee glyph, which
-// felt off-brand). Same geometry as the PDF variant in lib/pdf/bee-icon.tsx
-// so the booklet and the web view stay in lockstep.
+// Apple-iOS-Style Biene. Wir rendern das echte Emoji 🐝 mit erzwungenem
+// Apple-Color-Emoji-Font, damit Bienes Brand-Glyph auf macOS/iOS Safari +
+// Chrome immer als Apple-Bee dargestellt wird (gelb-orange Körper, schwarze
+// Streifen, blasse Flügel). Auf Windows/Android fällt der Browser auf den
+// jeweiligen System-Emoji-Font zurück — der größte Teil von Bienes Audience
+// ist iOS-mobile, daher ist Apple-Look bei den meisten Viewern garantiert.
+//
+// `font-variant-emoji: emoji` zwingt die Emoji-Glyph-Variante, falls der
+// Browser sie unterstützt (Chrome 122+, Safari 18+, Firefox 119+).
 
 type Props = {
   size?: number;
@@ -18,70 +23,25 @@ type Props = {
 export function BeeIcon({ size = 16, className, style, brandSlug }: Props) {
   if (brandSlug !== "biene") return null;
   return (
-    <svg
-      viewBox="0 0 64 64"
-      width={size}
-      height={size}
+    <span
       className={className}
-      style={style}
-      aria-hidden
       role="img"
+      aria-label="Biene"
+      style={{
+        fontFamily:
+          '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", emoji',
+        fontSize: size,
+        lineHeight: 1,
+        display: "inline-block",
+        verticalAlign: "middle",
+        fontStyle: "normal",
+        fontWeight: 400,
+        // @ts-expect-error — font-variant-emoji is a valid CSS property
+        // (CSS Fonts Level 4) but not yet in React's CSSProperties type
+        fontVariantEmoji: "emoji",
+      }}
     >
-      <path
-        d="M27 24 Q24 16 22 12"
-        stroke="#2b1f19"
-        strokeWidth={2}
-        fill="none"
-        strokeLinecap="round"
-      />
-      <path
-        d="M37 24 Q40 16 42 12"
-        stroke="#2b1f19"
-        strokeWidth={2}
-        fill="none"
-        strokeLinecap="round"
-      />
-      <circle cx={22} cy={12} r={2} fill="#2b1f19" />
-      <circle cx={42} cy={12} r={2} fill="#2b1f19" />
-      <ellipse
-        cx={20}
-        cy={24}
-        rx={10}
-        ry={7}
-        fill="#cfe8ff"
-        stroke="#9bbedb"
-        strokeWidth={0.7}
-      />
-      <ellipse
-        cx={44}
-        cy={24}
-        rx={10}
-        ry={7}
-        fill="#cfe8ff"
-        stroke="#9bbedb"
-        strokeWidth={0.7}
-      />
-      <ellipse
-        cx={32}
-        cy={40}
-        rx={18}
-        ry={17}
-        fill="#F4C44A"
-        stroke="#2b1f19"
-        strokeWidth={1.5}
-      />
-      <path
-        d="M15 35 Q32 37 49 35 L49 40 Q32 42 15 40 Z"
-        fill="#2b1f19"
-      />
-      <path
-        d="M15 47 Q32 49 49 47 L49 52 Q32 54 15 52 Z"
-        fill="#2b1f19"
-      />
-      <circle cx={26} cy={32} r={2.4} fill="#2b1f19" />
-      <circle cx={38} cy={32} r={2.4} fill="#2b1f19" />
-      <circle cx={26.5} cy={31.3} r={0.8} fill="#fff" />
-      <circle cx={38.5} cy={31.3} r={0.8} fill="#fff" />
-    </svg>
+      🐝
+    </span>
   );
 }
