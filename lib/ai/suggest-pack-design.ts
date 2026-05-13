@@ -51,6 +51,11 @@ const LAYOUT_OPTIONS: { id: CardLayout; description: string }[] = [
     description:
       "Macro-Bars mit Emojis + Checkbox-Zutaten + Timeline. Workout-fokussiert, alt — meist Vital besser.",
   },
+  {
+    id: "vinyl",
+    description:
+      "12\"-Schallplatte mit Hero als Center-Label, schwarze Disc mit Grooves, Audio-Spec-Strip (KCAL/MIN/KEY) + Top-Mikros, Steps als A-Side/B-Side-Tracklist (A1, A2, B1, B2), Zutaten als Liner-Notes. Pressed-by-Brand-Footer. Maximaler Wow-Faktor, einzigartig vs. allen anderen Layouts. Passt fuer Mealprep-Compilations, Hauptmahlzeiten-Packs, Show-Off-Sammlungen, alles wo der User eine Signature-Statement-Card haben moechte.",
+  },
 ];
 
 const MOOD_OPTIONS = [
@@ -228,9 +233,13 @@ TONALITÄT für Description/Subtitle/Tagline:
 PASSUNG sehr wichtig: Layout/Mood/Font sollen ZUR REZEPTAUSWAHL passen.
 - Wenn die Reels Dessert/Backwaren sind → patisserie/amber, lavender/honey, fraunces
 - Wenn Bowls/Healthy → vital, sage/mint, fraunces oder inter-tight
-- Wenn Mealprep → dashboard, sky, inter-tight
+- Wenn Mealprep → dashboard ODER vinyl, sky/cocoa, inter-tight
 - Wenn Snacks → minimal, mint/rose, fraunces
 - Wenn Comfort-Food/Hauptmahlzeiten → amber, honey, fraunces oder dm-serif
+- Wenn der User eine Signature-Compilation will (Top-Hits, Mealprep-Lieblinge,
+  Wochenstars) oder eine Show-Off-Sammlung → vinyl, cocoa/honey, fraunces.
+  vinyl ist deutlich von allen anderen Layouts unterscheidbar (Schallplatten-
+  Look) — gut wenn das Pack im Browser pop machen soll.
 
 SURFACE-STYLE (Pack-Hintergrund) — sei mutig wo es passt:
 - DEFAULT: solid — wirkt clean, sicher, immer ok

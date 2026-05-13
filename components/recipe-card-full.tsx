@@ -142,6 +142,8 @@ export function RecipeCardFull(props: RecipeCardFullProps) {
       return <VitalLayout {...props} />;
     case "amber":
       return <AmberLayout {...props} />;
+    case "vinyl":
+      return <VinylLayout {...props} />;
   }
 }
 
@@ -3609,4 +3611,515 @@ function MicrosPanel({
       </div>
     </div>
   );
+}
+
+// ════════════════════════════════════════════════
+// VINYL — 12"-Schallplatte (Phase C, neu)
+// ════════════════════════════════════════════════
+function VinylLayout({
+  brand,
+  pack,
+  recipe,
+  totalRecipes,
+}: RecipeCardFullProps) {
+  const recipeIndex = recipe.number - 1;
+  const grouped = groupIngredients(recipe.ingredients);
+  const flatIngredients = grouped.flatMap((g) => g.items);
+  const halfIngs = Math.ceil(flatIngredients.length / 2);
+
+  const time = recipe.prepTime + (recipe.cookTime ?? 0);
+  const audioKey = vinylAudioKeyWeb(recipe);
+  const topMicros = (recipe.nutrition.micros ?? [])
+    .slice()
+    .sort((a, b) => (b.pctDaily ?? 0) - (a.pctDaily ?? 0))
+    .slice(0, 3);
+
+  // Flat steps mit A1/A2/B1/B2-Labels
+  const stepGroups = groupRecipeSteps(recipe.steps);
+  const flatSteps: { label: string; text: string }[] = [];
+  let runningIdx = 0;
+  for (const g of stepGroups) {
+    for (const item of g.items) {
+      const sidePrefix =
+        runningIdx < Math.ceil(recipe.steps.length / 2) ? "A" : "B";
+      const sideIdx =
+        sidePrefix === "A"
+          ? runningIdx + 1
+          : runningIdx - Math.ceil(recipe.steps.length / 2) + 1;
+      flatSteps.push({ label: `${sidePrefix}${sideIdx}`, text: item.text });
+      runningIdx += 1;
+    }
+  }
+  const sideASize = Math.ceil(flatSteps.length / 2);
+  const sideA = flatSteps.slice(0, sideASize);
+  const sideB = flatSteps.slice(sideASize);
+
+  const showStory =
+    recipe.ingredients.length <= 10 && Boolean(recipe.description?.trim());
+
+  // CSS Grooves: konzentrische Ringe per radial-gradient gelayered
+  const groovesCss = `radial-gradient(circle at center,
+    transparent 27%, #1a1a1a 27%, transparent 27.6%,
+    transparent 32%, #181818 32%, transparent 32.6%,
+    transparent 37%, #1a1a1a 37%, transparent 37.6%,
+    transparent 42%, #181818 42%, transparent 42.6%,
+    transparent 47%, #1a1a1a 47%, transparent 47.6%,
+    transparent 50%)`;
+
+  return (
+    <article
+      className="overflow-hidden rounded-[var(--radius-card)] border"
+      style={{
+        background: pack.mood.background,
+        color: pack.mood.ink,
+        ...baseShellStyle(pack, brand),
+      }}
+    >
+      {/* ── Header ── */}
+      <header
+        className="flex items-center justify-between px-8 pt-7 pb-2"
+        style={{ color: pack.mood.inkSoft }}
+      >
+        <span
+          className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
+          style={{ color: pack.mood.accent }}
+        >
+          {pack.title}
+        </span>
+        <span
+          className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em]"
+        >
+          {String(recipeIndex + 1).padStart(2, "0")} / {String(totalRecipes).padStart(2, "0")}
+        </span>
+      </header>
+
+      {/* ── Vinyl-Disc + Title + Audio-Spec ── */}
+      <section className="flex flex-col items-center px-8 pt-4 pb-2">
+        {/* Disc */}
+        <div
+          className="relative aspect-square w-full max-w-[420px]"
+          style={{
+            background: `${groovesCss}, #0a0a0a`,
+            borderRadius: "50%",
+            boxShadow: "0 18px 50px -18px rgba(0,0,0,0.55)",
+          }}
+        >
+          {/* Center Label */}
+          <div
+            className="absolute inset-[35%] rounded-full"
+            style={{ background: pack.mood.accent }}
+          />
+          {/* Hero clipped */}
+          <div
+            className="absolute inset-[37%] overflow-hidden rounded-full"
+            style={{ background: pack.mood.background }}
+          >
+            {recipe.hero ? (
+              <Image
+                src={recipe.hero}
+                alt={recipe.title}
+                fill
+                sizes="240px"
+                className="object-cover"
+                quality={95}
+                unoptimized={recipe.hero.startsWith("data:")}
+              />
+            ) : (
+              <div
+                className="flex h-full w-full items-center justify-center font-display text-[80px] font-bold"
+                style={{ color: pack.mood.accent }}
+              >
+                {brand.name.charAt(0)}
+              </div>
+            )}
+          </div>
+          {/* Spindle hole */}
+          <div
+            className="absolute left-1/2 top-1/2 size-[6px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-inner"
+          />
+        </div>
+
+        {/* Title */}
+        <h2
+          className="mt-7 max-w-[480px] text-center font-display text-[34px] font-bold leading-[1.05] tracking-[-0.015em]"
+          style={{ color: pack.mood.ink }}
+        >
+          {softWrapWebTitle(recipe.title)}
+        </h2>
+
+        {/* Audio-Spec-Strip */}
+        <div
+          className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 px-4"
+          style={{ color: pack.mood.inkSoft }}
+        >
+          <span
+            className="font-mono text-[12px] font-bold uppercase tracking-[0.18em]"
+            style={{ color: pack.mood.ink }}
+          >
+            {Math.round(recipe.nutrition.kcal)} KCAL
+          </span>
+          <span className="opacity-30">│</span>
+          <span className="font-mono text-[12px] font-semibold uppercase tracking-[0.18em]">
+            {time} MIN
+          </span>
+          <span className="opacity-30">│</span>
+          <span
+            className="font-mono text-[12px] font-bold uppercase tracking-[0.18em]"
+            style={{ color: pack.mood.accent }}
+          >
+            {audioKey}
+          </span>
+        </div>
+
+        {/* Top-Mikros */}
+        {topMicros.length > 0 ? (
+          <div
+            className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 opacity-90"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            {topMicros.map((m, i) => (
+              <span
+                key={`${m.name}-${i}`}
+                className="flex items-baseline gap-1 font-mono text-[11px] uppercase tracking-[0.14em]"
+              >
+                <span
+                  className="font-semibold"
+                  style={{ color: pack.mood.accent }}
+                >
+                  {m.name}
+                </span>
+                {typeof m.pctDaily === "number" ? (
+                  <span
+                    className="font-bold"
+                    style={{ color: pack.mood.ink }}
+                  >
+                    {m.pctDaily}%
+                  </span>
+                ) : null}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        <span
+          className="mt-2 font-mono text-[9px] uppercase tracking-[0.18em] opacity-60"
+        >
+          {nutritionBasisInline(recipe.nutritionBasis)}
+        </span>
+      </section>
+
+      {/* ── Tracklist ── */}
+      <section className="grid grid-cols-1 gap-6 px-8 pt-8 sm:grid-cols-2 sm:gap-10">
+        <VinylSideColumnWeb
+          sideLabel="Side A"
+          tracks={sideA}
+          pack={pack}
+        />
+        {sideB.length > 0 ? (
+          <VinylSideColumnWeb
+            sideLabel="Side B"
+            tracks={sideB}
+            pack={pack}
+          />
+        ) : (
+          <div
+            className="hidden opacity-40 sm:block"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            <div
+              className="mb-2 flex items-center gap-2"
+              style={{ color: pack.mood.accent }}
+            >
+              <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]">
+                Side B
+              </span>
+              <span
+                className="h-[1px] flex-1"
+                style={{ background: pack.mood.ink, opacity: 0.15 }}
+              />
+            </div>
+            <p className="font-mono text-[11px] italic">
+              (Recipe fits on Side A — no Side B needed)
+            </p>
+          </div>
+        )}
+      </section>
+
+      {/* ── Liner Notes (Ingredients) ── */}
+      <section className="px-8 pt-8">
+        <div className="mb-2 flex items-center gap-2">
+          <span
+            className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
+            style={{ color: pack.mood.accent }}
+          >
+            Liner Notes
+          </span>
+          <span
+            className="h-[1px] flex-1"
+            style={{ background: pack.mood.ink, opacity: 0.15 }}
+          />
+          <span
+            className="font-mono text-[10px] uppercase tracking-[0.16em]"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            {recipe.ingredients.length} Ingredients
+          </span>
+        </div>
+        {grouped.length > 1 ? (
+          <div className="flex flex-col gap-4">
+            {grouped.map((group, gIdx) => (
+              <div key={`g-${gIdx}`}>
+                {group.name ? (
+                  <h4
+                    className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.18em]"
+                    style={{ color: pack.mood.inkSoft }}
+                  >
+                    {vinylWebGroupLabel(group.name)}
+                  </h4>
+                ) : null}
+                <VinylIngredientGridWeb
+                  items={group.items}
+                  pack={pack}
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
+            <div>
+              {flatIngredients.slice(0, halfIngs).map((ing, i) => (
+                <VinylIngredientRowWeb
+                  key={`a-${i}`}
+                  amount={ing.amount}
+                  name={ing.name}
+                  note={ing.note}
+                  pack={pack}
+                />
+              ))}
+            </div>
+            <div>
+              {flatIngredients.slice(halfIngs).map((ing, i) => (
+                <VinylIngredientRowWeb
+                  key={`b-${i}`}
+                  amount={ing.amount}
+                  name={ing.name}
+                  note={ing.note}
+                  pack={pack}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* ── Story-Block bei Sparse-Recipes ── */}
+      {showStory ? (
+        <section className="mt-6 px-8">
+          <blockquote
+            className="border-l-2 pl-4 font-display text-[15px] italic leading-relaxed"
+            style={{
+              borderColor: pack.mood.accent,
+              color: pack.mood.ink,
+            }}
+          >
+            {recipe.description}
+          </blockquote>
+        </section>
+      ) : null}
+
+      {/* ── Footer ── */}
+      <footer
+        className="mt-8 flex items-center justify-between border-t px-8 py-5"
+        style={{
+          borderColor: pack.mood.ink + "22",
+          color: pack.mood.inkSoft,
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
+            <circle cx="8" cy="8" r="7.5" fill="#0a0a0a" />
+            <circle cx="8" cy="8" r="2.5" fill={pack.mood.accent} />
+            <circle cx="8" cy="8" r="0.8" fill="#fff" />
+          </svg>
+          <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em]">
+            Pressed by {brand.name}
+          </span>
+        </div>
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em] opacity-70">
+          {brand.handle}
+        </span>
+      </footer>
+    </article>
+  );
+}
+
+// ─── Vinyl-Web-Sub-Components ─────────────────────────
+
+function VinylSideColumnWeb({
+  sideLabel,
+  tracks,
+  pack,
+}: {
+  sideLabel: string;
+  tracks: { label: string; text: string }[];
+  pack: Pack;
+}) {
+  return (
+    <div>
+      <div className="mb-3 flex items-center gap-2">
+        <span
+          className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
+          style={{ color: pack.mood.accent }}
+        >
+          {sideLabel}
+        </span>
+        <span
+          className="h-[1px] flex-1"
+          style={{ background: pack.mood.ink, opacity: 0.15 }}
+        />
+      </div>
+      {tracks.map((t, i) => (
+        <div
+          key={`${sideLabel}-${i}`}
+          className="mb-3 flex items-start gap-3 last:mb-0"
+        >
+          {/* Track-Label — gleiche fontSize/lineHeight wie Body (Anti-Pattern §1) */}
+          <span
+            className="shrink-0 font-mono text-[13px] italic font-bold leading-[1.45] tabular-nums"
+            style={{ color: pack.mood.accent, width: "26px" }}
+          >
+            {t.label}
+          </span>
+          {/* Track-Text */}
+          <p
+            className="text-[13px] leading-[1.45]"
+            style={{ color: pack.mood.ink }}
+          >
+            {t.text}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function VinylIngredientRowWeb({
+  amount,
+  name,
+  note,
+  pack,
+}: {
+  amount: string;
+  name: string;
+  note?: string;
+  pack: Pack;
+}) {
+  const displayAmount =
+    amount.length > 0
+      ? amount.charAt(0).toUpperCase() + amount.slice(1)
+      : amount;
+  const amountIsLong = displayAmount.length > 10;
+  return (
+    <div
+      className={`flex gap-3 border-b py-2 last:border-b-0 ${amountIsLong ? "items-center" : "items-start"}`}
+      style={{ borderColor: pack.mood.ink + "14" }}
+    >
+      <span
+        className="shrink-0 font-mono text-[12px] font-bold tabular-nums"
+        style={{ color: pack.mood.accent, width: "76px" }}
+      >
+        {displayAmount}
+      </span>
+      <div className="flex-1">
+        <p className="text-[13px] leading-snug" style={{ color: pack.mood.ink }}>
+          {name}
+        </p>
+        {note ? (
+          <p
+            className="mt-0.5 text-[11px] italic"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            {note}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function VinylIngredientGridWeb({
+  items,
+  pack,
+}: {
+  items: { amount: string; name: string; note?: string }[];
+  pack: Pack;
+}) {
+  if (items.length < 3) {
+    return (
+      <div>
+        {items.map((ing, i) => (
+          <VinylIngredientRowWeb
+            key={`g-${i}`}
+            amount={ing.amount}
+            name={ing.name}
+            note={ing.note}
+            pack={pack}
+          />
+        ))}
+      </div>
+    );
+  }
+  const half = Math.ceil(items.length / 2);
+  return (
+    <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
+      <div>
+        {items.slice(0, half).map((ing, i) => (
+          <VinylIngredientRowWeb
+            key={`gha-${i}`}
+            amount={ing.amount}
+            name={ing.name}
+            note={ing.note}
+            pack={pack}
+          />
+        ))}
+      </div>
+      <div>
+        {items.slice(half).map((ing, i) => (
+          <VinylIngredientRowWeb
+            key={`ghb-${i}`}
+            amount={ing.amount}
+            name={ing.name}
+            note={ing.note}
+            pack={pack}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// "Fuer" nur bei den/die/das — LAYOUT_RULES.md §5
+function vinylWebGroupLabel(name: string): string {
+  return /^(den|die|das)\s/i.test(name)
+    ? `Für ${name.toLowerCase()}`
+    : name;
+}
+
+function vinylAudioKeyWeb(recipe: Recipe): string {
+  const tags = (recipe.tags ?? []).map((t) => t.toLowerCase());
+  if (tags.some((t) => t.includes("vegan"))) return "VEGAN";
+  if (tags.some((t) => t.includes("high-protein") || t.includes("protein")))
+    return "HIGH-PROTEIN";
+  if (tags.some((t) => t.includes("low-carb"))) return "LOW-CARB";
+  if (tags.some((t) => t.includes("vegetarisch"))) return "VEG";
+  if (tags.some((t) => t.includes("dessert") || t.includes("kuchen")))
+    return "SWEET";
+  if (tags.some((t) => t.includes("snack"))) return "SNACK";
+  if (tags.some((t) => t.includes("mealprep"))) return "MEALPREP";
+  return "ORIGINAL";
+}
+
+function softWrapWebTitle(title: string): string {
+  // Compound-Substantive an Bindestrichen brechen lassen — Web nutzt ZWJ
+  // wenn nötig. Hier ein einfacher Word-Break-Hint.
+  return title;
 }

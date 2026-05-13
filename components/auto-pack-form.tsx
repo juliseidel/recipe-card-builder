@@ -2509,6 +2509,30 @@ function LayoutThumbnail({
         </>
       );
       break;
+    case "vinyl":
+      // 12"-Schallplatte mit Center-Label (Hero) + Tracklist drunter
+      body = (
+        <>
+          {/* Schwarze Disc */}
+          <circle cx="35" cy="22" r="18" fill="#0a0a0a" />
+          {/* Grooves */}
+          <circle cx="35" cy="22" r="15" fill="none" stroke="#1f1f1f" strokeWidth="0.4" />
+          <circle cx="35" cy="22" r="12" fill="none" stroke="#1f1f1f" strokeWidth="0.4" />
+          <circle cx="35" cy="22" r="9" fill="none" stroke="#1f1f1f" strokeWidth="0.4" />
+          {/* Center Label */}
+          <circle cx="35" cy="22" r="6" fill={accent} />
+          {/* Spindle hole */}
+          <circle cx="35" cy="22" r="0.8" fill="#fafafa" />
+          {/* Tracklist Lines */}
+          <rect x="4" y="44" width="6" height="1.5" rx="0.5" fill={accent} />
+          <rect x="12" y="44" width="20" height="1.5" rx="0.5" fill={inkSoft} opacity="0.4" />
+          <rect x="38" y="44" width="6" height="1.5" rx="0.5" fill={accent} />
+          <rect x="46" y="44" width="20" height="1.5" rx="0.5" fill={inkSoft} opacity="0.4" />
+          <rect x="4" y="48" width="6" height="1.5" rx="0.5" fill={accent} />
+          <rect x="12" y="48" width="16" height="1.5" rx="0.5" fill={inkSoft} opacity="0.4" />
+        </>
+      );
+      break;
   }
   return (
     <svg

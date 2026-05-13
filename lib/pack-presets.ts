@@ -61,6 +61,14 @@ export const layoutPresets: LayoutPreset[] = [
       "Macro-Bars mit Emojis 💪🌾🥑, Zutaten-Cart mit Checkboxen, Schritt-Timeline mit Verbindungslinien.",
     bestFor: "Aelteres Fitness-Layout — wir empfehlen Vital-Stack stattdessen",
   },
+  {
+    id: "vinyl",
+    title: "Vinyl",
+    description:
+      "12\"-Schallplatte: Hero als Center-Label auf schwarzer Disc mit Grooves, Title darunter, Audio-Spec-Strip (KCAL · MIN · KEY), Top-Mikros als Spec-Zeile. Steps als A-Side/B-Side-Tracklist (A1, A2, B1, B2). Zutaten als Liner-Notes in 2 Spalten. Footer „Pressed by [Brand]“. Komplett neue Design-Sprache aus der Musik-/Audio-Welt.",
+    bestFor:
+      "Mealprep-Sammlungen, Hauptmahlzeiten-Packs, Compilation-artige Kollektionen, jeder Pack der einen Signature-Wow-Faktor braucht",
+  },
 ];
 
 // Mood presets — eight pre-tuned palettes that pass contrast checks and look

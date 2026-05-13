@@ -39,6 +39,11 @@ const VARIANTS: Record<
   // Editorial-Foreword passt visuell — Honey-Mood, Stillleben in Frame,
   // Editorial-Magazine-Tonalitaet.
   amber: EditorialForewordPage,
+  // Vinyl-Layout reuses Editorial-Foreword als visuelle Bridge — der
+  // Vinyl-Look ist auf den Recipe-Cards selbst zu sehen, die Foreword-Page
+  // bleibt editorial-magazine. Dedizierte Vinyl-Foreword kann in einem
+  // spaeteren Schritt nachgereicht werden.
+  vinyl: EditorialForewordPage,
 };
 
 export function ForewordPage(props: ForewordPageProps) {

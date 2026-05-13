@@ -66,7 +66,11 @@ export type CardLayout =
   | "sport"
   | "dashboard"
   | "vital"
-  | "amber";
+  | "amber"
+  // ─── Neue Layouts (Phase C, ab 2026-05-13) ─────────────────────────────
+  // Jedes ist eine komplett andere Design-Sprache als die existierenden 7.
+  // Spec siehe docs/LAYOUT_RULES.md.
+  | "vinyl"; // 12"-Schallplatte: Hero als Center-Label, Steps als Tracklist
 
 export type Pack = {
   slug: string;
