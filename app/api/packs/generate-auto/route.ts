@@ -213,6 +213,8 @@ export async function POST(req: Request) {
   }
 
   // Layout: User-Override gewinnt, sonst Auto-Map nach moodHint.
+  // WICHTIG: Liste muss exakt CardLayout enum aus lib/packs.ts spiegeln,
+  // sonst werden gueltige Layouts ignoriert und auf default zurueckfallen.
   const VALID_LAYOUTS: import("@/lib/packs").CardLayout[] = [
     "editorial",
     "patisserie",
@@ -221,6 +223,7 @@ export async function POST(req: Request) {
     "dashboard",
     "vital",
     "amber",
+    "vinyl",
   ];
   let resolvedLayout: import("@/lib/packs").CardLayout;
   if (overrides.layout && VALID_LAYOUTS.includes(overrides.layout as import("@/lib/packs").CardLayout)) {

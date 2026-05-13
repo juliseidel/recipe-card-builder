@@ -92,6 +92,8 @@ type RouteParams = { params: Promise<{ id: string }> };
 
 // Valid layout-IDs gemaess CardLayout-Typ in lib/packs.ts. Wir akzeptieren
 // einen optionalen layout-Param im Body und prüfen ihn gegen diese Liste.
+// WICHTIG: muss exakt CardLayout enum aus lib/packs.ts spiegeln, sonst
+// werden gueltige Layouts vom UI ignoriert und auf default zurueckfallen.
 const VALID_LAYOUTS: readonly CardLayout[] = [
   "editorial",
   "vital",
@@ -99,6 +101,8 @@ const VALID_LAYOUTS: readonly CardLayout[] = [
   "patisserie",
   "amber",
   "dashboard",
+  "sport",
+  "vinyl",
 ] as const;
 
 export async function POST(req: Request, { params }: RouteParams) {
