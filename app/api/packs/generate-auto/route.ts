@@ -3,6 +3,7 @@ import { queryReelsForBrand, type ReelRow } from "@/lib/creator-reels-server";
 import { generatePackMeta } from "@/lib/ai/generate-pack-meta";
 import { buildPackFromReels, pickMoodById } from "@/lib/reel-library/pack-builder";
 import { loadBrand } from "@/lib/custom-brands-server";
+import type { Pack } from "@/lib/packs";
 
 // Auto-Pack-Generator. Wird vom Auto-Tab in /[brand]/new aufgerufen. User
 // gibt Filter (Timeframe, MealTypes, Cuisines), Server:
@@ -32,6 +33,24 @@ type Body = {
   sortBy?: "engagement" | "recent";
   /** Wie viele Reels max ins Pack. Default 12, Hard-Limit 20. */
   limit?: number;
+  /** Optionale User-Overrides — wenn gesetzt, wird Gemini's generatePackMeta
+   *  fuer diese Felder uebergangen. User-First. */
+  overrides?: {
+    title?: string;
+    subtitle?: string;
+    tagline?: string;
+    description?: string;
+    category?: string;
+    moodId?: string; // matched gegen moodPresets (lavender/sage/mint/sky/honey/rose/apricot/cocoa)
+    customMood?: {
+      background: string;
+      accent: string;
+      ink: string;
+      inkSoft: string;
+    };
+    layout?: string; // matched gegen CardLayout enum
+    displayFont?: "fraunces" | "dm-serif" | "inter-tight";
+  };
 };
 
 function sortReels(
@@ -114,48 +133,110 @@ export async function POST(req: Request) {
   }
 
   const selected = sortReels(allMatching, sortBy).slice(0, limit);
+  const overrides = body.overrides ?? {};
 
-  // Meta-Generierung (Title, Description, Mood). Brand wird mitgegeben, damit
-  // die Description in der Stimme der Creatorin geschrieben wird statt in
-  // generischer Marketing-Sprache.
+  // Meta-Generierung (Title, Description, Mood) NUR wenn nicht alle Felder
+  // ueberschrieben sind. User-First: wenn der User in der UI schon Title/
+  // Description gesetzt hat, sparen wir den Gemini-Call.
   const brand = await loadBrand(body.brandSlug);
-  let meta;
-  try {
-    meta = await generatePackMeta(selected, brand);
-  } catch (err) {
-    console.error("[generate-auto] generatePackMeta failed", err);
-    // Fallback: simple Default-Meta. Pack wird trotzdem erstellt.
+  const needsMeta = !(
+    overrides.title &&
+    overrides.subtitle &&
+    overrides.tagline &&
+    overrides.description &&
+    overrides.category
+  );
+  let meta: {
+    title: string;
+    subtitle: string;
+    tagline: string;
+    description: string;
+    category: string;
+    moodHint: "cream" | "sage" | "linen" | "amber";
+  };
+  if (needsMeta) {
+    try {
+      meta = await generatePackMeta(selected, brand);
+    } catch (err) {
+      console.error("[generate-auto] generatePackMeta failed", err);
+      meta = {
+        title: `${selected.length} Rezepte`,
+        subtitle: "Eine kuratierte Auswahl",
+        tagline: selected
+          .slice(0, 3)
+          .map((r) => r.recipe_title || "Rezept")
+          .join(" · "),
+        description: "Eine automatisch zusammengestellte Sammlung aus der Reel-Library des Creators.",
+        category: "Auto-Pack",
+        moodHint: "cream" as const,
+      };
+    }
+  } else {
+    // Alles vom User vorgegeben, generatePackMeta nicht noetig.
     meta = {
-      title: `${selected.length} Rezepte`,
-      subtitle: "Eine kuratierte Auswahl",
-      tagline: selected
-        .slice(0, 3)
-        .map((r) => r.recipe_title || "Rezept")
-        .join(" · "),
-      description: "Eine automatisch zusammengestellte Sammlung aus der Reel-Library des Creators.",
-      category: "Auto-Pack",
-      moodHint: "cream" as const,
+      title: overrides.title!,
+      subtitle: overrides.subtitle!,
+      tagline: overrides.tagline!,
+      description: overrides.description!,
+      category: overrides.category!,
+      moodHint: "cream",
     };
   }
 
-  // Mood-Mapping von brand-presets-IDs auf pack-presets-IDs.
-  const packMoodId = {
-    cream: "honey",
-    sage: "sage",
-    linen: "sky",
-    amber: "amber",
-  }[meta.moodHint] ?? "honey";
+  // Auto-Mapping wenn User keinen Mood/Layout/Font vorgegeben hat.
+  // Mood: erst User-customMood, dann User-moodId, dann moodHint-Mapping.
+  let resolvedMood: import("@/lib/packs").PackMood;
+  if (overrides.customMood) {
+    resolvedMood = overrides.customMood;
+  } else if (overrides.moodId) {
+    resolvedMood = pickMoodById(overrides.moodId);
+  } else {
+    const packMoodId = {
+      cream: "honey",
+      sage: "sage",
+      linen: "sky",
+      amber: "amber",
+    }[meta.moodHint] ?? "honey";
+    resolvedMood = pickMoodById(packMoodId);
+  }
 
-  const cardLayout: import("@/lib/packs").CardLayout =
-    meta.moodHint === "amber"
-      ? "amber"
-      : meta.moodHint === "sage"
-        ? "vital"
-        : meta.moodHint === "linen"
-          ? "minimal"
-          : "editorial";
+  // Layout: User-Override gewinnt, sonst Auto-Map nach moodHint.
+  const VALID_LAYOUTS: import("@/lib/packs").CardLayout[] = [
+    "editorial",
+    "patisserie",
+    "minimal",
+    "sport",
+    "dashboard",
+    "vital",
+    "amber",
+  ];
+  let resolvedLayout: import("@/lib/packs").CardLayout;
+  if (overrides.layout && VALID_LAYOUTS.includes(overrides.layout as import("@/lib/packs").CardLayout)) {
+    resolvedLayout = overrides.layout as import("@/lib/packs").CardLayout;
+  } else {
+    resolvedLayout =
+      meta.moodHint === "amber"
+        ? "amber"
+        : meta.moodHint === "sage"
+          ? "vital"
+          : meta.moodHint === "linen"
+            ? "minimal"
+            : "editorial";
+  }
 
-  const baseSlug = slugifyPack(meta.title) || "auto-pack";
+  // Font: User-Override gewinnt, sonst Auto-Map.
+  const resolvedFont: Pack["displayFont"] =
+    overrides.displayFont ??
+    (meta.moodHint === "linen" ? "inter-tight" : "fraunces");
+
+  // Override-Strings (falls partial)
+  const title = overrides.title?.trim() || meta.title;
+  const subtitle = overrides.subtitle?.trim() || meta.subtitle;
+  const tagline = overrides.tagline?.trim() || meta.tagline;
+  const description = overrides.description?.trim() || meta.description;
+  const category = overrides.category?.trim() || meta.category;
+
+  const baseSlug = slugifyPack(title) || "auto-pack";
   const slug = `${baseSlug}-${Date.now().toString(36).slice(-4)}`;
   const origin = new URL(req.url).origin;
 
@@ -164,14 +245,14 @@ export async function POST(req: Request) {
     reelIds: selected.map((r) => r.id),
     pack: {
       slug,
-      title: meta.title,
-      subtitle: meta.subtitle,
-      tagline: meta.tagline,
-      description: meta.description,
-      category: meta.category,
-      mood: pickMoodById(packMoodId),
-      displayFont: meta.moodHint === "linen" ? "inter-tight" : "fraunces",
-      cardLayout,
+      title,
+      subtitle,
+      tagline,
+      description,
+      category,
+      mood: resolvedMood,
+      displayFont: resolvedFont,
+      cardLayout: resolvedLayout,
     },
     origin,
   });

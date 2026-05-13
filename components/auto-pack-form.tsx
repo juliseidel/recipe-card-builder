@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import type { Brand } from "@/lib/brands";
+import type { CardLayout, PackMood } from "@/lib/packs";
+import { moodPresets, displayFontOptions, layoutPresets } from "@/lib/pack-presets";
 
 // Auto-Pack-Form fuer den /[brand]/new Auto-Tab. User waehlt Filter
 // (Timeframe + 8 Tag-Dimensionen + Limit + Sortierung), Live-Preview-Grid
@@ -35,6 +37,22 @@ type ReelPreview = {
 };
 
 type TagBucket = { value: string; count: number };
+
+// Server-Response von /api/packs/auto-suggest-design — Gemini-Vorschlag
+// fuer die Pack-Identitaet basierend auf den gewaehlten Reels.
+type PackDesignSuggestion = {
+  titles: string[];
+  layout: CardLayout;
+  layoutReason: string;
+  moodId: string;
+  moodReason: string;
+  fontId: "fraunces" | "dm-serif" | "inter-tight";
+  fontReason: string;
+  category: string;
+  subtitle: string;
+  tagline: string;
+  description: string;
+};
 
 type ReelTagAggregates = {
   total: number;
@@ -227,6 +245,30 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
   const [scrapeError, setScrapeError] = useState<string | null>(null);
   const [scrapeSuccess, setScrapeSuccess] = useState<string | null>(null);
 
+  // ─── Pack-Identity-State (KI-Auto-Setup) ───────────────────────────────
+  // User kann Title/Layout/Mood/Font manuell setzen ODER vom KI-Setup-
+  // Button befuellen lassen. Wenn nichts gesetzt ist (alles null), benutzt
+  // der Generate-Endpoint die generatePackMeta-Heuristik wie vorher.
+  const [packTitle, setPackTitle] = useState<string>("");
+  const [packSubtitle, setPackSubtitle] = useState<string>("");
+  const [packTagline, setPackTagline] = useState<string>("");
+  const [packDescription, setPackDescription] = useState<string>("");
+  const [packCategory, setPackCategory] = useState<string>("");
+  const [packLayout, setPackLayout] = useState<CardLayout | null>(null);
+  const [packMoodId, setPackMoodId] = useState<string | null>(null);
+  const [packCustomMood, setPackCustomMood] = useState<PackMood | null>(null);
+  const [packFont, setPackFont] = useState<
+    "fraunces" | "dm-serif" | "inter-tight" | null
+  >(null);
+
+  // KI-Suggestion-State: gespeicherte Antwort + Loading + 5 Title-Alternativen
+  const [aiSuggestion, setAiSuggestion] =
+    useState<PackDesignSuggestion | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [showAlternativeTitles, setShowAlternativeTitles] = useState(false);
+  const [showOptionalDetails, setShowOptionalDetails] = useState(false);
+
   const loadTags = useCallback(async () => {
     setTagsLoading(true);
     try {
@@ -411,6 +453,115 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
     }
   };
 
+  // Bundled filter-payload — identisch fuer /reels, /auto-suggest-design,
+  // /generate-auto Calls. So muss man Filter nur an EINER Stelle aendern.
+  const filterPayload = useMemo(() => {
+    const tf = TIMEFRAME_PRESETS.find((t) => t.id === timeframe);
+    const maxTimeMinutes = timeBucket
+      ? TIME_BUCKET_TO_MAX[timeBucket]
+      : undefined;
+    return {
+      brandSlug: brand.slug,
+      fromDate: tf && tf.days > 0 ? isoDaysAgo(tf.days) : undefined,
+      mealTypes: mealTypes.length > 0 ? mealTypes : undefined,
+      cuisines: cuisines.length > 0 ? cuisines : undefined,
+      mainIngredients:
+        mainIngredients.length > 0 ? mainIngredients : undefined,
+      dietaries: dietaries.length > 0 ? dietaries : undefined,
+      occasions: occasions.length > 0 ? occasions : undefined,
+      seasons: seasons.length > 0 ? seasons : undefined,
+      skillLevels: skillLevels.length > 0 ? skillLevels : undefined,
+      vessels: vessels.length > 0 ? vessels : undefined,
+      maxTimeMinutes,
+      limit,
+      sortBy,
+    };
+  }, [
+    brand.slug,
+    timeframe,
+    mealTypes,
+    cuisines,
+    mainIngredients,
+    dietaries,
+    occasions,
+    seasons,
+    skillLevels,
+    vessels,
+    timeBucket,
+    limit,
+    sortBy,
+  ]);
+
+  // KI-Auto-Setup: Gemini schaut auf die gewaehlten Reels und schlaegt
+  // Title/Layout/Mood/Font + 5 Title-Alternativen vor. User kann
+  // Vorschlag uebernehmen (per Klick auf einen Title) oder eigenes setzen.
+  const loadAiSuggestion = useCallback(async () => {
+    if (!reels || reels.length < 3) {
+      setAiError(
+        "Mindestens 3 Reels in der Live-Vorschau, bevor KI Vorschläge machen kann."
+      );
+      return;
+    }
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const res = await fetch("/api/packs/auto-suggest-design", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(filterPayload),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.suggestion) {
+        throw new Error(json.error ?? "KI-Vorschlag fehlgeschlagen.");
+      }
+      const s = json.suggestion as PackDesignSuggestion;
+      setAiSuggestion(s);
+      // Auto-Apply die Top-Empfehlung wenn User noch nichts gesetzt hat.
+      if (!packTitle && s.titles[0]) setPackTitle(s.titles[0]);
+      if (!packLayout) setPackLayout(s.layout);
+      if (!packMoodId && !packCustomMood) setPackMoodId(s.moodId);
+      if (!packFont) setPackFont(s.fontId);
+      if (!packCategory && s.category) setPackCategory(s.category);
+      if (!packSubtitle && s.subtitle) setPackSubtitle(s.subtitle);
+      if (!packTagline && s.tagline) setPackTagline(s.tagline);
+      if (!packDescription && s.description) setPackDescription(s.description);
+      setShowAlternativeTitles(false);
+    } catch (err) {
+      setAiError(
+        err instanceof Error ? err.message : "KI-Vorschlag fehlgeschlagen."
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  }, [
+    reels,
+    filterPayload,
+    packTitle,
+    packLayout,
+    packMoodId,
+    packCustomMood,
+    packFont,
+    packCategory,
+    packSubtitle,
+    packTagline,
+    packDescription,
+  ]);
+
+  const resetDesignOverrides = () => {
+    setPackTitle("");
+    setPackSubtitle("");
+    setPackTagline("");
+    setPackDescription("");
+    setPackCategory("");
+    setPackLayout(null);
+    setPackMoodId(null);
+    setPackCustomMood(null);
+    setPackFont(null);
+    setAiSuggestion(null);
+    setShowAlternativeTitles(false);
+    setShowOptionalDetails(false);
+  };
+
   const handleGenerate = async () => {
     if (!reels || reels.length < 3) {
       setError("Mindestens 3 Reels nötig, um ein Pack zu generieren.");
@@ -419,28 +570,26 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
     setGenerating(true);
     setError(null);
     try {
-      const tf = TIMEFRAME_PRESETS.find((t) => t.id === timeframe);
-      const maxTimeMinutes = timeBucket
-        ? TIME_BUCKET_TO_MAX[timeBucket]
-        : undefined;
+      // User-Overrides bauen: nur Felder mitschicken die User explizit
+      // gesetzt hat. Leere bleiben undefined, Backend nutzt dann seine
+      // generatePackMeta-Heuristik.
+      const overrides: Record<string, unknown> = {};
+      if (packTitle.trim()) overrides.title = packTitle.trim();
+      if (packSubtitle.trim()) overrides.subtitle = packSubtitle.trim();
+      if (packTagline.trim()) overrides.tagline = packTagline.trim();
+      if (packDescription.trim()) overrides.description = packDescription.trim();
+      if (packCategory.trim()) overrides.category = packCategory.trim();
+      if (packLayout) overrides.layout = packLayout;
+      if (packCustomMood) overrides.customMood = packCustomMood;
+      else if (packMoodId) overrides.moodId = packMoodId;
+      if (packFont) overrides.displayFont = packFont;
+
       const res = await fetch("/api/packs/generate-auto", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          brandSlug: brand.slug,
-          fromDate: tf && tf.days > 0 ? isoDaysAgo(tf.days) : undefined,
-          mealTypes: mealTypes.length > 0 ? mealTypes : undefined,
-          cuisines: cuisines.length > 0 ? cuisines : undefined,
-          mainIngredients:
-            mainIngredients.length > 0 ? mainIngredients : undefined,
-          dietaries: dietaries.length > 0 ? dietaries : undefined,
-          occasions: occasions.length > 0 ? occasions : undefined,
-          seasons: seasons.length > 0 ? seasons : undefined,
-          skillLevels: skillLevels.length > 0 ? skillLevels : undefined,
-          vessels: vessels.length > 0 ? vessels : undefined,
-          maxTimeMinutes,
-          limit,
-          sortBy,
+          ...filterPayload,
+          overrides: Object.keys(overrides).length > 0 ? overrides : undefined,
         }),
       });
       const json = await res.json();
@@ -454,6 +603,24 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
       setGenerating(false);
     }
   };
+
+  // Resolved-Mood fuer Live-Preview: Custom > Preset > null
+  const resolvedMood = useMemo<PackMood | null>(() => {
+    if (packCustomMood) return packCustomMood;
+    if (packMoodId)
+      return moodPresets.find((m) => m.id === packMoodId)?.mood ?? null;
+    return null;
+  }, [packCustomMood, packMoodId]);
+
+  // Hilft beim Disable des Generate-Buttons + KI-Setup
+  const hasEnoughReels = (reels?.length ?? 0) >= 3;
+  const designIsUntouched =
+    !packTitle &&
+    !packLayout &&
+    !packMoodId &&
+    !packCustomMood &&
+    !packFont &&
+    !aiSuggestion;
 
   const recipeWord = limit === 1 ? "Rezept" : "Rezepte";
   const reelWord = (reels?.length ?? 0) === 1 ? "Reel" : "Reels";
@@ -974,6 +1141,535 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
         )}
       </section>
 
+      {/* Section 5 — Pack-Identität (KI-Auto-Setup + Manual Overrides).
+          Hier waehlt der User Title/Layout/Mood/Font. Der Master-Button
+          "✨ KI-Auto-Setup" befuellt alle Felder in einem Klick basierend
+          auf den gewaehlten Reels. */}
+      <section className="editor-section editor-card flex flex-col gap-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <SectionHeader
+            num="05"
+            title="Pack-Identität"
+            hint="Titel, Farbe, Layout, Font — manuell oder KI-vorschlagen lassen."
+            brand={brand}
+          />
+          <div className="flex shrink-0 gap-2">
+            {!designIsUntouched ? (
+              <button
+                type="button"
+                onClick={resetDesignOverrides}
+                className="rounded-full border px-3 py-2 text-[11.5px] font-semibold transition-all hover:opacity-80"
+                style={{
+                  borderColor: brand.tokens.line,
+                  color: brand.tokens.inkMuted,
+                  background: brand.tokens.surface,
+                }}
+              >
+                ✕ Zurücksetzen
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void loadAiSuggestion()}
+              disabled={!hasEnoughReels || aiLoading}
+              className="flex items-center gap-1.5 rounded-full px-4 py-2 text-[12.5px] font-semibold text-white transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ background: brand.tokens.accent }}
+              title={
+                !hasEnoughReels
+                  ? "Mindestens 3 Reels in der Live-Vorschau nötig"
+                  : "KI wählt Titel, Layout, Farbe und Font passend zu den Reels"
+              }
+            >
+              {aiLoading ? (
+                <>
+                  <span className="size-3 animate-spin rounded-full border-[1.5px] border-white/40 border-t-white" />
+                  Gemini denkt nach…
+                </>
+              ) : (
+                <>✨ KI-Auto-Setup</>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {aiError ? (
+          <div
+            className="rounded-xl border px-4 py-2.5 text-[12px]"
+            style={{
+              borderColor: "rgba(197, 48, 48, 0.3)",
+              background: "rgba(254, 226, 226, 0.6)",
+              color: "#9b2c2c",
+            }}
+          >
+            {aiError}
+          </div>
+        ) : null}
+
+        {/* ── Title-Input mit KI-Alternativen-Toggle ── */}
+        <div className="flex flex-col gap-2">
+          <label
+            className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+            style={{ color: brand.tokens.inkMuted }}
+          >
+            Pack-Titel
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={packTitle}
+              onChange={(e) => setPackTitle(e.target.value)}
+              placeholder='z. B. „Bowls für die Woche" — leer lassen für Auto-Titel'
+              maxLength={50}
+              className="editor-input flex-1"
+            />
+            {aiSuggestion && aiSuggestion.titles.length > 1 ? (
+              <button
+                type="button"
+                onClick={() => setShowAlternativeTitles((v) => !v)}
+                className="shrink-0 rounded-xl border-2 px-3 py-2.5 text-[12px] font-semibold transition-all"
+                style={{
+                  borderColor: brand.tokens.line,
+                  color: brand.tokens.inkMuted,
+                  background: brand.tokens.surface,
+                }}
+                title="Weitere KI-Titel-Vorschläge anzeigen"
+              >
+                {showAlternativeTitles ? "✕" : "✨"} {aiSuggestion.titles.length} Vorschläge
+              </button>
+            ) : null}
+          </div>
+          {showAlternativeTitles && aiSuggestion ? (
+            <div className="mt-1 flex flex-col gap-1.5 rounded-xl border bg-white p-2.5"
+              style={{ borderColor: brand.tokens.line }}
+            >
+              {aiSuggestion.titles.map((t, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    setPackTitle(t);
+                    setShowAlternativeTitles(false);
+                  }}
+                  className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] transition-colors hover:bg-current/5"
+                  style={{ color: brand.tokens.ink }}
+                >
+                  <span>{t}</span>
+                  <span
+                    className="font-mono text-[10px] uppercase tracking-[0.14em]"
+                    style={{ color: brand.tokens.inkMuted }}
+                  >
+                    {i === 0 ? "★ Top-Pick" : `Vorschlag ${i + 1}`}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        {/* ── Layout-Picker ── */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <label
+              className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+              style={{ color: brand.tokens.inkMuted }}
+            >
+              Layout
+            </label>
+            {aiSuggestion ? (
+              <span
+                className="text-[10.5px]"
+                style={{ color: brand.tokens.inkMuted }}
+              >
+                ✨ Empfohlen: <span style={{ color: brand.tokens.ink, fontWeight: 600 }}>{layoutPresets.find((l) => l.id === aiSuggestion.layout)?.title}</span>
+                {" — "}
+                {aiSuggestion.layoutReason}
+              </span>
+            ) : null}
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+            {layoutPresets.map((l) => {
+              const active = packLayout === l.id;
+              const recommended = aiSuggestion?.layout === l.id;
+              return (
+                <button
+                  key={l.id}
+                  type="button"
+                  onClick={() => setPackLayout(active ? null : l.id)}
+                  className="group flex flex-col items-stretch gap-1.5 rounded-2xl border-2 p-2.5 text-left transition-all"
+                  style={{
+                    borderColor: active
+                      ? brand.tokens.accent
+                      : brand.tokens.line,
+                    background: active
+                      ? brand.tokens.accent + "12"
+                      : brand.tokens.surface,
+                  }}
+                  title={l.description}
+                >
+                  <LayoutThumbnail
+                    layout={l.id}
+                    accent={brand.tokens.accent}
+                    inkSoft={brand.tokens.inkMuted}
+                    surface={brand.tokens.surface}
+                  />
+                  <div className="flex items-center justify-between gap-1">
+                    <span
+                      className="text-[11.5px] font-semibold"
+                      style={{
+                        color: active ? brand.tokens.accent : brand.tokens.ink,
+                      }}
+                    >
+                      {l.title}
+                    </span>
+                    {recommended && !active ? (
+                      <span
+                        className="font-mono text-[9px]"
+                        style={{ color: brand.tokens.accent }}
+                      >
+                        ✨
+                      </span>
+                    ) : null}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Mood-Picker (8 Presets + Custom) ── */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <label
+              className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+              style={{ color: brand.tokens.inkMuted }}
+            >
+              Farbe / Mood
+            </label>
+            {aiSuggestion ? (
+              <span
+                className="text-[10.5px]"
+                style={{ color: brand.tokens.inkMuted }}
+              >
+                ✨ Empfohlen: <span style={{ color: brand.tokens.ink, fontWeight: 600 }}>{moodPresets.find((m) => m.id === aiSuggestion.moodId)?.label}</span>
+                {" — "}
+                {aiSuggestion.moodReason}
+              </span>
+            ) : null}
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {moodPresets.map((preset) => {
+              const active =
+                !packCustomMood && packMoodId === preset.id;
+              const recommended = aiSuggestion?.moodId === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => {
+                    setPackMoodId(active ? null : preset.id);
+                    setPackCustomMood(null);
+                  }}
+                  className="flex flex-col items-stretch gap-1.5 rounded-2xl border-2 p-2.5 text-left transition-all"
+                  style={{
+                    borderColor: active
+                      ? preset.mood.accent
+                      : brand.tokens.line,
+                    background: brand.tokens.surface,
+                  }}
+                >
+                  <div
+                    className="flex h-9 overflow-hidden rounded-lg"
+                    style={{ background: preset.mood.background }}
+                  >
+                    <span
+                      className="flex-1"
+                      style={{ background: preset.mood.background }}
+                    />
+                    <span
+                      className="w-1/3"
+                      style={{ background: preset.mood.accent }}
+                    />
+                    <span
+                      className="w-[10%]"
+                      style={{ background: preset.mood.ink }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-1">
+                    <span
+                      className="text-[11.5px] font-semibold"
+                      style={{ color: preset.mood.ink }}
+                    >
+                      {preset.label}
+                    </span>
+                    {recommended && !active ? (
+                      <span
+                        className="font-mono text-[9px]"
+                        style={{ color: brand.tokens.accent }}
+                      >
+                        ✨
+                      </span>
+                    ) : null}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Custom-Mood-Toggle */}
+          <details
+            className="group mt-1 rounded-xl border border-dashed px-3 py-2"
+            style={{ borderColor: brand.tokens.line }}
+            open={!!packCustomMood}
+          >
+            <summary
+              className="flex cursor-pointer items-center justify-between text-[12px] font-semibold"
+              onClick={(e) => {
+                e.preventDefault();
+                if (packCustomMood) {
+                  setPackCustomMood(null);
+                } else {
+                  const seed =
+                    moodPresets.find((m) => m.id === packMoodId)?.mood ??
+                    moodPresets[0].mood;
+                  setPackCustomMood({ ...seed });
+                  setPackMoodId(null);
+                }
+              }}
+              style={{ color: brand.tokens.inkMuted }}
+            >
+              <span>Eigene Farben (4 Picker)</span>
+              <span
+                className="font-mono text-[10px] uppercase tracking-[0.14em]"
+                style={{ color: packCustomMood ? brand.tokens.accent : brand.tokens.inkMuted }}
+              >
+                {packCustomMood ? "Aktiv" : "Aktivieren"}
+              </span>
+            </summary>
+            {packCustomMood ? (
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <ColorPickerInput
+                  label="Hintergrund"
+                  value={packCustomMood.background}
+                  onChange={(v) =>
+                    setPackCustomMood({ ...packCustomMood, background: v })
+                  }
+                  brand={brand}
+                />
+                <ColorPickerInput
+                  label="Akzent"
+                  value={packCustomMood.accent}
+                  onChange={(v) =>
+                    setPackCustomMood({ ...packCustomMood, accent: v })
+                  }
+                  brand={brand}
+                />
+                <ColorPickerInput
+                  label="Tinte"
+                  value={packCustomMood.ink}
+                  onChange={(v) =>
+                    setPackCustomMood({ ...packCustomMood, ink: v })
+                  }
+                  brand={brand}
+                />
+                <ColorPickerInput
+                  label="Tinte weich"
+                  value={packCustomMood.inkSoft}
+                  onChange={(v) =>
+                    setPackCustomMood({ ...packCustomMood, inkSoft: v })
+                  }
+                  brand={brand}
+                />
+              </div>
+            ) : null}
+          </details>
+        </div>
+
+        {/* ── Font-Picker ── */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <label
+              className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+              style={{ color: brand.tokens.inkMuted }}
+            >
+              Display-Font
+            </label>
+            {aiSuggestion ? (
+              <span
+                className="text-[10.5px]"
+                style={{ color: brand.tokens.inkMuted }}
+              >
+                ✨ Empfohlen: <span style={{ color: brand.tokens.ink, fontWeight: 600 }}>{displayFontOptions.find((f) => f.id === aiSuggestion.fontId)?.label}</span>
+              </span>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {displayFontOptions.map((f) => {
+              const active = packFont === f.id;
+              const recommended = aiSuggestion?.fontId === f.id;
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setPackFont(active ? null : f.id)}
+                  className="flex flex-col items-start gap-0.5 rounded-xl border-2 px-3 py-2 text-left transition-all"
+                  style={{
+                    borderColor: active
+                      ? brand.tokens.accent
+                      : brand.tokens.line,
+                    background: active
+                      ? brand.tokens.accent + "10"
+                      : brand.tokens.surface,
+                  }}
+                >
+                  <span
+                    className="flex items-center gap-1.5 text-[14px] font-semibold"
+                    style={{
+                      color: active ? brand.tokens.accent : brand.tokens.ink,
+                    }}
+                  >
+                    {f.label}
+                    {recommended && !active ? (
+                      <span className="font-mono text-[9px]" style={{ color: brand.tokens.accent }}>✨</span>
+                    ) : null}
+                  </span>
+                  <span
+                    className="text-[10.5px]"
+                    style={{ color: brand.tokens.inkMuted }}
+                  >
+                    {f.hint}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Optional Details (collapsible) ── */}
+        <details
+          className="group rounded-xl border border-dashed px-4 py-3"
+          style={{ borderColor: brand.tokens.line }}
+          open={showOptionalDetails}
+          onToggle={(e) => setShowOptionalDetails((e.target as HTMLDetailsElement).open)}
+        >
+          <summary
+            className="flex cursor-pointer items-center justify-between text-[12.5px] font-semibold"
+            style={{ color: brand.tokens.inkMuted }}
+          >
+            <span className="flex items-center gap-2">
+              <span>Optional: Subtitle, Tagline, Beschreibung, Kategorie</span>
+              <span
+                className="rounded-full px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-[0.14em]"
+                style={{
+                  background: brand.tokens.line,
+                  color: brand.tokens.inkMuted,
+                }}
+              >
+                Auto wenn leer
+              </span>
+            </span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.16em] group-open:hidden">
+              aufklappen
+            </span>
+            <span className="hidden font-mono text-[10px] uppercase tracking-[0.16em] group-open:inline">
+              zuklappen
+            </span>
+          </summary>
+          <div className="mt-4 flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: brand.tokens.inkMuted }}>
+                Untertitel
+              </label>
+              <input
+                type="text"
+                className="editor-input"
+                value={packSubtitle}
+                onChange={(e) => setPackSubtitle(e.target.value)}
+                placeholder="z. B. „High-Protein Frühstücke unter 400 kcal"
+                maxLength={80}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: brand.tokens.inkMuted }}>
+                Tagline
+              </label>
+              <input
+                type="text"
+                className="editor-input"
+                value={packTagline}
+                onChange={(e) => setPackTagline(e.target.value)}
+                placeholder="z. B. „Overnight Oats, Protein-Pancakes, Frischkäse-Toast"
+                maxLength={140}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: brand.tokens.inkMuted }}>
+                Beschreibung
+              </label>
+              <textarea
+                className="editor-input min-h-[80px] resize-none"
+                value={packDescription}
+                onChange={(e) => setPackDescription(e.target.value)}
+                placeholder="2-3 Sätze in deiner Stimme..."
+                maxLength={300}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: brand.tokens.inkMuted }}>
+                Kategorie
+              </label>
+              <input
+                type="text"
+                className="editor-input"
+                value={packCategory}
+                onChange={(e) => setPackCategory(e.target.value)}
+                placeholder="z. B. Frühstück, Snacks, Mealprep"
+                maxLength={40}
+              />
+            </div>
+          </div>
+        </details>
+
+        {/* ── Live Mood-Preview-Strip ── */}
+        {resolvedMood ? (
+          <div
+            className="flex items-stretch gap-0 overflow-hidden rounded-xl border"
+            style={{ borderColor: brand.tokens.line }}
+          >
+            <div
+              className="flex-1 px-3 py-2.5"
+              style={{ background: resolvedMood.background, color: resolvedMood.ink }}
+            >
+              <p className="text-[11px] uppercase tracking-[0.16em] opacity-70">
+                Live-Vorschau Pack-Cover-Mood
+              </p>
+              <p
+                className="text-[16px] font-semibold leading-tight"
+                style={{
+                  fontFamily:
+                    packFont === "dm-serif"
+                      ? "var(--font-dm-serif, serif)"
+                      : packFont === "inter-tight"
+                        ? "var(--font-inter-tight, sans-serif)"
+                        : "var(--font-fraunces, serif)",
+                }}
+              >
+                {packTitle.trim() || "Pack-Titel"}
+              </p>
+            </div>
+            <div
+              className="w-12"
+              style={{ background: resolvedMood.accent }}
+              title="Akzent"
+            />
+            <div
+              className="w-6"
+              style={{ background: resolvedMood.ink }}
+              title="Tinte"
+            />
+          </div>
+        ) : null}
+      </section>
+
       {/* Save bar */}
       <div className="sticky bottom-4 z-10">
         <div
@@ -1275,5 +1971,179 @@ function TimeFilterGroup({
         })}
       </div>
     </div>
+  );
+}
+
+// ─── Layout-Thumbnail (Mini-SVG-Vorschau pro Layout) ─────────────────────
+
+function LayoutThumbnail({
+  layout,
+  accent,
+  inkSoft,
+  surface,
+}: {
+  layout: CardLayout;
+  accent: string;
+  inkSoft: string;
+  surface: string;
+}) {
+  // Mini-SVG-Vorschau (70×52) die das Layout-Konzept andeutet. Kein perfekter
+  // Render, aber der User erkennt den Charakter (Sidebar, Full-Bleed, etc).
+  const base = (
+    <rect x="0" y="0" width="70" height="52" rx="4" fill={surface} />
+  );
+  let body: React.ReactNode;
+  switch (layout) {
+    case "patisserie":
+      // Linke Sidebar in Akzentfarbe + Polaroid + 4 Body-Zeilen rechts
+      body = (
+        <>
+          <rect x="0" y="0" width="24" height="52" fill={accent} />
+          <rect x="4" y="6" width="16" height="14" rx="1" fill={surface} opacity="0.95" />
+          <rect x="28" y="6" width="38" height="3" rx="1" fill={accent} />
+          <rect x="28" y="12" width="30" height="2" rx="1" fill={inkSoft} opacity="0.4" />
+          <rect x="28" y="18" width="34" height="2" rx="1" fill={inkSoft} opacity="0.4" />
+          <rect x="28" y="22" width="32" height="2" rx="1" fill={inkSoft} opacity="0.4" />
+          <rect x="28" y="26" width="33" height="2" rx="1" fill={inkSoft} opacity="0.4" />
+        </>
+      );
+      break;
+    case "minimal":
+      // Full-Bleed Hero oben + Spec-Strip + Body
+      body = (
+        <>
+          <rect x="0" y="0" width="70" height="24" fill={accent} opacity="0.6" />
+          <rect x="6" y="14" width="38" height="4" rx="1" fill={surface} />
+          <rect x="4" y="28" width="62" height="3" rx="1.5" fill={accent} />
+          <rect x="4" y="34" width="58" height="2" rx="1" fill={inkSoft} opacity="0.4" />
+          <rect x="4" y="38" width="52" height="2" rx="1" fill={inkSoft} opacity="0.4" />
+          <rect x="4" y="42" width="60" height="2" rx="1" fill={inkSoft} opacity="0.4" />
+        </>
+      );
+      break;
+    case "vital":
+      // 3 gestapelte Cards
+      body = (
+        <>
+          <rect x="4" y="4" width="62" height="12" rx="2" fill={accent} opacity="0.5" />
+          <rect x="4" y="20" width="62" height="12" rx="2" fill={accent} opacity="0.85" />
+          <circle cx="14" cy="26" r="3" fill={surface} />
+          <circle cx="24" cy="26" r="3" fill={surface} />
+          <circle cx="34" cy="26" r="3" fill={surface} />
+          <rect x="4" y="36" width="62" height="12" rx="2" fill={inkSoft} opacity="0.25" />
+        </>
+      );
+      break;
+    case "dashboard":
+      // Notion-Style Data-Rows
+      body = (
+        <>
+          <rect x="4" y="4" width="24" height="5" rx="1.5" fill={accent} />
+          <rect x="4" y="14" width="62" height="6" rx="1" fill={inkSoft} opacity="0.15" />
+          <rect x="4" y="22" width="62" height="6" rx="1" fill={inkSoft} opacity="0.15" />
+          <rect x="4" y="30" width="62" height="6" rx="1" fill={inkSoft} opacity="0.15" />
+          <rect x="4" y="38" width="62" height="6" rx="1" fill={inkSoft} opacity="0.15" />
+        </>
+      );
+      break;
+    case "amber":
+      // Sunset-Editorial: Hero zentriert mit Halo + Stat-Ribbon
+      body = (
+        <>
+          <circle cx="35" cy="18" r="14" fill={accent} opacity="0.7" />
+          <circle cx="35" cy="18" r="9" fill={accent} />
+          <rect x="4" y="36" width="62" height="4" rx="1" fill={accent} opacity="0.4" />
+          <rect x="4" y="42" width="42" height="3" rx="1" fill={inkSoft} opacity="0.4" />
+        </>
+      );
+      break;
+    case "editorial":
+      // Mikronaehrstoff-Banner oben + Hero + Body
+      body = (
+        <>
+          <rect x="4" y="4" width="62" height="4" rx="1" fill={accent} />
+          <rect x="4" y="12" width="30" height="24" rx="2" fill={accent} opacity="0.5" />
+          <rect x="38" y="12" width="28" height="3" rx="1" fill={inkSoft} opacity="0.6" />
+          <rect x="38" y="18" width="22" height="2" rx="1" fill={inkSoft} opacity="0.4" />
+          <rect x="38" y="22" width="26" height="2" rx="1" fill={inkSoft} opacity="0.4" />
+          <rect x="38" y="26" width="24" height="2" rx="1" fill={inkSoft} opacity="0.4" />
+          <rect x="4" y="40" width="62" height="2" rx="1" fill={inkSoft} opacity="0.3" />
+          <rect x="4" y="44" width="50" height="2" rx="1" fill={inkSoft} opacity="0.3" />
+        </>
+      );
+      break;
+    case "sport":
+      // Macro-Bars + Timeline
+      body = (
+        <>
+          <rect x="4" y="4" width="62" height="4" rx="2" fill={inkSoft} opacity="0.2" />
+          <rect x="4" y="4" width="40" height="4" rx="2" fill={accent} />
+          <rect x="4" y="12" width="62" height="4" rx="2" fill={inkSoft} opacity="0.2" />
+          <rect x="4" y="12" width="28" height="4" rx="2" fill={accent} />
+          <rect x="4" y="20" width="62" height="4" rx="2" fill={inkSoft} opacity="0.2" />
+          <rect x="4" y="20" width="34" height="4" rx="2" fill={accent} />
+          <circle cx="8" cy="34" r="2.5" fill={accent} />
+          <line x1="8" y1="36.5" x2="8" y2="44" stroke={accent} strokeWidth="1.5" />
+          <circle cx="8" cy="46" r="2.5" fill={accent} />
+          <rect x="14" y="32" width="40" height="3" rx="1" fill={inkSoft} opacity="0.4" />
+          <rect x="14" y="44" width="36" height="3" rx="1" fill={inkSoft} opacity="0.4" />
+        </>
+      );
+      break;
+  }
+  return (
+    <svg
+      viewBox="0 0 70 52"
+      width="100%"
+      height="auto"
+      style={{ aspectRatio: "70/52", display: "block" }}
+    >
+      {base}
+      {body}
+    </svg>
+  );
+}
+
+// ─── Color-Picker-Input (HTML color + Hex-Text) ──────────────────────────
+
+function ColorPickerInput({
+  label,
+  value,
+  onChange,
+  brand,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  brand: Brand;
+}) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span
+        className="text-[10.5px] font-semibold uppercase tracking-[0.14em]"
+        style={{ color: brand.tokens.inkMuted }}
+      >
+        {label}
+      </span>
+      <div
+        className="flex items-center gap-1.5 rounded-lg border bg-white px-1.5 py-1"
+        style={{ borderColor: brand.tokens.line }}
+      >
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="size-6 cursor-pointer rounded border-0 bg-transparent p-0"
+        />
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="min-w-0 flex-1 bg-transparent text-[11px] font-mono uppercase outline-none"
+          style={{ color: brand.tokens.ink }}
+          maxLength={7}
+        />
+      </div>
+    </label>
   );
 }
