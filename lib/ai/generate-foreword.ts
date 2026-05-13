@@ -64,6 +64,15 @@ DEUTSCHE SCHREIBWEISE (kritisch):
 - ß bleibt ß (nicht ss). Beispiel: "süß", nicht "suess".
 - NIEMALS Woerter ohne Umlaut wo einer hin gehoert.
 
+KEINE EM-DASHES / EN-DASHES (KI-TELL, kritisch!):
+- Verbotene Zeichen: "—" (Em-Dash) und "–" (En-Dash). Diese sind ein
+  KI-Tell und zerstoeren die authentische Stimme.
+- Stattdessen: nutze normale Satzzeichen — Komma, Doppelpunkt, Punkt.
+  Beispiel: NICHT "Hi, schoen dass du da bist — ich freu mich.",
+  SONDERN "Hi, schoen dass du da bist. Ich freu mich."
+- Bindestriche in Komposita ("low-carb", "Mama-Pause") sind OK, das
+  sind aber Hyphen-Minus (-), keine Em/En-Dashes.
+
 Was ein Pack-Vorwort tun muss:
 - Den Pack-Charakter in 3-5 Saetzen einfangen
 - Konkrete Inhalte erwaehnen (Rezept-Beispiele aus dem Pack)
@@ -152,11 +161,21 @@ export async function generatePackForeword(
     retries: 2,
   });
 
-  // Clean each field: trim, strip stray quotes, collapse whitespace.
+  // Clean each field: trim, strip stray quotes, collapse whitespace,
+  // KILL Em-Dashes und En-Dashes (KI-Tells). Wenn Gemini trotzdem
+  // welche generiert (selten, aber moeglich), ersetzen wir sie hier
+  // mit einem Komma — das ist die natuerlichste Substitution.
   const sanitize = (s: string, max: number): string => {
     let out = (s ?? "").trim();
     out = out.replace(/^["'„«]+|["'"»]+$/g, "");
+    // Em-Dashes (—) und En-Dashes (–) → Komma + Leerzeichen. Hyphen-Minus
+    // (-) bleibt erhalten (fuer Komposita wie "low-carb"). Wenn der Dash
+    // schon von Leerzeichen umgeben war (typisches Em-Dash-Pattern), kein
+    // doppeltes Leerzeichen.
+    out = out.replace(/\s*[—–]\s*/g, ", ");
     out = out.replace(/\s+/g, " ");
+    // Doppel-Komma-Cleanup falls Em-Dash neben Komma stand
+    out = out.replace(/,\s*,/g, ",");
     if (out.length > max) {
       const cut = out.slice(0, max);
       const lastDot = Math.max(

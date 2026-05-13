@@ -3,9 +3,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { generatePackCover } from "@/lib/ai/generate-pack-cover";
 import { generatePackForeword } from "@/lib/ai/generate-foreword";
 import { generateForewordImage } from "@/lib/ai/generate-foreword-image";
+import {
+  generateForewordCollage,
+  fetchHeroBuffers,
+  isBrandStyleHero,
+} from "@/lib/ai/generate-foreword-collage";
 import { loadBrand } from "@/lib/custom-brands-server";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 import type { Pack } from "@/lib/packs";
+import type { Recipe } from "@/lib/recipes";
 
 // Async pack-enrichment — generates everything a freshly-created custom
 // pack needs to look like one of the curated Bienen-Packs:
@@ -118,6 +124,60 @@ export async function POST(req: Request) {
     });
   }
 
+  // Foreword-Image-Strategie: wenn der Pack genug Brand-DNA-Heroes hat
+  // (>=3 echte Flux-Bilder), nehmen wir die als 2x2 Collage. Sonst
+  // Fallback auf Flux-Stillleben (generateForewordImage). Vorteil
+  // Collage: User-Request "Bild zeigt alle Rezepte aus dem Pack".
+  //
+  // Returns { buffer, isCollage } — der Caller benutzt isCollage als
+  // Filename-Marker (`{id}-collage.jpg` vs `{id}.jpg`), damit das
+  // Safety-Net spaeter erkennen kann ob noch Flux-Stillleben da ist
+  // (dann re-generate, sobald die Brand-Heroes alle da sind).
+  // Local-Capture damit TS row.brand_slug-Narrowing in der inner-function
+  // halten kann (Closure-Boundary-Edge-Case mit Optional-Chain).
+  const packRowBrandSlug = row.brand_slug as string;
+  async function buildForewordImage(): Promise<
+    { buffer: Buffer; isCollage: boolean } | null
+  > {
+    if (hasForewordImage) return null;
+    // Recipe-Heroes laden aus DB
+    const { data: recipeRows } = await supabase
+      .from("recipes")
+      .select("data")
+      .eq("brand_slug", packRowBrandSlug)
+      .eq("pack_slug", pack.slug);
+    const heroUrls: string[] = [];
+    for (const r of recipeRows ?? []) {
+      const recipe = r.data as Recipe;
+      if (recipe.hero && isBrandStyleHero(recipe.hero)) {
+        heroUrls.push(recipe.hero);
+      }
+    }
+    if (heroUrls.length >= 3) {
+      console.log(
+        `[packs/enrich] foreword-image: building collage from ${heroUrls.length} brand-heroes for ${pack.slug}`
+      );
+      try {
+        const buffers = await fetchHeroBuffers(heroUrls.slice(0, 4));
+        if (buffers.length >= 3) {
+          const buffer = await generateForewordCollage(buffers, pack.mood);
+          return { buffer, isCollage: true };
+        }
+      } catch (err) {
+        console.warn(
+          "[packs/enrich] collage failed, fallback to Flux still-life:",
+          err
+        );
+      }
+    } else {
+      console.log(
+        `[packs/enrich] foreword-image: only ${heroUrls.length} brand-heroes — using Flux still-life for ${pack.slug}`
+      );
+    }
+    const buffer = await generateForewordImage(pack);
+    return { buffer, isCollage: false };
+  }
+
   after(async () => {
     // Three independent enrichment tasks. We use Promise.allSettled so a
     // failure in one (Gemini overloaded, Flux timeout) doesn't drop the
@@ -130,9 +190,7 @@ export async function POST(req: Request) {
         hasForewordText
           ? Promise.resolve(null)
           : generatePackForeword(pack, brand),
-        hasForewordImage
-          ? Promise.resolve(null)
-          : generateForewordImage(pack),
+        buildForewordImage(),
       ]);
 
     // ─── Upload Pack-Cover ─────────────────────────────────────────────────
@@ -181,7 +239,11 @@ export async function POST(req: Request) {
       );
     }
 
-    // ─── Upload Foreword-Stillleben ───────────────────────────────────────
+    // ─── Upload Foreword-Bild (Collage ODER Flux-Stillleben) ─────────────
+    // Filename-Marker: `{id}-collage.jpg` bei Collage, `{id}.jpg` bei Flux.
+    // detectAndTriggerEnrichGaps liest diesen Marker und triggert re-gen
+    // wenn der Pack jetzt 3+ Brand-Heroes hat aber das Foreword noch ein
+    // Flux-Stillleben ist (User-Wunsch: Pack-Bild zeigt alle Rezepte).
     let newForewordImage: string | null = null;
     if (
       forewordImageSettled.status === "fulfilled" &&
@@ -189,10 +251,13 @@ export async function POST(req: Request) {
     ) {
       try {
         await ensureBucket(supabase, FOREWORD_BUCKET);
-        const filePath = `${row.id}.jpg`;
+        const { buffer, isCollage } = forewordImageSettled.value;
+        const filePath = isCollage
+          ? `${row.id}-collage.jpg`
+          : `${row.id}.jpg`;
         const upload = await supabase.storage
           .from(FOREWORD_BUCKET)
-          .upload(filePath, forewordImageSettled.value, {
+          .upload(filePath, buffer, {
             contentType: "image/jpeg",
             upsert: true,
             cacheControl: "31536000",
@@ -206,7 +271,9 @@ export async function POST(req: Request) {
           const { data } = supabase.storage
             .from(FOREWORD_BUCKET)
             .getPublicUrl(filePath);
-          newForewordImage = data.publicUrl;
+          // Cache-Bust-Suffix damit Browser + Vercel die neue URL auch
+          // dann holen wenn der alte Filename gelesen wurde.
+          newForewordImage = `${data.publicUrl}?t=${Date.now()}`;
         }
       } catch (err) {
         console.error("[packs/enrich] foreword image upload threw:", err);

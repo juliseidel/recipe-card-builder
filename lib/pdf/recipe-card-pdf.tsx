@@ -30,6 +30,7 @@ import {
 } from "./helpers";
 import { packTheme, withAlpha, blendWithWhite, PAGE_PADDING } from "./theme";
 import { BeeIcon } from "./bee-icon";
+import { formatIngredientAmount } from "@/lib/format-ingredient";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public entry — returns a single A4 page rendered in the matching layout.
@@ -2525,7 +2526,7 @@ function SportPage({
                     width: 50,
                   }}
                 >
-                  {ing.amount}
+                  {formatIngredientAmount(ing.amount)}
                 </Text>
                 <View style={{ flex: 1 }}>
                   <Text
@@ -3606,7 +3607,7 @@ function VitalPage({
                       letterSpacing: 0.2,
                     }}
                   >
-                    {ing.amount || "n. A."}
+                    {formatIngredientAmount(ing.amount) || "Nach Geschmack"}
                   </Text>
                   <View style={{ flex: 1 }}>
                     <Text
@@ -4468,7 +4469,7 @@ function AmberPage({
                       letterSpacing: 0.2,
                     }}
                   >
-                    {ing.amount || "n. A."}
+                    {formatIngredientAmount(ing.amount) || "Nach Geschmack"}
                   </Text>
                   <View style={{ flex: 1 }}>
                     <Text
@@ -4979,12 +4980,9 @@ function IngredientRow({
   const padV = rowPadV ?? (compact ? 3.5 : 4.5);
   const amountFont = compact ? 7.5 : 8;
   const amountW = compact ? 46 : 54;
-  // Capitalize-First fuer text-only amounts ("nach Geschmack" -> "Nach
-  // Geschmack", "etwas" -> "Etwas"). Numeric amounts ("1", "15 g") bleiben
-  // unveraendert.
-  const displayAmount = ing.amount
-    ? ing.amount.charAt(0).toUpperCase() + ing.amount.slice(1)
-    : ing.amount;
+  // formatIngredientAmount: "n. A." → "Nach Geschmack", plus
+  // Capitalize-First. Konsistent ueber alle 8 Layouts + Web.
+  const displayAmount = formatIngredientAmount(ing.amount);
   // Lange amounts wie "Nach Geschmack" wrappen auf zwei Zeilen. Bei
   // diesen Faellen wechseln wir auf alignItems "center", damit der
   // Name vertikal zwischen den beiden amount-Zeilen sitzt — sonst
@@ -6472,10 +6470,7 @@ function VinylIngredientRow({
   theme: ReturnType<typeof packTheme>;
   density: (typeof VINYL_DENSITY)["balanced"];
 }) {
-  const displayAmount =
-    amount.length > 0
-      ? amount.charAt(0).toUpperCase() + amount.slice(1)
-      : amount;
+  const displayAmount = formatIngredientAmount(amount);
   const amountIsLong = displayAmount.length > 10;
   return (
     <View

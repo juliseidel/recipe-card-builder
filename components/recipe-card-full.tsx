@@ -9,6 +9,7 @@ import {
   nutritionBasisInline,
   type Recipe,
 } from "@/lib/recipes";
+import { formatIngredientAmount } from "@/lib/format-ingredient";
 import {
   HeroSkeleton,
   MicrosSkeletonBanner,
@@ -467,7 +468,7 @@ function EditorialLayout({
                           className="font-mono text-[12px] tabular-nums break-words"
                           style={{ color: pack.mood.inkSoft }}
                         >
-                          {ing.amount}
+                          {formatIngredientAmount(ing.amount)}
                         </span>
                         <span className="text-[14px] leading-snug">
                           {ing.name}
@@ -886,7 +887,6 @@ function PatisserieLayout({
                 className="inline-flex items-center gap-1.5 font-display text-[15px] italic"
                 style={{ color: pack.mood.ink }}
               >
-                {brand.signature}
                 <BeeIcon brandSlug={brand.slug} size={16} />
               </span>
               <span
@@ -1425,7 +1425,6 @@ function MinimalLayout({
               className="inline-flex items-center gap-1.5 font-display text-[15px] italic"
               style={{ color: pack.mood.ink }}
             >
-              {brand.signature}
               <BeeIcon brandSlug={brand.slug} size={16} />
             </span>
             <span
@@ -1808,7 +1807,7 @@ function SportLayout({
                   className="font-mono text-[12px] tabular-nums"
                   style={{ color: pack.mood.inkSoft }}
                 >
-                  {ing.amount}
+                  {formatIngredientAmount(ing.amount)}
                 </span>
                 <span
                   className={`leading-snug ${
@@ -2273,7 +2272,7 @@ function VitalLayout({
                         className="w-14 shrink-0 text-[12.5px] font-semibold"
                         style={{ color: pack.mood.accent }}
                       >
-                        {ing.amount || "n. A."}
+                        {formatIngredientAmount(ing.amount) || "Nach Geschmack"}
                       </span>
                       <div className="flex min-w-0 flex-1 flex-col">
                         <span
@@ -2335,7 +2334,6 @@ function VitalLayout({
             className="inline-flex items-center gap-1.5 font-display text-[16px] italic"
             style={{ color: pack.mood.ink }}
           >
-            {brand.signature}
             <BeeIcon brandSlug={brand.slug} size={17} />
           </span>
           <span
@@ -2810,7 +2808,6 @@ function AmberLayout({
               className="inline-flex items-center gap-1.5 font-display text-[16px] italic"
               style={{ color: pack.mood.ink }}
             >
-              {brand.signature}
               <BeeIcon brandSlug={brand.slug} size={17} />
             </span>
             <span
@@ -3160,7 +3157,7 @@ function SectionList({
                     }`}
                     style={{ color: pack.mood.inkSoft }}
                   >
-                    {ingredient.amount}
+                    {formatIngredientAmount(ingredient.amount)}
                   </span>
                   <span
                     className={`text-[14px] leading-snug ${
@@ -3487,7 +3484,6 @@ function CardFooter({
           className={`inline-flex items-center gap-1.5 font-display text-[20px] ${italic ? "italic" : ""}`}
           style={{ color: brand.tokens.ink }}
         >
-          {brand.signature}
           <BeeIcon brandSlug={brand.slug} size={22} />
         </span>
 
@@ -4061,10 +4057,7 @@ function VinylIngredientRowWeb({
   note?: string;
   pack: Pack;
 }) {
-  const displayAmount =
-    amount.length > 0
-      ? amount.charAt(0).toUpperCase() + amount.slice(1)
-      : amount;
+  const displayAmount = formatIngredientAmount(amount);
   const amountIsLong = displayAmount.length > 10;
   return (
     <div

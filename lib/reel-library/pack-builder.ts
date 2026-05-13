@@ -320,7 +320,12 @@ export async function detectAndTriggerEnrichGaps(
     cover.includes("/uploads/");
   const hasForeword = Boolean(pack.foreword);
   const hasForewordImage = Boolean(pack.forewordImage);
-  const needsPackEnrich = !hasCover || !hasForeword || !hasForewordImage;
+  // Foreword-Image-Upgrade-Trigger: wenn das Pack genug Brand-Heroes hat
+  // aber das aktuelle Foreword-Image noch ein Flux-Stillleben ist (nicht
+  // `-collage.jpg`), wollen wir das spaeter zu einer Collage upgraden.
+  // Wir entscheiden das aber erst NACH dem Recipe-Hero-Check unten.
+  const forewordIsCollage =
+    hasForewordImage && pack.forewordImage!.includes("-collage.jpg");
 
   // Recipe-Rows mit hero/micros-Status laden
   const { data: recipeRows } = await supabase
@@ -330,6 +335,7 @@ export async function detectAndTriggerEnrichGaps(
     .eq("pack_slug", packSlug);
 
   const recipeIdsToEnrich: string[] = [];
+  let brandHeroCount = 0;
   for (const row of recipeRows ?? []) {
     const recipe = row.data as Recipe;
     const hero = recipe.hero ?? "";
@@ -337,6 +343,7 @@ export async function detectAndTriggerEnrichGaps(
       !hero ||
       /cdninstagram\.com|fbcdn\.net|tiktokcdn|tiktok-domain/i.test(hero) ||
       /\/reel-covers\//i.test(hero);
+    if (!isPlaceholderHero && hero) brandHeroCount += 1;
     const microsEmpty =
       !recipe.nutrition?.micros || recipe.nutrition.micros.length === 0;
     const microsAttempted = Boolean(recipe.nutrition?.microsAttemptedAt);
@@ -347,6 +354,16 @@ export async function detectAndTriggerEnrichGaps(
       recipeIdsToEnrich.push(row.id as string);
     }
   }
+
+  // Foreword-Collage-Upgrade: wenn jetzt 3+ Brand-Heroes da sind und das
+  // Foreword-Image noch ein Flux-Stillleben ist, regenerieren wir es als
+  // Collage. forewordImage steht dann auf das alte Bild — wir triggern
+  // /packs/enrich mit forceForewordImage=true.
+  const needsForewordUpgrade =
+    !forewordIsCollage && brandHeroCount >= 3 && hasForewordImage;
+
+  const needsPackEnrich =
+    !hasCover || !hasForeword || !hasForewordImage || needsForewordUpgrade;
 
   if (!needsPackEnrich && recipeIdsToEnrich.length === 0) {
     return { triggeredPackEnrich: false, triggeredRecipeIds: [] };
@@ -372,7 +389,12 @@ export async function detectAndTriggerEnrichGaps(
       fetch(`${origin}/api/packs/enrich`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ packId: packRow.id }),
+        body: JSON.stringify({
+          packId: packRow.id,
+          // forceForewordImage wenn Upgrade von Flux-Stillleben zu Collage
+          // gewuenscht ist (3+ Brand-Heroes verfuegbar)
+          ...(needsForewordUpgrade ? { forceForewordImage: true } : {}),
+        }),
       }).catch((err) =>
         console.warn("[pack-builder] gap pack-enrich failed", err)
       )
