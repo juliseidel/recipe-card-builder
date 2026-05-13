@@ -160,8 +160,30 @@ function EditorialPage({
   const grouped = groupIngredients(recipe.ingredients);
   const time = totalTime(recipe);
   const pl = portionsLabel(recipe.servings);
-  const density = getDensity(recipe);
+  // Editorial-spezifischer Density-Cap: spacious kann den Body wegen
+  // der grosszuegigen Header/Mikros/Stats/Story-Paddings ueberlaufen
+  // (auch bei moderat komplexen Recipes mit 8 Zutaten + 3 Schritten).
+  // Wenn React-PDF overflowt, erzeugt es eine leere Page zwischen
+  // diesem Recipe und dem naechsten. Daher cap auf "balanced" max.
+  const rawDensity = getDensity(recipe);
+  const density = rawDensity === "spacious" ? "balanced" : rawDensity;
   const d = EDITORIAL_DENSITY[density];
+  // Adaptive Title-FontSize bei langen Titles (analog Patisserie). Plus
+  // softWrapTitle damit Bindestriche ("Parmesan-Chicken-Sticks") als
+  // wrap-Punkt funktionieren und der Title nicht hinten abgeschnitten
+  // wird.
+  const titleLen = recipe.title.length;
+  const titleFontSize =
+    titleLen <= 14
+      ? d.titleFontSize
+      : titleLen <= 19
+        ? Math.max(d.titleFontSize - 2, 20)
+        : titleLen <= 25
+          ? Math.max(d.titleFontSize - 5, 18)
+          : titleLen <= 32
+            ? Math.max(d.titleFontSize - 8, 16)
+            : Math.max(d.titleFontSize - 10, 14);
+  const titleDisplay = softWrapTitle(recipe.title);
 
   return (
     <Page
@@ -248,14 +270,14 @@ function EditorialPage({
             <Text
               style={{
                 fontFamily: "Fraunces",
-                fontSize: d.titleFontSize,
+                fontSize: titleFontSize,
                 lineHeight: 1.02,
                 letterSpacing: -0.3,
                 color: t.ink,
                 textTransform: "uppercase",
               }}
             >
-              {recipe.title}
+              {titleDisplay}
             </Text>
             <Text
               style={{
