@@ -2441,32 +2441,35 @@ function RestaurantForewordPage({
         }}
       >
         {story.length > 0 ? (
-          // Drop-Cap-Layout in react-pdf: das W als eigenes Text-Element
-          // links neben dem Body. Wichtige Werte um das W sauber oben
-          // aligned mit der ersten Body-Zeile zu bekommen (NICHT mid-line
-          // wie vorher): fontSize ~ 2× body-fontSize, lineHeight 1 (nicht
-          // 0.85 — das verkleinerte die Yoga-Box und yoga zentrierte den
-          // Glyph dann mid-line), marginTop 0, paddingTop angepasst sodass
-          // die Cap-Höhe an Body-Cap-Höhe ausgerichtet ist.
-          <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+          // Drop-Cap-Layout. Vorherige Versuche mit flex-row + alignItems
+          // flex-start hatten ein react-pdf-Limit: yoga positioniert den
+          // Glyph baseline-aligned innerhalb seiner Box, nicht cap-top.
+          // Bei unterschiedlichen fontSizes (W 30pt vs Body 11pt) wirkte
+          // das W damit mid-line statt klassisch oben sitzend.
+          //
+          // Robuste Loesung: W absolut links oben positionieren, Body
+          // bekommt konstant paddingLeft. Klassischer Editorial-Look —
+          // alle Body-Zeilen sind gleich eingerueckt, das W schwebt
+          // links daneben. Deterministisch, keine yoga-Quirks mehr.
+          <View style={{ position: "relative" }}>
             <Text
               style={{
+                position: "absolute",
+                top: -2,
+                left: 0,
                 fontFamily: "Fraunces",
-                fontSize: 30,
+                fontSize: 32,
+                lineHeight: 1,
                 fontWeight: 700,
                 fontStyle: "italic",
                 color: RESTAURANT_FOREWORD_COLORS.gold,
-                lineHeight: 1,
-                marginRight: 6,
-                paddingTop: 2,
-                width: 22,
               }}
             >
               {storyFirstChar}
             </Text>
             <Text
               style={{
-                flex: 1,
+                paddingLeft: 28,
                 fontFamily: "Fraunces",
                 fontSize: 11,
                 color: RESTAURANT_FOREWORD_COLORS.ink,
