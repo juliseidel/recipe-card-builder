@@ -949,26 +949,9 @@ function PatisseriePage({
                 </View>
               ) : null}
               <View style={{ flex: 1 }}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 5,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: "Fraunces",
-                      fontStyle: "italic",
-                      fontSize: 14,
-                      color: t.ink,
-                      lineHeight: 1.05,
-                    }}
-                  >
-                    {brand.signature}
-                  </Text>
-                  <BeeIcon brandSlug={brand.slug} size={15} />
-                </View>
+                {/* brand.signature ("Deine Julia") + BeeIcon entfernt —
+                    User-Feedback, kam an zu vielen Stellen vor. Avatar
+                    links + Handle/Pack-Caption reichen. */}
                 <Text
                   style={{
                     fontSize: 7.5,
@@ -3751,17 +3734,8 @@ function VitalPage({
         wrap={false}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Text
-            style={{
-              fontFamily: "Fraunces",
-              fontStyle: "italic",
-              fontSize: 13,
-              color: t.ink,
-            }}
-          >
-            {brand.signature}
-          </Text>
-          <BeeIcon brandSlug={brand.slug} size={14} />
+          {/* brand.signature ("Deine Julia") + BeeIcon entfernt —
+              User-Feedback, kam an zu vielen Stellen vor. */}
           <Text
             style={{
               fontSize: 7,
@@ -4698,26 +4672,9 @@ function AmberPage({
             </View>
           ) : null}
           <View>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 5,
-              }}
-            >
-              <Text
-                style={{
-                  fontFamily: "Fraunces",
-                  fontStyle: "italic",
-                  fontSize: 13,
-                  color: t.ink,
-                  lineHeight: 1.1,
-                }}
-              >
-                {brand.signature}
-              </Text>
-              <BeeIcon brandSlug={brand.slug} size={14} />
-            </View>
+            {/* brand.signature ("Deine Julia") + BeeIcon entfernt — kam
+                an zu vielen Stellen vor (User-Feedback, generisch).
+                Avatar links + Handle/Pack-Caption reichen als Footer. */}
             <Text
               style={{
                 fontSize: 7,
