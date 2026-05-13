@@ -249,14 +249,18 @@ function IndexPage({
       size="A4"
       style={{ backgroundColor: "#ffffff", fontFamily: "Inter", color: t.ink }}
     >
+      {/* Header kompakter (vorher paddingTop 36 + Mega-"N Rezepte"-Headline,
+          das hat bei 14+ Recipes das Inhaltsverzeichnis auf zwei Seiten
+          gedrueckt). Jetzt nur Eyebrow + Pack-Title + Rezept-Anzahl in
+          einer Zeile. */}
       <View
         style={{
           backgroundColor: t.paper,
           borderBottomWidth: 1,
           borderBottomColor: t.divider,
           paddingHorizontal: 40,
-          paddingTop: 36,
-          paddingBottom: 24,
+          paddingTop: 28,
+          paddingBottom: 18,
         }}
       >
         <Text
@@ -268,69 +272,63 @@ function IndexPage({
             textTransform: "uppercase",
           }}
         >
-          Inhaltsverzeichnis
+          Inhaltsverzeichnis · {recipes.length} Rezepte
         </Text>
         <Text
           style={{
             fontFamily: "Fraunces",
-            fontSize: 36,
+            fontSize: 28,
             color: t.ink,
-            marginTop: 8,
-            letterSpacing: -0.4,
-          }}
-        >
-          {recipes.length} Rezepte
-        </Text>
-        <Text
-          style={{
-            fontFamily: "Fraunces",
-            fontStyle: "italic",
-            fontSize: 13,
-            color: t.inkSoft,
             marginTop: 4,
+            letterSpacing: -0.3,
           }}
         >
-          {pack.tagline}
+          {pack.title}
         </Text>
       </View>
 
-      <View style={{ paddingHorizontal: 40, paddingTop: 24, paddingBottom: 40 }}>
+      {/* Body: paddingVertical pro Row 8 -> 5, damit 14+ Recipes auf eine
+          Seite passen. Plus Subtitle nur rendern wenn vorhanden, kein
+          leerer marginTop bei subtitlelosen Recipes. */}
+      <View style={{ paddingHorizontal: 40, paddingTop: 14, paddingBottom: 32 }}>
         {recipes.map((r, i) => (
           <View
             key={r.slug}
             style={{
               flexDirection: "row",
-              alignItems: "baseline",
+              alignItems: "center",
               borderBottomWidth: 0.5,
               borderBottomColor: t.divider,
-              paddingVertical: 8,
+              paddingVertical: 5,
               gap: 10,
             }}
           >
             <Text
               style={{
                 fontFamily: "Fraunces",
-                fontSize: 14,
+                fontSize: 13,
                 color: t.accent,
-                width: 28,
+                width: 24,
               }}
             >
               {pad2(r.number)}
             </Text>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11.5, fontWeight: 600, color: t.ink }}>
+              <Text style={{ fontSize: 10.5, fontWeight: 600, color: t.ink }}>
                 {r.title}
               </Text>
-              <Text style={{ fontSize: 8.5, color: t.inkSoft, marginTop: 1 }}>
-                {r.subtitle}
-              </Text>
+              {r.subtitle ? (
+                <Text style={{ fontSize: 8, color: t.inkSoft, marginTop: 1 }}>
+                  {r.subtitle}
+                </Text>
+              ) : null}
             </View>
             <Text
               style={{
                 fontFamily: "Inter",
-                fontSize: 9,
+                fontSize: 8.5,
                 color: t.inkSoft,
-                width: 60,
+                width: 56,
                 textAlign: "right",
               }}
             >
@@ -339,9 +337,9 @@ function IndexPage({
             <Text
               style={{
                 fontFamily: "Fraunces",
-                fontSize: 12,
+                fontSize: 11,
                 color: t.ink,
-                width: 60,
+                width: 56,
                 textAlign: "right",
               }}
             >
@@ -349,9 +347,9 @@ function IndexPage({
             </Text>
             <Text
               style={{
-                fontSize: 9,
+                fontSize: 8.5,
                 color: t.inkSoft,
-                width: 30,
+                width: 28,
                 textAlign: "right",
               }}
             >

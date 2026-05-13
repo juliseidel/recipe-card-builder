@@ -168,7 +168,11 @@ function EditorialPage({
       size="A4"
       style={{ backgroundColor: "#ffffff", fontFamily: "Inter", color: t.ink }}
     >
-      {/* TOP MARKER BAR — kompakt, only Pack-Info */}
+      {/* TOP MARKER BAR — kompakt. Nur Pack-Title + Recipe-Position.
+          Pack-Tagline wurde entfernt: bei Custom-Packs ist die tagline
+          oft sehr lang (z.B. "Probiere 'X', 'Y', 'Z' und mehr") und
+          ueberlappte mit dem Pack-Title. Recipe-Position dafuer rechts
+          (analog zu Vital/Amber), als Navigation-Anker. */}
       <View
         style={{
           flexDirection: "row",
@@ -195,13 +199,12 @@ function EditorialPage({
         <Text
           style={{
             fontSize: 7.5,
+            fontWeight: 600,
             letterSpacing: 1.4,
             color: t.inkSoft,
-            fontStyle: "italic",
-            fontFamily: "Fraunces",
           }}
         >
-          {pack.tagline ?? ""}
+          {pad2(recipe.number)} / {pad2(totalRecipes)}
         </Text>
       </View>
 
