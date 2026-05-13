@@ -877,8 +877,13 @@ function DashboardForewordPage({
 }
 
 // ─── EDITORIAL — Pack 5 (Feierabend-Klassiker) ─────────────────────────────
-// Magazine-spread feel. Big still-life on top, two-column body underneath
-// with greeting as italic Fraunces drop-cap and pull-quote signoff.
+// Card-Centered Design (v2): die gesamte Vorwort-Komposition sitzt in
+// einer weissen Card auf dem Pack-Mood-Background. Hero-Bild oben in
+// der Card, Greeting + Story + Signoff stacked als single-column unter
+// dem Bild. Das fuehlt sich wie eine Premium-Kochbuch-Innenseite an,
+// vermeidet die asymmetrische Zwei-Spalten-Verteilung mit ihrem grossen
+// Whitespace rechts, und gibt dem Pack-Mood-Color einen Frame-Rolle
+// statt komplettes Page-Fill.
 function EditorialForewordPage({
   brand,
   pack,
@@ -887,102 +892,131 @@ function EditorialForewordPage({
   avatarDataUri,
 }: ForewordPageProps) {
   const t = packTheme(pack);
+  // Adaptive Hero-Höhe: bei Bild im Stack höher (270pt), ohne Bild
+  // schrumpft die Card und gibt dem Greeting + Body mehr Atemraum.
+  const heroHeight = imageDataUri ? 270 : 0;
 
   return (
     <Page
       size="A4"
       style={{ backgroundColor: t.bg, fontFamily: "Inter", color: t.ink }}
     >
+      {/* Eyebrow oben (Vorwort · Pack-Title) — sitzt direkt auf dem
+          Pack-Background, nicht in der Card. Dezent, dient als
+          Kapitel-Marker. */}
       <View
         style={{
-          flex: 1,
-          paddingHorizontal: 50,
-          paddingTop: 36,
-          paddingBottom: 36,
-          flexDirection: "column",
-          justifyContent: "space-between",
+          paddingHorizontal: 44,
+          paddingTop: 30,
+          paddingBottom: 14,
         }}
       >
         <TopStrip pack={pack} />
+      </View>
+
+      {/* WHITE CARD — der eigentliche Inhalt. Margin schafft den
+          Pack-Mood-Frame, borderRadius gibt der Card editorial-Pop. */}
+      <View
+        style={{
+          marginHorizontal: 40,
+          marginBottom: 16,
+          flex: 1,
+          backgroundColor: "#ffffff",
+          borderRadius: 10,
+          overflow: "hidden",
+          flexDirection: "column",
+        }}
+      >
+        {imageDataUri ? (
+          <Image
+            src={imageDataUri}
+            style={{
+              width: "100%",
+              height: heroHeight,
+              objectFit: "cover",
+            }}
+          />
+        ) : null}
 
         <View
           style={{
             flex: 1,
+            paddingHorizontal: 38,
+            paddingTop: 32,
+            paddingBottom: 28,
             flexDirection: "column",
-            paddingTop: 14,
-            paddingBottom: 12,
             gap: 18,
           }}
         >
-          {/* Wide hero band — wird komplett weggelassen wenn kein
-              imageDataUri da ist. So bekommt das Vorwort mehr Raum fuers
-              Editorial-Greeting + Body, statt eines leeren Farbblocks. */}
-          {imageDataUri ? (
-            <View style={{ width: "100%", height: 220, overflow: "hidden" }}>
-              <Image
-                src={imageDataUri}
-                style={{ width: "100%", height: 220, objectFit: "cover" }}
-              />
-            </View>
-          ) : null}
-
-          {/* Greeting — italic Fraunces, generous size, sits below hero */}
+          {/* Greeting — italic Fraunces, prominent als Vorwort-Anker */}
           <Text
             style={{
               fontFamily: "Fraunces",
               fontStyle: "italic",
-              fontSize: 36,
-              lineHeight: 1.05,
+              fontSize: 30,
+              lineHeight: 1.08,
               color: t.ink,
-              letterSpacing: -0.6,
+              letterSpacing: -0.5,
             }}
           >
             {content.greeting}
           </Text>
 
-          {/* Two-column body for editorial-magazine feel */}
+          {/* Story — single column, generous lineHeight, leftright-Atmen
+              durch padding-Right max-width-aehnlichen Effekt. */}
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 11.5,
+              lineHeight: 1.7,
+              color: t.ink,
+              maxWidth: 480,
+            }}
+          >
+            {content.story}
+          </Text>
+
+          {/* Signoff als italic Fraunces mit Accent-Bar links — pull-quote-
+              feel ohne zweite Spalte. */}
           <View
             style={{
               flexDirection: "row",
-              gap: 24,
-              alignItems: "flex-start",
+              alignItems: "center",
+              gap: 12,
+              marginTop: 6,
             }}
           >
-            <View style={{ flex: 1 }}>
-              <Text
-                style={{
-                  fontFamily: "Inter",
-                  fontSize: 11.5,
-                  lineHeight: 1.65,
-                  color: t.ink,
-                }}
-              >
-                {content.story}
-              </Text>
-            </View>
             <View
               style={{
-                flex: 1,
-                paddingLeft: 18,
-                borderLeftWidth: 2,
-                borderLeftColor: t.accent,
+                width: 22,
+                height: 2,
+                backgroundColor: t.accent,
+              }}
+            />
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontStyle: "italic",
+                fontSize: 14.5,
+                color: t.ink,
               }}
             >
-              <Text
-                style={{
-                  fontFamily: "Fraunces",
-                  fontStyle: "italic",
-                  fontSize: 16,
-                  lineHeight: 1.45,
-                  color: t.ink,
-                }}
-              >
-                {content.signoff}
-              </Text>
-            </View>
+              {content.signoff}
+            </Text>
           </View>
         </View>
+      </View>
 
+      {/* Author-Strip aussen unter der Card auf dem Pack-Mood-Background.
+          Mit eigenem padding fuer Atemraum (paddingHorizontal matched
+          mit Card margin damit Avatar nicht visuell raus-haengt). */}
+      <View
+        style={{
+          paddingHorizontal: 44,
+          paddingTop: 4,
+          paddingBottom: 28,
+        }}
+      >
         <AuthorStrip
           brand={brand}
           pack={pack}
