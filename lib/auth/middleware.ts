@@ -69,8 +69,31 @@ function redirectToLogin(request: NextRequest): NextResponse {
   return NextResponse.redirect(loginUrl);
 }
 
+// Internal-Token: Server-Side-fetch von einer Lambda zu einer anderen
+// Lambda haben kein Session-Cookie und werden sonst zu /login redirected.
+// Pack-Builder z.B. triggert nach buildPackFromReels() die enrich-
+// Endpoints im after()-Hook. Diese Calls setzen den X-Internal-Token-
+// Header auf SUPABASE_SERVICE_ROLE_KEY (in Server-Lambdas verfuegbar);
+// die Middleware laesst diese Calls durch ohne Cookie-Check.
+//
+// Sicherheit: SUPABASE_SERVICE_ROLE_KEY ist NUR Server-Side gesetzt, NIE
+// im Browser-Bundle. Ein externer Caller kann den Token nicht raten/
+// kennen. Server-zu-Server-Trust ist erreicht ohne extra Env-Var.
+function hasInternalToken(request: NextRequest): boolean {
+  const expected = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!expected) return false;
+  const provided = request.headers.get("x-internal-token");
+  return provided === expected;
+}
+
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Stufe 0: Internal-Server-Side-Call (mit X-Internal-Token) — sofort
+  // durchlassen. Verhindert dass after()-Lambdas in Redirects laufen.
+  if (hasInternalToken(request)) {
+    return NextResponse.next({ request });
+  }
 
   // Stufe 1: Public-Path-Bypass — kein Auth, kein Supabase-Client.
   if (isPublic(pathname)) {

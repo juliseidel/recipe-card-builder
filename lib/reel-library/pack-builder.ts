@@ -276,36 +276,50 @@ export async function buildPackFromReels(
 
 // Helper fuer die Caller-Routes: triggert /packs/enrich und /recipes/enrich
 // in einem after()-Hook. Stellt sicher dass die Lambda alive bleibt bis
-// alle fetch-Calls initiiert sind, NextJS terminate'd dann sauber. Returnt
-// ein Promise das alle Calls awaited — Caller wrappt in after(() => ...).
+// alle fetch-Calls initiiert sind, NextJS terminate'd dann sauber.
+//
+// X-Internal-Token: Server-Side-fetch hat kein Session-Cookie und wird
+// sonst von der Auth-Middleware zu /login redirected. Mit dem Header
+// (= SUPABASE_SERVICE_ROLE_KEY) laesst die Middleware den Call durch.
 export async function triggerEnrichForBuiltPack(
   origin: string,
   packId: string,
   recipeIds: string[]
 ): Promise<void> {
+  const internalToken = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   console.log(
-    `[pack-builder] triggering enrich for packId=${packId} + ${recipeIds.length} recipes`
+    `[pack-builder] triggering enrich for packId=${packId} + ${recipeIds.length} recipes (internal-token ${internalToken ? "set" : "MISSING"})`
   );
+  const headers = {
+    "Content-Type": "application/json",
+    "x-internal-token": internalToken,
+  };
   // Pack-Cover + Foreword parallel mit allen Recipe-Heroes. allSettled
   // damit ein failing Call die anderen nicht blockiert.
   const results = await Promise.allSettled([
     fetch(`${origin}/api/packs/enrich`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ packId }),
     }),
     ...recipeIds.map((id) =>
       fetch(`${origin}/api/recipes/enrich`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ recipeId: id }),
       })
     ),
   ]);
-  const failedCount = results.filter((r) => r.status === "rejected").length;
-  if (failedCount > 0) {
-    console.warn(
-      `[pack-builder] ${failedCount}/${results.length} enrich-Calls failed to initiate`
-    );
-  }
+  results.forEach((r, idx) => {
+    if (r.status === "rejected") {
+      console.warn(
+        `[pack-builder] enrich call ${idx} rejected:`,
+        r.reason instanceof Error ? r.reason.message : r.reason
+      );
+    } else if (r.value && !r.value.ok) {
+      console.warn(
+        `[pack-builder] enrich call ${idx} returned HTTP ${r.value.status} ${r.value.statusText} (URL: ${r.value.url})`
+      );
+    }
+  });
 }
