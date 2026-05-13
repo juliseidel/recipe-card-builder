@@ -6706,40 +6706,40 @@ const NEWSPAPER_DENSITY: Record<
     sectionGap: 10,
   },
   balanced: {
-    heroAspectRatio: 4 / 3,
-    headlineFontSize: 30,
+    heroAspectRatio: 3 / 2,
+    headlineFontSize: 28,
     eyebrowFontSize: 8,
     bylineFontSize: 9.5,
     leadFontSize: 9.5,
-    leadDropCapSize: 34,
+    leadDropCapSize: 32,
+    ingredientFontSize: 9.5,
+    ingredientRowPadV: 3.5,
+    stepFontSize: 9.5,
+    stepMarginBottom: 7,
+    sectionLabelFontSize: 8.5,
+    macrosLabelFontSize: 7,
+    macrosValueFontSize: 15,
+    microsFontSize: 7.5,
+    topPadding: 20,
+    sectionGap: 14,
+  },
+  spacious: {
+    heroAspectRatio: 3 / 2,
+    headlineFontSize: 30,
+    eyebrowFontSize: 8.5,
+    bylineFontSize: 10,
+    leadFontSize: 10,
+    leadDropCapSize: 35,
     ingredientFontSize: 9.5,
     ingredientRowPadV: 4,
     stepFontSize: 9.5,
     stepMarginBottom: 8,
-    sectionLabelFontSize: 8.5,
-    macrosLabelFontSize: 7,
-    macrosValueFontSize: 16,
-    microsFontSize: 7.5,
-    topPadding: 22,
-    sectionGap: 18,
-  },
-  spacious: {
-    heroAspectRatio: 4 / 3,
-    headlineFontSize: 34,
-    eyebrowFontSize: 8.5,
-    bylineFontSize: 10,
-    leadFontSize: 10.5,
-    leadDropCapSize: 40,
-    ingredientFontSize: 10,
-    ingredientRowPadV: 5.5,
-    stepFontSize: 10,
-    stepMarginBottom: 10,
     sectionLabelFontSize: 9,
     macrosLabelFontSize: 7.5,
-    macrosValueFontSize: 19,
+    macrosValueFontSize: 16,
     microsFontSize: 8,
-    topPadding: 26,
-    sectionGap: 24,
+    topPadding: 22,
+    sectionGap: 16,
   },
 };
 
@@ -7132,19 +7132,19 @@ function NewspaperPage({
       <View
         style={{
           paddingHorizontal: PAGE_PADDING,
-          paddingBottom: 10,
+          paddingBottom: 6,
         }}
       >
         {/* Doppellinie ueber Spreadsheet (Newspaper-typisch) */}
         <View style={{ height: 1.5, backgroundColor: theme.ink, marginBottom: 1 }} />
-        <View style={{ height: 0.5, backgroundColor: theme.ink, marginBottom: 10 }} />
+        <View style={{ height: 0.5, backgroundColor: theme.ink, marginBottom: 7 }} />
         {/* Master-Label + dezenter Basis-Hinweis rechts */}
         <View
           style={{
             flexDirection: "row",
             justifyContent: "space-between",
             alignItems: "baseline",
-            marginBottom: 10,
+            marginBottom: 7,
           }}
         >
           <Text
@@ -7161,7 +7161,7 @@ function NewspaperPage({
           </Text>
         </View>
         {/* MAKROS — prominenter Block in eigener Sub-Zeile */}
-        <View style={{ marginBottom: topMicros.length > 0 ? 10 : 0 }}>
+        <View style={{ marginBottom: topMicros.length > 0 ? 7 : 0 }}>
           <Text
             style={{
               fontFamily: "Inter",
@@ -7170,7 +7170,7 @@ function NewspaperPage({
               letterSpacing: 1.6,
               color: theme.inkSubtle,
               textTransform: "uppercase",
-              marginBottom: 5,
+              marginBottom: 3,
             }}
           >
             Makros
@@ -7209,7 +7209,7 @@ function NewspaperPage({
               style={{
                 height: 0.5,
                 backgroundColor: theme.divider,
-                marginBottom: 7,
+                marginBottom: 5,
               }}
             />
             <Text
@@ -7220,7 +7220,7 @@ function NewspaperPage({
                 letterSpacing: 1.6,
                 color: theme.inkSubtle,
                 textTransform: "uppercase",
-                marginBottom: 4,
+                marginBottom: 3,
               }}
             >
               Mikros
