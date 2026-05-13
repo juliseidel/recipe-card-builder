@@ -5654,8 +5654,11 @@ function MicrosStrip({
 const VINYL_DENSITY: Record<
   Density,
   {
-    discSize: number;
-    discLabelRadius: number;
+    /** Quadratisches Album-Cover (Hero-Bild). LP-Disc hat denselben Diameter
+     *  und steht halb rechts heraus. */
+    albumSize: number;
+    /** Radius des LP-Center-Labels (mood-accent-Scheibe mit Brand-Name). */
+    labelRadius: number;
     titleFontSize: number;
     audioSpecFontSize: number;
     trackFontSize: number;
@@ -5668,8 +5671,8 @@ const VINYL_DENSITY: Record<
   }
 > = {
   compact: {
-    discSize: 220,
-    discLabelRadius: 44,
+    albumSize: 175,
+    labelRadius: 32,
     titleFontSize: 22,
     audioSpecFontSize: 8.5,
     trackFontSize: 9,
@@ -5681,9 +5684,9 @@ const VINYL_DENSITY: Record<
     sectionGap: 10,
   },
   balanced: {
-    discSize: 260,
-    discLabelRadius: 50,
-    titleFontSize: 26,
+    albumSize: 210,
+    labelRadius: 38,
+    titleFontSize: 28,
     audioSpecFontSize: 9.5,
     trackFontSize: 9.5,
     trackMarginBottom: 8,
@@ -5694,9 +5697,9 @@ const VINYL_DENSITY: Record<
     sectionGap: 14,
   },
   spacious: {
-    discSize: 295,
-    discLabelRadius: 56,
-    titleFontSize: 30,
+    albumSize: 240,
+    labelRadius: 44,
+    titleFontSize: 32,
     audioSpecFontSize: 10,
     trackFontSize: 10,
     trackMarginBottom: 10,
@@ -5707,18 +5710,15 @@ const VINYL_DENSITY: Record<
     sectionGap: 18,
   },
 };
-
-// Audio-Key aus Recipe-Tags + nutritionBasis ableiten. Vinyl-Aesthetik
-// passt zu kurzen, kraftvollen Labels.
 function vinylAudioKey(recipe: Recipe): string {
   const tags = (recipe.tags ?? []).map((t) => t.toLowerCase());
   if (tags.some((t) => t.includes("vegan"))) return "VEGAN";
   if (tags.some((t) => t.includes("high-protein") || t.includes("protein")))
     return "HIGH-PROTEIN";
   if (tags.some((t) => t.includes("low-carb"))) return "LOW-CARB";
-  if (tags.some((t) => t.includes("vegetarisch"))) return "VEG";
+  if (tags.some((t) => t.includes("vegetarisch"))) return "VEGETARISCH";
   if (tags.some((t) => t.includes("dessert") || t.includes("kuchen")))
-    return "SWEET";
+    return "SÜSS";
   if (tags.some((t) => t.includes("snack"))) return "SNACK";
   if (tags.some((t) => t.includes("mealprep"))) return "MEALPREP";
   return "ORIGINAL";
@@ -5730,6 +5730,7 @@ function VinylPage({
   recipe,
   totalRecipes,
   heroDataUri,
+  qrDataUri,
   hideRecipeIndex,
 }: RecipeCardPdfProps) {
   const theme = packTheme(pack);
@@ -5738,25 +5739,17 @@ function VinylPage({
   const showStory = shouldShowStory(recipe);
   const recipePosition = recipe.number;
 
+  // Steps mit A1/A2/B1/B2-Labels durchsequenzieren (Tracklist-Style)
   const stepGroups = groupSteps(recipe.steps);
   const flatSteps: { label: string; text: string }[] = [];
-  // Alle Step-Texte mit Vinyl-Track-Labels (A1/A2…/B1/B2…) durchsequenzieren.
-  // Bei einer Group skip wir den Gruppennamen — Tracklist ist linear, der
-  // Gruppen-Header wird stattdessen als Sub-Section-Hinweis gerendert.
   let runningIndex = 0;
   for (const group of stepGroups) {
     for (const item of group.items) {
-      const sidePrefix = runningIndex < Math.ceil(recipe.steps.length / 2)
-        ? "A"
-        : "B";
+      const half = Math.ceil(recipe.steps.length / 2);
+      const sidePrefix = runningIndex < half ? "A" : "B";
       const sideIdx =
-        sidePrefix === "A"
-          ? runningIndex + 1
-          : runningIndex - Math.ceil(recipe.steps.length / 2) + 1;
-      flatSteps.push({
-        label: `${sidePrefix}${sideIdx}`,
-        text: item.text,
-      });
+        sidePrefix === "A" ? runningIndex + 1 : runningIndex - half + 1;
+      flatSteps.push({ label: `${sidePrefix}${sideIdx}`, text: item.text });
       runningIndex += 1;
     }
   }
@@ -5764,12 +5757,12 @@ function VinylPage({
   const sideA = flatSteps.slice(0, sideASize);
   const sideB = flatSteps.slice(sideASize);
 
-  // Ingredients in 2 Spalten splitten — Liner Notes Style.
+  // Ingredients
   const ingredientGroups = groupIngredients(recipe.ingredients);
   const flatIngredients = ingredientGroups.flatMap((g) => g.items);
   const halfIngs = Math.ceil(flatIngredients.length / 2);
 
-  // Audio-Spec: KCAL · TIME · KEY + Top-3 Mikros.
+  // Audio-Spec
   const time = totalTime(recipe);
   const audioKey = vinylAudioKey(recipe);
   const topMicros = (recipe.nutrition.micros ?? [])
@@ -5780,15 +5773,13 @@ function VinylPage({
     )
     .slice(0, 3);
 
-  // Vinyl-Grooves: konzentrische Linien fuer Disc-Optik. Anzahl skaliert
-  // mit Disc-Size damit Linien immer dicht genug stehen.
-  const grooveCount = Math.round(D.discSize / 12);
-  const grooves: number[] = [];
-  for (let i = 0; i < grooveCount; i++) {
-    const radius = D.discLabelRadius + 8 + i * ((D.discSize / 2 - D.discLabelRadius - 12) / grooveCount);
-    grooves.push(radius);
-  }
   const titleSafe = softWrapTitle(recipe.title);
+
+  // Album-Sleeve: Hero quadratisch + LP halb-rausgezogen rechts
+  const albumSize = D.albumSize;
+  const lpRadius = albumSize / 2;
+  // LP-Disc-Position: 50% rausgezogen (links überlappt Hero, rechts steht raus)
+  const lpOffsetLeft = albumSize - lpRadius;
 
   return (
     <Page
@@ -5816,149 +5807,180 @@ function VinylPage({
             textTransform: "uppercase",
           }}
         >
-          {pack.title.toUpperCase()}
+          {pack.title}
         </Text>
-        <Text
-          style={{
-            fontFamily: "Inter",
-            fontSize: 8.5,
-            fontWeight: 600,
-            letterSpacing: 1.6,
-            color: theme.inkSoft,
-          }}
-        >
-          {pad2(recipePosition)} / {pad2(totalRecipes)}
-        </Text>
+        {!hideRecipeIndex ? (
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 8.5,
+              fontWeight: 600,
+              letterSpacing: 1.6,
+              color: theme.inkSoft,
+            }}
+          >
+            {pad2(recipePosition)} / {pad2(totalRecipes)}
+          </Text>
+        ) : null}
       </View>
 
-      {/* ── Vinyl-Disc + Title + Audio-Spec ── */}
+      {/* ── Album-Sleeve: Hero gross + LP halb-rausgezogen ── */}
       <View
         style={{
           alignItems: "center",
           paddingHorizontal: PAGE_PADDING,
-          paddingTop: density === "compact" ? 4 : 10,
+          paddingTop: density === "compact" ? 6 : 12,
         }}
       >
         <View
           style={{
-            width: D.discSize,
-            height: D.discSize,
+            width: albumSize + lpOffsetLeft,
+            height: albumSize,
             position: "relative",
           }}
         >
-          {/* Schwarze Vinyl-Disc als Basis */}
+          {/* Vinyl-Disc rechts (z-index: hinter Hero, rechts halb sichtbar) */}
           <View
             style={{
               position: "absolute",
               top: 0,
-              left: 0,
-              width: D.discSize,
-              height: D.discSize,
+              left: albumSize - 16,
+              width: albumSize,
+              height: albumSize,
               backgroundColor: "#0a0a0a",
-              borderRadius: D.discSize / 2,
+              borderRadius: albumSize / 2,
             }}
           />
-          {/* Grooves (konzentrische Linien) — als Svg-Layer fuer
-              Pixel-praezise Kreise */}
+          {/* Grooves */}
           <Svg
-            style={{ position: "absolute", top: 0, left: 0 }}
-            width={D.discSize}
-            height={D.discSize}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: albumSize - 16,
+            }}
+            width={albumSize}
+            height={albumSize}
           >
-            {grooves.map((r, i) => (
-              <Circle
-                key={i}
-                cx={D.discSize / 2}
-                cy={D.discSize / 2}
-                r={r}
-                fill="none"
-                stroke={i % 4 === 0 ? "#1f1f1f" : "#141414"}
-                strokeWidth={0.4}
-              />
-            ))}
-            {/* Reflektions-Highlight — schwacher Akzent-Strich fuer
-                3D-Feel. Geht von oben-links nach unten-rechts auf der
-                Disc-Oberflaeche. */}
+            {Array.from({ length: 8 }, (_, i) => {
+              const r = (albumSize / 2) - 8 - i * 10;
+              if (r <= D.labelRadius) return null;
+              return (
+                <Circle
+                  key={i}
+                  cx={albumSize / 2}
+                  cy={albumSize / 2}
+                  r={r}
+                  fill="none"
+                  stroke={i % 3 === 0 ? "#1f1f1f" : "#141414"}
+                  strokeWidth={0.5}
+                />
+              );
+            })}
+            {/* Reflection-Highlight */}
             <Path
-              d={`M ${D.discSize * 0.18} ${D.discSize * 0.22}
-                  A ${D.discSize * 0.42} ${D.discSize * 0.42} 0 0 1
-                  ${D.discSize * 0.32} ${D.discSize * 0.14}`}
+              d={`M ${albumSize * 0.62} ${albumSize * 0.2}
+                  A ${albumSize * 0.4} ${albumSize * 0.4} 0 0 1
+                  ${albumSize * 0.78} ${albumSize * 0.32}`}
               stroke="#2a2a2a"
               strokeWidth={1}
               fill="none"
             />
           </Svg>
-          {/* Center-Label (bunte Scheibe) */}
+          {/* LP Center-Label */}
           <View
             style={{
               position: "absolute",
-              top: D.discSize / 2 - D.discLabelRadius,
-              left: D.discSize / 2 - D.discLabelRadius,
-              width: D.discLabelRadius * 2,
-              height: D.discLabelRadius * 2,
+              top: albumSize / 2 - D.labelRadius,
+              left: albumSize - 16 + albumSize / 2 - D.labelRadius,
+              width: D.labelRadius * 2,
+              height: D.labelRadius * 2,
               backgroundColor: theme.accent,
-              borderRadius: D.discLabelRadius,
+              borderRadius: D.labelRadius,
               alignItems: "center",
               justifyContent: "center",
             }}
-          />
-          {/* Hero-Image clipped circular */}
-          {heroDataUri ? (
-            <View
+          >
+            <Text
               style={{
-                position: "absolute",
-                top: D.discSize / 2 - (D.discLabelRadius - 6),
-                left: D.discSize / 2 - (D.discLabelRadius - 6),
-                width: (D.discLabelRadius - 6) * 2,
-                height: (D.discLabelRadius - 6) * 2,
-                borderRadius: D.discLabelRadius - 6,
-                overflow: "hidden",
+                fontFamily: "Fraunces",
+                fontSize: D.labelRadius * 0.32,
+                fontWeight: 700,
+                color: "#fafafa",
+                textAlign: "center",
+                paddingHorizontal: 4,
+                lineHeight: 1.0,
               }}
             >
-              <Image
-                src={heroDataUri}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            </View>
-          ) : (
-            // Fallback: Center-Label mit Brand-Initial wenn kein Hero
-            <View
+              {brand.name.toUpperCase()}
+            </Text>
+            <Text
               style={{
-                position: "absolute",
-                top: D.discSize / 2 - (D.discLabelRadius - 6),
-                left: D.discSize / 2 - (D.discLabelRadius - 6),
-                width: (D.discLabelRadius - 6) * 2,
-                height: (D.discLabelRadius - 6) * 2,
-                borderRadius: D.discLabelRadius - 6,
-                backgroundColor: theme.bg,
-                alignItems: "center",
-                justifyContent: "center",
+                fontFamily: "Inter",
+                fontSize: D.labelRadius * 0.16,
+                letterSpacing: 1.2,
+                color: "#fafafa",
+                marginTop: 4,
+                opacity: 0.85,
               }}
             >
-              <Text
-                style={{
-                  fontFamily: "Fraunces",
-                  fontSize: D.discLabelRadius * 0.9,
-                  fontWeight: 700,
-                  color: theme.accent,
-                }}
-              >
-                {brand.name.charAt(0)}
-              </Text>
-            </View>
-          )}
-          {/* Spindle hole im Zentrum */}
+              {pad2(recipePosition)} · SEITE A
+            </Text>
+          </View>
+          {/* Spindle hole */}
           <View
             style={{
               position: "absolute",
-              top: D.discSize / 2 - 3,
-              left: D.discSize / 2 - 3,
+              top: albumSize / 2 - 3,
+              left: albumSize - 16 + albumSize / 2 - 3,
               width: 6,
               height: 6,
               backgroundColor: "#fafafa",
               borderRadius: 3,
             }}
           />
+
+          {/* Album-Cover (Hero) LINKS — ueberlappt die LP teilweise */}
+          <View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: albumSize,
+              height: albumSize,
+              borderRadius: 2,
+              overflow: "hidden",
+              backgroundColor: theme.paper,
+            }}
+          >
+            {heroDataUri ? (
+              <Image
+                src={heroDataUri}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: theme.accent,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontSize: 96,
+                    fontWeight: 700,
+                    color: "#fafafa",
+                    opacity: 0.85,
+                  }}
+                >
+                  {brand.name.charAt(0)}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Recipe-Title */}
@@ -5969,49 +5991,84 @@ function VinylPage({
             fontWeight: 700,
             color: theme.ink,
             textAlign: "center",
-            marginTop: density === "compact" ? 12 : 18,
-            marginBottom: 4,
+            marginTop: density === "compact" ? 14 : 20,
+            marginBottom: 6,
             lineHeight: 1.1,
-            maxWidth: 480,
+            maxWidth: 460,
           }}
         >
           {titleSafe}
         </Text>
 
-        {/* Audio-Spec-Strip (Mikros in EIGENER Position vs. andere Layouts) */}
+        {/* Audio-Spec-Strip */}
         <View
           style={{
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "center",
             gap: 12,
-            marginTop: 4,
+            marginTop: 2,
             paddingHorizontal: 24,
             flexWrap: "wrap",
           }}
         >
-          <AudioSpecPill
-            label={`${Math.round(recipe.nutrition.kcal)} KCAL`}
-            theme={theme}
-            fontSize={D.audioSpecFontSize}
-            prominent
-          />
-          <AudioSpecSeparator theme={theme} />
-          <AudioSpecPill
-            label={`${time} MIN`}
-            theme={theme}
-            fontSize={D.audioSpecFontSize}
-          />
-          <AudioSpecSeparator theme={theme} />
-          <AudioSpecPill
-            label={audioKey}
-            theme={theme}
-            fontSize={D.audioSpecFontSize}
-            accent
-          />
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: D.audioSpecFontSize,
+              fontWeight: 700,
+              letterSpacing: 1.6,
+              color: theme.ink,
+              textTransform: "uppercase",
+            }}
+          >
+            {Math.round(recipe.nutrition.kcal)} KCAL
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 9,
+              color: theme.divider,
+            }}
+          >
+            │
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: D.audioSpecFontSize,
+              fontWeight: 600,
+              letterSpacing: 1.6,
+              color: theme.inkSoft,
+              textTransform: "uppercase",
+            }}
+          >
+            {time} MIN
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 9,
+              color: theme.divider,
+            }}
+          >
+            │
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: D.audioSpecFontSize,
+              fontWeight: 700,
+              letterSpacing: 1.6,
+              color: theme.accent,
+              textTransform: "uppercase",
+            }}
+          >
+            {audioKey}
+          </Text>
         </View>
 
-        {/* Top-3 Mikros — zweite Spec-Zeile */}
+        {/* Top-3 Mikros */}
         {topMicros.length > 0 ? (
           <View
             style={{
@@ -6086,42 +6143,11 @@ function VinylPage({
         </Text>
       </View>
 
-      {/* ── Tracklist (Steps als A-Side / B-Side) ── */}
+      {/* ── ZUTATEN (Liner Notes) ── */}
       <View
         style={{
-          flexDirection: "row",
           paddingHorizontal: PAGE_PADDING,
           marginTop: D.sectionGap + 4,
-          gap: 24,
-        }}
-      >
-        <VinylSideColumn
-          sideLabel="SIDE A"
-          tracks={sideA}
-          theme={theme}
-          density={D}
-        />
-        <View
-          style={{
-            width: 0.5,
-            backgroundColor: theme.divider,
-            marginVertical: 4,
-          }}
-        />
-        <VinylSideColumn
-          sideLabel="SIDE B"
-          tracks={sideB.length > 0 ? sideB : [{ label: "—", text: "(nur Side A)" }]}
-          theme={theme}
-          density={D}
-          dimmedIfEmpty={sideB.length === 0}
-        />
-      </View>
-
-      {/* ── Liner Notes (Ingredients in 2 Spalten) ── */}
-      <View
-        style={{
-          paddingHorizontal: PAGE_PADDING,
-          marginTop: D.sectionGap,
         }}
       >
         <View
@@ -6142,7 +6168,7 @@ function VinylPage({
               textTransform: "uppercase",
             }}
           >
-            Liner Notes
+            Zutaten
           </Text>
           <View
             style={{ flex: 1, height: 0.5, backgroundColor: theme.divider }}
@@ -6156,12 +6182,10 @@ function VinylPage({
               textTransform: "uppercase",
             }}
           >
-            {recipe.ingredients.length} Ingredients
+            {recipe.ingredients.length} {recipe.ingredients.length === 1 ? "Zutat" : "Zutaten"}
           </Text>
         </View>
 
-        {/* Ingredient-Groups respektieren — bei Gruppen ueber 2 Spalten
-            mit Group-Headers; bei flat list direkt 2-Spalten. */}
         {ingredientGroups.length > 1 ? (
           <View>
             {ingredientGroups.map((group, gIdx) => (
@@ -6222,7 +6246,38 @@ function VinylPage({
         )}
       </View>
 
-      {/* ── Sparse-Story-Block (≤10 Zutaten + Story vorhanden) ── */}
+      {/* ── ZUBEREITUNG (Tracklist Seite A / Seite B) ── */}
+      <View
+        style={{
+          flexDirection: "row",
+          paddingHorizontal: PAGE_PADDING,
+          marginTop: D.sectionGap,
+          gap: 20,
+        }}
+      >
+        <VinylSideColumn
+          sideLabel="Seite A"
+          tracks={sideA}
+          theme={theme}
+          density={D}
+        />
+        <View
+          style={{
+            width: 0.5,
+            backgroundColor: theme.divider,
+            marginVertical: 4,
+          }}
+        />
+        <VinylSideColumn
+          sideLabel="Seite B"
+          tracks={sideB.length > 0 ? sideB : [{ label: "—", text: "(nur Seite A)" }]}
+          theme={theme}
+          density={D}
+          dimmedIfEmpty={sideB.length === 0}
+        />
+      </View>
+
+      {/* ── Sparse-Story-Block ── */}
       {showStory ? (
         <View
           style={{
@@ -6253,7 +6308,7 @@ function VinylPage({
         </View>
       ) : null}
 
-      {/* ── Footer ── */}
+      {/* ── Footer mit QR-Code ── */}
       <View
         style={{
           position: "absolute",
@@ -6264,12 +6319,13 @@ function VinylPage({
           alignItems: "center",
           justifyContent: "space-between",
           paddingTop: 8,
+          gap: 12,
           borderTopWidth: 0.5,
           borderTopColor: theme.divider,
         }}
+        fixed
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          {/* Mini-Vinyl-Icon */}
           <Svg width={14} height={14} viewBox="0 0 14 14">
             <Circle cx={7} cy={7} r={6.5} fill="#0a0a0a" />
             <Circle cx={7} cy={7} r={2.2} fill={theme.accent} />
@@ -6285,73 +6341,49 @@ function VinylPage({
               textTransform: "uppercase",
             }}
           >
-            Pressed by {brand.name}
+            {brand.handle} · {pack.title}
           </Text>
         </View>
-        <Text
-          style={{
-            fontFamily: "Inter",
-            fontSize: 8,
-            letterSpacing: 1.4,
-            color: theme.inkSubtle,
-            textTransform: "uppercase",
-          }}
-        >
-          {brand.handle}
-        </Text>
+        {qrDataUri ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 7,
+                letterSpacing: 1.2,
+                color: theme.inkSubtle,
+                textTransform: "uppercase",
+                textAlign: "right",
+              }}
+            >
+              Scan{"\n"}für{"\n"}Original
+            </Text>
+            <Image
+              src={qrDataUri}
+              style={{ width: 32, height: 32 }}
+            />
+          </View>
+        ) : (
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 8,
+              letterSpacing: 1.4,
+              color: theme.inkSubtle,
+              textTransform: "uppercase",
+            }}
+          >
+            {recipe.sourceLabel ?? "Original auf Instagram"}
+          </Text>
+        )}
       </View>
     </Page>
   );
 }
 
-// ─── Vinyl-spezifische Sub-Components ─────────────────────────────────────
+// ─── Vinyl-Sub-Components ────────────────────────────────────────────────
 
-function AudioSpecPill({
-  label,
-  theme,
-  fontSize,
-  prominent = false,
-  accent = false,
-}: {
-  label: string;
-  theme: ReturnType<typeof packTheme>;
-  fontSize: number;
-  prominent?: boolean;
-  accent?: boolean;
-}) {
-  return (
-    <Text
-      style={{
-        fontFamily: "Inter",
-        fontSize,
-        fontWeight: prominent || accent ? 700 : 600,
-        letterSpacing: 1.6,
-        color: accent ? theme.accent : prominent ? theme.ink : theme.inkSoft,
-        textTransform: "uppercase",
-      }}
-    >
-      {label}
-    </Text>
-  );
-}
-
-function AudioSpecSeparator({ theme }: { theme: ReturnType<typeof packTheme> }) {
-  return (
-    <Text
-      style={{
-        fontFamily: "Inter",
-        fontSize: 9,
-        color: theme.divider,
-      }}
-    >
-      │
-    </Text>
-  );
-}
-
-// Vinyl-Tracklist-Column. WICHTIG: Step-Number-Glyph-Centering nach
-// LAYOUT_RULES.md §1 — identische font/fontSize/lineHeight, nur
-// fontWeight/color/style fuer den Pop.
+// Vinyl-Tracklist-Column mit Glyph-Center-Lock (LAYOUT_RULES.md §1)
 function VinylSideColumn({
   sideLabel,
   tracks,
@@ -6366,13 +6398,7 @@ function VinylSideColumn({
   dimmedIfEmpty?: boolean;
 }) {
   return (
-    <View
-      style={{
-        flex: 1,
-        opacity: dimmedIfEmpty ? 0.35 : 1,
-      }}
-    >
-      {/* Side-Label */}
+    <View style={{ flex: 1, opacity: dimmedIfEmpty ? 0.35 : 1 }}>
       <View
         style={{
           flexDirection: "row",
@@ -6393,11 +6419,8 @@ function VinylSideColumn({
         >
           {sideLabel}
         </Text>
-        <View
-          style={{ flex: 1, height: 0.5, backgroundColor: theme.divider }}
-        />
+        <View style={{ flex: 1, height: 0.5, backgroundColor: theme.divider }} />
       </View>
-      {/* Tracks — identische font/fontSize/lineHeight fuer Number + Text */}
       {tracks.map((track, i) => (
         <View
           key={`${sideLabel}-${i}`}
@@ -6408,11 +6431,10 @@ function VinylSideColumn({
             marginBottom: density.trackMarginBottom,
           }}
         >
-          {/* Track-Label (A1, A2, B1, ...) */}
           <Text
             style={{
-              fontSize: density.trackFontSize, // identisch zu Body
-              lineHeight: 1.45, // identisch zu Body
+              fontSize: density.trackFontSize,
+              lineHeight: 1.45,
               fontStyle: "italic",
               fontWeight: 700,
               color: theme.accent,
@@ -6421,12 +6443,11 @@ function VinylSideColumn({
           >
             {track.label}
           </Text>
-          {/* Track-Text */}
           <Text
             style={{
               flex: 1,
-              fontSize: density.trackFontSize, // identisch
-              lineHeight: 1.45, // identisch
+              fontSize: density.trackFontSize,
+              lineHeight: 1.45,
               color: theme.ink,
             }}
           >
@@ -6438,8 +6459,6 @@ function VinylSideColumn({
   );
 }
 
-// Vinyl-Ingredient-Row. Folgt LAYOUT_RULES.md §4 (alignItems-Switch bei
-// langem Amount-Text wie "Nach Geschmack").
 function VinylIngredientRow({
   amount,
   name,
@@ -6453,7 +6472,6 @@ function VinylIngredientRow({
   theme: ReturnType<typeof packTheme>;
   density: (typeof VINYL_DENSITY)["balanced"];
 }) {
-  // Auto-Capitalize wie in den existierenden Layouts (Anti-Pattern §4)
   const displayAmount =
     amount.length > 0
       ? amount.charAt(0).toUpperCase() + amount.slice(1)
@@ -6509,8 +6527,6 @@ function VinylIngredientRow({
   );
 }
 
-// Ingredient-Grid fuer Gruppen-Layout (3+ Zutaten pro Gruppe → 2 Spalten,
-// sonst 1 Spalte fuer kompakte Lesbarkeit).
 function VinylIngredientGrid({
   items,
   theme,

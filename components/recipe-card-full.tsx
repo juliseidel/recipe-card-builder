@@ -3634,18 +3634,15 @@ function VinylLayout({
     .sort((a, b) => (b.pctDaily ?? 0) - (a.pctDaily ?? 0))
     .slice(0, 3);
 
-  // Flat steps mit A1/A2/B1/B2-Labels
   const stepGroups = groupRecipeSteps(recipe.steps);
   const flatSteps: { label: string; text: string }[] = [];
   let runningIdx = 0;
   for (const g of stepGroups) {
     for (const item of g.items) {
-      const sidePrefix =
-        runningIdx < Math.ceil(recipe.steps.length / 2) ? "A" : "B";
+      const half = Math.ceil(recipe.steps.length / 2);
+      const sidePrefix = runningIdx < half ? "A" : "B";
       const sideIdx =
-        sidePrefix === "A"
-          ? runningIdx + 1
-          : runningIdx - Math.ceil(recipe.steps.length / 2) + 1;
+        sidePrefix === "A" ? runningIdx + 1 : runningIdx - half + 1;
       flatSteps.push({ label: `${sidePrefix}${sideIdx}`, text: item.text });
       runningIdx += 1;
     }
@@ -3657,13 +3654,13 @@ function VinylLayout({
   const showStory =
     recipe.ingredients.length <= 10 && Boolean(recipe.description?.trim());
 
-  // CSS Grooves: konzentrische Ringe per radial-gradient gelayered
+  // CSS Grooves: konzentrische Ringe per radial-gradient
   const groovesCss = `radial-gradient(circle at center,
-    transparent 27%, #1a1a1a 27%, transparent 27.6%,
-    transparent 32%, #181818 32%, transparent 32.6%,
-    transparent 37%, #1a1a1a 37%, transparent 37.6%,
-    transparent 42%, #181818 42%, transparent 42.6%,
-    transparent 47%, #1a1a1a 47%, transparent 47.6%,
+    transparent 22%, #1a1a1a 22%, transparent 22.5%,
+    transparent 28%, #181818 28%, transparent 28.5%,
+    transparent 34%, #1a1a1a 34%, transparent 34.5%,
+    transparent 40%, #181818 40%, transparent 40.5%,
+    transparent 46%, #1a1a1a 46%, transparent 46.5%,
     transparent 50%)`;
 
   return (
@@ -3693,33 +3690,89 @@ function VinylLayout({
         </span>
       </header>
 
-      {/* ── Vinyl-Disc + Title + Audio-Spec ── */}
+      {/* ── Album-Sleeve: Hero gross + LP halb-rausgezogen ── */}
       <section className="flex flex-col items-center px-8 pt-4 pb-2">
-        {/* Disc */}
         <div
-          className="relative aspect-square w-full max-w-[420px]"
+          className="relative"
           style={{
-            background: `${groovesCss}, #0a0a0a`,
-            borderRadius: "50%",
-            boxShadow: "0 18px 50px -18px rgba(0,0,0,0.55)",
+            width: "min(420px, 70%)",
+            aspectRatio: "1.55 / 1",
           }}
         >
-          {/* Center Label */}
+          {/* LP-Disc rechts (1:1, hinter Hero links überlappt) */}
           <div
-            className="absolute inset-[35%] rounded-full"
-            style={{ background: pack.mood.accent }}
-          />
-          {/* Hero clipped */}
+            className="absolute rounded-full shadow-2xl"
+            style={{
+              top: 0,
+              right: 0,
+              width: "65%",
+              aspectRatio: "1 / 1",
+              background: `${groovesCss}, #0a0a0a`,
+            }}
+          >
+            {/* Center Label */}
+            <div
+              className="absolute rounded-full"
+              style={{
+                inset: "33%",
+                background: pack.mood.accent,
+                color: "#fafafa",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center",
+                padding: "8px",
+              }}
+            >
+              <span
+                className="font-display font-bold uppercase leading-[0.95]"
+                style={{ fontSize: "calc(0.6vw + 8px)", letterSpacing: "0.02em" }}
+              >
+                {brand.name}
+              </span>
+              <span
+                className="font-mono opacity-85"
+                style={{
+                  fontSize: "calc(0.3vw + 5px)",
+                  letterSpacing: "0.14em",
+                  marginTop: "4px",
+                }}
+              >
+                {String(recipeIndex + 1).padStart(2, "0")} · SEITE A
+              </span>
+            </div>
+            {/* Spindle hole */}
+            <div
+              className="absolute rounded-full bg-white"
+              style={{
+                top: "50%",
+                left: "50%",
+                width: "6px",
+                height: "6px",
+                transform: "translate(-50%, -50%)",
+              }}
+            />
+          </div>
+
+          {/* Album-Cover (Hero) LINKS, ueberlappt LP */}
           <div
-            className="absolute inset-[37%] overflow-hidden rounded-full"
-            style={{ background: pack.mood.background }}
+            className="absolute overflow-hidden shadow-2xl"
+            style={{
+              top: 0,
+              left: 0,
+              width: "64%",
+              aspectRatio: "1 / 1",
+              borderRadius: "2px",
+              background: pack.mood.background,
+            }}
           >
             {recipe.hero ? (
               <Image
                 src={recipe.hero}
                 alt={recipe.title}
                 fill
-                sizes="240px"
+                sizes="280px"
                 className="object-cover"
                 quality={95}
                 unoptimized={recipe.hero.startsWith("data:")}
@@ -3727,24 +3780,20 @@ function VinylLayout({
             ) : (
               <div
                 className="flex h-full w-full items-center justify-center font-display text-[80px] font-bold"
-                style={{ color: pack.mood.accent }}
+                style={{ color: pack.mood.accent, background: pack.mood.accent + "20" }}
               >
                 {brand.name.charAt(0)}
               </div>
             )}
           </div>
-          {/* Spindle hole */}
-          <div
-            className="absolute left-1/2 top-1/2 size-[6px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-inner"
-          />
         </div>
 
         {/* Title */}
         <h2
-          className="mt-7 max-w-[480px] text-center font-display text-[34px] font-bold leading-[1.05] tracking-[-0.015em]"
+          className="mt-8 max-w-[480px] text-center font-display text-[34px] font-bold leading-[1.05] tracking-[-0.015em]"
           style={{ color: pack.mood.ink }}
         >
-          {softWrapWebTitle(recipe.title)}
+          {recipe.title}
         </h2>
 
         {/* Audio-Spec-Strip */}
@@ -3771,7 +3820,6 @@ function VinylLayout({
           </span>
         </div>
 
-        {/* Top-Mikros */}
         {topMicros.length > 0 ? (
           <div
             className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 opacity-90"
@@ -3807,51 +3855,14 @@ function VinylLayout({
         </span>
       </section>
 
-      {/* ── Tracklist ── */}
-      <section className="grid grid-cols-1 gap-6 px-8 pt-8 sm:grid-cols-2 sm:gap-10">
-        <VinylSideColumnWeb
-          sideLabel="Side A"
-          tracks={sideA}
-          pack={pack}
-        />
-        {sideB.length > 0 ? (
-          <VinylSideColumnWeb
-            sideLabel="Side B"
-            tracks={sideB}
-            pack={pack}
-          />
-        ) : (
-          <div
-            className="hidden opacity-40 sm:block"
-            style={{ color: pack.mood.inkSoft }}
-          >
-            <div
-              className="mb-2 flex items-center gap-2"
-              style={{ color: pack.mood.accent }}
-            >
-              <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]">
-                Side B
-              </span>
-              <span
-                className="h-[1px] flex-1"
-                style={{ background: pack.mood.ink, opacity: 0.15 }}
-              />
-            </div>
-            <p className="font-mono text-[11px] italic">
-              (Recipe fits on Side A — no Side B needed)
-            </p>
-          </div>
-        )}
-      </section>
-
-      {/* ── Liner Notes (Ingredients) ── */}
+      {/* ── ZUTATEN ── */}
       <section className="px-8 pt-8">
         <div className="mb-2 flex items-center gap-2">
           <span
             className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
             style={{ color: pack.mood.accent }}
           >
-            Liner Notes
+            Zutaten
           </span>
           <span
             className="h-[1px] flex-1"
@@ -3861,7 +3872,7 @@ function VinylLayout({
             className="font-mono text-[10px] uppercase tracking-[0.16em]"
             style={{ color: pack.mood.inkSoft }}
           >
-            {recipe.ingredients.length} Ingredients
+            {recipe.ingredients.length} {recipe.ingredients.length === 1 ? "Zutat" : "Zutaten"}
           </span>
         </div>
         {grouped.length > 1 ? (
@@ -3911,7 +3922,36 @@ function VinylLayout({
         )}
       </section>
 
-      {/* ── Story-Block bei Sparse-Recipes ── */}
+      {/* ── ZUBEREITUNG (Tracklist) ── */}
+      <section className="grid grid-cols-1 gap-6 px-8 pt-8 sm:grid-cols-2 sm:gap-10">
+        <VinylSideColumnWeb sideLabel="Seite A" tracks={sideA} pack={pack} />
+        {sideB.length > 0 ? (
+          <VinylSideColumnWeb sideLabel="Seite B" tracks={sideB} pack={pack} />
+        ) : (
+          <div
+            className="hidden opacity-40 sm:block"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            <div
+              className="mb-2 flex items-center gap-2"
+              style={{ color: pack.mood.accent }}
+            >
+              <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]">
+                Seite B
+              </span>
+              <span
+                className="h-[1px] flex-1"
+                style={{ background: pack.mood.ink, opacity: 0.15 }}
+              />
+            </div>
+            <p className="font-mono text-[11px] italic">
+              (Rezept passt komplett auf Seite A)
+            </p>
+          </div>
+        )}
+      </section>
+
+      {/* ── Story-Block ── */}
       {showStory ? (
         <section className="mt-6 px-8">
           <blockquote
@@ -3928,7 +3968,7 @@ function VinylLayout({
 
       {/* ── Footer ── */}
       <footer
-        className="mt-8 flex items-center justify-between border-t px-8 py-5"
+        className="mt-8 flex items-center justify-between gap-4 border-t px-8 py-5"
         style={{
           borderColor: pack.mood.ink + "22",
           color: pack.mood.inkSoft,
@@ -3941,18 +3981,28 @@ function VinylLayout({
             <circle cx="8" cy="8" r="0.8" fill="#fff" />
           </svg>
           <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em]">
-            Pressed by {brand.name}
+            {brand.handle} · {pack.title}
           </span>
         </div>
-        <span className="font-mono text-[10px] uppercase tracking-[0.18em] opacity-70">
-          {brand.handle}
-        </span>
+        {recipe.sourceUrl ? (
+          <a
+            href={recipe.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-[10px] uppercase tracking-[0.18em] underline-offset-2 hover:underline"
+            style={{ color: pack.mood.accent }}
+          >
+            {recipe.sourceLabel ?? "Original auf Instagram"} ↗
+          </a>
+        ) : (
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] opacity-70">
+            Vinyl-Edition
+          </span>
+        )}
       </footer>
     </article>
   );
 }
-
-// ─── Vinyl-Web-Sub-Components ─────────────────────────
 
 function VinylSideColumnWeb({
   sideLabel,
@@ -3982,14 +4032,12 @@ function VinylSideColumnWeb({
           key={`${sideLabel}-${i}`}
           className="mb-3 flex items-start gap-3 last:mb-0"
         >
-          {/* Track-Label — gleiche fontSize/lineHeight wie Body (Anti-Pattern §1) */}
           <span
             className="shrink-0 font-mono text-[13px] italic font-bold leading-[1.45] tabular-nums"
             style={{ color: pack.mood.accent, width: "26px" }}
           >
             {t.label}
           </span>
-          {/* Track-Text */}
           <p
             className="text-[13px] leading-[1.45]"
             style={{ color: pack.mood.ink }}
@@ -4097,7 +4145,6 @@ function VinylIngredientGridWeb({
   );
 }
 
-// "Fuer" nur bei den/die/das — LAYOUT_RULES.md §5
 function vinylWebGroupLabel(name: string): string {
   return /^(den|die|das)\s/i.test(name)
     ? `Für ${name.toLowerCase()}`
@@ -4110,16 +4157,10 @@ function vinylAudioKeyWeb(recipe: Recipe): string {
   if (tags.some((t) => t.includes("high-protein") || t.includes("protein")))
     return "HIGH-PROTEIN";
   if (tags.some((t) => t.includes("low-carb"))) return "LOW-CARB";
-  if (tags.some((t) => t.includes("vegetarisch"))) return "VEG";
+  if (tags.some((t) => t.includes("vegetarisch"))) return "VEGETARISCH";
   if (tags.some((t) => t.includes("dessert") || t.includes("kuchen")))
-    return "SWEET";
+    return "SÜSS";
   if (tags.some((t) => t.includes("snack"))) return "SNACK";
   if (tags.some((t) => t.includes("mealprep"))) return "MEALPREP";
   return "ORIGINAL";
-}
-
-function softWrapWebTitle(title: string): string {
-  // Compound-Substantive an Bindestrichen brechen lassen — Web nutzt ZWJ
-  // wenn nötig. Hier ein einfacher Word-Break-Hint.
-  return title;
 }
