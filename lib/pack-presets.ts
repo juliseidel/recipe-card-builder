@@ -85,6 +85,14 @@ export const layoutPresets: LayoutPreset[] = [
     bestFor:
       "Premium-Mealprep-Packs, Show-Off-Sammlungen, Dessert-Editions, Nacht- und Sunset-Themen, alles wo Dark-Mode-Pop gewünscht ist",
   },
+  {
+    id: "restaurant",
+    title: "Restaurant Menu",
+    description:
+      "Fine-Dining-Speisekarte: Cream-Background mit Gold-Akzenten, quadratisches Hero mit dünner Gold-Border, italic Fraunces-Display-Title, Diamant-Ornamente. Zutaten mit klassischem Dot-Leader-Pattern (Name........Menge), Schritte mit Roman-Numerals (I, II, III, IV). Mikronährstoffe als beschreibender Wine-Notes-Block unten (Reich an Vitamin C, Calcium, frisch wie ein Sommerwein) plus dezenter %-Subline. Maison-Original-Aesthetik wie ein Pariser Bistro-Menu.",
+    bestFor:
+      "Date-Night-Packs, festliche Dinner-Menus, Premium-Hauptmahlzeiten, edle Desserts, Wein-begleitete Kollektionen, Sonntag-Brunch-Hits",
+  },
 ];
 
 // Mood presets — eight pre-tuned palettes that pass contrast checks and look

@@ -66,6 +66,11 @@ const LAYOUT_OPTIONS: { id: CardLayout; description: string }[] = [
     description:
       "Sternkarten-Look auf Dark-Sky-Background (Marineblau, #0a0e1f). Hero rund mit Glow-Halo, italic Fraunces-Title in cream-Weiss, ✦-Stern-Bullets bei Zutaten, Schritte als Trajectory mit Station-Markern. Mikronaehrstoffe in EIGENER Position: als Planeten-Symbole vertikal am rechten Rand (kleine Akzent-Kreise mit %-Wert, durch Connection-Line verbunden). Background-Sterne als Atmosphaere. Sehr eigenstaendige Premium-Optik, Dark-Mode-Pop. Passt fuer Premium-Mealprep-Packs, Show-Off-Sammlungen, Dessert-Editions, Nacht- und Sunset-Themen, alles wo der Pack im Browser pop machen soll.",
   },
+  {
+    id: "restaurant",
+    description:
+      "Fine-Dining-Speisekarte: Cream-Background (#fcf9f3) mit Gold-Akzenten (#b08842). Hero quadratisch mit duenner Gold-Border, italic Fraunces-Display-Title zentriert, ◆-Diamant-Ornamente. Zutaten mit klassischem Dot-Leader-Pattern (Name....Menge), Schritte mit Roman-Numerals (I, II, III). Mikronaehrstoffe in EIGENER Position: als beschreibender 'Wine Notes'-Block unten ('Reich an Vitamin C, Calcium, frisch wie ein Sommerwein') plus dezenter %-Subline. Maison-Pariser-Bistro-Aesthetik. Passt fuer Date-Night-Packs, festliche Dinners, Premium-Hauptmahlzeiten, edle Desserts, Wein-begleitete Kollektionen, Sonntag-Brunch.",
+  },
 ];
 
 const MOOD_OPTIONS = [
@@ -119,7 +124,7 @@ const RESPONSE_SCHEMA = {
     layout: {
       type: "string",
       description:
-        'Empfohlenes Layout, einer aus: "amber", "editorial", "patisserie", "minimal", "vital", "dashboard", "sport", "vinyl", "newspaper", "constellation".',
+        'Empfohlenes Layout, einer aus: "amber", "editorial", "patisserie", "minimal", "vital", "dashboard", "sport", "vinyl", "newspaper", "constellation", "restaurant".',
     },
     layoutReason: {
       type: "string",
@@ -254,6 +259,11 @@ PASSUNG sehr wichtig: Layout/Mood/Font sollen ZUR REZEPTAUSWAHL passen.
   will (z.B. Date-Night-Desserts, Premium-Mealprep, "after dark"-Snacks) →
   constellation, cocoa/honey/lavender, fraunces. Sehr eigenstaendige Dark-Sky-
   Optik (dunkles Marineblau + Sternen-Background), Mikros als Planeten-Symbole.
+- Wenn das Pack ein Restaurant-/Bistro-Feel haben soll (Date-Night-Dinners,
+  Pariser-Maison-Aesthetik, mehrgaengige Menus, edle Hauptmahlzeiten, Wein-
+  begleitete Rezepte) → restaurant, honey/cocoa/rose, fraunces. Cream-BG mit
+  Gold-Ornamenten, Dot-Leader bei Zutaten, Roman-Numerals bei Steps, Wine-
+  Notes-Block fuer Mikros.
 
 SURFACE-STYLE (Pack-Hintergrund) — sei mutig wo es passt:
 - DEFAULT: solid — wirkt clean, sicher, immer ok

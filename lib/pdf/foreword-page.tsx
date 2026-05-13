@@ -50,6 +50,10 @@ const VARIANTS: Record<
   // Hero rund mit Glow-Halo, italic Drop-Cap-Story in cream-Text, Planet-
   // Akzent als kleiner Anker. Kein brand.signature (wie Vinyl/Newspaper).
   constellation: ConstellationForewordPage,
+  // Restaurant-Foreword: dediziert. Fine-Dining-Speisekarte mit Cream-BG,
+  // Gold-Ornamenten, quadr. Hero mit Gold-Border, italic Drop-Cap-Story.
+  // Author-Box im Footer mit Avatar (KEIN brand.signature).
+  restaurant: RestaurantForewordPage,
 };
 
 export function ForewordPage(props: ForewordPageProps) {
@@ -2147,6 +2151,409 @@ function ConstellationForewordPage({
               }}
             >
               Trajectory Beginnt
+            </Text>
+          </View>
+        </View>
+      </View>
+    </Page>
+  );
+}
+
+// ─── RESTAURANT — Fine-Dining-Speisekarte-Vorwort ────────────────────────────
+// Cream-BG, Gold-Ornamente, quadr. Hero mit Gold-Border, italic Drop-Cap-
+// Story, ◆-Diamanten als Section-Marker. Author-Box im Footer mit Avatar
+// (KEIN brand.signature — wie Vinyl/Newspaper/Constellation).
+const RESTAURANT_FOREWORD_COLORS = {
+  bg: "#fcf9f3",
+  paper: "#f5f1e8",
+  ink: "#2c2418",
+  inkSoft: "#665544",
+  inkSubtle: "#9a8a76",
+  gold: "#b08842",
+  divider: "#d8cdb8",
+} as const;
+
+function RestaurantForewordPage({
+  brand,
+  pack,
+  content,
+  imageDataUri,
+  avatarDataUri,
+}: ForewordPageProps) {
+  const t = packTheme(pack);
+  void t;
+  const greeting = content.greeting?.trim() || "Vorwort";
+  const story = content.story?.trim() ?? "";
+  const signoff = content.signoff?.trim() ?? "";
+  const storyFirstChar = story.charAt(0);
+  const storyRest = story.slice(1);
+
+  return (
+    <Page
+      size="A4"
+      style={{
+        backgroundColor: RESTAURANT_FOREWORD_COLORS.bg,
+        fontFamily: "Fraunces",
+        color: RESTAURANT_FOREWORD_COLORS.ink,
+      }}
+    >
+      {/* Masthead */}
+      <View
+        style={{
+          paddingHorizontal: 36,
+          paddingTop: 30,
+          alignItems: "center",
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            width: "100%",
+          }}
+        >
+          <View
+            style={{
+              flex: 1,
+              height: 0.5,
+              backgroundColor: RESTAURANT_FOREWORD_COLORS.gold,
+            }}
+          />
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 7.5,
+              fontWeight: 700,
+              letterSpacing: 3,
+              color: RESTAURANT_FOREWORD_COLORS.gold,
+              textTransform: "uppercase",
+            }}
+          >
+            Le Menu · Vorwort
+          </Text>
+          <View
+            style={{
+              flex: 1,
+              height: 0.5,
+              backgroundColor: RESTAURANT_FOREWORD_COLORS.gold,
+            }}
+          />
+        </View>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            marginTop: 8,
+          }}
+        >
+          <Text style={{ fontSize: 7, color: RESTAURANT_FOREWORD_COLORS.gold }}>
+            ◆
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: 12,
+              fontStyle: "italic",
+              fontWeight: 600,
+              letterSpacing: 2,
+              color: RESTAURANT_FOREWORD_COLORS.ink,
+              textTransform: "uppercase",
+            }}
+          >
+            {brand.name}
+          </Text>
+          <Text style={{ fontSize: 7, color: RESTAURANT_FOREWORD_COLORS.gold }}>
+            ◆
+          </Text>
+        </View>
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: 7,
+            letterSpacing: 1.8,
+            color: RESTAURANT_FOREWORD_COLORS.inkSubtle,
+            textTransform: "uppercase",
+            marginTop: 3,
+          }}
+        >
+          {pack.title}
+        </Text>
+      </View>
+
+      {/* Hero quadratisch mit Gold-Border, zentriert */}
+      <View
+        style={{
+          alignItems: "center",
+          paddingTop: 22,
+        }}
+      >
+        <View
+          style={{
+            width: 208,
+            height: 208,
+            padding: 4,
+            borderWidth: 0.75,
+            borderColor: RESTAURANT_FOREWORD_COLORS.gold,
+          }}
+        >
+          <View
+            style={{
+              width: 200,
+              height: 200,
+              overflow: "hidden",
+              backgroundColor: RESTAURANT_FOREWORD_COLORS.paper,
+            }}
+          >
+            {imageDataUri ? (
+              <Image
+                src={imageDataUri}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  backgroundColor: RESTAURANT_FOREWORD_COLORS.gold,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontSize: 86,
+                    fontWeight: 700,
+                    fontStyle: "italic",
+                    color: "#fafafa",
+                  }}
+                >
+                  {brand.name.charAt(0)}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Eyebrow + Greeting */}
+      <View style={{ paddingHorizontal: 64, marginTop: 18, alignItems: "center" }}>
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: 8,
+            fontWeight: 600,
+            letterSpacing: 3,
+            color: RESTAURANT_FOREWORD_COLORS.gold,
+            textTransform: "uppercase",
+          }}
+        >
+          Préface · Bienvenue
+        </Text>
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontSize: 30,
+            fontStyle: "italic",
+            fontWeight: 600,
+            color: RESTAURANT_FOREWORD_COLORS.ink,
+            textAlign: "center",
+            marginTop: 8,
+            lineHeight: 1.1,
+            letterSpacing: 0.3,
+          }}
+        >
+          {greeting}
+        </Text>
+        {/* Ornamental Rule unter Greeting */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            marginTop: 10,
+          }}
+        >
+          <View
+            style={{
+              width: 36,
+              height: 0.5,
+              backgroundColor: RESTAURANT_FOREWORD_COLORS.gold,
+            }}
+          />
+          <Text style={{ fontSize: 7, color: RESTAURANT_FOREWORD_COLORS.gold }}>
+            ◇
+          </Text>
+          <View
+            style={{
+              width: 36,
+              height: 0.5,
+              backgroundColor: RESTAURANT_FOREWORD_COLORS.gold,
+            }}
+          />
+        </View>
+      </View>
+
+      {/* Story als italic Drop-Cap-Block */}
+      <View
+        style={{
+          paddingHorizontal: 72,
+          marginTop: 18,
+        }}
+      >
+        {story.length > 0 ? (
+          <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: 46,
+                fontWeight: 700,
+                fontStyle: "italic",
+                color: RESTAURANT_FOREWORD_COLORS.gold,
+                lineHeight: 0.85,
+                marginRight: 6,
+                marginTop: -3,
+                width: 34,
+              }}
+            >
+              {storyFirstChar}
+            </Text>
+            <Text
+              style={{
+                flex: 1,
+                fontFamily: "Fraunces",
+                fontSize: 11,
+                color: RESTAURANT_FOREWORD_COLORS.ink,
+                lineHeight: 1.65,
+                textAlign: "justify",
+                letterSpacing: 0.2,
+              }}
+            >
+              {storyRest}
+            </Text>
+          </View>
+        ) : null}
+
+        {signoff ? (
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: 11,
+              fontStyle: "italic",
+              color: RESTAURANT_FOREWORD_COLORS.gold,
+              marginTop: 18,
+              textAlign: "center",
+              letterSpacing: 0.3,
+            }}
+          >
+            {signoff}
+          </Text>
+        ) : null}
+      </View>
+
+      {/* Footer mit Author-Strip (KEIN brand.signature) */}
+      <View
+        style={{
+          position: "absolute",
+          left: 36,
+          right: 36,
+          bottom: 30,
+        }}
+      >
+        <View
+          style={{
+            height: 0.5,
+            backgroundColor: RESTAURANT_FOREWORD_COLORS.gold,
+            marginBottom: 14,
+          }}
+        />
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 14,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
+            {avatarDataUri ? (
+              <View
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 19,
+                  overflow: "hidden",
+                  borderWidth: 1.5,
+                  borderColor: RESTAURANT_FOREWORD_COLORS.gold,
+                }}
+              >
+                <Image
+                  src={avatarDataUri}
+                  style={{
+                    width: 35,
+                    height: 35,
+                    objectFit: "cover",
+                    objectPosition: "center 25%",
+                  }}
+                />
+              </View>
+            ) : null}
+            <View>
+              <Text
+                style={{
+                  fontFamily: "Fraunces",
+                  fontSize: 11,
+                  fontStyle: "italic",
+                  fontWeight: 600,
+                  letterSpacing: 1.6,
+                  color: RESTAURANT_FOREWORD_COLORS.ink,
+                  textTransform: "uppercase",
+                }}
+              >
+                {brand.name}
+              </Text>
+              <Text
+                style={{
+                  fontFamily: "Inter",
+                  fontSize: 8,
+                  color: RESTAURANT_FOREWORD_COLORS.inkSoft,
+                  marginTop: 2,
+                  letterSpacing: 1.2,
+                }}
+              >
+                {brand.handle}
+              </Text>
+            </View>
+          </View>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 7,
+            }}
+          >
+            <Text style={{ fontSize: 7, color: RESTAURANT_FOREWORD_COLORS.gold }}>
+              ◆
+            </Text>
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 8,
+                fontWeight: 600,
+                letterSpacing: 1.8,
+                color: RESTAURANT_FOREWORD_COLORS.inkSoft,
+                textTransform: "uppercase",
+              }}
+            >
+              Le Menu Commence
             </Text>
           </View>
         </View>

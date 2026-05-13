@@ -2619,6 +2619,52 @@ function LayoutThumbnail({
         </>
       );
       break;
+    case "restaurant":
+      // Fine-Dining Speisekarte: cream-bg, Gold-Linien, quadratisches Hero
+      // mit Gold-Border zentriert, Dot-Leader-Zutaten, Roman-Numerals
+      body = (
+        <>
+          {/* Cream Background override */}
+          <rect x="0" y="0" width="70" height="52" rx="4" fill="#fcf9f3" />
+          {/* Top-Ornament: Gold-Linie + ◆ Diamonds + Brand-Hint */}
+          <line x1="6" y1="6" x2="20" y2="6" stroke="#b08842" strokeWidth="0.4" />
+          <text x="22" y="7.5" fontSize="2.4" fill="#b08842" fontWeight="700">◆</text>
+          <rect x="26" y="5" width="18" height="2" rx="0.3" fill="#2c2418" opacity="0.85" />
+          <text x="46" y="7.5" fontSize="2.4" fill="#b08842" fontWeight="700">◆</text>
+          <line x1="50" y1="6" x2="64" y2="6" stroke="#b08842" strokeWidth="0.4" />
+          {/* Hero quadratisch mit Gold-Border zentriert */}
+          <rect x="26" y="11" width="18" height="18" fill="none" stroke="#b08842" strokeWidth="0.5" />
+          <rect x="27" y="12" width="16" height="16" fill={accent} opacity="0.65" />
+          {/* Title-Hint italic */}
+          <rect x="20" y="31" width="30" height="2" rx="0.3" fill="#2c2418" opacity="0.85" />
+          {/* Ornamental Rule mit ◇ */}
+          <line x1="26" y1="35" x2="32" y2="35" stroke="#b08842" strokeWidth="0.4" />
+          <text x="33.5" y="36" fontSize="2" fill="#b08842">◇</text>
+          <line x1="38" y1="35" x2="44" y2="35" stroke="#b08842" strokeWidth="0.4" />
+          {/* Dot-Leader Zutaten: Name....Menge */}
+          <rect x="5" y="38.5" width="12" height="1" rx="0.2" fill="#2c2418" opacity="0.8" />
+          <text x="18" y="39.3" fontSize="1.6" fill="#b08842" opacity="0.55" letterSpacing="0.5">
+            ··············
+          </text>
+          <rect x="40" y="38.5" width="6" height="1" rx="0.2" fill="#2c2418" opacity="0.9" />
+          <rect x="5" y="41.5" width="10" height="1" rx="0.2" fill="#2c2418" opacity="0.8" />
+          <text x="16" y="42.3" fontSize="1.6" fill="#b08842" opacity="0.55" letterSpacing="0.5">
+            ················
+          </text>
+          <rect x="42" y="41.5" width="6" height="1" rx="0.2" fill="#2c2418" opacity="0.9" />
+          {/* Roman-Numerals Steps + Text */}
+          <text x="5" y="46.6" fontSize="2.4" fill="#b08842" fontWeight="700" fontStyle="italic">I.</text>
+          <rect x="10" y="45.8" width="32" height="1" rx="0.2" fill="#2c2418" opacity="0.7" />
+          <text x="5" y="49.6" fontSize="2.4" fill="#b08842" fontWeight="700" fontStyle="italic">II.</text>
+          <rect x="10" y="48.8" width="28" height="1" rx="0.2" fill="#2c2418" opacity="0.7" />
+          {/* Wine-Notes Hint (rechte untere Ecke) */}
+          <text x="49" y="46.6" fontSize="1.7" fill="#b08842" fontWeight="700">◇</text>
+          <rect x="51.5" y="45.8" width="14" height="1" rx="0.2" fill="#b08842" opacity="0.85" />
+          <rect x="49" y="48.5" width="16" height="0.9" rx="0.2" fill="#2c2418" opacity="0.55" fontStyle="italic" />
+          <rect x="49" y="50.2" width="14" height="0.9" rx="0.2" fill="#2c2418" opacity="0.55" />
+        </>
+      );
+      break;
   }
   return (
     <svg

@@ -72,7 +72,8 @@ export type CardLayout =
   // Spec siehe docs/LAYOUT_RULES.md.
   | "vinyl" // 12"-Schallplatte: Hero als Album-Sleeve, Steps als Tracklist
   | "newspaper" // Broadsheet-Editorial: Drop-Cap Lead + 3-Spalten + Spreadsheet-Mikros
-  | "constellation"; // Sternkarten-Look: Dark-Sky, Hero mit Glow-Halo, Mikros als Planeten rechts, Steps als Trajectory
+  | "constellation" // Sternkarten-Look: Dark-Sky, Hero mit Glow-Halo, Mikros als Planeten rechts, Steps als Trajectory
+  | "restaurant"; // Fine-Dining-Speisekarte: Cream + Gold, quadrat. Hero mit Gold-Border, Dot-Leader-Zutaten, Roman-Steps, Wine-Notes-Mikros
 
 export type Pack = {
   slug: string;

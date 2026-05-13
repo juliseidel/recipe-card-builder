@@ -75,6 +75,7 @@ const LAYOUTS: Record<CardLayout, (p: RecipeCardPdfProps) => React.JSX.Element> 
   vinyl: VinylPage,
   newspaper: NewspaperPage,
   constellation: ConstellationPage,
+  restaurant: RestaurantPage,
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -8847,4 +8848,1033 @@ function buildConstellationStars(seed: string): {
     stars.push({ x, y, r, opacity });
   }
   return stars;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// LAYOUT 11 (Phase C): RESTAURANT MENU — Fine-Dining-Speisekarte
+// ═════════════════════════════════════════════════════════════════════════════
+// Komplett andere Design-Sprache als alle anderen 10 Layouts. Konzept:
+//
+//   ┌────────────────────────────────────────────────────────────────────┐
+//   │  ─────────────  LE MENU  ─────────────                              │
+//   │              ◆  {BRAND_NAME}  ◆                                     │
+//   │                                                                     │
+//   │                  ┌─────────────┐                                    │
+//   │                  │             │ ← Hero quadratisch                 │
+//   │                  │    HERO     │   mit Gold-Border                  │
+//   │                  │             │                                    │
+//   │                  └─────────────┘                                    │
+//   │                                                                     │
+//   │                ENTREE · I. PLAT                                     │
+//   │                                                                     │
+//   │           Pasta al Limone                                           │
+//   │                                                                     │
+//   │      ─── ◇ ───────────────── ◇ ───                                 │
+//   │                                                                     │
+//   │                Subtitle italic                                      │
+//   │                                                                     │
+//   │           25 MIN · 300 KCAL · 4 PORTIONEN                          │
+//   │                                                                     │
+//   │  ──────────────────────────────────────────                        │
+//   │   ZUTATEN                                                           │
+//   │   ─────────                                                         │
+//   │   Magerquark.....................................500 g             │
+//   │   Skyr...........................................150 g             │
+//   │   Frischkäse.....................................150 g             │
+//   │   Creme Fine....................................200 ml             │
+//   │                                                                     │
+//   │   ZUBEREITUNG                                                       │
+//   │   ────────────                                                      │
+//   │   I.   Magerquark, Schmand und Creme verrühren.                    │
+//   │   II.  Die Mandarinen unter die Creme heben.                       │
+//   │   III. Eine Schicht der Löffelbiskuits einlegen.                   │
+//   │   IV.  Den Pudding gleichmäßig verteilen.                          │
+//   │                                                                     │
+//   │      ─── ◇ ─── WINE NOTES ─── ◇ ───                                │
+//   │                                                                     │
+//   │   Reich an Vitamin C, Calcium und Eisen, frisch und                │
+//   │   fokussiert wie ein leichter Sommerwein.                          │
+//   │                                                                     │
+//   │   VITAMIN C 44%  ·  CALCIUM 28%  ·  EISEN 23%                       │
+//   │                                                                     │
+//   │  ──────────────────────────────────────────                        │
+//   │  @handle · pack                                          [QR]       │
+//   └────────────────────────────────────────────────────────────────────┘
+//
+// Mikros in EIGENER Position vs allen anderen Layouts:
+//   - vinyl: Audio-Spec-Strip oben
+//   - editorial: Banner ueber Hero
+//   - patisserie: Vertikale Liste in Sidebar
+//   - vital: Pearl-Strip mittig
+//   - amber: Vertikale Bars rechts
+//   - minimal: Capsule-Pills horizontal
+//   - dashboard: Data-Rows mit Icons
+//   - sport: Macro-Bars mit Emojis
+//   - newspaper: Spreadsheet-Footer-Row mit Doppellinien
+//   - constellation: Planet-Column rechts neben Hero
+//   - restaurant: Italic "Wine Notes"-Block unten — als beschreibender Satz
+//                  ("Reich an X, Y, Z, frisch wie ein Sommerwein") plus
+//                  dezenter Subline mit %-Werten. Kein Grid, keine Tabelle.
+//
+// Background ist hardcoded `#fcf9f3` (Cream), Gold `#b08842` als Ornament-
+// Akzent (◆ Diamanten, Wine-Notes-Trennlinien, Hero-Border) plus theme.accent
+// fuer Pack-Mood-Akzent (Title-Highlights, Section-Headers).
+//
+// Anti-Patterns aus LAYOUT_RULES.md alle adressiert.
+
+const RESTAURANT_COLORS = {
+  bg: "#fcf9f3",
+  paper: "#f5f1e8",
+  ink: "#2c2418",
+  inkSoft: "#665544",
+  inkSubtle: "#9a8a76",
+  gold: "#b08842",
+  goldSoft: "#d4b478",
+  divider: "#d8cdb8",
+} as const;
+
+const RESTAURANT_DENSITY: Record<
+  Density,
+  {
+    heroSize: number;
+    titleFontSize: number;
+    eyebrowFontSize: number;
+    subtitleFontSize: number;
+    specFontSize: number;
+    ingredientFontSize: number;
+    ingredientRowPadV: number;
+    ingredientNoteFontSize: number;
+    stepFontSize: number;
+    stepMarginBottom: number;
+    sectionLabelFontSize: number;
+    wineNotesFontSize: number;
+    topPadding: number;
+    sectionGap: number;
+  }
+> = {
+  compact: {
+    heroSize: 140,
+    titleFontSize: 24,
+    eyebrowFontSize: 7.5,
+    subtitleFontSize: 9.5,
+    specFontSize: 8.5,
+    ingredientFontSize: 9,
+    ingredientRowPadV: 2.5,
+    ingredientNoteFontSize: 6.5,
+    stepFontSize: 9,
+    stepMarginBottom: 5,
+    sectionLabelFontSize: 7.5,
+    wineNotesFontSize: 10,
+    topPadding: 14,
+    sectionGap: 10,
+  },
+  balanced: {
+    heroSize: 168,
+    titleFontSize: 30,
+    eyebrowFontSize: 8,
+    subtitleFontSize: 10.5,
+    specFontSize: 9.5,
+    ingredientFontSize: 9.5,
+    ingredientRowPadV: 3.5,
+    ingredientNoteFontSize: 7,
+    stepFontSize: 9.5,
+    stepMarginBottom: 7,
+    sectionLabelFontSize: 8,
+    wineNotesFontSize: 11.5,
+    topPadding: 22,
+    sectionGap: 14,
+  },
+  spacious: {
+    heroSize: 190,
+    titleFontSize: 34,
+    eyebrowFontSize: 8.5,
+    subtitleFontSize: 11.5,
+    specFontSize: 10,
+    ingredientFontSize: 10,
+    ingredientRowPadV: 5,
+    ingredientNoteFontSize: 7.5,
+    stepFontSize: 10,
+    stepMarginBottom: 9,
+    sectionLabelFontSize: 8.5,
+    wineNotesFontSize: 13,
+    topPadding: 28,
+    sectionGap: 18,
+  },
+};
+
+// Roman-Numerals fuer Steps. Bis L (50) ist mehr als genug — kein Rezept
+// hat 50 Schritte. Format: "I", "II", "III", "IV", ... ohne Punkt
+// (Punkt kommt vom Renderer als Suffix, damit "IV." richtig aussieht).
+function toRoman(n: number): string {
+  const r: [number, string][] = [
+    [50, "L"],
+    [40, "XL"],
+    [10, "X"],
+    [9, "IX"],
+    [5, "V"],
+    [4, "IV"],
+    [1, "I"],
+  ];
+  let out = "";
+  let v = n;
+  for (const [val, sym] of r) {
+    while (v >= val) {
+      out += sym;
+      v -= val;
+    }
+  }
+  return out;
+}
+
+// Wine-Notes-Satz aus den Top-Mikros + Recipe-Charakter generieren.
+// Keine Em/En-dashes (LAYOUT_RULES §8) — nur Komma + Punkt.
+function buildWineNotes(micros: Micronutrient[], recipe: Recipe): string {
+  if (micros.length === 0) return "";
+  const names = micros.map((m) => m.name);
+  const microPart =
+    names.length === 1
+      ? `Reich an ${names[0]}`
+      : names.length === 2
+        ? `Reich an ${names[0]} und ${names[1]}`
+        : `Reich an ${names.slice(0, -1).join(", ")} und ${names[names.length - 1]}`;
+
+  const tags = (recipe.tags ?? []).map((t) => t.toLowerCase());
+  let character: string;
+  if (tags.some((t) => t.includes("dessert") || t.includes("süß") || t.includes("kuchen"))) {
+    character = "süß und vollmundig wie ein edler Dessertwein";
+  } else if (tags.some((t) => t.includes("protein") || t.includes("high-protein"))) {
+    character = "kräftig und sättigend wie ein vollmundiger Roter";
+  } else if (tags.some((t) => t.includes("vegan") || t.includes("salat") || t.includes("bowl"))) {
+    character = "frisch und fokussiert wie ein leichter Sommerwein";
+  } else if (tags.some((t) => t.includes("mealprep"))) {
+    character = "ausgewogen und harmonisch wie ein klassischer Cuvée";
+  } else if (tags.some((t) => t.includes("snack"))) {
+    character = "spritzig und unkompliziert wie ein junger Schaumwein";
+  } else {
+    character = "ausgewogen und feinsinnig wie ein gut gereifter Jahrgang";
+  }
+  return `${microPart}, ${character}.`;
+}
+
+function RestaurantPage({
+  brand,
+  pack,
+  recipe,
+  totalRecipes,
+  heroDataUri,
+  qrDataUri,
+  hideRecipeIndex,
+}: RecipeCardPdfProps) {
+  const theme = packTheme(pack);
+  const density = getDensity(recipe);
+  const D = RESTAURANT_DENSITY[density];
+  const showStory = shouldShowStory(recipe);
+  const recipePosition = recipe.number;
+  const titleSafe = softWrapTitle(recipe.title);
+
+  const ingredientGroups = groupIngredients(recipe.ingredients);
+  const flatIngredients = ingredientGroups.flatMap((g) => g.items);
+
+  const stepGroups = groupSteps(recipe.steps);
+  const flatSteps: { num: number; text: string }[] = [];
+  let runningStep = 0;
+  for (const g of stepGroups) {
+    for (const item of g.items) {
+      runningStep += 1;
+      flatSteps.push({ num: runningStep, text: item.text });
+    }
+  }
+
+  const topMicros = (recipe.nutrition.micros ?? [])
+    .slice()
+    .sort(
+      (a: Micronutrient, b: Micronutrient) =>
+        (b.pctDaily ?? 0) - (a.pctDaily ?? 0)
+    )
+    .slice(0, 3);
+
+  const time = totalTime(recipe);
+  const wineNotes = buildWineNotes(topMicros, recipe);
+  // Roman-Width adaptiv: ab 10 Schritten wird "XIII." breit
+  const romanWidth = flatSteps.length >= 10 ? 32 : 22;
+
+  return (
+    <Page
+      size="A4"
+      style={{
+        backgroundColor: RESTAURANT_COLORS.bg,
+        fontFamily: "Fraunces",
+        color: RESTAURANT_COLORS.ink,
+      }}
+    >
+      {/* ── Masthead ── */}
+      <View
+        style={{
+          paddingHorizontal: PAGE_PADDING,
+          paddingTop: D.topPadding,
+          alignItems: "center",
+        }}
+      >
+        {/* Ornamental Top-Rule mit Pack-Title + Recipe-Index */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            width: "100%",
+          }}
+        >
+          <View
+            style={{
+              flex: 1,
+              height: 0.5,
+              backgroundColor: RESTAURANT_COLORS.gold,
+            }}
+          />
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 7.5,
+              fontWeight: 700,
+              letterSpacing: 3,
+              color: RESTAURANT_COLORS.gold,
+              textTransform: "uppercase",
+            }}
+          >
+            Le Menu
+          </Text>
+          <View
+            style={{
+              flex: 1,
+              height: 0.5,
+              backgroundColor: RESTAURANT_COLORS.gold,
+            }}
+          />
+        </View>
+        {/* Brand-Mark zwischen zwei Diamanten */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            marginTop: 8,
+          }}
+        >
+          <Text style={{ fontSize: 7, color: RESTAURANT_COLORS.gold }}>◆</Text>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: 11,
+              fontStyle: "italic",
+              fontWeight: 600,
+              letterSpacing: 2,
+              color: RESTAURANT_COLORS.ink,
+              textTransform: "uppercase",
+            }}
+          >
+            {brand.name}
+          </Text>
+          <Text style={{ fontSize: 7, color: RESTAURANT_COLORS.gold }}>◆</Text>
+        </View>
+        {/* Pack-Title + Index als sehr feine Sub-Eyebrow */}
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: 6.5,
+            letterSpacing: 1.6,
+            color: RESTAURANT_COLORS.inkSubtle,
+            textTransform: "uppercase",
+            marginTop: 3,
+          }}
+        >
+          {pack.title}
+          {!hideRecipeIndex
+            ? `  ·  N° ${pad2(recipePosition)} / ${pad2(totalRecipes)}`
+            : ""}
+        </Text>
+      </View>
+
+      {/* ── Hero quadratisch mit Gold-Border ── */}
+      <View
+        style={{
+          alignItems: "center",
+          paddingTop: density === "compact" ? 12 : 20,
+        }}
+      >
+        <View
+          style={{
+            width: D.heroSize + 8,
+            height: D.heroSize + 8,
+            padding: 4,
+            borderWidth: 0.75,
+            borderColor: RESTAURANT_COLORS.gold,
+          }}
+        >
+          <View
+            style={{
+              width: D.heroSize,
+              height: D.heroSize,
+              overflow: "hidden",
+              backgroundColor: RESTAURANT_COLORS.paper,
+            }}
+          >
+            {heroDataUri ? (
+              <Image
+                src={heroDataUri}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  backgroundColor: theme.accent,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontSize: 80,
+                    fontWeight: 700,
+                    fontStyle: "italic",
+                    color: "#fafafa",
+                  }}
+                >
+                  {brand.name.charAt(0)}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* ── Title-Block ── */}
+      <View
+        style={{
+          alignItems: "center",
+          paddingHorizontal: 56,
+          paddingTop: density === "compact" ? 10 : 16,
+        }}
+      >
+        {/* Eyebrow: Kategorie + Roman-Position */}
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: D.eyebrowFontSize,
+            fontWeight: 600,
+            letterSpacing: 3,
+            color: RESTAURANT_COLORS.gold,
+            textTransform: "uppercase",
+            marginBottom: 6,
+          }}
+        >
+          {pack.category}
+          {!hideRecipeIndex ? `  ·  ${toRoman(recipePosition)}. Plat` : ""}
+        </Text>
+        {/* Italic Title in serif */}
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontSize: D.titleFontSize,
+            fontStyle: "italic",
+            fontWeight: 600,
+            color: RESTAURANT_COLORS.ink,
+            textAlign: "center",
+            lineHeight: 1.1,
+            letterSpacing: 0.3,
+          }}
+        >
+          {titleSafe}
+        </Text>
+        {/* Ornamental Rule unter Title */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            marginTop: 8,
+            marginBottom: 8,
+          }}
+        >
+          <View
+            style={{
+              width: 40,
+              height: 0.5,
+              backgroundColor: RESTAURANT_COLORS.gold,
+            }}
+          />
+          <Text style={{ fontSize: 7, color: RESTAURANT_COLORS.gold }}>◇</Text>
+          <View
+            style={{
+              width: 40,
+              height: 0.5,
+              backgroundColor: RESTAURANT_COLORS.gold,
+            }}
+          />
+        </View>
+        {recipe.subtitle ? (
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: D.subtitleFontSize,
+              fontStyle: "italic",
+              color: RESTAURANT_COLORS.inkSoft,
+              textAlign: "center",
+              lineHeight: 1.4,
+              maxWidth: 380,
+            }}
+          >
+            {recipe.subtitle}
+          </Text>
+        ) : null}
+        {/* Spec-Strip: ZEIT · KCAL · PORTIONEN */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "baseline",
+            gap: 10,
+            marginTop: 10,
+            flexWrap: "wrap",
+            justifyContent: "center",
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: D.specFontSize,
+              fontWeight: 700,
+              letterSpacing: 2,
+              color: RESTAURANT_COLORS.ink,
+              textTransform: "uppercase",
+            }}
+          >
+            {time} Min
+          </Text>
+          <Text style={{ fontSize: 7, color: RESTAURANT_COLORS.gold }}>·</Text>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: D.specFontSize,
+              fontWeight: 700,
+              letterSpacing: 2,
+              color: RESTAURANT_COLORS.ink,
+              textTransform: "uppercase",
+            }}
+          >
+            {Math.round(recipe.nutrition.kcal)} Kcal
+          </Text>
+          <Text style={{ fontSize: 7, color: RESTAURANT_COLORS.gold }}>·</Text>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: D.specFontSize,
+              fontWeight: 700,
+              letterSpacing: 2,
+              color: RESTAURANT_COLORS.ink,
+              textTransform: "uppercase",
+            }}
+          >
+            {recipe.servings === 1
+              ? "1 Portion"
+              : `${recipe.servings} Portionen`}
+          </Text>
+        </View>
+      </View>
+
+      {/* ── Zutaten mit Dot-Leader ── */}
+      <View
+        style={{
+          paddingHorizontal: 56,
+          marginTop: D.sectionGap + 6,
+        }}
+      >
+        <RestaurantSectionHeader
+          label="Zutaten"
+          right={`${recipe.ingredients.length} ${recipe.ingredients.length === 1 ? "Zutat" : "Zutaten"}`}
+          density={D}
+        />
+        {ingredientGroups.length > 1 ? (
+          <View>
+            {ingredientGroups.map((group, gIdx) => (
+              <View key={`g-${gIdx}`} style={{ marginTop: gIdx > 0 ? 8 : 4 }}>
+                {group.name ? (
+                  <Text
+                    style={{
+                      fontFamily: "Fraunces",
+                      fontSize: 8,
+                      fontStyle: "italic",
+                      letterSpacing: 1.4,
+                      color: RESTAURANT_COLORS.gold,
+                      textTransform: "uppercase",
+                      marginBottom: 4,
+                      marginTop: 2,
+                    }}
+                  >
+                    {restaurantGroupLabel(group.name)}
+                  </Text>
+                ) : null}
+                {group.items.map((ing, i) => (
+                  <RestaurantIngredientRow
+                    key={`gi-${gIdx}-${i}`}
+                    amount={ing.amount}
+                    name={ing.name}
+                    note={ing.note}
+                    density={D}
+                  />
+                ))}
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View>
+            {flatIngredients.map((ing, i) => (
+              <RestaurantIngredientRow
+                key={`fi-${i}`}
+                amount={ing.amount}
+                name={ing.name}
+                note={ing.note}
+                density={D}
+              />
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* ── Zubereitung mit Roman-Numerals ── */}
+      <View
+        style={{
+          paddingHorizontal: 56,
+          marginTop: D.sectionGap + 4,
+        }}
+      >
+        <RestaurantSectionHeader
+          label="Zubereitung"
+          right={`${flatSteps.length} ${flatSteps.length === 1 ? "Schritt" : "Schritte"}`}
+          density={D}
+        />
+        <View>
+          {flatSteps.map((step) => (
+            <View
+              key={`s-${step.num}`}
+              style={{
+                flexDirection: "row",
+                alignItems: "flex-start",
+                gap: 6,
+                marginBottom: D.stepMarginBottom,
+              }}
+            >
+              {/* Roman-Numeral mit Glyph-Center-Lock §1 */}
+              <Text
+                style={{
+                  fontSize: D.stepFontSize,
+                  lineHeight: 1.5,
+                  fontStyle: "italic",
+                  fontWeight: 600,
+                  color: RESTAURANT_COLORS.gold,
+                  width: romanWidth,
+                }}
+              >
+                {toRoman(step.num)}.
+              </Text>
+              <Text
+                style={{
+                  flex: 1,
+                  fontFamily: "Fraunces",
+                  fontSize: D.stepFontSize,
+                  lineHeight: 1.5,
+                  color: RESTAURANT_COLORS.ink,
+                }}
+              >
+                {step.text}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* ── Wine Notes mit Mikros (EIGENE POSITION) ── */}
+      {topMicros.length > 0 ? (
+        <View
+          style={{
+            paddingHorizontal: 56,
+            marginTop: D.sectionGap + 4,
+          }}
+        >
+          {/* Ornamental Section-Header */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              justifyContent: "center",
+              marginBottom: 8,
+            }}
+          >
+            <View
+              style={{
+                flex: 1,
+                height: 0.5,
+                backgroundColor: RESTAURANT_COLORS.gold,
+              }}
+            />
+            <Text style={{ fontSize: 7, color: RESTAURANT_COLORS.gold }}>◇</Text>
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 7.5,
+                fontWeight: 700,
+                letterSpacing: 3,
+                color: RESTAURANT_COLORS.gold,
+                textTransform: "uppercase",
+              }}
+            >
+              Wine Notes
+            </Text>
+            <Text style={{ fontSize: 7, color: RESTAURANT_COLORS.gold }}>◇</Text>
+            <View
+              style={{
+                flex: 1,
+                height: 0.5,
+                backgroundColor: RESTAURANT_COLORS.gold,
+              }}
+            />
+          </View>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: D.wineNotesFontSize,
+              fontStyle: "italic",
+              color: RESTAURANT_COLORS.ink,
+              textAlign: "center",
+              lineHeight: 1.5,
+              letterSpacing: 0.2,
+              marginBottom: 8,
+            }}
+          >
+            {wineNotes}
+          </Text>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "baseline",
+              gap: 10,
+              justifyContent: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            {topMicros.map((m: Micronutrient, i: number) => (
+              <View
+                key={`wn-${i}`}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "baseline",
+                  gap: 4,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "Inter",
+                    fontSize: 7.5,
+                    fontWeight: 600,
+                    letterSpacing: 1.8,
+                    color: RESTAURANT_COLORS.gold,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {m.name}
+                </Text>
+                {typeof m.pctDaily === "number" ? (
+                  <Text
+                    style={{
+                      fontFamily: "Inter",
+                      fontSize: 8,
+                      fontWeight: 700,
+                      color: RESTAURANT_COLORS.ink,
+                    }}
+                  >
+                    {m.pctDaily}%
+                  </Text>
+                ) : null}
+                {i < topMicros.length - 1 ? (
+                  <Text
+                    style={{
+                      fontSize: 7,
+                      color: RESTAURANT_COLORS.gold,
+                      marginLeft: 6,
+                    }}
+                  >
+                    ·
+                  </Text>
+                ) : null}
+              </View>
+            ))}
+          </View>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 6.5,
+              letterSpacing: 1.4,
+              color: RESTAURANT_COLORS.inkSubtle,
+              textTransform: "uppercase",
+              textAlign: "center",
+              marginTop: 4,
+            }}
+          >
+            {nutritionBasisInline(recipe.nutritionBasis)}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* ── Sparse-Story-Block (≤10 Zutaten + Story) ── */}
+      {showStory ? (
+        <View
+          style={{
+            paddingHorizontal: 56,
+            marginTop: D.sectionGap - 2,
+          }}
+        >
+          <View
+            style={{
+              borderLeftWidth: 1.5,
+              borderLeftColor: RESTAURANT_COLORS.gold,
+              paddingLeft: 10,
+              paddingVertical: 2,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: 9.5,
+                fontStyle: "italic",
+                color: RESTAURANT_COLORS.inkSoft,
+                lineHeight: 1.45,
+              }}
+            >
+              {recipe.description}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
+      {/* ── Footer mit QR ── */}
+      <View
+        style={{
+          position: "absolute",
+          left: PAGE_PADDING,
+          right: PAGE_PADDING,
+          bottom: 22,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingTop: 8,
+          borderTopWidth: 0.5,
+          borderTopColor: RESTAURANT_COLORS.divider,
+          gap: 12,
+        }}
+        fixed
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Text style={{ fontSize: 9, color: RESTAURANT_COLORS.gold }}>◆</Text>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 8,
+              fontWeight: 600,
+              letterSpacing: 1.6,
+              color: RESTAURANT_COLORS.inkSoft,
+              textTransform: "uppercase",
+            }}
+          >
+            {brand.handle} · {pack.title}
+          </Text>
+        </View>
+        {qrDataUri ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 7,
+                letterSpacing: 1.2,
+                color: RESTAURANT_COLORS.inkSubtle,
+                textTransform: "uppercase",
+                textAlign: "right",
+              }}
+            >
+              Scan{"\n"}für{"\n"}Original
+            </Text>
+            <Image src={qrDataUri} style={{ width: 32, height: 32 }} />
+          </View>
+        ) : (
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 7.5,
+              letterSpacing: 1.4,
+              color: RESTAURANT_COLORS.inkSubtle,
+              textTransform: "uppercase",
+            }}
+          >
+            {recipe.sourceLabel ?? "Maison Original"}
+          </Text>
+        )}
+      </View>
+    </Page>
+  );
+}
+
+// ─── Restaurant Sub-Components ────────────────────────────────────────────
+
+function RestaurantSectionHeader({
+  label,
+  right,
+  density,
+}: {
+  label: string;
+  right: string;
+  density: (typeof RESTAURANT_DENSITY)["balanced"];
+}) {
+  return (
+    <View>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "baseline",
+          gap: 8,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: density.sectionLabelFontSize,
+            fontWeight: 700,
+            letterSpacing: 2.6,
+            color: RESTAURANT_COLORS.ink,
+            textTransform: "uppercase",
+          }}
+        >
+          {label}
+        </Text>
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontSize: density.sectionLabelFontSize,
+            fontStyle: "italic",
+            color: RESTAURANT_COLORS.inkSubtle,
+          }}
+        >
+          {right}
+        </Text>
+      </View>
+      <View
+        style={{
+          height: 0.5,
+          backgroundColor: RESTAURANT_COLORS.gold,
+          marginTop: 3,
+          marginBottom: 6,
+        }}
+      />
+    </View>
+  );
+}
+
+function RestaurantIngredientRow({
+  amount,
+  name,
+  note,
+  density,
+}: {
+  amount: string;
+  name: string;
+  note?: string;
+  density: (typeof RESTAURANT_DENSITY)["balanced"];
+}) {
+  const displayAmount = formatIngredientAmount(amount);
+  const amountIsLong = displayAmount.length > 10;
+  // Dot-Leader: ein langer "·"-String mit fixer Färbung, durch overflow im
+  // mittleren View clipped. Funktioniert in react-pdf zuverlaessig — eine
+  // dotted-Border wird nicht von allen PDF-Renderern korrekt dargestellt.
+  return (
+    <View
+      style={{
+        paddingVertical: density.ingredientRowPadV,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: amountIsLong ? "center" : "flex-end",
+          gap: 4,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontSize: density.ingredientFontSize,
+            color: RESTAURANT_COLORS.ink,
+            lineHeight: 1.3,
+          }}
+        >
+          {name}
+        </Text>
+        {/* Dot-Leader-Mitte: overflow hidden damit langer String genau die
+            freie Breite fuellt */}
+        <View
+          style={{
+            flex: 1,
+            overflow: "hidden",
+            paddingBottom: 2,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: density.ingredientFontSize - 1,
+              color: RESTAURANT_COLORS.gold,
+              opacity: 0.55,
+              letterSpacing: 2.5,
+            }}
+            // Hint an react-pdf: keine Zeilenumbrueche im Dot-String
+            wrap={false}
+          >
+            {"·".repeat(80)}
+          </Text>
+        </View>
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: density.ingredientFontSize,
+            fontWeight: 600,
+            color: RESTAURANT_COLORS.ink,
+            lineHeight: amountIsLong ? 1.3 : undefined,
+            paddingTop: amountIsLong ? 0 : 1,
+            textAlign: "right",
+          }}
+        >
+          {displayAmount}
+        </Text>
+      </View>
+      {note ? (
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontSize: density.ingredientNoteFontSize,
+            fontStyle: "italic",
+            color: RESTAURANT_COLORS.inkSubtle,
+            marginTop: 1,
+          }}
+        >
+          {note}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+// "Fuer" nur bei den/die/das — LAYOUT_RULES.md §5
+function restaurantGroupLabel(name: string): string {
+  return /^(den|die|das)\s/i.test(name)
+    ? `Für ${name.toLowerCase()}`
+    : name;
 }

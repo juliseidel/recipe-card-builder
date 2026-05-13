@@ -149,6 +149,8 @@ export function RecipeCardFull(props: RecipeCardFullProps) {
       return <NewspaperLayout {...props} />;
     case "constellation":
       return <ConstellationLayout {...props} />;
+    case "restaurant":
+      return <RestaurantLayout {...props} />;
   }
 }
 
@@ -5297,6 +5299,515 @@ function ConstellationStepColumnWeb({
 }
 
 function constellationGroupLabelWeb(name: string): string {
+  return /^(den|die|das)\s/i.test(name)
+    ? `Für ${name.toLowerCase()}`
+    : name;
+}
+
+// ════════════════════════════════════════════════
+// RESTAURANT MENU — Fine-Dining Speisekarte (Phase C, neu)
+// ════════════════════════════════════════════════
+const RESTAURANT_WEB = {
+  bg: "#fcf9f3",
+  paper: "#f5f1e8",
+  ink: "#2c2418",
+  inkSoft: "#665544",
+  inkSubtle: "#9a8a76",
+  gold: "#b08842",
+  goldSoft: "#d4b478",
+  divider: "#d8cdb8",
+} as const;
+
+function toRomanWeb(n: number): string {
+  const r: [number, string][] = [
+    [50, "L"],
+    [40, "XL"],
+    [10, "X"],
+    [9, "IX"],
+    [5, "V"],
+    [4, "IV"],
+    [1, "I"],
+  ];
+  let out = "";
+  let v = n;
+  for (const [val, sym] of r) {
+    while (v >= val) {
+      out += sym;
+      v -= val;
+    }
+  }
+  return out;
+}
+
+function buildWineNotesWeb(
+  micros: { name: string; pctDaily?: number }[],
+  recipe: Recipe
+): string {
+  if (micros.length === 0) return "";
+  const names = micros.map((m) => m.name);
+  const microPart =
+    names.length === 1
+      ? `Reich an ${names[0]}`
+      : names.length === 2
+        ? `Reich an ${names[0]} und ${names[1]}`
+        : `Reich an ${names.slice(0, -1).join(", ")} und ${names[names.length - 1]}`;
+  const tags = (recipe.tags ?? []).map((t) => t.toLowerCase());
+  let character: string;
+  if (tags.some((t) => t.includes("dessert") || t.includes("süß") || t.includes("kuchen"))) {
+    character = "süß und vollmundig wie ein edler Dessertwein";
+  } else if (tags.some((t) => t.includes("protein") || t.includes("high-protein"))) {
+    character = "kräftig und sättigend wie ein vollmundiger Roter";
+  } else if (tags.some((t) => t.includes("vegan") || t.includes("salat") || t.includes("bowl"))) {
+    character = "frisch und fokussiert wie ein leichter Sommerwein";
+  } else if (tags.some((t) => t.includes("mealprep"))) {
+    character = "ausgewogen und harmonisch wie ein klassischer Cuvée";
+  } else if (tags.some((t) => t.includes("snack"))) {
+    character = "spritzig und unkompliziert wie ein junger Schaumwein";
+  } else {
+    character = "ausgewogen und feinsinnig wie ein gut gereifter Jahrgang";
+  }
+  return `${microPart}, ${character}.`;
+}
+
+function RestaurantLayout({
+  brand,
+  pack,
+  recipe,
+  totalRecipes,
+}: RecipeCardFullProps) {
+  const recipeIndex = recipe.number - 1;
+  const grouped = groupIngredients(recipe.ingredients);
+  const flatIngredients = grouped.flatMap((g) => g.items);
+  const time = recipe.prepTime + (recipe.cookTime ?? 0);
+
+  const stepGroups = groupRecipeSteps(recipe.steps);
+  const flatSteps: { num: number; text: string }[] = [];
+  let running = 0;
+  for (const g of stepGroups) {
+    for (const item of g.items) {
+      running += 1;
+      flatSteps.push({ num: running, text: item.text });
+    }
+  }
+
+  const topMicros = (recipe.nutrition.micros ?? [])
+    .slice()
+    .sort((a, b) => (b.pctDaily ?? 0) - (a.pctDaily ?? 0))
+    .slice(0, 3);
+
+  const wineNotes = buildWineNotesWeb(topMicros, recipe);
+  const showStory =
+    recipe.ingredients.length <= 10 && Boolean(recipe.description?.trim());
+
+  return (
+    <article
+      className="overflow-hidden rounded-[var(--radius-card)] border"
+      style={{
+        background: RESTAURANT_WEB.bg,
+        color: RESTAURANT_WEB.ink,
+        borderColor: RESTAURANT_WEB.divider,
+      }}
+    >
+      {/* ── Masthead ── */}
+      <header className="flex flex-col items-center px-8 pt-8">
+        <div className="flex w-full items-center gap-3">
+          <span
+            className="h-[1px] flex-1"
+            style={{ background: RESTAURANT_WEB.gold }}
+          />
+          <span
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.3em]"
+            style={{ color: RESTAURANT_WEB.gold }}
+          >
+            Le Menu
+          </span>
+          <span
+            className="h-[1px] flex-1"
+            style={{ background: RESTAURANT_WEB.gold }}
+          />
+        </div>
+        <div className="mt-3 flex items-center gap-3">
+          <span style={{ color: RESTAURANT_WEB.gold, fontSize: "9px" }}>◆</span>
+          <span
+            className="font-display text-[13px] italic font-semibold uppercase tracking-[0.2em]"
+            style={{ color: RESTAURANT_WEB.ink }}
+          >
+            {brand.name}
+          </span>
+          <span style={{ color: RESTAURANT_WEB.gold, fontSize: "9px" }}>◆</span>
+        </div>
+        <p
+          className="mt-1 font-mono text-[9px] uppercase tracking-[0.2em]"
+          style={{ color: RESTAURANT_WEB.inkSubtle }}
+        >
+          {pack.title}
+          {`  ·  N° ${String(recipeIndex + 1).padStart(2, "0")} / ${String(totalRecipes).padStart(2, "0")}`}
+        </p>
+      </header>
+
+      {/* ── Hero quadratisch mit Gold-Border ── */}
+      <section className="flex justify-center px-8 pt-8">
+        <div
+          className="p-[5px]"
+          style={{
+            border: `1px solid ${RESTAURANT_WEB.gold}`,
+          }}
+        >
+          <div
+            className="relative h-[260px] w-[260px] overflow-hidden md:h-[300px] md:w-[300px]"
+            style={{ background: RESTAURANT_WEB.paper }}
+          >
+            {recipe.hero ? (
+              <Image
+                src={recipe.hero}
+                alt={recipe.title}
+                fill
+                sizes="300px"
+                className="object-cover"
+                quality={95}
+                unoptimized={recipe.hero.startsWith("data:")}
+              />
+            ) : (
+              <div
+                className="flex h-full w-full items-center justify-center font-display text-[100px] font-bold italic"
+                style={{ background: pack.mood.accent, color: "#fafafa" }}
+              >
+                {brand.name.charAt(0)}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Title-Block ── */}
+      <section className="flex flex-col items-center px-12 pt-7">
+        <p
+          className="font-mono text-[10px] font-semibold uppercase tracking-[0.32em]"
+          style={{ color: RESTAURANT_WEB.gold }}
+        >
+          {pack.category}
+          {`  ·  ${toRomanWeb(recipeIndex + 1)}. Plat`}
+        </p>
+        <h2
+          className="mt-3 max-w-[520px] text-center font-display text-[40px] italic font-semibold leading-[1.08]"
+          style={{ color: RESTAURANT_WEB.ink, letterSpacing: "0.01em" }}
+        >
+          {recipe.title}
+        </h2>
+        {/* Ornamental Rule */}
+        <div className="mt-3 flex items-center gap-2">
+          <span
+            className="block h-[1px] w-[50px]"
+            style={{ background: RESTAURANT_WEB.gold }}
+          />
+          <span style={{ color: RESTAURANT_WEB.gold, fontSize: "9px" }}>◇</span>
+          <span
+            className="block h-[1px] w-[50px]"
+            style={{ background: RESTAURANT_WEB.gold }}
+          />
+        </div>
+        {recipe.subtitle ? (
+          <p
+            className="mt-3 max-w-[440px] text-center font-display text-[14px] italic leading-snug"
+            style={{ color: RESTAURANT_WEB.inkSoft }}
+          >
+            {recipe.subtitle}
+          </p>
+        ) : null}
+        <div
+          className="mt-4 flex flex-wrap items-baseline justify-center gap-3"
+          style={{ color: RESTAURANT_WEB.ink }}
+        >
+          <span className="font-mono text-[12px] font-bold uppercase tracking-[0.2em]">
+            {time} Min
+          </span>
+          <span style={{ color: RESTAURANT_WEB.gold, fontSize: "9px" }}>·</span>
+          <span className="font-mono text-[12px] font-bold uppercase tracking-[0.2em]">
+            {Math.round(recipe.nutrition.kcal)} Kcal
+          </span>
+          <span style={{ color: RESTAURANT_WEB.gold, fontSize: "9px" }}>·</span>
+          <span className="font-mono text-[12px] font-bold uppercase tracking-[0.2em]">
+            {recipe.servings === 1 ? "1 Portion" : `${recipe.servings} Portionen`}
+          </span>
+        </div>
+      </section>
+
+      {/* ── Zutaten mit Dot-Leader ── */}
+      <section className="px-12 pt-10">
+        <RestaurantSectionHeaderWeb
+          label="Zutaten"
+          right={`${recipe.ingredients.length} ${recipe.ingredients.length === 1 ? "Zutat" : "Zutaten"}`}
+        />
+        {grouped.length > 1 ? (
+          <div className="flex flex-col gap-4">
+            {grouped.map((group, gIdx) => (
+              <div key={`g-${gIdx}`}>
+                {group.name ? (
+                  <h4
+                    className="mb-1 font-display text-[11px] italic uppercase tracking-[0.16em]"
+                    style={{ color: RESTAURANT_WEB.gold }}
+                  >
+                    {restaurantGroupLabelWeb(group.name)}
+                  </h4>
+                ) : null}
+                {group.items.map((ing, i) => (
+                  <RestaurantIngredientRowWeb
+                    key={`gi-${gIdx}-${i}`}
+                    amount={ing.amount}
+                    name={ing.name}
+                    note={ing.note}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div>
+            {flatIngredients.map((ing, i) => (
+              <RestaurantIngredientRowWeb
+                key={`fi-${i}`}
+                amount={ing.amount}
+                name={ing.name}
+                note={ing.note}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── Zubereitung mit Roman-Numerals ── */}
+      <section className="px-12 pt-8">
+        <RestaurantSectionHeaderWeb
+          label="Zubereitung"
+          right={`${flatSteps.length} ${flatSteps.length === 1 ? "Schritt" : "Schritte"}`}
+        />
+        <div className="mt-3">
+          {flatSteps.map((step) => (
+            <div
+              key={`s-${step.num}`}
+              className="mb-3 flex items-start gap-2 last:mb-0"
+            >
+              {/* Roman-Numeral mit Glyph-Center-Lock §1: gleiche font-size + line-height */}
+              <span
+                className="shrink-0 font-display text-[14px] italic font-semibold leading-[1.55]"
+                style={{
+                  color: RESTAURANT_WEB.gold,
+                  width: flatSteps.length >= 10 ? "44px" : "30px",
+                }}
+              >
+                {toRomanWeb(step.num)}.
+              </span>
+              <p
+                className="font-display text-[14px] leading-[1.55]"
+                style={{ color: RESTAURANT_WEB.ink }}
+              >
+                {step.text}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Wine Notes (EIGENE Mikros-Position) ── */}
+      {topMicros.length > 0 ? (
+        <section className="px-12 pt-9">
+          <div className="flex items-center gap-3 justify-center">
+            <span
+              className="h-[1px] flex-1"
+              style={{ background: RESTAURANT_WEB.gold }}
+            />
+            <span style={{ color: RESTAURANT_WEB.gold, fontSize: "9px" }}>◇</span>
+            <span
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.32em]"
+              style={{ color: RESTAURANT_WEB.gold }}
+            >
+              Wine Notes
+            </span>
+            <span style={{ color: RESTAURANT_WEB.gold, fontSize: "9px" }}>◇</span>
+            <span
+              className="h-[1px] flex-1"
+              style={{ background: RESTAURANT_WEB.gold }}
+            />
+          </div>
+          <p
+            className="mt-4 text-center font-display text-[15px] italic leading-[1.55]"
+            style={{ color: RESTAURANT_WEB.ink, letterSpacing: "0.01em" }}
+          >
+            {wineNotes}
+          </p>
+          <div className="mt-4 flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1">
+            {topMicros.map((m, i) => (
+              <span
+                key={`wn-${i}`}
+                className="flex items-baseline gap-1.5"
+              >
+                <span
+                  className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em]"
+                  style={{ color: RESTAURANT_WEB.gold }}
+                >
+                  {m.name}
+                </span>
+                {typeof m.pctDaily === "number" ? (
+                  <span
+                    className="font-mono text-[11px] font-bold"
+                    style={{ color: RESTAURANT_WEB.ink }}
+                  >
+                    {m.pctDaily}%
+                  </span>
+                ) : null}
+                {i < topMicros.length - 1 ? (
+                  <span
+                    className="ml-2"
+                    style={{ color: RESTAURANT_WEB.gold, fontSize: "9px" }}
+                  >
+                    ·
+                  </span>
+                ) : null}
+              </span>
+            ))}
+          </div>
+          <p
+            className="mt-2 text-center font-mono text-[9px] uppercase tracking-[0.18em]"
+            style={{ color: RESTAURANT_WEB.inkSubtle }}
+          >
+            {nutritionBasisInline(recipe.nutritionBasis)}
+          </p>
+        </section>
+      ) : null}
+
+      {/* ── Story-Block (sparse) ── */}
+      {showStory ? (
+        <section className="mt-7 px-12">
+          <blockquote
+            className="border-l-[1.5px] pl-4 font-display text-[14px] italic leading-relaxed"
+            style={{
+              borderColor: RESTAURANT_WEB.gold,
+              color: RESTAURANT_WEB.inkSoft,
+            }}
+          >
+            {recipe.description}
+          </blockquote>
+        </section>
+      ) : null}
+
+      {/* ── Footer ── */}
+      <footer
+        className="mt-9 flex items-center justify-between gap-4 border-t px-8 py-5"
+        style={{
+          borderColor: RESTAURANT_WEB.divider,
+          color: RESTAURANT_WEB.inkSoft,
+        }}
+      >
+        <div className="flex items-center gap-2">
+          <span style={{ color: RESTAURANT_WEB.gold, fontSize: "10px" }}>◆</span>
+          <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em]">
+            {brand.handle} · {pack.title}
+          </span>
+        </div>
+        {recipe.sourceUrl ? (
+          <a
+            href={recipe.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-[10px] uppercase tracking-[0.18em] underline-offset-2 hover:underline"
+            style={{ color: RESTAURANT_WEB.gold }}
+          >
+            {recipe.sourceLabel ?? "Maison Original"} ↗
+          </a>
+        ) : (
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] opacity-70">
+            Maison Original
+          </span>
+        )}
+      </footer>
+    </article>
+  );
+}
+
+function RestaurantSectionHeaderWeb({
+  label,
+  right,
+}: {
+  label: string;
+  right: string;
+}) {
+  return (
+    <div>
+      <div className="flex items-baseline gap-2">
+        <span
+          className="font-mono text-[11px] font-bold uppercase tracking-[0.32em]"
+          style={{ color: RESTAURANT_WEB.ink }}
+        >
+          {label}
+        </span>
+        <span
+          className="font-display text-[11px] italic"
+          style={{ color: RESTAURANT_WEB.inkSubtle }}
+        >
+          {right}
+        </span>
+      </div>
+      <div
+        className="mt-1 h-[1px]"
+        style={{ background: RESTAURANT_WEB.gold }}
+      />
+    </div>
+  );
+}
+
+function RestaurantIngredientRowWeb({
+  amount,
+  name,
+  note,
+}: {
+  amount: string;
+  name: string;
+  note?: string;
+}) {
+  const displayAmount = formatIngredientAmount(amount);
+  // Web-Dot-Leader: CSS-Trick mit flex-basis + overflow + repeated "·".
+  // Funktioniert ohne extra-JS und respektiert die Container-Breite.
+  return (
+    <div className="py-1.5">
+      <div className="flex items-end gap-2">
+        <span
+          className="font-display text-[14px] leading-[1.3]"
+          style={{ color: RESTAURANT_WEB.ink }}
+        >
+          {name}
+        </span>
+        <span
+          className="relative flex-1 overflow-hidden whitespace-nowrap pb-[2px] font-mono"
+          style={{
+            color: RESTAURANT_WEB.gold,
+            opacity: 0.55,
+            letterSpacing: "0.25em",
+            fontSize: "13px",
+          }}
+          aria-hidden
+        >
+          {"·".repeat(80)}
+        </span>
+        <span
+          className="shrink-0 font-mono text-[14px] font-semibold tabular-nums"
+          style={{ color: RESTAURANT_WEB.ink }}
+        >
+          {displayAmount}
+        </span>
+      </div>
+      {note ? (
+        <p
+          className="mt-0.5 font-display text-[11px] italic"
+          style={{ color: RESTAURANT_WEB.inkSubtle }}
+        >
+          {note}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function restaurantGroupLabelWeb(name: string): string {
   return /^(den|die|das)\s/i.test(name)
     ? `Für ${name.toLowerCase()}`
     : name;
