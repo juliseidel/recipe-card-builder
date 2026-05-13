@@ -99,20 +99,20 @@ const EDITORIAL_DENSITY: Record<
   }
 > = {
   compact: {
-    headerPadTop: 22,
-    headerPadBottom: 16,
+    headerPadTop: 16,
+    headerPadBottom: 10,
     titleFontSize: 24,
     subtitleFontSize: 10.5,
-    bodyPadTop: 18,
-    bodyPadBottom: 14,
-    ingRowPadV: 3,
+    bodyPadTop: 12,
+    bodyPadBottom: 9,
+    ingRowPadV: 2.5,
     ingFontSize: 9,
     ingNoteFontSize: 6.5,
-    stepMarginBottom: 7,
+    stepMarginBottom: 6,
     stepFontSize: 9,
     stepNumFontSize: 16,
-    microsPadTop: 14,
-    microsPadBottom: 16,
+    microsPadTop: 9,
+    microsPadBottom: 11,
   },
   balanced: {
     headerPadTop: 28,
@@ -348,7 +348,7 @@ function EditorialPage({
           after the title, with mini progress bars. No other pack gives
           micros this kind of editorial billing — they're always tucked
           into the footer strip. */}
-      <EditorialMicrosBanner recipe={recipe} theme={t} />
+      <EditorialMicrosBanner recipe={recipe} theme={t} density={density} />
 
       {/* 4-TILE STATS BAR — Portionen · kcal · Eiweiß · Zeit */}
       <View
@@ -394,13 +394,15 @@ function EditorialPage({
         />
       </View>
 
-      {/* BIENES STORY — pull-quote with «»-quotes, honey-tinted */}
+      {/* BIENES STORY — pull-quote with «»-quotes, honey-tinted.
+          Density-aware padding: bei compact reduzieren wir den Block
+          damit lange Recipes auf eine Seite passen. */}
       {recipe.description ? (
         <View
           style={{
             paddingHorizontal: 32,
-            paddingTop: 18,
-            paddingBottom: 22,
+            paddingTop: density === "compact" ? 10 : 18,
+            paddingBottom: density === "compact" ? 12 : 22,
             backgroundColor: blendWithWhite(t.bg, 0.4),
             borderBottomWidth: 1,
             borderBottomColor: t.divider,
@@ -414,7 +416,7 @@ function EditorialPage({
               letterSpacing: 1.6,
               color: t.accent,
               textTransform: "uppercase",
-              marginBottom: 8,
+              marginBottom: density === "compact" ? 5 : 8,
             }}
           >
             {`${brand.name}s Story`}
@@ -494,22 +496,31 @@ function EditorialPage({
 function EditorialMicrosBanner({
   recipe,
   theme,
+  density = "balanced",
 }: {
   recipe: Recipe;
   theme: ReturnType<typeof packTheme>;
+  density?: Density;
 }) {
   const micros = recipe.nutrition.micros;
   if (!micros || micros.length === 0) return null;
   const top = [...micros]
     .sort((a, b) => (b.pctDaily ?? 0) - (a.pctDaily ?? 0))
     .slice(0, 6);
+  // Density-aware padding: bei compact (lange Recipes wie Tikka Masala
+  // mit 12+8 ingredients/steps) reduzieren wir die Mikros-Banner-Hoehe
+  // damit das ganze Recipe sauber auf eine Seite passt.
+  const isCompact = density === "compact";
+  const padTop = isCompact ? 9 : 16;
+  const padBottom = isCompact ? 11 : 20;
+  const headerMb = isCompact ? 7 : 12;
 
   return (
     <View
       style={{
         paddingHorizontal: 32,
-        paddingTop: 16,
-        paddingBottom: 20,
+        paddingTop: padTop,
+        paddingBottom: padBottom,
         backgroundColor: blendWithWhite(theme.bg, 0.55),
         borderBottomWidth: 1,
         borderBottomColor: theme.divider,
@@ -521,7 +532,7 @@ function EditorialMicrosBanner({
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "baseline",
-          marginBottom: 12,
+          marginBottom: headerMb,
         }}
       >
         <Text
@@ -5165,9 +5176,9 @@ function PortionTile({
       style={{
         flex: 1,
         alignItems: "center",
-        paddingVertical: compact ? 18 : 22,
+        paddingVertical: compact ? 14 : 22,
         paddingHorizontal: 8,
-        gap: 5,
+        gap: compact ? 3 : 5,
         backgroundColor: highlight ? blendWithWhite(theme.bg, 0.65) : "transparent",
         borderRightWidth: borderRight ? 1 : 0,
         borderRightColor: theme.divider,

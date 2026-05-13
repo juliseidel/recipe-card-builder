@@ -287,23 +287,50 @@ function IndexPage({
         </Text>
       </View>
 
-      {/* Adaptive Inhaltsverzeichnis — bei vielen Recipes kompakter,
-          damit alles auf einer Seite passt:
-          - <= 12: bequem (paddingVertical 5, fontSize 10.5)
-          - 13-16: kompakt (paddingVertical 4, fontSize 9.5, subtitle weglassen)
-          - 17+: maximal kompakt (paddingVertical 3, fontSize 9, subtitle weg) */}
+      {/* Adaptive Inhaltsverzeichnis — Rows werden so dimensioniert, dass
+          die ganze Seite gut gefuellt wird (nicht halb-leer wie vorher)
+          und gleichzeitig alles auf eine Seite passt:
+          - 1-6 Recipes:    sehr grosszuegig (paddingV 14, fontSize 14)
+          - 7-10:           grosszuegig (paddingV 11, fontSize 13)
+          - 11-14:          komfortabel (paddingV 9, fontSize 12)
+          - 15-18:          balanced (paddingV 6, fontSize 11)
+          - 19-22:          kompakt (paddingV 4, fontSize 10, Subtitle aus)
+          - 23+:            maximal kompakt (paddingV 3, fontSize 9, Subtitle aus) */}
       {(() => {
         const count = recipes.length;
-        const tight = count > 12;
-        const veryTight = count > 16;
-        const rowPadV = veryTight ? 3 : tight ? 4 : 5;
-        const numFont = veryTight ? 11 : tight ? 12 : 13;
-        const titleFont = veryTight ? 9 : tight ? 9.5 : 10.5;
-        const subFont = veryTight ? 0 : tight ? 0 : 8;
-        const sideFont = veryTight ? 7.5 : tight ? 8 : 8.5;
-        const kcalFont = veryTight ? 9.5 : tight ? 10 : 11;
-        const bodyPadTop = tight ? 10 : 14;
-        const bodyPadBottom = tight ? 24 : 32;
+        let rowPadV: number;
+        let numFont: number;
+        let titleFont: number;
+        let subFont: number;
+        let sideFont: number;
+        let kcalFont: number;
+        let bodyPadTop: number;
+        let bodyPadBottom: number;
+        if (count <= 6) {
+          rowPadV = 14; numFont = 16; titleFont = 14; subFont = 10;
+          sideFont = 10; kcalFont = 13;
+          bodyPadTop = 22; bodyPadBottom = 60;
+        } else if (count <= 10) {
+          rowPadV = 11; numFont = 15; titleFont = 13; subFont = 9.5;
+          sideFont = 9.5; kcalFont = 12.5;
+          bodyPadTop = 18; bodyPadBottom = 50;
+        } else if (count <= 14) {
+          rowPadV = 9; numFont = 14; titleFont = 12; subFont = 9;
+          sideFont = 9; kcalFont = 12;
+          bodyPadTop = 16; bodyPadBottom = 40;
+        } else if (count <= 18) {
+          rowPadV = 6; numFont = 13; titleFont = 11; subFont = 8.5;
+          sideFont = 8.5; kcalFont = 11;
+          bodyPadTop = 14; bodyPadBottom = 30;
+        } else if (count <= 22) {
+          rowPadV = 4; numFont = 12; titleFont = 10; subFont = 0;
+          sideFont = 8; kcalFont = 10;
+          bodyPadTop = 12; bodyPadBottom = 22;
+        } else {
+          rowPadV = 3; numFont = 11; titleFont = 9; subFont = 0;
+          sideFont = 7.5; kcalFont = 9.5;
+          bodyPadTop = 10; bodyPadBottom = 16;
+        }
         return (
           <View
             style={{
