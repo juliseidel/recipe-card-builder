@@ -287,77 +287,100 @@ function IndexPage({
         </Text>
       </View>
 
-      {/* Body: paddingVertical pro Row 8 -> 5, damit 14+ Recipes auf eine
-          Seite passen. Plus Subtitle nur rendern wenn vorhanden, kein
-          leerer marginTop bei subtitlelosen Recipes. */}
-      <View style={{ paddingHorizontal: 40, paddingTop: 14, paddingBottom: 32 }}>
-        {recipes.map((r, i) => (
+      {/* Adaptive Inhaltsverzeichnis — bei vielen Recipes kompakter,
+          damit alles auf einer Seite passt:
+          - <= 12: bequem (paddingVertical 5, fontSize 10.5)
+          - 13-16: kompakt (paddingVertical 4, fontSize 9.5, subtitle weglassen)
+          - 17+: maximal kompakt (paddingVertical 3, fontSize 9, subtitle weg) */}
+      {(() => {
+        const count = recipes.length;
+        const tight = count > 12;
+        const veryTight = count > 16;
+        const rowPadV = veryTight ? 3 : tight ? 4 : 5;
+        const numFont = veryTight ? 11 : tight ? 12 : 13;
+        const titleFont = veryTight ? 9 : tight ? 9.5 : 10.5;
+        const subFont = veryTight ? 0 : tight ? 0 : 8;
+        const sideFont = veryTight ? 7.5 : tight ? 8 : 8.5;
+        const kcalFont = veryTight ? 9.5 : tight ? 10 : 11;
+        const bodyPadTop = tight ? 10 : 14;
+        const bodyPadBottom = tight ? 24 : 32;
+        return (
           <View
-            key={r.slug}
             style={{
-              flexDirection: "row",
-              alignItems: "center",
-              borderBottomWidth: 0.5,
-              borderBottomColor: t.divider,
-              paddingVertical: 5,
-              gap: 10,
+              paddingHorizontal: 40,
+              paddingTop: bodyPadTop,
+              paddingBottom: bodyPadBottom,
             }}
           >
-            <Text
-              style={{
-                fontFamily: "Fraunces",
-                fontSize: 13,
-                color: t.accent,
-                width: 24,
-              }}
-            >
-              {pad2(r.number)}
-            </Text>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 10.5, fontWeight: 600, color: t.ink }}>
-                {r.title}
-              </Text>
-              {r.subtitle ? (
-                <Text style={{ fontSize: 8, color: t.inkSoft, marginTop: 1 }}>
-                  {r.subtitle}
+            {recipes.map((r, i) => (
+              <View
+                key={r.slug}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  borderBottomWidth: 0.5,
+                  borderBottomColor: t.divider,
+                  paddingVertical: rowPadV,
+                  gap: 10,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontSize: numFont,
+                    color: t.accent,
+                    width: 24,
+                  }}
+                >
+                  {pad2(r.number)}
                 </Text>
-              ) : null}
-            </View>
-            <Text
-              style={{
-                fontFamily: "Inter",
-                fontSize: 8.5,
-                color: t.inkSoft,
-                width: 56,
-                textAlign: "right",
-              }}
-            >
-              {totalTime(r)} Min
-            </Text>
-            <Text
-              style={{
-                fontFamily: "Fraunces",
-                fontSize: 11,
-                color: t.ink,
-                width: 56,
-                textAlign: "right",
-              }}
-            >
-              {r.nutrition.kcal} kcal
-            </Text>
-            <Text
-              style={{
-                fontSize: 8.5,
-                color: t.inkSoft,
-                width: 28,
-                textAlign: "right",
-              }}
-            >
-              S. {i + 3}
-            </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: titleFont, fontWeight: 600, color: t.ink }}>
+                    {r.title}
+                  </Text>
+                  {r.subtitle && subFont > 0 ? (
+                    <Text style={{ fontSize: subFont, color: t.inkSoft, marginTop: 1 }}>
+                      {r.subtitle}
+                    </Text>
+                  ) : null}
+                </View>
+                <Text
+                  style={{
+                    fontFamily: "Inter",
+                    fontSize: sideFont,
+                    color: t.inkSoft,
+                    width: 56,
+                    textAlign: "right",
+                  }}
+                >
+                  {totalTime(r)} Min
+                </Text>
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontSize: kcalFont,
+                    color: t.ink,
+                    width: 56,
+                    textAlign: "right",
+                  }}
+                >
+                  {r.nutrition.kcal} kcal
+                </Text>
+                <Text
+                  style={{
+                    fontSize: sideFont,
+                    color: t.inkSoft,
+                    width: 28,
+                    textAlign: "right",
+                  }}
+                >
+                  S. {i + 3}
+                </Text>
+              </View>
+            ))}
           </View>
-        ))}
-      </View>
+        );
+      })()}
 
       <PageFooter brand={brand} pack={pack} pageLabel="Inhaltsverzeichnis" />
     </Page>

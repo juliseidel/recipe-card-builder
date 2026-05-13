@@ -99,52 +99,52 @@ const EDITORIAL_DENSITY: Record<
   }
 > = {
   compact: {
-    headerPadTop: 18,
-    headerPadBottom: 12,
-    titleFontSize: 24,
-    subtitleFontSize: 10.5,
-    bodyPadTop: 12,
-    bodyPadBottom: 9,
-    ingRowPadV: 2.5,
-    ingFontSize: 9,
-    ingNoteFontSize: 6.5,
-    stepMarginBottom: 6,
-    stepFontSize: 9,
-    stepNumFontSize: 16,
-    microsPadTop: 9,
-    microsPadBottom: 10,
-  },
-  balanced: {
     headerPadTop: 22,
     headerPadBottom: 16,
+    titleFontSize: 24,
+    subtitleFontSize: 10.5,
+    bodyPadTop: 18,
+    bodyPadBottom: 14,
+    ingRowPadV: 3,
+    ingFontSize: 9,
+    ingNoteFontSize: 6.5,
+    stepMarginBottom: 7,
+    stepFontSize: 9,
+    stepNumFontSize: 16,
+    microsPadTop: 14,
+    microsPadBottom: 16,
+  },
+  balanced: {
+    headerPadTop: 28,
+    headerPadBottom: 22,
     titleFontSize: 28,
     subtitleFontSize: 12,
-    bodyPadTop: 16,
-    bodyPadBottom: 12,
-    ingRowPadV: 3.5,
+    bodyPadTop: 26,
+    bodyPadBottom: 20,
+    ingRowPadV: 4.5,
     ingFontSize: 9.5,
     ingNoteFontSize: 7,
-    stepMarginBottom: 8,
+    stepMarginBottom: 10,
     stepFontSize: 9.5,
     stepNumFontSize: 18,
-    microsPadTop: 8,
-    microsPadBottom: 9,
+    microsPadTop: 16,
+    microsPadBottom: 18,
   },
   spacious: {
-    headerPadTop: 28,
-    headerPadBottom: 20,
+    headerPadTop: 34,
+    headerPadBottom: 26,
     titleFontSize: 32,
     subtitleFontSize: 13,
-    bodyPadTop: 20,
-    bodyPadBottom: 16,
-    ingRowPadV: 5,
+    bodyPadTop: 32,
+    bodyPadBottom: 26,
+    ingRowPadV: 6,
     ingFontSize: 10,
     ingNoteFontSize: 7.5,
-    stepMarginBottom: 10,
+    stepMarginBottom: 12,
     stepFontSize: 10,
     stepNumFontSize: 20,
-    microsPadTop: 11,
-    microsPadBottom: 12,
+    microsPadTop: 20,
+    microsPadBottom: 22,
   },
 };
 
@@ -377,8 +377,8 @@ function EditorialPage({
         <View
           style={{
             paddingHorizontal: 32,
-            paddingTop: 11,
-            paddingBottom: 13,
+            paddingTop: 18,
+            paddingBottom: 22,
             backgroundColor: blendWithWhite(t.bg, 0.4),
             borderBottomWidth: 1,
             borderBottomColor: t.divider,
@@ -392,7 +392,7 @@ function EditorialPage({
               letterSpacing: 1.6,
               color: t.accent,
               textTransform: "uppercase",
-              marginBottom: 5,
+              marginBottom: 8,
             }}
           >
             {`${brand.name}s Story`}
@@ -486,8 +486,8 @@ function EditorialMicrosBanner({
     <View
       style={{
         paddingHorizontal: 32,
-        paddingTop: 10,
-        paddingBottom: 12,
+        paddingTop: 16,
+        paddingBottom: 20,
         backgroundColor: blendWithWhite(theme.bg, 0.55),
         borderBottomWidth: 1,
         borderBottomColor: theme.divider,
@@ -499,7 +499,7 @@ function EditorialMicrosBanner({
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "baseline",
-          marginBottom: 7,
+          marginBottom: 12,
         }}
       >
         <Text
@@ -524,7 +524,7 @@ function EditorialMicrosBanner({
           Mikronährstoffe {nutritionBasisInline(recipe?.nutritionBasis)} · % Tagesbedarf
         </Text>
       </View>
-      <View style={{ flexDirection: "row", gap: 8 }}>
+      <View style={{ flexDirection: "row", gap: 10 }}>
         {top.map((m) => {
           const pct = Math.min(100, Math.max(0, m.pctDaily ?? 0));
           return (
@@ -5143,8 +5143,9 @@ function PortionTile({
       style={{
         flex: 1,
         alignItems: "center",
-        paddingVertical: compact ? 12 : 16,
-        paddingHorizontal: 6,
+        paddingVertical: compact ? 18 : 22,
+        paddingHorizontal: 8,
+        gap: 5,
         backgroundColor: highlight ? blendWithWhite(theme.bg, 0.65) : "transparent",
         borderRightWidth: borderRight ? 1 : 0,
         borderRightColor: theme.divider,
@@ -5165,7 +5166,6 @@ function PortionTile({
           fontFamily: "Fraunces",
           fontSize: 22,
           color: theme.ink,
-          marginTop: 2,
           lineHeight: 1,
         }}
       >
@@ -5175,7 +5175,6 @@ function PortionTile({
         style={{
           fontSize: 7.5,
           color: theme.inkSoft,
-          marginTop: 2,
           textAlign: "center",
         }}
       >
