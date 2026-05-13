@@ -145,6 +145,8 @@ export function RecipeCardFull(props: RecipeCardFullProps) {
       return <AmberLayout {...props} />;
     case "vinyl":
       return <VinylLayout {...props} />;
+    case "newspaper":
+      return <NewspaperLayout {...props} />;
   }
 }
 
@@ -4156,4 +4158,486 @@ function vinylAudioKeyWeb(recipe: Recipe): string {
   if (tags.some((t) => t.includes("snack"))) return "SNACK";
   if (tags.some((t) => t.includes("mealprep"))) return "MEALPREP";
   return "ORIGINAL";
+}
+
+// ════════════════════════════════════════════════
+// NEWSPAPER — Broadsheet-Editorial (Phase C, neu)
+// ════════════════════════════════════════════════
+function NewspaperLayout({
+  brand,
+  pack,
+  recipe,
+  totalRecipes,
+}: RecipeCardFullProps) {
+  const recipeIndex = recipe.number - 1;
+  const grouped = groupIngredients(recipe.ingredients);
+  const flatIngredients = grouped.flatMap((g) => g.items);
+  const time = recipe.prepTime + (recipe.cookTime ?? 0);
+
+  const stepGroups = groupRecipeSteps(recipe.steps);
+  const flatSteps: { num: number; text: string }[] = [];
+  let running = 0;
+  for (const g of stepGroups) {
+    for (const item of g.items) {
+      running += 1;
+      flatSteps.push({ num: running, text: item.text });
+    }
+  }
+  const halfSteps = Math.ceil(flatSteps.length / 2);
+  const stepsA = flatSteps.slice(0, halfSteps);
+  const stepsB = flatSteps.slice(halfSteps);
+
+  const topMicros = (recipe.nutrition.micros ?? [])
+    .slice()
+    .sort((a, b) => (b.pctDaily ?? 0) - (a.pctDaily ?? 0))
+    .slice(0, 3);
+
+  const leadText = recipe.description?.trim() ?? "";
+  const leadFirstChar = leadText.charAt(0);
+  const leadRest = leadText.slice(1);
+
+  return (
+    <article
+      className="overflow-hidden rounded-[var(--radius-card)] border"
+      style={{
+        background: "#fafaf5",
+        color: pack.mood.ink,
+        ...baseShellStyle(pack, brand),
+      }}
+    >
+      {/* ── Masthead ── */}
+      <header className="px-8 pt-7 pb-1">
+        <div
+          className="flex items-baseline justify-between gap-3 border-b-[2px] pb-2"
+          style={{ borderColor: pack.mood.ink }}
+        >
+          <h1
+            className="font-display text-[24px] font-bold italic leading-none"
+            style={{ color: pack.mood.ink, letterSpacing: "-0.01em" }}
+          >
+            {brand.name} Times
+          </h1>
+          <span
+            className="font-mono text-[10px] uppercase tracking-[0.18em]"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            Das Rezept-Magazin · {pack.title} · No {String(recipeIndex + 1).padStart(2, "0")} / {String(totalRecipes).padStart(2, "0")}
+          </span>
+        </div>
+        <div
+          className="mt-[2px] h-[1px]"
+          style={{ background: pack.mood.ink }}
+        />
+      </header>
+
+      {/* ── Hero + Headline + Lead ── */}
+      <section className="grid gap-6 px-8 pt-5 md:grid-cols-[1.2fr_1fr]">
+        <div>
+          <div
+            className="overflow-hidden"
+            style={{
+              aspectRatio: "4 / 3",
+              background: pack.mood.background,
+            }}
+          >
+            {recipe.hero ? (
+              <Image
+                src={recipe.hero}
+                alt={recipe.title}
+                width={640}
+                height={480}
+                className="h-full w-full object-cover"
+                quality={95}
+                unoptimized={recipe.hero.startsWith("data:")}
+              />
+            ) : (
+              <div
+                className="flex h-full w-full items-center justify-center font-display text-[64px] font-bold italic"
+                style={{ color: "#fafafa", background: pack.mood.accent }}
+              >
+                {brand.name.charAt(0)}
+              </div>
+            )}
+          </div>
+          <p
+            className="mt-2 font-display text-[11px] italic leading-snug"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            {recipe.subtitle ||
+              `Eine Aufnahme aus ${brand.name}s Küche, exklusiv für dieses Pack.`}
+          </p>
+        </div>
+
+        <div>
+          <p
+            className="mb-2 font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
+            style={{ color: pack.mood.accent }}
+          >
+            {pack.category}
+          </p>
+          <h2
+            className="font-display text-[34px] font-bold italic leading-[1.05] tracking-[-0.01em]"
+            style={{ color: pack.mood.ink }}
+          >
+            {recipe.title}
+          </h2>
+          <div className="mt-3 mb-3 flex items-center gap-2">
+            <span
+              className="font-display text-[13px] italic"
+              style={{ color: pack.mood.inkSoft }}
+            >
+              Von {brand.name}
+            </span>
+            <span
+              className="h-[1px] flex-1"
+              style={{ background: pack.mood.ink, opacity: 0.18 }}
+            />
+            <span
+              className="font-mono text-[10px] uppercase tracking-[0.18em]"
+              style={{ color: pack.mood.inkSoft }}
+            >
+              {time} Min
+            </span>
+          </div>
+          {leadText.length > 0 ? (
+            <div className="flex items-start gap-1">
+              <span
+                className="font-display text-[42px] font-bold italic leading-[0.85]"
+                style={{ color: pack.mood.accent }}
+              >
+                {leadFirstChar}
+              </span>
+              <p
+                className="flex-1 font-display text-[14px] leading-[1.5] text-justify"
+                style={{ color: pack.mood.ink }}
+              >
+                {leadRest}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      {/* ── Zutaten in 3 Spalten ── */}
+      <section className="px-8 pt-8">
+        <NewspaperSectionHeaderWeb
+          label="Zutaten"
+          right={`${recipe.ingredients.length} ${recipe.ingredients.length === 1 ? "Zutat" : "Zutaten"}`}
+          pack={pack}
+        />
+        {grouped.length > 1 ? (
+          <div className="flex flex-col gap-4 mt-2">
+            {grouped.map((group, gIdx) => (
+              <div key={`g-${gIdx}`}>
+                {group.name ? (
+                  <h4
+                    className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.18em]"
+                    style={{ color: pack.mood.inkSoft }}
+                  >
+                    {newspaperGroupLabelWeb(group.name)}
+                  </h4>
+                ) : null}
+                <NewspaperIngredientGridWeb
+                  items={group.items}
+                  pack={pack}
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <NewspaperIngredientGridWeb items={flatIngredients} pack={pack} />
+        )}
+      </section>
+
+      {/* ── Zubereitung in 2 Spalten ── */}
+      <section className="px-8 pt-7">
+        <NewspaperSectionHeaderWeb
+          label="Zubereitung"
+          right={`${flatSteps.length} ${flatSteps.length === 1 ? "Schritt" : "Schritte"}`}
+          pack={pack}
+        />
+        <div className="mt-2 grid grid-cols-1 gap-x-6 sm:grid-cols-2">
+          <NewspaperStepColumnWeb steps={stepsA} pack={pack} />
+          {stepsB.length > 0 ? (
+            <NewspaperStepColumnWeb steps={stepsB} pack={pack} />
+          ) : null}
+        </div>
+      </section>
+
+      {/* ── Spreadsheet-Footer mit Nährwerten + Mikros ── */}
+      <section className="mt-8 px-8">
+        <div
+          className="h-[2px]"
+          style={{ background: pack.mood.ink }}
+        />
+        <div
+          className="mt-[2px] h-[1px]"
+          style={{ background: pack.mood.ink, opacity: 0.5 }}
+        />
+        <p
+          className="mt-3 mb-3 font-mono text-[10px] font-bold uppercase tracking-[0.2em]"
+          style={{ color: pack.mood.ink }}
+        >
+          Nährwerte {nutritionBasisInline(recipe.nutritionBasis)}
+        </p>
+        <div className="flex flex-wrap gap-x-8 gap-y-4 md:flex-nowrap">
+          <div className="flex flex-1 flex-wrap gap-x-6 gap-y-3 md:flex-nowrap">
+            <NewspaperMacroCellWeb label="KCAL" value={String(Math.round(recipe.nutrition.kcal))} pack={pack} />
+            <NewspaperMacroCellWeb label="Protein" value={`${recipe.nutrition.protein}g`} pack={pack} />
+            <NewspaperMacroCellWeb label="Kohlenh." value={`${recipe.nutrition.carbs}g`} pack={pack} />
+            <NewspaperMacroCellWeb label="Fett" value={`${recipe.nutrition.fat}g`} pack={pack} />
+          </div>
+          {topMicros.length > 0 ? (
+            <>
+              <div
+                className="hidden w-[1px] md:block"
+                style={{ background: pack.mood.ink, opacity: 0.2 }}
+              />
+              <div className="flex flex-1 flex-wrap gap-x-5 gap-y-3 md:flex-nowrap">
+                {topMicros.map((m, i) => (
+                  <NewspaperMicroCellWeb
+                    key={`${m.name}-${i}`}
+                    name={m.name}
+                    pct={m.pctDaily}
+                    pack={pack}
+                  />
+                ))}
+              </div>
+            </>
+          ) : null}
+        </div>
+      </section>
+
+      {/* ── Footer ── */}
+      <footer
+        className="mt-8 flex items-center justify-between border-t px-8 py-5"
+        style={{
+          borderColor: pack.mood.ink + "22",
+          color: pack.mood.inkSoft,
+        }}
+      >
+        <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em]">
+          {brand.handle} · {pack.title}
+        </span>
+        {recipe.sourceUrl ? (
+          <a
+            href={recipe.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-[10px] uppercase tracking-[0.18em] underline-offset-2 hover:underline"
+            style={{ color: pack.mood.accent }}
+          >
+            {recipe.sourceLabel ?? "Original auf Instagram"} ↗
+          </a>
+        ) : (
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] opacity-70">
+            Erstausgabe
+          </span>
+        )}
+      </footer>
+    </article>
+  );
+}
+
+// ─── Newspaper Sub-Components (Web) ──────────────────────────
+
+function NewspaperSectionHeaderWeb({
+  label,
+  right,
+  pack,
+}: {
+  label: string;
+  right: string;
+  pack: Pack;
+}) {
+  return (
+    <div className="flex items-center gap-2 mb-1">
+      <span
+        className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
+        style={{ color: pack.mood.ink }}
+      >
+        {label}
+      </span>
+      <span
+        className="h-[1px] flex-1"
+        style={{ background: pack.mood.ink, opacity: 0.18 }}
+      />
+      <span
+        className="font-mono text-[10px] uppercase tracking-[0.18em]"
+        style={{ color: pack.mood.inkSoft }}
+      >
+        {right}
+      </span>
+    </div>
+  );
+}
+
+function NewspaperIngredientGridWeb({
+  items,
+  pack,
+}: {
+  items: { amount: string; name: string; note?: string }[];
+  pack: Pack;
+}) {
+  const useThree = items.length > 4;
+  const cols = useThree ? 3 : 2;
+  return (
+    <div
+      className={`grid gap-x-5 ${useThree ? "sm:grid-cols-3" : "sm:grid-cols-2"} grid-cols-1`}
+    >
+      {Array.from({ length: cols }).map((_, ci) => {
+        const perCol = Math.ceil(items.length / cols);
+        const colItems = items.slice(ci * perCol, (ci + 1) * perCol);
+        return (
+          <div key={`col-${ci}`}>
+            {colItems.map((ing, i) => (
+              <NewspaperIngredientRowWeb
+                key={`${ci}-${i}`}
+                amount={ing.amount}
+                name={ing.name}
+                note={ing.note}
+                pack={pack}
+              />
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function NewspaperIngredientRowWeb({
+  amount,
+  name,
+  note,
+  pack,
+}: {
+  amount: string;
+  name: string;
+  note?: string;
+  pack: Pack;
+}) {
+  const displayAmount = formatIngredientAmount(amount);
+  const amountIsLong = displayAmount.length > 10;
+  return (
+    <div
+      className={`flex gap-2 border-b py-2 last:border-b-0 ${amountIsLong ? "items-center" : "items-start"}`}
+      style={{ borderColor: pack.mood.ink + "14" }}
+    >
+      <span
+        className="shrink-0 font-mono text-[12px] font-bold tabular-nums"
+        style={{ color: pack.mood.accent, width: "62px" }}
+      >
+        {displayAmount}
+      </span>
+      <div className="flex-1">
+        <p
+          className="font-display text-[13px] leading-snug"
+          style={{ color: pack.mood.ink }}
+        >
+          {name}
+        </p>
+        {note ? (
+          <p
+            className="mt-0.5 font-display text-[11px] italic"
+            style={{ color: pack.mood.inkSoft }}
+          >
+            {note}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function NewspaperStepColumnWeb({
+  steps,
+  pack,
+}: {
+  steps: { num: number; text: string }[];
+  pack: Pack;
+}) {
+  return (
+    <div>
+      {steps.map((step) => (
+        <div
+          key={`s-${step.num}`}
+          className="mb-3 flex items-start gap-2 last:mb-0"
+        >
+          <span
+            className="shrink-0 font-mono text-[13px] italic font-bold leading-[1.45] tabular-nums"
+            style={{ color: pack.mood.accent, width: "18px" }}
+          >
+            {step.num}
+          </span>
+          <p
+            className="font-display text-[13px] leading-[1.45]"
+            style={{ color: pack.mood.ink }}
+          >
+            {step.text}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function NewspaperMacroCellWeb({
+  label,
+  value,
+  pack,
+}: {
+  label: string;
+  value: string;
+  pack: Pack;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span
+        className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em]"
+        style={{ color: pack.mood.inkSoft }}
+      >
+        {label}
+      </span>
+      <span
+        className="font-display text-[20px] font-bold"
+        style={{ color: pack.mood.ink }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function NewspaperMicroCellWeb({
+  name,
+  pct,
+  pack,
+}: {
+  name: string;
+  pct?: number;
+  pack: Pack;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span
+        className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em]"
+        style={{ color: pack.mood.accent }}
+      >
+        {name}
+      </span>
+      <span
+        className="font-display text-[18px] font-bold"
+        style={{ color: pack.mood.ink }}
+      >
+        {typeof pct === "number" ? `${pct}%` : "—"}
+      </span>
+    </div>
+  );
+}
+
+function newspaperGroupLabelWeb(name: string): string {
+  return /^(den|die|das)\s/i.test(name)
+    ? `Für ${name.toLowerCase()}`
+    : name;
 }

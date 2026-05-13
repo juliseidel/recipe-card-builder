@@ -103,6 +103,7 @@ const VALID_LAYOUTS: readonly CardLayout[] = [
   "dashboard",
   "sport",
   "vinyl",
+  "newspaper",
 ] as const;
 
 export async function POST(req: Request, { params }: RouteParams) {

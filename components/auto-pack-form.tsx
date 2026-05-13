@@ -2533,6 +2533,47 @@ function LayoutThumbnail({
         </>
       );
       break;
+    case "newspaper":
+      // Broadsheet: Masthead, Hero+Headline, 3-Col Body, Spreadsheet-Footer
+      body = (
+        <>
+          {/* Masthead doppellinie */}
+          <rect x="3" y="3" width="64" height="1" fill={inkSoft} />
+          <rect x="3" y="5" width="64" height="0.4" fill={inkSoft} opacity="0.5" />
+          {/* Title-Italic Hint */}
+          <rect x="3" y="7.5" width="30" height="2" rx="0.5" fill={accent} />
+          {/* Hero block */}
+          <rect x="3" y="12" width="30" height="14" fill={accent} opacity="0.5" />
+          {/* Right column lines */}
+          <rect x="36" y="12" width="22" height="2.5" rx="0.5" fill={accent} />
+          <rect x="36" y="16" width="20" height="1.2" rx="0.3" fill={inkSoft} opacity="0.3" />
+          <rect x="36" y="18.5" width="18" height="1" rx="0.3" fill={inkSoft} opacity="0.3" />
+          <rect x="36" y="21" width="20" height="1" rx="0.3" fill={inkSoft} opacity="0.3" />
+          <rect x="36" y="23.5" width="16" height="1" rx="0.3" fill={inkSoft} opacity="0.3" />
+          {/* 3-col body hint */}
+          <rect x="3" y="29" width="18" height="0.6" fill={inkSoft} opacity="0.4" />
+          <rect x="3" y="31" width="14" height="0.6" fill={inkSoft} opacity="0.4" />
+          <rect x="3" y="33" width="16" height="0.6" fill={inkSoft} opacity="0.4" />
+          <rect x="25" y="29" width="18" height="0.6" fill={inkSoft} opacity="0.4" />
+          <rect x="25" y="31" width="14" height="0.6" fill={inkSoft} opacity="0.4" />
+          <rect x="25" y="33" width="16" height="0.6" fill={inkSoft} opacity="0.4" />
+          <rect x="47" y="29" width="18" height="0.6" fill={inkSoft} opacity="0.4" />
+          <rect x="47" y="31" width="14" height="0.6" fill={inkSoft} opacity="0.4" />
+          <rect x="47" y="33" width="16" height="0.6" fill={inkSoft} opacity="0.4" />
+          {/* Spreadsheet footer doppellinie */}
+          <rect x="3" y="40" width="64" height="1" fill={inkSoft} />
+          <rect x="3" y="42" width="64" height="0.4" fill={inkSoft} opacity="0.5" />
+          {/* Spreadsheet cells (Macros + Mikros) */}
+          <rect x="3" y="44" width="3" height="2" fill={accent} />
+          <rect x="7" y="44" width="3" height="2" fill={accent} />
+          <rect x="11" y="44" width="3" height="2" fill={accent} />
+          <rect x="15" y="44" width="3" height="2" fill={accent} />
+          <rect x="40" y="44" width="3" height="2" fill={accent} opacity="0.7" />
+          <rect x="44" y="44" width="3" height="2" fill={accent} opacity="0.7" />
+          <rect x="48" y="44" width="3" height="2" fill={accent} opacity="0.7" />
+        </>
+      );
+      break;
   }
   return (
     <svg

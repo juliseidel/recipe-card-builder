@@ -70,7 +70,8 @@ export type CardLayout =
   // ─── Neue Layouts (Phase C, ab 2026-05-13) ─────────────────────────────
   // Jedes ist eine komplett andere Design-Sprache als die existierenden 7.
   // Spec siehe docs/LAYOUT_RULES.md.
-  | "vinyl"; // 12"-Schallplatte: Hero als Center-Label, Steps als Tracklist
+  | "vinyl" // 12"-Schallplatte: Hero als Album-Sleeve, Steps als Tracklist
+  | "newspaper"; // Broadsheet-Editorial: Drop-Cap Lead + 3-Spalten + Spreadsheet-Mikros
 
 export type Pack = {
   slug: string;

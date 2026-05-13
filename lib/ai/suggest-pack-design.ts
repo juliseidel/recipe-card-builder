@@ -56,6 +56,11 @@ const LAYOUT_OPTIONS: { id: CardLayout; description: string }[] = [
     description:
       "12\"-Schallplatte mit Hero als Center-Label, schwarze Disc mit Grooves, Audio-Spec-Strip (KCAL/MIN/KEY) + Top-Mikros, Steps als A-Side/B-Side-Tracklist (A1, A2, B1, B2), Zutaten als Liner-Notes. Pressed-by-Brand-Footer. Maximaler Wow-Faktor, einzigartig vs. allen anderen Layouts. Passt fuer Mealprep-Compilations, Hauptmahlzeiten-Packs, Show-Off-Sammlungen, alles wo der User eine Signature-Statement-Card haben moechte.",
   },
+  {
+    id: "newspaper",
+    description:
+      "Broadsheet-Editorial wie New York Times / Guardian. Italic Headline mit Drop-Cap im Lead-Paragraph, Byline 'Von [Brand]', Magazine-Hero mit Bildunterschrift. Zutaten in 3 Spalten (Newspaper-typisch), Schritte in 2 Spalten mit italic Nummern. Naehrwerte als Spreadsheet-Footer-Row mit Doppellinie. Mikros in EIGENER Position (unten als Daten-Zeile) statt seitlich/oben. Passt fuer hochwertige Recipe-Kollektionen mit editorialem Anspruch, Magazin-Pack-Konzepte, Reiseküche, Saisonal, Sonntag-Klassiker.",
+  },
 ];
 
 const MOOD_OPTIONS = [

@@ -44,6 +44,10 @@ const VARIANTS: Record<
   // bleibt editorial-magazine. Dedizierte Vinyl-Foreword kann in einem
   // spaeteren Schritt nachgereicht werden.
   vinyl: EditorialForewordPage,
+  // Newspaper-Layout reuses Editorial-Foreword — beide sind Magazin-
+  // Editorial. Die Newspaper-Recipe-Cards selbst haben den Broadsheet-
+  // Look mit Drop-Cap + 3-Spalten, das hebt sich vom Vorwort ab.
+  newspaper: EditorialForewordPage,
 };
 
 export function ForewordPage(props: ForewordPageProps) {

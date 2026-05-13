@@ -73,6 +73,7 @@ const LAYOUTS: Record<CardLayout, (p: RecipeCardPdfProps) => React.JSX.Element> 
   vital: VitalPage,
   amber: AmberPage,
   vinyl: VinylPage,
+  newspaper: NewspaperPage,
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -6581,6 +6582,982 @@ function VinylIngredientGrid({
 
 // "Fuer" nur bei den/die/das — LAYOUT_RULES.md §5
 function ingredientGroupLabel(name: string): string {
+  return /^(den|die|das)\s/i.test(name)
+    ? `Für ${name.toLowerCase()}`
+    : name;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// LAYOUT 9 (Phase C): NEWSPAPER — Broadsheet-Editorial
+// ═════════════════════════════════════════════════════════════════════════════
+// Komplett andere Design-Sprache als alle anderen 8 Layouts. Konzept:
+//
+//   ┌────────────────────────────────────────────────────────────────┐
+//   │  JULIA TIMES · DAS REZEPT-MAGAZIN · TASTE OF ITALY · No 02     │
+//   │  ════════════════════════════════════════════════════════════  │
+//   │                              │                                  │
+//   │                              │  HAUPTGERICHT                    │
+//   │       HERO-BILD              │                                  │
+//   │       (55% width)            │  Pasta-Hits, die                 │  Italic Headline
+//   │                              │  jeder kennt                     │  + Drop-Cap
+//   │                              │                                  │
+//   │                              │  Von Julia Breitenfeld           │  Byline
+//   │                              │  ─────────                       │
+//   │                              │                                  │
+//   │  Bildunterschrift italic     │  D as ist eine cremige Pasta...  │  Lead mit Drop-Cap
+//   │                              │                                  │
+//   ├──────────────────────────────┴──────────────────────────────────┤
+//   │  ZUTATEN                                       7 Zutaten        │
+//   │  ─────────────────────────────────────────────────────────────  │
+//   │  500 g  Magerquark   │  200 ml Creme Fine  │  1 EL  Ajvar       │  3-Col
+//   │  150 g  Skyr         │  150 g  Frischkäse  │  1/2   Zitrone     │
+//   ├──────────────────────────────────────────────────────────────────┤
+//   │  ZUBEREITUNG                                                     │
+//   │  ─────────────                                                   │
+//   │  1  Magerquark, Schmand   │  3  Eine Schicht der Löffel-         │  2-Col Steps
+//   │     und Creme verrühren.  │     biskuits in eine Form...         │
+//   │  2  Die Mandarinen unter  │  4  Den Pudding gleichmäßig...       │
+//   │     die Creme heben.      │                                      │
+//   ├──────────────────────────────────────────────────────────────────┤
+//   │  ═══════════════════════════════════════════════════════════     │
+//   │  NÄHRWERTE PRO PORTION                                            │  Spreadsheet
+//   │  KCAL  PROTEIN  KOHLENH  FETT  │  C 44%  B12 28%  Calcium 23%   │  Mikros HIER
+//   │  ────  ───────  ───────  ────  │  ──────  ───────  ──────────   │  (anders als
+//   │  300   23g      30g       10g  │                                 │  alle anderen)
+//   ├──────────────────────────────────────────────────────────────────┤
+//   │  @itsonlyme.julia · Taste of Italy                  [QR]         │  Footer
+//   └────────────────────────────────────────────────────────────────┘
+//
+// Mikros in EIGENER Position vs allen anderen Layouts:
+//   - vinyl: Audio-Spec-Strip oben
+//   - editorial: Banner ueber dem Hero
+//   - patisserie: Vertikale Liste in Sidebar
+//   - vital: Pearl-Strip mittig
+//   - amber: Vertikale Bars
+//   - minimal: Capsule-Pills horizontal
+//   - dashboard: Data-Rows mit Icons
+//   - sport: Macro-Bars mit Emojis
+//   - newspaper: Spreadsheet-Footer-Row mit Doppellinien
+//
+// Anti-Patterns aus LAYOUT_RULES.md alle adressiert.
+
+const NEWSPAPER_DENSITY: Record<
+  Density,
+  {
+    heroAspectRatio: number; // breite/hoehe — Hero im Magazine-Verhaeltnis
+    headlineFontSize: number;
+    eyebrowFontSize: number;
+    bylineFontSize: number;
+    leadFontSize: number;
+    leadDropCapSize: number;
+    ingredientFontSize: number;
+    ingredientRowPadV: number;
+    stepFontSize: number;
+    stepMarginBottom: number;
+    sectionLabelFontSize: number;
+    macrosLabelFontSize: number;
+    macrosValueFontSize: number;
+    microsFontSize: number;
+    topPadding: number;
+    sectionGap: number;
+  }
+> = {
+  compact: {
+    heroAspectRatio: 4 / 3,
+    headlineFontSize: 24,
+    eyebrowFontSize: 7.5,
+    bylineFontSize: 8.5,
+    leadFontSize: 8.5,
+    leadDropCapSize: 28,
+    ingredientFontSize: 9,
+    ingredientRowPadV: 2.5,
+    stepFontSize: 9,
+    stepMarginBottom: 5,
+    sectionLabelFontSize: 8,
+    macrosLabelFontSize: 6.5,
+    macrosValueFontSize: 11.5,
+    microsFontSize: 7,
+    topPadding: 14,
+    sectionGap: 10,
+  },
+  balanced: {
+    heroAspectRatio: 4 / 3,
+    headlineFontSize: 30,
+    eyebrowFontSize: 8,
+    bylineFontSize: 9.5,
+    leadFontSize: 9.5,
+    leadDropCapSize: 34,
+    ingredientFontSize: 9.5,
+    ingredientRowPadV: 4,
+    stepFontSize: 9.5,
+    stepMarginBottom: 8,
+    sectionLabelFontSize: 8.5,
+    macrosLabelFontSize: 7,
+    macrosValueFontSize: 13.5,
+    microsFontSize: 7.5,
+    topPadding: 22,
+    sectionGap: 14,
+  },
+  spacious: {
+    heroAspectRatio: 4 / 3,
+    headlineFontSize: 34,
+    eyebrowFontSize: 8.5,
+    bylineFontSize: 10,
+    leadFontSize: 10.5,
+    leadDropCapSize: 40,
+    ingredientFontSize: 10,
+    ingredientRowPadV: 5.5,
+    stepFontSize: 10,
+    stepMarginBottom: 10,
+    sectionLabelFontSize: 9,
+    macrosLabelFontSize: 7.5,
+    macrosValueFontSize: 15,
+    microsFontSize: 8,
+    topPadding: 26,
+    sectionGap: 18,
+  },
+};
+
+function NewspaperPage({
+  brand,
+  pack,
+  recipe,
+  totalRecipes,
+  heroDataUri,
+  qrDataUri,
+  hideRecipeIndex,
+}: RecipeCardPdfProps) {
+  const theme = packTheme(pack);
+  const density = getDensity(recipe);
+  const D = NEWSPAPER_DENSITY[density];
+  const showStory = shouldShowStory(recipe);
+  const recipePosition = recipe.number;
+  const titleSafe = softWrapTitle(recipe.title);
+
+  const ingredientGroups = groupIngredients(recipe.ingredients);
+  const flatIngredients = ingredientGroups.flatMap((g) => g.items);
+
+  const stepGroups = groupSteps(recipe.steps);
+  const flatSteps: { num: number; text: string }[] = [];
+  let runningStep = 0;
+  for (const g of stepGroups) {
+    for (const item of g.items) {
+      runningStep += 1;
+      flatSteps.push({ num: runningStep, text: item.text });
+    }
+  }
+
+  // Top-3 Mikros nach %-EU-Bedarf sortiert
+  const topMicros = (recipe.nutrition.micros ?? [])
+    .slice()
+    .sort(
+      (a: Micronutrient, b: Micronutrient) =>
+        (b.pctDaily ?? 0) - (a.pctDaily ?? 0)
+    )
+    .slice(0, 3);
+
+  const time = totalTime(recipe);
+
+  // Lead-Paragraph: Drop-Cap mit erstem Buchstaben vom description
+  const leadText = recipe.description?.trim() ?? "";
+  const leadFirstChar = leadText.charAt(0);
+  const leadRest = leadText.slice(1);
+
+  // Newspaper-Background: dezenter cream-tinted Off-White (typisch Print)
+  const newspaperBg = "#fafaf5";
+
+  return (
+    <Page
+      size="A4"
+      style={{ backgroundColor: newspaperBg, fontFamily: "Fraunces", color: theme.ink }}
+    >
+      {/* ── Masthead ── */}
+      <View
+        style={{
+          paddingHorizontal: PAGE_PADDING,
+          paddingTop: D.topPadding,
+          paddingBottom: 6,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            borderBottomWidth: 2,
+            borderBottomColor: theme.ink,
+            paddingBottom: 5,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: 22,
+              fontWeight: 700,
+              fontStyle: "italic",
+              color: theme.ink,
+              letterSpacing: -0.3,
+            }}
+          >
+            {brand.name} Times
+          </Text>
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 7.5,
+              color: theme.inkSoft,
+              letterSpacing: 1.6,
+              textTransform: "uppercase",
+            }}
+          >
+            Das Rezept-Magazin · {pack.title}
+            {hideRecipeIndex
+              ? ""
+              : ` · No ${pad2(recipePosition)} / ${pad2(totalRecipes)}`}
+          </Text>
+        </View>
+        {/* Doppellinie unter Masthead (Newspaper-typisch) */}
+        <View
+          style={{
+            height: 0.5,
+            backgroundColor: theme.ink,
+            marginTop: 2,
+          }}
+        />
+      </View>
+
+      {/* ── Top-Section: Hero + Headline mit Drop-Cap-Lead ── */}
+      <View
+        style={{
+          flexDirection: "row",
+          paddingHorizontal: PAGE_PADDING,
+          marginTop: 10,
+          gap: 16,
+        }}
+      >
+        {/* Hero — links (~55%) */}
+        <View style={{ width: "55%" }}>
+          <View
+            style={{
+              width: "100%",
+              aspectRatio: D.heroAspectRatio,
+              overflow: "hidden",
+              backgroundColor: theme.paper,
+            }}
+          >
+            {heroDataUri ? (
+              <Image
+                src={heroDataUri}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <View
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  backgroundColor: theme.accent,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "Fraunces",
+                    fontSize: 72,
+                    fontWeight: 700,
+                    fontStyle: "italic",
+                    color: "#fafafa",
+                  }}
+                >
+                  {brand.name.charAt(0)}
+                </Text>
+              </View>
+            )}
+          </View>
+          {/* Bildunterschrift italic (typisch Magazin) */}
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: 7.5,
+              fontStyle: "italic",
+              color: theme.inkSoft,
+              marginTop: 4,
+              lineHeight: 1.35,
+            }}
+          >
+            {recipe.subtitle ||
+              `Eine Aufnahme aus ${brand.name}s Küche, exklusiv für dieses Pack.`}
+          </Text>
+        </View>
+
+        {/* Rechte Spalte: Headline + Byline + Lead */}
+        <View style={{ flex: 1, justifyContent: "flex-start" }}>
+          {/* Eyebrow (Kategorie wie Section-Label) */}
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: D.eyebrowFontSize,
+              fontWeight: 700,
+              letterSpacing: 2,
+              color: theme.accent,
+              textTransform: "uppercase",
+              marginBottom: 6,
+            }}
+          >
+            {pack.category}
+          </Text>
+          {/* Italic Headline mit großem Display-Look */}
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: D.headlineFontSize,
+              fontWeight: 700,
+              fontStyle: "italic",
+              color: theme.ink,
+              lineHeight: 1.0,
+              letterSpacing: -0.5,
+              marginBottom: 8,
+            }}
+          >
+            {titleSafe}
+          </Text>
+          {/* Byline + Rule */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 10,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: D.bylineFontSize,
+                fontStyle: "italic",
+                color: theme.inkSoft,
+              }}
+            >
+              Von {brand.name}
+            </Text>
+            <View
+              style={{ flex: 1, height: 0.5, backgroundColor: theme.divider }}
+            />
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 7,
+                letterSpacing: 1.4,
+                color: theme.inkSoft,
+                textTransform: "uppercase",
+              }}
+            >
+              {time} Min
+            </Text>
+          </View>
+          {/* Lead-Paragraph mit Drop-Cap */}
+          {leadText.length > 0 ? (
+            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+              <Text
+                style={{
+                  fontFamily: "Fraunces",
+                  fontSize: D.leadDropCapSize,
+                  fontWeight: 700,
+                  fontStyle: "italic",
+                  color: theme.accent,
+                  lineHeight: 0.85,
+                  marginRight: 4,
+                  marginTop: -2,
+                  width: D.leadDropCapSize * 0.7,
+                }}
+              >
+                {leadFirstChar}
+              </Text>
+              <Text
+                style={{
+                  flex: 1,
+                  fontFamily: "Fraunces",
+                  fontSize: D.leadFontSize,
+                  color: theme.ink,
+                  lineHeight: 1.45,
+                  textAlign: "justify",
+                }}
+              >
+                {leadRest}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      {/* ── Zutaten-Section ── */}
+      <View
+        style={{
+          paddingHorizontal: PAGE_PADDING,
+          marginTop: D.sectionGap + 4,
+        }}
+      >
+        <NewspaperSectionHeader
+          label="Zutaten"
+          right={`${recipe.ingredients.length} ${recipe.ingredients.length === 1 ? "Zutat" : "Zutaten"}`}
+          theme={theme}
+          density={D}
+        />
+        {ingredientGroups.length > 1 ? (
+          <View>
+            {ingredientGroups.map((group, gIdx) => (
+              <View
+                key={`g-${gIdx}`}
+                style={{ marginTop: gIdx > 0 ? 8 : 4 }}
+              >
+                {group.name ? (
+                  <Text
+                    style={{
+                      fontFamily: "Inter",
+                      fontSize: 7.5,
+                      fontWeight: 600,
+                      letterSpacing: 1.4,
+                      color: theme.inkSoft,
+                      textTransform: "uppercase",
+                      marginBottom: 4,
+                    }}
+                  >
+                    {newspaperGroupLabel(group.name)}
+                  </Text>
+                ) : null}
+                <NewspaperIngredientGrid
+                  items={group.items}
+                  theme={theme}
+                  density={D}
+                />
+              </View>
+            ))}
+          </View>
+        ) : (
+          <NewspaperIngredientGrid
+            items={flatIngredients}
+            theme={theme}
+            density={D}
+          />
+        )}
+      </View>
+
+      {/* ── Zubereitung-Section ── */}
+      <View
+        style={{
+          paddingHorizontal: PAGE_PADDING,
+          marginTop: D.sectionGap + 2,
+        }}
+      >
+        <NewspaperSectionHeader
+          label="Zubereitung"
+          right={`${flatSteps.length} ${flatSteps.length === 1 ? "Schritt" : "Schritte"}`}
+          theme={theme}
+          density={D}
+        />
+        <NewspaperStepsGrid
+          steps={flatSteps}
+          theme={theme}
+          density={D}
+        />
+      </View>
+
+      {/* ── Sparse-Story-Block (≤10 Zutaten + Story) ── */}
+      {showStory && leadText.length === 0 ? (
+        <View
+          style={{
+            paddingHorizontal: PAGE_PADDING,
+            marginTop: D.sectionGap - 2,
+          }}
+        >
+          <View
+            style={{
+              borderLeftWidth: 2,
+              borderLeftColor: theme.accent,
+              paddingLeft: 10,
+              paddingVertical: 4,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: 9.5,
+                fontStyle: "italic",
+                color: theme.ink,
+                lineHeight: 1.45,
+              }}
+            >
+              {recipe.description}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
+      {/* ── Spreadsheet-Footer mit Mikros (EIGENE POSITION) ── */}
+      <View
+        style={{
+          position: "absolute",
+          left: PAGE_PADDING,
+          right: PAGE_PADDING,
+          bottom: 70,
+        }}
+        fixed
+      >
+        {/* Doppellinie ueber Spreadsheet (Newspaper-typisch) */}
+        <View style={{ height: 1.5, backgroundColor: theme.ink, marginBottom: 1 }} />
+        <View style={{ height: 0.5, backgroundColor: theme.ink, marginBottom: 8 }} />
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: 7.5,
+            fontWeight: 700,
+            letterSpacing: 2,
+            color: theme.ink,
+            textTransform: "uppercase",
+            marginBottom: 8,
+          }}
+        >
+          Nährwerte {nutritionBasisInline(recipe.nutritionBasis)}
+        </Text>
+        <View style={{ flexDirection: "row", gap: 24 }}>
+          {/* Macros */}
+          <View style={{ flexDirection: "row", gap: 18, flex: 1 }}>
+            <NewspaperMacroCell
+              label="KCAL"
+              value={String(Math.round(recipe.nutrition.kcal))}
+              theme={theme}
+              density={D}
+            />
+            <NewspaperMacroCell
+              label="Protein"
+              value={`${recipe.nutrition.protein}g`}
+              theme={theme}
+              density={D}
+            />
+            <NewspaperMacroCell
+              label="Kohlenh."
+              value={`${recipe.nutrition.carbs}g`}
+              theme={theme}
+              density={D}
+            />
+            <NewspaperMacroCell
+              label="Fett"
+              value={`${recipe.nutrition.fat}g`}
+              theme={theme}
+              density={D}
+            />
+          </View>
+          {/* Mikros (rechts, vertikale Trennlinie davor) */}
+          {topMicros.length > 0 ? (
+            <>
+              <View
+                style={{
+                  width: 0.5,
+                  backgroundColor: theme.divider,
+                }}
+              />
+              <View style={{ flexDirection: "row", gap: 16, flex: 1 }}>
+                {topMicros.map((m: Micronutrient, i: number) => (
+                  <NewspaperMicroCell
+                    key={`${m.name}-${i}`}
+                    name={m.name}
+                    pct={m.pctDaily}
+                    theme={theme}
+                    density={D}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
+        </View>
+      </View>
+
+      {/* ── Footer mit QR-Code ── */}
+      <View
+        style={{
+          position: "absolute",
+          left: PAGE_PADDING,
+          right: PAGE_PADDING,
+          bottom: 22,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingTop: 8,
+          borderTopWidth: 0.5,
+          borderTopColor: theme.divider,
+          gap: 12,
+        }}
+        fixed
+      >
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: 8,
+            fontWeight: 600,
+            letterSpacing: 1.4,
+            color: theme.inkSoft,
+            textTransform: "uppercase",
+          }}
+        >
+          {brand.handle} · {pack.title}
+        </Text>
+        {qrDataUri ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: 7,
+                letterSpacing: 1.2,
+                color: theme.inkSubtle,
+                textTransform: "uppercase",
+                textAlign: "right",
+              }}
+            >
+              Original{"\n"}scannen
+            </Text>
+            <Image src={qrDataUri} style={{ width: 32, height: 32 }} />
+          </View>
+        ) : (
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: 7.5,
+              letterSpacing: 1.4,
+              color: theme.inkSubtle,
+              textTransform: "uppercase",
+            }}
+          >
+            {recipe.sourceLabel ?? "Erstausgabe"}
+          </Text>
+        )}
+      </View>
+    </Page>
+  );
+}
+
+// ─── Newspaper Sub-Components ────────────────────────────────────────────
+
+function NewspaperSectionHeader({
+  label,
+  right,
+  theme,
+  density,
+}: {
+  label: string;
+  right: string;
+  theme: ReturnType<typeof packTheme>;
+  density: (typeof NEWSPAPER_DENSITY)["balanced"];
+}) {
+  return (
+    <View>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 6,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: density.sectionLabelFontSize,
+            fontWeight: 700,
+            letterSpacing: 2,
+            color: theme.ink,
+            textTransform: "uppercase",
+          }}
+        >
+          {label}
+        </Text>
+        <View
+          style={{ flex: 1, height: 0.5, backgroundColor: theme.divider }}
+        />
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: density.sectionLabelFontSize - 1,
+            letterSpacing: 1.4,
+            color: theme.inkSoft,
+            textTransform: "uppercase",
+          }}
+        >
+          {right}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// 3-Column Ingredient-Grid (Newspaper-typisch)
+function NewspaperIngredientGrid({
+  items,
+  theme,
+  density,
+}: {
+  items: IngredientGroup["items"];
+  theme: ReturnType<typeof packTheme>;
+  density: (typeof NEWSPAPER_DENSITY)["balanced"];
+}) {
+  // Bei <= 4 Items: 2 Spalten. Sonst 3 Spalten (Newspaper-Standard).
+  const useThree = items.length > 4;
+  const cols = useThree ? 3 : 2;
+  const perCol = Math.ceil(items.length / cols);
+  const columns: (typeof items)[] = [];
+  for (let c = 0; c < cols; c++) {
+    columns.push(items.slice(c * perCol, (c + 1) * perCol));
+  }
+  return (
+    <View style={{ flexDirection: "row", gap: 14 }}>
+      {columns.map((col, ci) => (
+        <View key={`col-${ci}`} style={{ flex: 1 }}>
+          {col.map((ing, i) => (
+            <NewspaperIngredientRow
+              key={`${ci}-${i}`}
+              amount={ing.amount}
+              name={ing.name}
+              note={ing.note}
+              theme={theme}
+              density={density}
+            />
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function NewspaperIngredientRow({
+  amount,
+  name,
+  note,
+  theme,
+  density,
+}: {
+  amount: string;
+  name: string;
+  note?: string;
+  theme: ReturnType<typeof packTheme>;
+  density: (typeof NEWSPAPER_DENSITY)["balanced"];
+}) {
+  const displayAmount = formatIngredientAmount(amount);
+  const amountIsLong = displayAmount.length > 10;
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: amountIsLong ? "center" : "flex-start",
+        paddingVertical: density.ingredientRowPadV,
+        borderBottomWidth: 0.4,
+        borderBottomColor: theme.divider,
+        gap: 6,
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: "Inter",
+          fontSize: density.ingredientFontSize,
+          fontWeight: 700,
+          color: theme.accent,
+          width: 50,
+          lineHeight: amountIsLong ? 1.3 : undefined,
+          paddingTop: amountIsLong ? 0 : 1,
+        }}
+      >
+        {displayAmount}
+      </Text>
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontSize: density.ingredientFontSize,
+            color: theme.ink,
+            lineHeight: 1.3,
+          }}
+        >
+          {name}
+        </Text>
+        {note ? (
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: density.ingredientFontSize - 2,
+              fontStyle: "italic",
+              color: theme.inkSubtle,
+              marginTop: 1,
+            }}
+          >
+            {note}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+// 2-Column Steps mit italic Nummern (Glyph-Center-Lock §1)
+function NewspaperStepsGrid({
+  steps,
+  theme,
+  density,
+}: {
+  steps: { num: number; text: string }[];
+  theme: ReturnType<typeof packTheme>;
+  density: (typeof NEWSPAPER_DENSITY)["balanced"];
+}) {
+  const half = Math.ceil(steps.length / 2);
+  const colA = steps.slice(0, half);
+  const colB = steps.slice(half);
+  return (
+    <View style={{ flexDirection: "row", gap: 20 }}>
+      <NewspaperStepColumn steps={colA} theme={theme} density={density} />
+      <View
+        style={{
+          width: 0.5,
+          backgroundColor: theme.divider,
+          marginVertical: 4,
+        }}
+      />
+      {colB.length > 0 ? (
+        <NewspaperStepColumn steps={colB} theme={theme} density={density} />
+      ) : (
+        <View style={{ flex: 1 }} />
+      )}
+    </View>
+  );
+}
+
+function NewspaperStepColumn({
+  steps,
+  theme,
+  density,
+}: {
+  steps: { num: number; text: string }[];
+  theme: ReturnType<typeof packTheme>;
+  density: (typeof NEWSPAPER_DENSITY)["balanced"];
+}) {
+  return (
+    <View style={{ flex: 1 }}>
+      {steps.map((step) => (
+        <View
+          key={`s-${step.num}`}
+          style={{
+            flexDirection: "row",
+            alignItems: "flex-start",
+            gap: 8,
+            marginBottom: density.stepMarginBottom + 2,
+          }}
+        >
+          {/* Step-Nummer — gleiche font/fontSize/lineHeight wie Body (§1) */}
+          <Text
+            style={{
+              fontSize: density.stepFontSize, // identisch
+              lineHeight: 1.45, // identisch
+              fontStyle: "italic",
+              fontWeight: 700,
+              color: theme.accent,
+              width: 16,
+            }}
+          >
+            {step.num}
+          </Text>
+          <Text
+            style={{
+              flex: 1,
+              fontFamily: "Fraunces",
+              fontSize: density.stepFontSize,
+              lineHeight: 1.45,
+              color: theme.ink,
+            }}
+          >
+            {step.text}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function NewspaperMacroCell({
+  label,
+  value,
+  theme,
+  density,
+}: {
+  label: string;
+  value: string;
+  theme: ReturnType<typeof packTheme>;
+  density: (typeof NEWSPAPER_DENSITY)["balanced"];
+}) {
+  return (
+    <View style={{ flexDirection: "column", gap: 1 }}>
+      <Text
+        style={{
+          fontFamily: "Inter",
+          fontSize: density.macrosLabelFontSize,
+          fontWeight: 600,
+          letterSpacing: 1.4,
+          color: theme.inkSoft,
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </Text>
+      <Text
+        style={{
+          fontFamily: "Fraunces",
+          fontSize: density.macrosValueFontSize,
+          fontWeight: 700,
+          color: theme.ink,
+        }}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function NewspaperMicroCell({
+  name,
+  pct,
+  theme,
+  density,
+}: {
+  name: string;
+  pct?: number;
+  theme: ReturnType<typeof packTheme>;
+  density: (typeof NEWSPAPER_DENSITY)["balanced"];
+}) {
+  return (
+    <View style={{ flexDirection: "column", gap: 1 }}>
+      <Text
+        style={{
+          fontFamily: "Inter",
+          fontSize: density.macrosLabelFontSize,
+          fontWeight: 600,
+          letterSpacing: 1.4,
+          color: theme.accent,
+          textTransform: "uppercase",
+        }}
+      >
+        {name}
+      </Text>
+      <Text
+        style={{
+          fontFamily: "Fraunces",
+          fontSize: density.microsFontSize + 4,
+          fontWeight: 700,
+          color: theme.ink,
+        }}
+      >
+        {typeof pct === "number" ? `${pct}%` : "—"}
+      </Text>
+    </View>
+  );
+}
+
+// "Fuer" nur bei den/die/das — LAYOUT_RULES.md §5
+function newspaperGroupLabel(name: string): string {
   return /^(den|die|das)\s/i.test(name)
     ? `Für ${name.toLowerCase()}`
     : name;

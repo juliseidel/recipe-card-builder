@@ -69,6 +69,14 @@ export const layoutPresets: LayoutPreset[] = [
     bestFor:
       "Mealprep-Sammlungen, Hauptmahlzeiten-Packs, Compilation-artige Kollektionen, jeder Pack der einen Signature-Wow-Faktor braucht",
   },
+  {
+    id: "newspaper",
+    title: "Newspaper",
+    description:
+      "Broadsheet-Editorial wie New York Times / Guardian: italic Headline mit Drop-Cap im Lead-Paragraph, Byline „Von [Brand]\", Magazine-Hero mit Bildunterschrift, Zutaten in 3 Spalten (Newspaper-typisch), Schritte in 2 Spalten mit italic Nummern. Nährwerte als Spreadsheet-Footer mit Doppellinie. Komplett anderes Mikronährstoffe-Layout (unten als Daten-Zeile) statt seitlich/oben.",
+    bestFor:
+      "Hochwertige Recipe-Kollektionen mit editorialem Anspruch, Magazin-Pack-Konzepte, Pack-Themen die Lese-Tiefe brauchen (Reiseküche, Saisonal, Sonntag-Recipes)",
+  },
 ];
 
 // Mood presets — eight pre-tuned palettes that pass contrast checks and look
