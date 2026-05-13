@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
-import { headers } from "next/headers";
-import { after } from "next/server";
 import { loadBrand } from "@/lib/custom-brands-server";
-import { detectAndTriggerEnrichGaps } from "@/lib/reel-library/pack-builder";
+import { PackAutoEnrichTrigger } from "@/components/pack-auto-enrich-trigger";
 import {
   getPack,
   getPacksForBrand,
@@ -100,28 +98,14 @@ export default async function PackPage({ params }: PackPageProps) {
 
   const recipes = await getRecipesForPack(pack.slug);
 
-  // Safety-Net: bei jedem Pack-Detail-Visit pruefen wir ob Recipes ohne
-  // Hero/Mikros existieren oder das Pack-Cover fehlt — und triggern dann
-  // /packs/enrich + /recipes/enrich nach. Macht den Pack robust gegen
-  // Lambda-Timeouts oder transiente Flux/Gemini-Fails bei der initialen
-  // Erstellung. Sicheres "skip wenn schon enrich'd"-Verhalten ist in den
-  // Endpoints selbst (hasCover/needsHero/needsMicros). Custom-Packs only —
-  // statische Bienen-Packs sind code-only und haben ihren Content
-  // committed, brauchen keinen Enrich-Trigger.
-  if (customRow) {
-    const hdrs = await headers();
-    const origin =
-      hdrs.get("x-forwarded-proto") && hdrs.get("host")
-        ? `${hdrs.get("x-forwarded-proto")}://${hdrs.get("host")}`
-        : `https://${hdrs.get("host") ?? "clever-satoshi-22bf41.vercel.app"}`;
-    after(async () => {
-      try {
-        await detectAndTriggerEnrichGaps(origin, brandSlug, pack.slug);
-      } catch (err) {
-        console.error("[pack-detail] gap-trigger failed", err);
-      }
-    });
-  }
+  // Safety-Net: bei Pack-Detail-Visit wird ein Client-Component-Trigger
+  // gemountet, der nach dem Render einen POST an /api/packs/auto-trigger-
+  // enrich macht. Dieser Endpoint laeuft mit User-Session-Cookies (kein
+  // Internal-Token noetig) und prueft via detectAndTriggerEnrichGaps ob
+  // Recipes ohne Hero/Mikros oder Pack-Cover-Lueck existieren. Wenn ja:
+  // triggert /packs/enrich + /recipes/enrich nach. Skipped fuer kuratierte
+  // Bienen-Packs (kein customRow).
+  const enrichTriggerCustomPackId = customRow?.id ?? null;
 
   // Live recipe count for the cover hero + the "Alle Rezeptkarten" badge:
   //   curated cards visible
@@ -148,6 +132,12 @@ export default async function PackPage({ params }: PackPageProps) {
       style={{ background: brand.tokens.background }}
     >
       <SiteHeader />
+      {enrichTriggerCustomPackId ? (
+        <PackAutoEnrichTrigger
+          brandSlug={brandSlug}
+          packSlug={pack.slug}
+        />
+      ) : null}
       <PackCover brand={brand} pack={pack} totalRecipes={liveRecipeCount} />
       <PackActions
         brand={brand}
