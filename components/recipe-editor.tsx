@@ -62,13 +62,15 @@ export type RecipeEditorProps = {
   brandSlug: string;
   packSlug: string;
   /** When set, the editor opens in EDIT mode and pre-fills every field
-   *  from the existing recipe. Save calls updateCustomRecipe() instead of
-   *  addCustomRecipe(). The id is the supabase row id; the recipe is the
-   *  full hydrated CustomRecipe so the form starts in the exact state the
-   *  card was last saved in. */
+   *  from the existing recipe. Two sub-modes:
+   *   - editing.id set    → updateCustomRecipe() on save (existing custom row)
+   *   - editing.id absent → addCustomRecipe() with the recipe's existing
+   *     slug intact (fork-on-save: curated static recipe gets overridden
+   *     by a new custom row that wins at read time).
+   *  recipe can be either a CustomRecipe or a static curated Recipe. */
   editing?: {
-    id: string;
-    recipe: CustomRecipe;
+    id?: string;
+    recipe: Recipe;
   };
 };
 
@@ -78,6 +80,7 @@ export function RecipeEditor({
   editing,
 }: RecipeEditorProps) {
   const isEditMode = Boolean(editing);
+  const isForkMode = Boolean(editing && !editing.id);
   // Brand wird async geladen — Code-Brand (Biene) zuerst, dann DB-Brand-
   // Lookup. Drei-Zustand-State (undefined = Loading, null = nicht
   // gefunden, Brand = ready) damit DB-Brand-Workspaces den Recipe-Editor
@@ -284,6 +287,24 @@ export function RecipeEditor({
   const [hideMicros, setHideMicros] = useState<boolean>(
     er?.tweaks?.hideMicros ?? false
   );
+
+  // PDF-Live-Preview. blobUrl wird vom Render-Endpoint gesetzt und im
+  // <iframe> als src verwendet. previousBlobUrl wird beim naechsten
+  // Render revoked, damit der Browser den vorigen Blob freigeben kann.
+  const [pdfPreviewBlobUrl, setPdfPreviewBlobUrl] = useState<string | null>(
+    null
+  );
+  const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false);
+  const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null);
+  const previousPdfBlobUrlRef = useRef<string | null>(null);
+  useEffect(() => {
+    // Cleanup beim Unmount: alle Blobs freigeben.
+    return () => {
+      if (previousPdfBlobUrlRef.current) {
+        URL.revokeObjectURL(previousPdfBlobUrlRef.current);
+      }
+    };
+  }, []);
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -598,7 +619,89 @@ export function RecipeEditor({
     // EDIT mode: write back to the existing row. The slug stays put so
     // existing PDFs / shared links keep resolving. Hero/sourceUrl/sourceLabel
     // from the original are preserved if the user didn't touch sourceUrl.
-    if (isEditMode && editing) {
+    //
+    // FORK mode (editing.id absent): curated static recipe. We INSERT a new
+    // custom row reusing the existing slug — the reader (getRecipesForPack
+    // / getRecipe) prefers the custom row on slug match, so the user's edits
+    // take over the rendering without disturbing the rest of the pack.
+    if (isEditMode && editing && !editing.id) {
+      const hasTweaks =
+        densityOverride !== "auto" || hideStory || hideMicros;
+      const tweaks = hasTweaks
+        ? {
+            ...(densityOverride !== "auto"
+              ? { densityOverride }
+              : {}),
+            ...(hideStory ? { hideStory: true } : {}),
+            ...(hideMicros ? { hideMicros: true } : {}),
+          }
+        : undefined;
+
+      const existing = editing.recipe;
+      const saved = await addCustomRecipe({
+        brandSlug: brand.slug,
+        slug: existing.slug, // KEEP original slug so the override resolves
+        packSlug: pack.slug,
+        baseRecipeCount: pack.recipeCount,
+        cardLayout,
+        title: title.trim(),
+        subtitle: subtitle.trim() || pack.tagline,
+        description: description.trim() || pack.description,
+        prepTime: parseInt(prepTime) || 0,
+        cookTime: cookTime ? parseInt(cookTime) : undefined,
+        difficulty,
+        servings: parseInt(servings) || 1,
+        tags,
+        ingredients: builtIngredients,
+        steps: builtSteps,
+        nutrition: {
+          ...existing.nutrition,
+          kcal: parseInt(kcal) || 0,
+          protein: parseInt(protein) || 0,
+          carbs: parseInt(carbs) || 0,
+          fat: parseInt(fat) || 0,
+        },
+        nutritionBasis,
+        // Preserve the curated hero — the user didn't touch the image,
+        // and we don't want to lose it. The customRecipe addCustomRecipe
+        // signature lets us pass it through; the static recipe's hero is
+        // a public path which renders fine from the custom row too.
+        ...(existing.hero ? { hero: existing.hero } : {}),
+        ...(sourceUrl.trim()
+          ? {
+              sourceUrl: sourceUrl.trim(),
+              sourceLabel: sourceLabelForUrl(sourceUrl.trim()),
+            }
+          : existing.sourceUrl
+            ? {
+                sourceUrl: existing.sourceUrl,
+                sourceLabel: existing.sourceLabel,
+              }
+            : {}),
+        ...(tweaks ? { tweaks } : {}),
+      });
+      if (!saved) {
+        setSaving(false);
+        setError(
+          "Konnte die Karte nicht speichern. Bitte erneut versuchen."
+        );
+        return;
+      }
+      await fetch("/api/packs/revalidate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brandSlug: brand.slug, packSlug: pack.slug }),
+      }).catch(() => {
+        /* non-blocking */
+      });
+      setSavedSuccess(true);
+      setTimeout(() => {
+        router.replace(`/${brand.slug}/${pack.slug}/${saved.slug}`);
+      }, 350);
+      return;
+    }
+
+    if (isEditMode && editing && editing.id) {
       const existing = editing.recipe;
       // Tweaks-Payload: nur setzen wenn mindestens ein Tweak abweicht
       // vom Default. Sonst löschen wir das Feld komplett, damit gespeicherte
@@ -749,6 +852,50 @@ export function RecipeEditor({
       // — nicht mehr auf einem leeren /new-Form. Sauberer Flow.
       router.replace(`/${brand.slug}/${pack.slug}/${saved.slug}`);
     }, 350);
+  };
+
+  // PDF-Live-Preview-Refresh: POST current Recipe-State → binary PDF →
+  // Blob-URL → iframe.src. Manueller Trigger (Button), nicht onChange, weil
+  // ein single-recipe-Render 3-10s dauert. Vorheriger Blob wird revoked.
+  const refreshPdfPreview = async () => {
+    if (!brand || !pack || !previewRecipe) return;
+    setPdfPreviewLoading(true);
+    setPdfPreviewError(null);
+    try {
+      const res = await fetch("/api/pdf/preview-recipe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brandSlug: brand.slug,
+          packSlug: pack.slug,
+          recipe: previewRecipe,
+          totalRecipes: pack.recipeCount,
+        }),
+      });
+      if (!res.ok) {
+        let msg = `Render fehlgeschlagen (${res.status})`;
+        try {
+          const j = (await res.json()) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          /* response wasn't JSON */
+        }
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      if (previousPdfBlobUrlRef.current) {
+        URL.revokeObjectURL(previousPdfBlobUrlRef.current);
+      }
+      previousPdfBlobUrlRef.current = url;
+      setPdfPreviewBlobUrl(url);
+    } catch (err) {
+      setPdfPreviewError(
+        err instanceof Error ? err.message : "PDF-Render fehlgeschlagen."
+      );
+    } finally {
+      setPdfPreviewLoading(false);
+    }
   };
 
   // Tag operations — accept both pre-defined chips and free-typed tags.
@@ -995,7 +1142,11 @@ export function RecipeEditor({
                 className="font-display text-[20px] leading-none"
                 style={{ color: pack.mood.ink }}
               >
-                {isEditMode ? "Karte bearbeiten" : "Neue Rezeptkarte"}
+                {isForkMode
+                  ? "Karte bearbeiten (neue Version)"
+                  : isEditMode
+                    ? "Karte bearbeiten"
+                    : "Neue Rezeptkarte"}
               </span>
             </div>
           </div>
@@ -1064,7 +1215,11 @@ export function RecipeEditor({
                 </>
               ) : (
                 <>
-                  {isEditMode ? "Änderungen speichern" : "Karte speichern"}
+                  {isForkMode
+                    ? "Eigene Version speichern"
+                    : isEditMode
+                      ? "Änderungen speichern"
+                      : "Karte speichern"}
                   <svg
                     width="14"
                     height="14"
@@ -2013,6 +2168,125 @@ export function RecipeEditor({
                 />
               )
             ) : null}
+
+            {/* PDF-Live-Preview: rendert die Karte server-side eins-zu-eins
+                wie beim PDF-Download. 3-10s pro Render — daher button-
+                triggered statt onChange. Beim ersten Render zeigt die
+                Sektion nur den Aktualisieren-Button; ab dem zweiten ist
+                der vorige Blob noch im iframe und wird beim Klick ersetzt. */}
+            <div
+              className="mt-5 rounded-2xl border p-4"
+              style={{
+                borderColor: brand.tokens.line,
+                background: brand.tokens.surface,
+              }}
+            >
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <span
+                  className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+                  style={{ color: brand.tokens.inkMuted }}
+                >
+                  PDF-Vorschau
+                </span>
+                <span
+                  className="text-[11px]"
+                  style={{ color: brand.tokens.inkMuted }}
+                >
+                  eins-zu-eins wie der Download
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => void refreshPdfPreview()}
+                disabled={pdfPreviewLoading || !previewRecipe}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2 text-[13px] font-medium transition-colors disabled:opacity-50"
+                style={{
+                  background: pack.mood.ink,
+                  color: pack.mood.background,
+                }}
+              >
+                {pdfPreviewLoading ? (
+                  <>
+                    <span className="inline-block size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    Rendere PDF…
+                  </>
+                ) : pdfPreviewBlobUrl ? (
+                  <>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 14 14"
+                      fill="none"
+                      aria-hidden
+                    >
+                      <path
+                        d="M1.5 7a5.5 5.5 0 1011 0 5.5 5.5 0 00-11 0zM7 4v3l2 2"
+                        stroke="currentColor"
+                        strokeWidth="1.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    Vorschau aktualisieren
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 14 14"
+                      fill="none"
+                      aria-hidden
+                    >
+                      <path
+                        d="M3 3h8v8H3z"
+                        stroke="currentColor"
+                        strokeWidth="1.4"
+                      />
+                      <path
+                        d="M5.5 6L7 7.5 9 5.5"
+                        stroke="currentColor"
+                        strokeWidth="1.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    PDF rendern
+                  </>
+                )}
+              </button>
+              {pdfPreviewError ? (
+                <p
+                  className="mt-3 text-[12px]"
+                  style={{ color: "#b91c1c" }}
+                >
+                  {pdfPreviewError}
+                </p>
+              ) : null}
+              {pdfPreviewBlobUrl ? (
+                <div
+                  className="mt-3 overflow-hidden rounded-xl border"
+                  style={{
+                    borderColor: brand.tokens.line,
+                    aspectRatio: "210 / 297",
+                  }}
+                >
+                  <iframe
+                    src={pdfPreviewBlobUrl}
+                    title="PDF-Vorschau der Rezeptkarte"
+                    className="h-full w-full"
+                  />
+                </div>
+              ) : (
+                <p
+                  className="mt-3 text-[12px] leading-snug"
+                  style={{ color: brand.tokens.inkMuted }}
+                >
+                  Klicke auf „PDF rendern", um die fertige Karte als A4-PDF
+                  zu sehen. Der Render dauert 3-10 Sekunden.
+                </p>
+              )}
+            </div>
 
             {/* Pflicht-Checklist */}
             <div

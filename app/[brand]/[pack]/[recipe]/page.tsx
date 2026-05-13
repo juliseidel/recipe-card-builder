@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { loadBrand } from "@/lib/custom-brands-server";
 import { getPack } from "@/lib/packs";
@@ -81,6 +82,35 @@ export default async function RecipePage({ params }: RecipePageProps) {
       recipe.slug
     );
 
+    // Edit-Button auch fuer kuratierte Karten — die /edit-Route entscheidet
+    // dann selbst: existiert schon ein Custom-Override (Fork-on-Edit), wird
+    // der bearbeitet. Wenn nicht, oeffnet der Editor im Fork-Mode und legt
+    // beim ersten Save eine Custom-Kopie mit gleichem slug an. So sind alle
+    // Karten editierbar, ohne dass das curated Code-Recipe in lib/recipes.ts
+    // mutiert wird.
+    const editAction = (
+      <Link
+        href={`/${brand.slug}/${pack.slug}/${recipe.slug}/edit`}
+        className="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[12px] font-medium transition-colors hover:bg-canvas-alt"
+        style={{
+          borderColor: pack.mood.ink + "20",
+          color: pack.mood.ink,
+          background: "rgba(255,255,255,0.6)",
+        }}
+      >
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden>
+          <path
+            d="M9.3 1.7l3 3L4.5 12.5H1.5V9.5z"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        Bearbeiten
+      </Link>
+    );
+
     return (
       <RecipeDetailLayout
         brand={brand}
@@ -90,6 +120,7 @@ export default async function RecipePage({ params }: RecipePageProps) {
         totalRecipes={staticRecipes.length}
         previous={previous}
         next={next}
+        editAction={editAction}
         deleteAction={
           <StaticRecipeDeleteButton
             brandSlug={brand.slug}

@@ -1,6 +1,7 @@
 "use client";
 
 import type { Recipe } from "./recipes";
+import { recipes as staticRecipes } from "./recipes";
 import { getSupabase } from "./supabase";
 
 export type CustomRecipe = Recipe & {
@@ -49,7 +50,16 @@ export async function getCustomRecipesForPack(
     console.error("[recipes-db] getCustomRecipesForPack", error);
     return [];
   }
-  return (data ?? []).map(rowToCustomRecipe);
+  // Static-Override-Rows (is_custom=true MIT slug-match in staticRecipes)
+  // werden bereits vom Server-Side getRecipesForPack() als Ersatz für das
+  // curated Recipe geliefert. Hier filtern wir sie raus damit das UI nicht
+  // doppelt rendert (Server-Liste + Client-Liste).
+  const staticSlugsInPack = new Set(
+    staticRecipes.filter((r) => r.packSlug === packSlug).map((r) => r.slug)
+  );
+  return ((data ?? []) as RecipeRow[])
+    .filter((row) => !staticSlugsInPack.has(row.recipe_slug))
+    .map(rowToCustomRecipe);
 }
 
 export async function getCustomRecipe(

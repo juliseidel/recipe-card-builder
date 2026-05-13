@@ -1930,14 +1930,30 @@ export async function getRecipesForPack(
   // wieder fluessig — wiederholte Visits in 30s gehen aus Memory.
   const dbRows = await getPackDbRows(packSlug);
 
-  // Returnt NUR die statischen Recipes mit DB-Hero-Override.
-  // Custom Recipes (is_custom=true) werden client-side via
-  // getCustomRecipesForPack() vom RecipeGrid + NutritionOverview geladen
-  // — wenn wir sie hier auch returnen wuerden, gaeben Page-Renders doppelte
-  // Karten (Server-static-plus-custom-Array + Client-fetched-custom-Array,
-  // beide gemerged via mergeAndRenumber → jede Custom-Karte doppelt).
+  // Returnt NUR die statischen Recipes mit DB-Hero-Override und ggf.
+  // mit Custom-Override (Fork-on-Edit aus Phase 3): wenn ein
+  // is_custom=true Row mit gleichem slug existiert, ersetzt dessen
+  // data-Payload das curated Recipe komplett. So koennen Bienen-Packs
+  // bearbeitet werden ohne dass der Custom-Eintrag doppelt in der Liste
+  // erscheint.
+  // Custom-only Recipes (slug nicht in code) werden weiterhin client-
+  // side via getCustomRecipesForPack() geladen — nicht hier, sonst
+  // gibt's Doubling im RecipeGrid.
   return fromCode.map((r) => {
     const row = dbRows.find((x) => x.recipe_slug === r.slug);
+    // Custom-Override: wenn data vorhanden (only set fuer is_custom=true),
+    // verwende das als Recipe-Basis statt code. Hero-Cache-Bust passt
+    // auf custom-stored hero ebenfalls.
+    if (row?.data) {
+      const customRecipe = row.data;
+      const heroFromCustom = customRecipe.hero ?? row.hero;
+      return {
+        ...customRecipe,
+        ...(heroFromCustom
+          ? { hero: withHeroCacheBust(heroFromCustom) }
+          : {}),
+      };
+    }
     return row?.hero ? { ...r, hero: withHeroCacheBust(row.hero) } : r;
   });
 }
@@ -1946,20 +1962,26 @@ export async function getRecipe(
   packSlug: string,
   recipeSlug: string
 ): Promise<Recipe | undefined> {
-  // Code wins fuer das Rezept-Inhalt (Title, Steps, Nutrition etc.). ABER:
-  // das hero-Feld bekommt eine Ausnahme — wenn der Operator den
-  // "KI-Alternative"-Button im Detail-View geklickt hat, hat der enrich-
-  // Endpoint ein frisches Hero in die DB geschrieben. Das wollen wir
-  // sehen, sonst ist der Re-Roll-Button unsichtbar (Map ueberschreibt
-  // immer den DB-Eintrag). Loesung: static recipes laden, dann fuer das
-  // hero-Feld einen 1-Spalten-DB-Query nachlegen und wenn da ein hero
-  // ist, ueberschreiben.
+  // Custom-Override (Fork-on-Edit aus Phase 3) wins ueber Code. Wenn ein
+  // is_custom=true Row mit gleichem slug in der DB existiert, ist das die
+  // bearbeitete Version und wir geben sie zurueck — der Pack-Detail-Page-
+  // Reader und der Recipe-Detail-Layout zeigen dann die user-edited Karte.
+  // Sonst: Code wins fuer Title/Steps/Nutrition, mit optionalem DB-Hero-
+  // Override (KI-Alternative-Button).
   const fromCode = staticRecipe(packSlug, recipeSlug);
   if (fromCode) {
     // Re-Use des gecachten Pack-DB-Reads (shared mit Listen-View).
     // Kein zweiter Roundtrip wenn die Pack-Page schon besucht wurde.
     const dbRows = await getPackDbRows(packSlug);
     const row = dbRows.find((x) => x.recipe_slug === recipeSlug);
+    // Custom-Override hat Vorrang vor Code.
+    if (row?.data) {
+      const customRecipe = row.data;
+      const heroFromCustom = customRecipe.hero ?? row.hero;
+      return heroFromCustom
+        ? { ...customRecipe, hero: withHeroCacheBust(heroFromCustom) }
+        : customRecipe;
+    }
     if (row?.hero)
       return { ...fromCode, hero: withHeroCacheBust(row.hero) };
     return fromCode;
