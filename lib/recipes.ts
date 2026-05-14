@@ -1816,8 +1816,12 @@ export function mergeAndRenumber<R extends Recipe>(
   staticRecipes: R[],
   customRecipes: MergeableCustom<R>[]
 ): R[] {
+  // Slug als Tie-Breaker: Pack-Rezepte, die in einem Batch angelegt wurden,
+  // haben oft identische createdAt — ohne stabilen zweiten Schluessel haengt
+  // die Reihenfolge dann an der DB-Heap-Order und springt nach jedem Update.
   const sortedCustom = [...customRecipes].sort(
-    (a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)
+    (a, b) =>
+      (b.createdAt ?? 0) - (a.createdAt ?? 0) || a.slug.localeCompare(b.slug)
   );
   const sortedStatic = [...staticRecipes].sort((a, b) => a.number - b.number);
   const merged = [...sortedCustom, ...sortedStatic];

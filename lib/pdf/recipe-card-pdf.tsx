@@ -262,7 +262,10 @@ function EditorialPage({
         }}
         wrap={false}
       >
-        <View style={{ width: 130 }}>
+        {/* alignSelf flex-start + feste Hoehe: sonst streckt der row-Parent
+            (alignItems default "stretch") den Bild-Slot auf die Section-
+            Hoehe — bei dichten Karten wuchs das Hero dadurch sichtbar. */}
+        <View style={{ width: 130, height: 130, alignSelf: "flex-start" }}>
           {heroDataUri ? (
             <View
               style={{
@@ -821,7 +824,7 @@ function PatisseriePage({
                 marginTop: 8,
               }}
             >
-              «&nbsp;{recipe.subtitle}&nbsp;»
+              «&nbsp;{recipe.subtitle} »
             </Text>
 
             {/* Polaroid — slight tilt, white frame against lavender so
@@ -1065,7 +1068,10 @@ function PatisseriePage({
             style={{
               flexDirection: "row",
               alignItems: "baseline",
-              gap: 14,
+              // gap 8 (vorher 14): "X Portionen … kcal pro Portion" ist
+              // breiter als die Stueck-Variante und kippte sonst in eine
+              // zweite Zeile — der Strip bleibt jetzt einzeilig.
+              gap: 8,
               flexWrap: "wrap",
               paddingBottom: 12,
               borderBottomWidth: 0.5,
@@ -2262,7 +2268,7 @@ function SportPage({
               marginTop: 6,
             }}
           >
-            «&nbsp;{recipe.subtitle}&nbsp;»
+            «&nbsp;{recipe.subtitle} »
           </Text>
           <View
             style={{
@@ -3357,7 +3363,7 @@ function VitalPage({
                 marginTop: 4,
               }}
             >
-              «&nbsp;{recipe.subtitle}&nbsp;»
+              «&nbsp;{recipe.subtitle} »
             </Text>
           ) : null}
           <View
@@ -4304,7 +4310,7 @@ function AmberPage({
               textAlign: "center",
             }}
           >
-            «&nbsp;{recipe.subtitle}&nbsp;»
+            «&nbsp;{recipe.subtitle} »
           </Text>
         ) : null}
         <Text
