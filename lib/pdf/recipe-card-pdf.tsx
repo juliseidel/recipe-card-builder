@@ -27,6 +27,7 @@ import {
   totalTime,
   pad2,
   portionsLabel,
+  servingsCountLabel,
   type IngredientGroup,
 } from "./helpers";
 import { packTheme, withAlpha, blendWithWhite, PAGE_PADDING } from "./theme";
@@ -9473,9 +9474,7 @@ function RestaurantPage({
               textTransform: "uppercase",
             }}
           >
-            {recipe.servings === 1
-              ? "1 Portion"
-              : `${recipe.servings} Portionen`}
+            {servingsCountLabel(recipe)}
           </Text>
         </View>
         {/* Spec-Strip Zeile 2: Makros (Protein/KH/Fett). Dezenter Farbton

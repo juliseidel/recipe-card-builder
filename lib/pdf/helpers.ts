@@ -127,3 +127,14 @@ export function pad2(n: number): string {
 export function portionsLabel(servings: number): string {
   return servings === 1 ? "Portion" : "Portionen";
 }
+
+// Count + unit noun for spec-strips ("6 Stücke", "2 Portionen", "1 Portion").
+// Follows nutritionBasis, not servings alone — a piece-based recipe must read
+// "Stück", never "Portion" (PDF design rule: spec-strip labels follow basis).
+export function servingsCountLabel(recipe: Recipe): string {
+  const n = recipe.servings;
+  if (recipe.nutritionBasis === "piece") {
+    return n === 1 ? "1 Stück" : `${n} Stücke`;
+  }
+  return n === 1 ? "1 Portion" : `${n} Portionen`;
+}

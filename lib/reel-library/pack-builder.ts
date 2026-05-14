@@ -153,7 +153,10 @@ export async function buildPackFromReels(
     category: opts.pack.category,
     tagline: opts.pack.tagline,
     description: opts.pack.description,
-    recipeCount: successes.length,
+    // Custom-pack baseline stays 0 — the live count is the recipes-table
+    // row count, which the pack/brand pages add on top. Storing
+    // successes.length here double-counted (pack showed ~2× its recipes).
+    recipeCount: 0,
     coverImage: opts.presetCoverImage ?? "",
     mood: opts.pack.mood,
     displayFont: opts.pack.displayFont,
