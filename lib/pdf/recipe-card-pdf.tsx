@@ -1358,16 +1358,16 @@ function MinimalPage({
           : recipe.servings === 1
             ? "Portion"
             : "Portionen";
-  // Bei vielen Steps (>=6) override auf compact-density. Bei sehr vielen
-  // Steps (>=7) zusaetzlich noch enger — sonst ueberlaufen lange Step-Texte
-  // den verfuegbaren Body-Slot. Solero-Tiramisu (7 Schritte mit 3-4 Zeilen
-  // Anweisungstext) ist der Worst-Case.
+  // Bei vielen Steps (>=6) override auf compact-density UND zusaetzlich
+  // enger (kleinerer stepMarginBottom + stepFontSize). Sonst ueberlaufen
+  // lange Step-Texte den Body-Slot und ueberlappen sich. Loaded Süßkartoffel
+  // (6 Schritte mit teils 3-4 Zeilen Text) war genau dieser Worst-Case.
   const baseDensity = getDensity(recipe);
   const stepCount = recipe.steps?.length ?? 0;
   const density = stepCount >= 6 ? "compact" : baseDensity;
   const dBase = MINIMAL_DENSITY[density];
   const d =
-    stepCount >= 7
+    stepCount >= 6
       ? {
           ...dBase,
           stepMarginBottom: Math.max(3, dBase.stepMarginBottom - 2),
