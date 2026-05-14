@@ -9647,11 +9647,13 @@ function RestaurantPage({
           </View>
         </View>
 
-        {/* Sparse-Story-Block — NUR wenn KEINE Wine-Notes geplant sind.
-            Bei Wine-Notes-Block (topMicros.length > 0) wuerde der Story-
-            Pull-Quote sonst UNTER dem fixed Wine-Notes-Stack laufen
-            und ueberlappen mit Footer (siehe Sweet-Balance XXL-Cookie). */}
-        {showStory && topMicros.length === 0 ? (
+        {/* Sparse-Story-Block — fuellt die Whitespace auf duennen Karten.
+            Nur bei spacious density (score <= 14, z.B. Crema mit 1 Schritt
+            oder 0-Punkte-Eis mit 3 Schritten): da ist garantiert genug
+            Platz, der Pull-Quote laeuft nie unter den fixed Genussprofil-
+            Stack. balanced/compact Karten fuellen die Seite schon ueber
+            Steps + Zutaten und brauchen ihn nicht. */}
+        {showStory && density === "spacious" ? (
           <View
             style={{
               marginTop: D.sectionGap - 2,

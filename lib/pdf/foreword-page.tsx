@@ -2240,11 +2240,16 @@ function RestaurantForewordPage({
         color: RESTAURANT_FOREWORD_COLORS.ink,
       }}
     >
+      {/* Inhalt vertikal zentriert — ein kurzes Vorwort soll mittig auf der
+          Seite sitzen statt oben zu kleben mit grosser Leerflaeche unten.
+          paddingBottom balanciert optisch gegen den absolut positionierten
+          Footer, damit die Mitte oberhalb des Footers wirkt. */}
+      <View style={{ flex: 1, justifyContent: "center", paddingBottom: 56 }}>
       {/* Masthead */}
       <View
         style={{
           paddingHorizontal: 36,
-          paddingTop: 30,
+          paddingTop: 0,
           alignItems: "center",
         }}
       >
@@ -2473,6 +2478,7 @@ function RestaurantForewordPage({
             {signoff}
           </Text>
         ) : null}
+      </View>
       </View>
 
       {/* Footer mit Author-Strip (KEIN brand.signature) */}

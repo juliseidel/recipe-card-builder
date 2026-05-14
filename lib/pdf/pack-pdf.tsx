@@ -81,7 +81,12 @@ export function PackPdfDocument({
       ) : null}
 
       {/* INDEX (page 2 without foreword, page 3 with foreword) */}
-      <IndexPage brand={brand} pack={pack} recipes={recipes} />
+      <IndexPage
+        brand={brand}
+        pack={pack}
+        recipes={recipes}
+        showForeword={showForeword}
+      />
 
       {/* PAGES 3..N+2 — RECIPES */}
       {recipes.map((recipe, idx) => (
@@ -238,10 +243,12 @@ function IndexPage({
   brand,
   pack,
   recipes,
+  showForeword,
 }: {
   brand: Brand;
   pack: Pack;
   recipes: Recipe[];
+  showForeword: boolean;
 }) {
   const t = packTheme(pack);
   return (
@@ -401,7 +408,7 @@ function IndexPage({
                     textAlign: "right",
                   }}
                 >
-                  S. {i + 3}
+                  S. {i + (showForeword ? 4 : 3)}
                 </Text>
               </View>
             ))}
