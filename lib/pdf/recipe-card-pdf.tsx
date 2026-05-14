@@ -32,7 +32,7 @@ import {
 } from "./helpers";
 import { packTheme, withAlpha, blendWithWhite, PAGE_PADDING } from "./theme";
 import { BeeIcon } from "./bee-icon";
-import { formatIngredientAmount, isQualitativeAmount } from "@/lib/format-ingredient";
+import { formatIngredientAmount } from "@/lib/format-ingredient";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public entry — returns a single A4 page rendered in the matching layout.
@@ -4455,7 +4455,6 @@ function AmberPage({
               {group.items.map((ing, ii) => {
                 const amountDisplay =
                   formatIngredientAmount(ing.amount) || "Nach Geschmack";
-                const amountQualitative = isQualitativeAmount(amountDisplay);
                 return (
                   <View
                     key={ii}
@@ -4471,19 +4470,19 @@ function AmberPage({
                   >
                     <Text
                       style={{
-                        // Breitere Amount-Spalte + kleinere Schrift fuer
-                        // qualitative Amounts, damit "Nach Geschmack" nicht
-                        // auf zwei Zeilen umbricht (User-Feedback). 48 pt war
-                        // zu schmal fuer 14-Zeichen-Phrasen.
+                        // Einheitliche Mengen-Typografie: ob "250 g" oder
+                        // "Nach Geschmack" — jede Menge rendert gleich
+                        // (Fraunces italic, dezent, eine Stufe kleiner).
+                        // Vorher war quantitativ Inter/fett/Akzentfarbe und
+                        // qualitativ Fraunces/italic/grau — der Stilbruch in
+                        // derselben Spalte fiel auf (User-Feedback). 58 pt
+                        // Breite haelt auch "Nach Geschmack" einzeilig.
                         width: 58,
-                        fontFamily: amountQualitative ? "Fraunces" : "Inter",
-                        fontSize: amountQualitative
-                          ? d.ingFontSize - 2
-                          : d.ingFontSize,
-                        fontStyle: amountQualitative ? "italic" : "normal",
-                        fontWeight: amountQualitative ? 400 : 600,
-                        color: amountQualitative ? t.inkSoft : t.accent,
-                        letterSpacing: amountQualitative ? 0 : 0.2,
+                        fontFamily: "Fraunces",
+                        fontSize: d.ingFontSize - 2,
+                        fontStyle: "italic",
+                        fontWeight: 400,
+                        color: t.inkSoft,
                       }}
                     >
                       {amountDisplay}
