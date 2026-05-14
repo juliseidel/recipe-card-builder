@@ -4975,18 +4975,25 @@ function IngredientRow({
   // Zeilen erzwingen, die dann mit dem Note-Text der gleichen Row
   // kollidieren wuerden.
   const padV = rowPadV ?? (compact ? 3.5 : 4.5);
-  const amountFont = compact ? 7.5 : 8;
   const amountW = compact ? 46 : 54;
   // formatIngredientAmount: "n. A." → "Nach Geschmack", plus
   // Capitalize-First. Konsistent ueber alle 8 Layouts + Web.
   const displayAmount = formatIngredientAmount(ing.amount);
-  // Lange amounts wie "Nach Geschmack" wrappen auf zwei Zeilen. Bei
-  // diesen Faellen wechseln wir auf alignItems "center", damit der
-  // Name vertikal zwischen den beiden amount-Zeilen sitzt — sonst
-  // wirkt die Border-Bottom-Linie visuell als wuerde sie "zwischen Nach
-  // und Geschmack durchgehen". Bei kurzen single-line amounts bleibt
-  // flex-start mit paddingTop=1 (font-metric-Compensation gegen Inter).
+  // Lange Amounts wie "Nach Geschmack" passen bei voller Schriftgroesse
+  // nicht in die schmale Amount-Spalte (46-54 pt) und wrappen auf zwei
+  // Zeilen ("Nach" / "Geschmack") — das sah unsauber aus (User-Feedback
+  // Curly Fries Salat). Gegenmassnahme: lange Amounts rendern eine Stufe
+  // kleiner, dann bleibt "Nach Geschmack" einzeilig. Falls ein Amount
+  // trotzdem wrappt (selten, z.B. "Saft einer halben"), zentriert
+  // alignItems "center" den Namen vertikal zwischen den beiden Zeilen.
   const amountIsLong = Boolean(displayAmount) && displayAmount.length > 10;
+  const amountFont = amountIsLong
+    ? compact
+      ? 6.5
+      : 7
+    : compact
+      ? 7.5
+      : 8;
   const rowAlign: "center" | "flex-start" = amountIsLong
     ? "center"
     : "flex-start";
