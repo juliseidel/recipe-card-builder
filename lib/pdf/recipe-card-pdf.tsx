@@ -1068,10 +1068,11 @@ function PatisseriePage({
             style={{
               flexDirection: "row",
               alignItems: "baseline",
-              // gap 8 (vorher 14): "X Portionen … kcal pro Portion" ist
+              // gap 5 (vorher 14): "X Portionen … kcal pro Portion" ist
               // breiter als die Stueck-Variante und kippte sonst in eine
-              // zweite Zeile — der Strip bleibt jetzt einzeilig.
-              gap: 8,
+              // zweite Zeile — der Strip bleibt jetzt auch beim breitesten
+              // Rezept einzeilig.
+              gap: 5,
               flexWrap: "wrap",
               paddingBottom: 12,
               borderBottomWidth: 0.5,
