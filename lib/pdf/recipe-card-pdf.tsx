@@ -3595,7 +3595,16 @@ function VitalPage({
                   {group.name}
                 </Text>
               ) : null}
-              {group.items.map((ing, ii) => (
+              {group.items.map((ing, ii) => {
+                const displayAmount =
+                  formatIngredientAmount(ing.amount) || "Nach Geschmack";
+                // Lange Amounts ("Nach Geschmack") brauchen in der breiteren
+                // 64-pt-Spalte eine Stufe kleinere Schrift, sonst brechen
+                // sie auf zwei Zeilen um, ueberlappen den Zutaten-Namen und
+                // schieben ganze Karten auf eine zweite Seite (User-Feedback
+                // "Schüttel Salat auf zwei Seiten").
+                const amountIsLong = displayAmount.length > 10;
+                return (
                 <View
                   key={ii}
                   style={{
@@ -3610,14 +3619,16 @@ function VitalPage({
                 >
                   <Text
                     style={{
-                      width: 48,
-                      fontSize: d.ingFontSize,
+                      width: 64,
+                      fontSize: amountIsLong
+                        ? d.ingFontSize - 2
+                        : d.ingFontSize,
                       fontWeight: 600,
                       color: t.accent,
                       letterSpacing: 0.2,
                     }}
                   >
-                    {formatIngredientAmount(ing.amount) || "Nach Geschmack"}
+                    {displayAmount}
                   </Text>
                   <View style={{ flex: 1 }}>
                     <Text
@@ -3644,7 +3655,8 @@ function VitalPage({
                     ) : null}
                   </View>
                 </View>
-              ))}
+                );
+              })}
             </View>
           ))}
         </View>
