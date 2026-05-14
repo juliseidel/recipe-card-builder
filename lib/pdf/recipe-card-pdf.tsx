@@ -7377,12 +7377,12 @@ function NewspaperIngredientRow({
   density: (typeof NEWSPAPER_DENSITY)["balanced"];
 }) {
   const displayAmount = formatIngredientAmount(amount);
-  const isQualitative = isQualitativeAmount(displayAmount);
-  // Qualitative Phrasen wie "Nach Geschmack" sollen NICHT dominieren:
-  // kleinere Schrift, italic, normales Gewicht, dezente Farbe.
-  const amountFontSize = isQualitative
-    ? density.ingredientFontSize - 2
-    : density.ingredientFontSize;
+  // Einheitliche Mengen-Typografie: ob "150 g" oder "Nach Geschmack" — jede
+  // Menge rendert in derselben Schrift, Groesse, Stil und Farbe. Vorher war
+  // die quantitative Variante gross/fett/Inter/Akzent, die qualitative
+  // klein/italic/Fraunces/grau — zwei Welten in einer Spalte, das wirkte
+  // verworren. Jetzt durchgaengig dezent; die Zutat selbst ist ueber
+  // Groesse + 500er-Gewicht der klare primaere Lesepunkt.
   const amountIsLong = displayAmount.length > 10;
   return (
     <View
@@ -7397,14 +7397,14 @@ function NewspaperIngredientRow({
     >
       <Text
         style={{
-          fontFamily: isQualitative ? "Fraunces" : "Inter",
-          fontSize: amountFontSize,
-          fontStyle: isQualitative ? "italic" : "normal",
-          fontWeight: isQualitative ? 400 : 700,
-          color: isQualitative ? theme.inkSoft : theme.accent,
+          fontFamily: "Fraunces",
+          fontSize: density.ingredientFontSize - 2,
+          fontStyle: "italic",
+          fontWeight: 400,
+          color: theme.inkSoft,
           width: 50,
           lineHeight: amountIsLong ? 1.3 : undefined,
-          paddingTop: amountIsLong ? (isQualitative ? 1 : 0) : 1,
+          paddingTop: 1,
         }}
       >
         {displayAmount}
@@ -7414,6 +7414,7 @@ function NewspaperIngredientRow({
           style={{
             fontFamily: "Fraunces",
             fontSize: density.ingredientFontSize,
+            fontWeight: 500,
             color: theme.ink,
             lineHeight: 1.3,
           }}
