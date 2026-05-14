@@ -4471,10 +4471,14 @@ function AmberPage({
                   >
                     <Text
                       style={{
-                        width: 48,
+                        // Breitere Amount-Spalte + kleinere Schrift fuer
+                        // qualitative Amounts, damit "Nach Geschmack" nicht
+                        // auf zwei Zeilen umbricht (User-Feedback). 48 pt war
+                        // zu schmal fuer 14-Zeichen-Phrasen.
+                        width: 58,
                         fontFamily: amountQualitative ? "Fraunces" : "Inter",
                         fontSize: amountQualitative
-                          ? d.ingFontSize - 1.5
+                          ? d.ingFontSize - 2
                           : d.ingFontSize,
                         fontStyle: amountQualitative ? "italic" : "normal",
                         fontWeight: amountQualitative ? 400 : 600,
