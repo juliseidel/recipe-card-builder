@@ -167,7 +167,14 @@ function EditorialPage({
   const t = packTheme(pack);
   const grouped = groupIngredients(recipe.ingredients);
   const time = totalTime(recipe);
-  const pl = portionsLabel(recipe.servings);
+  // Einheit folgt nutritionBasis — ein piece-Rezept liest "ergibt 9 Stücke",
+  // nie "9 Portionen" (sonst widerspricht der Header dem "PRO STÜCK"-Tile).
+  const pl =
+    recipe.nutritionBasis === "piece"
+      ? recipe.servings === 1
+        ? "Stück"
+        : "Stücke"
+      : portionsLabel(recipe.servings);
   // Editorial-spezifischer Density-Cap: spacious kann den Body wegen
   // der grosszuegigen Header/Mikros/Stats/Story-Paddings ueberlaufen
   // (auch bei moderat komplexen Recipes mit 8 Zutaten + 3 Schritten).
@@ -378,7 +385,7 @@ function EditorialPage({
         <PortionTile
           label={nutritionBasisLabel(recipe.nutritionBasis)}
           value={String(recipe.nutrition.kcal)}
-          sub={`kcal · ${recipe.nutrition.carbs}g KH · ${recipe.nutrition.fat}g Fett`}
+          sub={`kcal · ${recipe.nutrition.carbs} g KH · ${recipe.nutrition.fat} g Fett`}
           theme={t}
           highlight
           borderRight
@@ -387,7 +394,7 @@ function EditorialPage({
         />
         <PortionTile
           label="EIWEISS"
-          value={`${recipe.nutrition.protein}g`}
+          value={`${recipe.nutrition.protein} g`}
           sub={nutritionBasisInline(recipe.nutritionBasis)}
           theme={t}
           borderRight
@@ -658,8 +665,15 @@ function PatisseriePage({
 }: RecipeCardPdfProps) {
   const t = packTheme(pack);
   const time = totalTime(recipe);
-  const stueck = recipe.servings === 1 ? "Stück" : "Stücke";
-  const stueckSing = "Stück";
+  // Spec-strip-Einheit folgt nutritionBasis, nicht nur servings — ein
+  // portion-basiertes Rezept muss "2 Portionen" lesen, nie "2 Stücke".
+  const stueckSing = recipe.nutritionBasis === "piece" ? "Stück" : "Portion";
+  const stueck =
+    recipe.servings === 1
+      ? stueckSing
+      : recipe.nutritionBasis === "piece"
+        ? "Stücke"
+        : "Portionen";
   const density = getDensity(recipe);
   const d = PATISSERIE_DENSITY[density];
 
@@ -927,22 +941,22 @@ function PatisseriePage({
               {avatarDataUri ? (
                 <View
                   style={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: 32,
+                    width: 46,
+                    height: 46,
+                    borderRadius: 23,
                     overflow: "hidden",
                     borderWidth: 1.5,
                     borderColor: t.accent,
                   }}
                 >
-                  {/* 64x64 statt 50x50 — bei Portrait-Avataren (Julia hat
-                      Schultern + Gesicht im 320x320 Original) bleibt im
-                      groesseren Circle mehr vom Kopf sichtbar. */}
+                  {/* Bewusst kleiner als der QR-Stempel (50pt) — ein groesserer
+                      Avatar drueckte optisch ueber den QR-Code (User-Feedback).
+                      objectPosition faengt den Portrait-Crop ab. */}
                   <Image
                     src={avatarDataUri}
                     style={{
-                      width: 61,
-                      height: 61,
+                      width: 43,
+                      height: 43,
                       objectFit: "cover",
                       objectPosition: "center 30%",
                     }}
@@ -1135,13 +1149,13 @@ function PatisseriePage({
             {[
               {
                 label: "Eiweiß",
-                value: `${recipe.nutrition.protein}g`,
+                value: `${recipe.nutrition.protein} g`,
               },
               {
                 label: "Kohlenhydrate",
-                value: `${recipe.nutrition.carbs}g`,
+                value: `${recipe.nutrition.carbs} g`,
               },
-              { label: "Fett", value: `${recipe.nutrition.fat}g` },
+              { label: "Fett", value: `${recipe.nutrition.fat} g` },
             ].map((m) => (
               <View
                 key={m.label}

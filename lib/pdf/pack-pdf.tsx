@@ -492,7 +492,7 @@ function NutritionOverviewPage({
             marginTop: 6,
           }}
         >
-          Ø {avg.kcal} kcal · Ø {avg.protein}g Eiweiß pro Portion
+          Ø {avg.kcal} kcal · Ø {avg.protein} g Eiweiß je Rezept
         </Text>
       </View>
 
@@ -606,9 +606,10 @@ function NutritionOverviewPage({
             fontStyle: "italic",
           }}
         >
-          Alle Werte gelten pro Portion (kcal-Spalte) bzw. als Pack-Summe in der
-          letzten Zeile. Werte basieren auf {brand.name}s Original-Rezepten und
-          können je nach verwendeten Marken leicht abweichen.
+          Die kcal-Spalte zeigt den Wert pro Portion bzw. pro Stück, die letzte
+          Zeile die Pack-Summe. Werte basieren auf {brand.name}s
+          Original-Rezepten und können je nach verwendeter Marke leicht
+          abweichen.
         </Text>
       </View>
 
@@ -623,7 +624,7 @@ function NutritionOverviewPage({
 // die das Feld nie kannten). Fuer Custom-Packs schreibt Gemini den Outro
 // Pack- und Saison-spezifisch — siehe lib/ai/generate-foreword.ts.
 const DEFAULT_OUTRO =
-  "Danke, dass du mit mir kochst. Wenn dir die Karten gefallen, schick sie gerne weiter — und teil dein Ergebnis auf Instagram. Ich liebe es, eure Versionen zu sehen.";
+  "Danke, dass du mit mir kochst. Wenn dir die Karten gefallen, schick sie gerne weiter und teil dein Ergebnis auf Instagram. Ich liebe es, eure Versionen zu sehen.";
 
 function OutroPage({
   brand,
