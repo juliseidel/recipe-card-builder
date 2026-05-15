@@ -52,19 +52,9 @@ const LAYOUT_OPTIONS: { id: CardLayout; description: string }[] = [
       "Macro-Bars mit Emojis + Checkbox-Zutaten + Timeline. Workout-fokussiert, alt — meist Vital besser.",
   },
   {
-    id: "vinyl",
-    description:
-      "12\"-Schallplatte mit Hero als Center-Label, schwarze Disc mit Grooves, Audio-Spec-Strip (KCAL/MIN/KEY) + Top-Mikros, Steps als A-Side/B-Side-Tracklist (A1, A2, B1, B2), Zutaten als Liner-Notes. Pressed-by-Brand-Footer. Maximaler Wow-Faktor, einzigartig vs. allen anderen Layouts. Passt fuer Mealprep-Compilations, Hauptmahlzeiten-Packs, Show-Off-Sammlungen, alles wo der User eine Signature-Statement-Card haben moechte.",
-  },
-  {
     id: "newspaper",
     description:
       "Broadsheet-Editorial wie New York Times / Guardian. Italic Headline mit Drop-Cap im Lead-Paragraph, Byline 'Von [Brand]', Magazine-Hero mit Bildunterschrift. Zutaten in 3 Spalten (Newspaper-typisch), Schritte in 2 Spalten mit italic Nummern. Naehrwerte als Spreadsheet-Footer-Row mit Doppellinie. Mikros in EIGENER Position (unten als Daten-Zeile) statt seitlich/oben. Passt fuer hochwertige Recipe-Kollektionen mit editorialem Anspruch, Magazin-Pack-Konzepte, Reiseküche, Saisonal, Sonntag-Klassiker.",
-  },
-  {
-    id: "constellation",
-    description:
-      "Sternkarten-Look auf Dark-Sky-Background (Marineblau, #0a0e1f). Hero rund mit Glow-Halo, italic Fraunces-Title in cream-Weiss, ✦-Stern-Bullets bei Zutaten, Schritte als Trajectory mit Station-Markern. Mikronaehrstoffe in EIGENER Position: als Planeten-Symbole vertikal am rechten Rand (kleine Akzent-Kreise mit %-Wert, durch Connection-Line verbunden). Background-Sterne als Atmosphaere. Sehr eigenstaendige Premium-Optik, Dark-Mode-Pop. Passt fuer Premium-Mealprep-Packs, Show-Off-Sammlungen, Dessert-Editions, Nacht- und Sunset-Themen, alles wo der Pack im Browser pop machen soll.",
   },
   {
     id: "restaurant",
@@ -124,7 +114,7 @@ const RESPONSE_SCHEMA = {
     layout: {
       type: "string",
       description:
-        'Empfohlenes Layout, einer aus: "amber", "editorial", "patisserie", "minimal", "vital", "dashboard", "sport", "vinyl", "newspaper", "constellation", "restaurant".',
+        'Empfohlenes Layout, einer aus: "amber", "editorial", "patisserie", "minimal", "vital", "dashboard", "sport", "newspaper", "restaurant".',
     },
     layoutReason: {
       type: "string",
@@ -248,17 +238,9 @@ TONALITÄT für Description/Subtitle/Tagline:
 PASSUNG sehr wichtig: Layout/Mood/Font sollen ZUR REZEPTAUSWAHL passen.
 - Wenn die Reels Dessert/Backwaren sind → patisserie/amber, lavender/honey, fraunces
 - Wenn Bowls/Healthy → vital, sage/mint, fraunces oder inter-tight
-- Wenn Mealprep → dashboard ODER vinyl, sky/cocoa, inter-tight
+- Wenn Mealprep → dashboard, sky/cocoa, inter-tight
 - Wenn Snacks → minimal, mint/rose, fraunces
 - Wenn Comfort-Food/Hauptmahlzeiten → amber, honey, fraunces oder dm-serif
-- Wenn der User eine Signature-Compilation will (Top-Hits, Mealprep-Lieblinge,
-  Wochenstars) oder eine Show-Off-Sammlung → vinyl, cocoa/honey, fraunces.
-  vinyl ist deutlich von allen anderen Layouts unterscheidbar (Schallplatten-
-  Look) — gut wenn das Pack im Browser pop machen soll.
-- Wenn der User Dark-Mode-Optik / Premium-Show-Off / Nacht-Sunset-Themen
-  will (z.B. Date-Night-Desserts, Premium-Mealprep, "after dark"-Snacks) →
-  constellation, cocoa/honey/lavender, fraunces. Sehr eigenstaendige Dark-Sky-
-  Optik (dunkles Marineblau + Sternen-Background), Mikros als Planeten-Symbole.
 - Wenn das Pack ein Restaurant-/Bistro-Feel haben soll (Date-Night-Dinners,
   Pariser-Maison-Aesthetik, mehrgaengige Menus, edle Hauptmahlzeiten, Wein-
   begleitete Rezepte) → restaurant, honey/cocoa/rose, fraunces. Cream-BG mit

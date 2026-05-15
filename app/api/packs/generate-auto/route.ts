@@ -223,9 +223,7 @@ export async function POST(req: Request) {
     "dashboard",
     "vital",
     "amber",
-    "vinyl",
     "newspaper",
-    "constellation",
     "restaurant",
   ];
   let resolvedLayout: import("@/lib/packs").CardLayout;

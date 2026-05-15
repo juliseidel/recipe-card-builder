@@ -62,28 +62,12 @@ export const layoutPresets: LayoutPreset[] = [
     bestFor: "Aelteres Fitness-Layout — wir empfehlen Vital-Stack stattdessen",
   },
   {
-    id: "vinyl",
-    title: "Vinyl",
-    description:
-      "12\"-Schallplatte: Hero als Center-Label auf schwarzer Disc mit Grooves, Title darunter, Audio-Spec-Strip (KCAL · MIN · KEY), Top-Mikros als Spec-Zeile. Steps als A-Side/B-Side-Tracklist (A1, A2, B1, B2). Zutaten als Liner-Notes in 2 Spalten. Footer „Pressed by [Brand]“. Komplett neue Design-Sprache aus der Musik-/Audio-Welt.",
-    bestFor:
-      "Mealprep-Sammlungen, Hauptmahlzeiten-Packs, Compilation-artige Kollektionen, jeder Pack der einen Signature-Wow-Faktor braucht",
-  },
-  {
     id: "newspaper",
     title: "Newspaper",
     description:
       "Broadsheet-Editorial wie New York Times / Guardian: italic Headline mit Drop-Cap im Lead-Paragraph, Byline „Von [Brand]\", Magazine-Hero mit Bildunterschrift, Zutaten in 3 Spalten (Newspaper-typisch), Schritte in 2 Spalten mit italic Nummern. Nährwerte als Spreadsheet-Footer mit Doppellinie. Komplett anderes Mikronährstoffe-Layout (unten als Daten-Zeile) statt seitlich/oben.",
     bestFor:
       "Hochwertige Recipe-Kollektionen mit editorialem Anspruch, Magazin-Pack-Konzepte, Pack-Themen die Lese-Tiefe brauchen (Reiseküche, Saisonal, Sonntag-Recipes)",
-  },
-  {
-    id: "constellation",
-    title: "Constellation",
-    description:
-      "Sternkarten-Look auf Dark-Sky-Background (Marineblau): Hero rund mit Glow-Halo, italic Fraunces-Title in cream-Weiß, Mikronährstoffe als Planeten-Symbole am rechten Rand (kleine Akzent-Kreise mit %-Wert, vertikal verbunden), Zutaten mit ✦-Stern-Bullets, Schritte als Trajectory (horizontale Linie mit Station-Markern bei ≤4 Steps, sonst 2-Spalten-Grid). Background-Sterne als Atmosphäre. Sehr eigenständige Premium-Optik.",
-    bestFor:
-      "Premium-Mealprep-Packs, Show-Off-Sammlungen, Dessert-Editions, Nacht- und Sunset-Themen, alles wo Dark-Mode-Pop gewünscht ist",
   },
   {
     id: "restaurant",

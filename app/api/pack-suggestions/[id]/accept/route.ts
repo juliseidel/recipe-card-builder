@@ -102,9 +102,7 @@ const VALID_LAYOUTS: readonly CardLayout[] = [
   "amber",
   "dashboard",
   "sport",
-  "vinyl",
   "newspaper",
-  "constellation",
   "restaurant",
 ] as const;
 
