@@ -9400,57 +9400,42 @@ function FeatureIngredientBlock({
       ) : null}
       {group.items.map((it, i) => {
         const amount = formatIngredientAmount(it.amount);
-        // Zutaten-Zeile: amount fett dunkel, name leicht heller, note in
-        // klammern. Layout-Beat aehnelt dem Mockup (kein Dot-Leader, keine
-        // Zahlen-Tabellen, einfach lesbar).
+        // Zutaten-Zeile: amount + name + note in EINEM Text-Block (inline)
+        // damit der Wrap natuerlich am Wortrand passiert. Frueheres Layout
+        // mit flexDirection: row + flexWrap: wrap und 2 Text-Elementen hat
+        // bei schmalen 2-Spalten amount und name auf SEPARATE Zeilen
+        // gepusht ("80 ml" oben, "Mandelmilch" auf naechster Zeile) — das
+        // sah broken aus. Inline-Nested-Text wraps wie eine echte Zeile.
         return (
-          <View
+          <Text
             key={`ing-${i}`}
             style={{
+              fontFamily: "Inter",
+              fontSize: density.ingredientFontSize,
+              lineHeight: density.ingredientLineHeight,
+              color: inkPrimary,
               marginBottom: density.ingredientGap,
-              flexDirection: "row",
-              alignItems: "baseline",
-              gap: 4,
-              flexWrap: "wrap",
             }}
           >
             {amount ? (
-              <Text
-                style={{
-                  fontFamily: "Inter",
-                  fontSize: density.ingredientFontSize,
-                  fontWeight: 600,
-                  color: inkPrimary,
-                  lineHeight: density.ingredientLineHeight,
-                }}
-              >
+              <Text style={{ fontWeight: 600, color: inkPrimary }}>
                 {amount}
               </Text>
             ) : null}
-            <Text
-              style={{
-                fontFamily: "Inter",
-                fontSize: density.ingredientFontSize,
-                color: inkPrimary,
-                lineHeight: density.ingredientLineHeight,
-                flexShrink: 1,
-              }}
-            >
-              {it.name}
-              {it.note ? (
-                <Text
-                  style={{
-                    fontFamily: "Inter",
-                    fontStyle: "italic",
-                    fontSize: density.ingredientFontSize - 0.5,
-                    color: inkSecondary,
-                  }}
-                >
-                  {` (${it.note})`}
-                </Text>
-              ) : null}
-            </Text>
-          </View>
+            {amount ? "  " : ""}
+            {it.name}
+            {it.note ? (
+              <Text
+                style={{
+                  fontStyle: "italic",
+                  color: inkSecondary,
+                  fontSize: density.ingredientFontSize - 0.5,
+                }}
+              >
+                {` (${it.note})`}
+              </Text>
+            ) : null}
+          </Text>
         );
       })}
     </View>
@@ -9717,13 +9702,16 @@ function FeaturePage({
           </View>
         </View>
 
-        {/* Macros-Pills + (bei compact/ultra) Mikros-Inline darunter.
-            Bei isDense wandert die Mikros-Zeile aus der eigenen Section ins
-            Macro-Stripe hinein — spart einen Section-Label-Block (~25 pt). */}
+        {/* Makro-Stat-Strip — Editorial-Tile-Layout: jeder Wert in einer
+            eigenen Zelle, Big-Number in Fraunces medium oben, Caps-Label
+            in Inter unten. Dezente vertikale Trennlinien zwischen den
+            Tiles geben dem Strip den editorial-magazine-Beat (ersetzt die
+            alten Inline-Pills, die zu "billig" wirkten — User-Feedback
+            2026-05-15). */}
         {macros.length > 0 || microsInline ? (
           <View
             style={{
-              paddingTop: 10,
+              paddingTop: 12,
               borderTopWidth: 0.5,
               borderTopColor: divider,
             }}
@@ -9732,26 +9720,27 @@ function FeaturePage({
               <View
                 style={{
                   flexDirection: "row",
-                  flexWrap: "wrap",
-                  alignItems: "baseline",
-                  gap: d.macroRowGap,
+                  alignItems: "stretch",
                 }}
               >
-                {macros.map((m) => (
+                {macros.map((m, i) => (
                   <View
                     key={m.label}
                     style={{
-                      flexDirection: "row",
-                      alignItems: "baseline",
-                      gap: 3,
+                      flex: 1,
+                      paddingLeft: i === 0 ? 0 : 6,
+                      paddingRight: i === macros.length - 1 ? 0 : 6,
+                      borderLeftWidth: i === 0 ? 0 : 0.4,
+                      borderLeftColor: divider,
                     }}
                   >
                     <Text
                       style={{
-                        fontFamily: "Inter",
-                        fontSize: d.macroFontSize,
-                        fontWeight: 700,
+                        fontFamily: "Fraunces",
+                        fontSize: d.macroFontSize + 1.5,
+                        fontWeight: 500,
                         color: ink,
+                        lineHeight: 1.1,
                       }}
                     >
                       {m.value}
@@ -9760,9 +9749,11 @@ function FeaturePage({
                       style={{
                         fontFamily: "Inter",
                         fontSize: d.macroLabelFontSize,
-                        fontWeight: 700,
+                        fontWeight: 600,
                         color: inkSubtle,
-                        letterSpacing: 1.2,
+                        letterSpacing: 1.4,
+                        textTransform: "uppercase",
+                        marginTop: 2,
                       }}
                     >
                       {m.label}
@@ -9774,12 +9765,15 @@ function FeaturePage({
             {microsInline ? (
               <Text
                 style={{
-                  fontFamily: "Inter",
+                  fontFamily: "Fraunces",
                   fontStyle: "italic",
                   fontSize: d.microsFontSize,
                   color: inkSoft,
                   lineHeight: d.microsLineHeight,
-                  marginTop: macros.length > 0 ? 4 : 0,
+                  marginTop: macros.length > 0 ? 8 : 0,
+                  paddingTop: macros.length > 0 ? 6 : 0,
+                  borderTopWidth: macros.length > 0 ? 0.3 : 0,
+                  borderTopColor: divider,
                 }}
               >
                 Reich an{" "}
@@ -9862,9 +9856,9 @@ function FeaturePage({
             />
             <Text
               style={{
-                fontFamily: "Inter",
+                fontFamily: "Fraunces",
                 fontStyle: "italic",
-                fontSize: d.microsFontSize,
+                fontSize: d.microsFontSize + 0.5,
                 color: inkSoft,
                 lineHeight: d.microsLineHeight,
               }}
@@ -9917,24 +9911,24 @@ function FeaturePage({
                   marginBottom: stepGap,
                 }}
               >
-                <View
+                {/* Step-Number in Fraunces italic statt Inter-bold —
+                    editorial-magazine-feel statt Bullet-Liste. Padding-Top
+                    aligned die Number an die Baseline der ersten Body-
+                    Zeile damit der Strich rechts daneben sauber sitzt. */}
+                <Text
                   style={{
                     width: d.stepNumColWidth,
-                    paddingTop: 1,
+                    fontFamily: "Fraunces",
+                    fontStyle: "italic",
+                    fontSize: stepNumFontSize + 1,
+                    fontWeight: 500,
+                    color: t.accent,
+                    lineHeight: 1.15,
+                    paddingTop: 0.5,
                   }}
                 >
-                  <Text
-                    style={{
-                      fontFamily: "Inter",
-                      fontSize: stepNumFontSize,
-                      fontWeight: 700,
-                      color: t.accent,
-                      lineHeight: 1,
-                    }}
-                  >
-                    {item.index + 1}.
-                  </Text>
-                </View>
+                  {item.index + 1}
+                </Text>
                 <Text
                   style={{
                     flex: 1,
@@ -9986,17 +9980,27 @@ function FeaturePage({
         </View>
       </View>
 
-      {/* ─── Hero-Spalte rechts (zweites Flex-Child, flex:1 fuellt Rest) ─ */}
+      {/* ─── Hero-Spalte rechts (zweites Flex-Child, flex:1 fuellt Rest) ─
+          Image bekommt opacity: 0.88 + ein subtle contentBg-Overlay mit
+          opacity: 0.14 damit das Foto nicht zu aggressiv wirkt und sich
+          in den Content-BG einbettet (User-Feedback 2026-05-15: "Bild
+          muss transparenter sein, sonst zu aggressiv"). */}
       <View
         style={{
           flex: 1,
           backgroundColor: blendWithWhite(t.accent, 0.9),
+          position: "relative",
         }}
       >
         {heroDataUri ? (
           <Image
             src={heroDataUri}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              opacity: 0.88,
+            }}
           />
         ) : (
           <View
@@ -10019,6 +10023,19 @@ function FeaturePage({
             </Text>
           </View>
         )}
+        {heroDataUri ? (
+          <View
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: contentBg,
+              opacity: 0.14,
+            }}
+          />
+        ) : null}
       </View>
 
       {/* ─── Soft-Fade-Overlay an der linken Foto-Kante (z-top) ────────── */}

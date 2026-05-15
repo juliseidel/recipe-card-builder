@@ -5836,7 +5836,9 @@ function FeatureLayout({
         position: "relative",
       }}
     >
-      {/* Hero rechts (absolut positioniert, full-bleed) */}
+      {/* Hero rechts (absolut positioniert, full-bleed). Image-Opacity
+          0.88 + ein subtle contentBg-Overlay machen das Foto sanfter und
+          editorial — sonst wirkt's zu aggressiv (User-Feedback). */}
       <div
         className="absolute top-0 right-0 h-full overflow-hidden"
         style={{
@@ -5855,6 +5857,7 @@ function FeatureLayout({
             className="object-cover content-fade-in"
             priority
             quality={95}
+            style={{ opacity: 0.88 }}
           />
         ) : (
           <div
@@ -5868,6 +5871,18 @@ function FeatureLayout({
             {recipe.title.charAt(0).toUpperCase()}
           </div>
         )}
+
+        {/* Subtle contentBg-Overlay damit das Foto im Cream-Tint des
+            Content-Bereichs verschmilzt. */}
+        {recipe.hero ? (
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              backgroundColor: contentBg,
+              opacity: 0.14,
+            }}
+          />
+        ) : null}
 
         {/* Soft-Fade-Overlay an der linken Foto-Kante */}
         <div
@@ -5996,7 +6011,10 @@ function FeatureLayout({
           </div>
         </div>
 
-        {/* Macros + Mikros-Inline (bei compact/ultra) */}
+        {/* Makro-Stat-Strip — Editorial-Tile-Layout statt Inline-Pills.
+            Big-Value in Fraunces medium oben, Caps-Label unten, dezente
+            vertikale Trennlinien dazwischen. Plus optional Mikros-Inline
+            darunter bei compact/ultra. */}
         {macros.length > 0 || (microsInline && micros.length > 0) ? (
           <div
             className="pt-3"
@@ -6005,47 +6023,58 @@ function FeatureLayout({
             }}
           >
             {macros.length > 0 ? (
-              <div
-                className="flex flex-wrap items-baseline"
-                style={{ gap: "14px" }}
-              >
-                {macros.map((m) => (
-                  <span
+              <div className="flex items-stretch">
+                {macros.map((m, i) => (
+                  <div
                     key={m.label}
-                    className="flex items-baseline"
-                    style={{ gap: "4px" }}
+                    style={{
+                      flex: 1,
+                      paddingLeft: i === 0 ? 0 : "8px",
+                      paddingRight:
+                        i === macros.length - 1 ? 0 : "8px",
+                      borderLeft:
+                        i === 0 ? "none" : `0.4px solid ${divider}`,
+                    }}
                   >
-                    <span
-                      className="font-bold"
+                    <p
+                      className="font-display"
                       style={{
                         color: ink,
-                        fontSize: `${d.macroFontSize}px`,
+                        fontSize: `${d.macroFontSize + 2}px`,
+                        fontWeight: 500,
+                        lineHeight: 1.1,
                       }}
                     >
                       {m.value}
-                    </span>
-                    <span
-                      className="font-bold"
+                    </p>
+                    <p
+                      className="font-semibold uppercase"
                       style={{
                         color: inkSubtle,
                         fontSize: `${d.macroLabelFontSize}px`,
-                        letterSpacing: "0.12em",
+                        letterSpacing: "0.16em",
+                        marginTop: "2px",
                       }}
                     >
                       {m.label}
-                    </span>
-                  </span>
+                    </p>
+                  </div>
                 ))}
               </div>
             ) : null}
             {microsInline && micros.length > 0 ? (
               <p
-                className="italic"
+                className="font-display italic"
                 style={{
                   color: inkSoft,
                   fontSize: `${d.microsFontSize}px`,
                   lineHeight: 1.45,
-                  marginTop: macros.length > 0 ? "4px" : 0,
+                  marginTop: macros.length > 0 ? "8px" : 0,
+                  paddingTop: macros.length > 0 ? "6px" : 0,
+                  borderTop:
+                    macros.length > 0
+                      ? `0.3px solid ${divider}`
+                      : "none",
                 }}
               >
                 Reich an{" "}
@@ -6136,11 +6165,11 @@ function FeatureLayout({
               accent={pack.mood.accent}
             />
             <p
-              className="italic"
+              className="font-display italic"
               style={{
                 color: inkSoft,
-                fontSize: `${d.microsFontSize}px`,
-                lineHeight: 1.5,
+                fontSize: `${d.microsFontSize + 0.5}px`,
+                lineHeight: 1.55,
               }}
             >
               {micros
@@ -6186,17 +6215,20 @@ function FeatureLayout({
                 className="flex items-start"
                 style={{ marginBottom: `${stepGap}px` }}
               >
+                {/* Step-Number in Fraunces italic statt Bold-Sans —
+                    editorial-magazine-feel, accent-color als Marker. */}
                 <span
-                  className="shrink-0 font-bold"
+                  className="shrink-0 font-display italic"
                   style={{
                     width: `${d.stepNumColWidth}px`,
                     color: pack.mood.accent,
-                    fontSize: `${stepNumFontSize}px`,
-                    lineHeight: 1,
-                    paddingTop: "2px",
+                    fontSize: `${stepNumFontSize + 1}px`,
+                    fontWeight: 500,
+                    lineHeight: 1.15,
+                    paddingTop: "1px",
                   }}
                 >
-                  {item.index + 1}.
+                  {item.index + 1}
                 </span>
                 <p
                   className="flex-1"
