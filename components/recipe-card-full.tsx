@@ -5008,17 +5008,60 @@ function StudioLayout({
     </div>
   );
 
+  // Hero "bleed" Layout-Strategie: paddingRight an Eyebrow + Title-Block
+  // damit Text nicht unter den absolut positionierten Hero laeuft.
+  const headerColPaddingRight = `${d.heroWidth + 24}px`;
+
   return (
     <article
-      className="mx-auto w-full max-w-[960px] overflow-hidden rounded-[var(--radius-card)] border bg-white"
+      className="relative mx-auto w-full max-w-[960px] overflow-hidden rounded-[var(--radius-card)] border bg-white"
       style={{
         ...baseShellStyle(pack, brand),
         backgroundColor: c.bg,
       }}
     >
+      {/* Hero "Bleed" — rechts oben, bis zur Ecke der Karte */}
+      <div
+        className="absolute top-0 right-0 overflow-hidden"
+        style={{
+          width: `${d.heroWidth}px`,
+          height: `${d.heroHeight}px`,
+          backgroundColor: pack.mood.background + "60",
+        }}
+      >
+        {recipe.hero ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <Image
+            src={recipe.hero}
+            alt={recipe.title}
+            width={d.heroWidth * 2}
+            height={d.heroHeight * 2}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div
+            className="flex h-full w-full items-center justify-center"
+            style={{ color: pack.mood.accent + "60" }}
+          >
+            <span
+              className="font-display"
+              style={{
+                fontSize: `${d.heroWidth * 0.45}px`,
+                lineHeight: 1,
+              }}
+            >
+              {recipe.title.charAt(0).toUpperCase()}
+            </span>
+          </div>
+        )}
+      </div>
+
       <div className="px-8 pt-10 pb-8 sm:px-14 sm:pt-12 sm:pb-10">
-        {/* Eyebrow */}
-        <div className="mb-3 flex items-center justify-between">
+        {/* Eyebrow — paddingRight, damit nicht unter den Hero */}
+        <div
+          className="mb-3 flex items-center justify-between"
+          style={{ paddingRight: headerColPaddingRight }}
+        >
           <span
             className="font-semibold uppercase"
             style={{
@@ -5044,84 +5087,51 @@ function StudioLayout({
         </div>
         <div
           className="mb-7 h-px"
-          style={{ backgroundColor: c.divider }}
+          style={{
+            backgroundColor: c.divider,
+            marginRight: headerColPaddingRight,
+          }}
         />
 
-        {/* Header: Title links + Hero rechts */}
-        <div className="flex items-start gap-6">
-          <div className="min-w-0 flex-1">
-            <h1
-              className="font-display font-medium"
-              style={{
-                color: c.ink,
-                fontSize: `${finalTitleSize}px`,
-                lineHeight: 1.05,
-              }}
-            >
-              {recipe.title}
-            </h1>
-            <div
-              className="mt-3 mb-3 h-[2px] w-7"
-              style={{ backgroundColor: pack.mood.accent }}
-            />
-            {recipe.subtitle ? (
-              <p
-                className="font-display italic"
-                style={{
-                  color: c.inkSoft,
-                  fontSize: `${d.subtitleFontSize}px`,
-                  lineHeight: 1.45,
-                  marginBottom: "14px",
-                }}
-              >
-                {recipe.subtitle}
-              </p>
-            ) : null}
-            <p
-              className="font-semibold uppercase"
-              style={{
-                color: c.inkSoft,
-                fontSize: `${d.specFontSize}px`,
-                letterSpacing: "0.26em",
-              }}
-            >
-              {specs.join("  ·  ")}
-            </p>
-          </div>
-          <div
-            className="shrink-0 overflow-hidden"
+        {/* Header: nur Title-Spalte (Hero ist Bleed-Bild, absolute) */}
+        <div style={{ paddingRight: headerColPaddingRight }}>
+          <h1
+            className="font-display font-medium"
             style={{
-              width: `${d.heroWidth}px`,
-              height: `${d.heroHeight}px`,
-              backgroundColor: pack.mood.background + "60",
+              color: c.ink,
+              fontSize: `${finalTitleSize}px`,
+              lineHeight: 1.05,
             }}
           >
-            {recipe.hero ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <Image
-                src={recipe.hero}
-                alt={recipe.title}
-                width={d.heroWidth * 2}
-                height={d.heroHeight * 2}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div
-                className="flex h-full w-full items-center justify-center"
-                style={{ color: pack.mood.accent + "60" }}
-              >
-                <span
-                  className="font-display"
-                  style={{
-                    fontSize: `${d.heroWidth * 0.5}px`,
-                    lineHeight: 1,
-                  }}
-                >
-                  {recipe.title.charAt(0).toUpperCase()}
-                </span>
-              </div>
-            )}
-          </div>
+            {recipe.title}
+          </h1>
+          <div
+            className="mt-3 mb-3 h-[2px] w-7"
+            style={{ backgroundColor: pack.mood.accent }}
+          />
+          {recipe.subtitle ? (
+            <p
+              className="font-display italic"
+              style={{
+                color: c.inkSoft,
+                fontSize: `${d.subtitleFontSize}px`,
+                lineHeight: 1.45,
+                marginBottom: "14px",
+              }}
+            >
+              {recipe.subtitle}
+            </p>
+          ) : null}
+          <p
+            className="font-semibold uppercase"
+            style={{
+              color: c.inkSoft,
+              fontSize: `${d.specFontSize}px`,
+              letterSpacing: "0.26em",
+            }}
+          >
+            {specs.join("  ·  ")}
+          </p>
         </div>
 
         <div
@@ -5185,11 +5195,12 @@ function StudioLayout({
             for (let i = 0; i < cols; i++) {
               columns.push(group.items.slice(i * perCol, (i + 1) * perCol));
             }
-            const amountColWidth = `${d.ingredientFontSize * 3.6}px`;
+            const amountColWidth = `${d.ingredientFontSize * 3.4}px`;
+            const dotSize = Math.max(3.5, d.ingredientFontSize * 0.3);
             return (
               <div
                 key={gi}
-                style={{ marginBottom: gi === ingredientGroups.length - 1 ? 0 : "14px" }}
+                style={{ marginBottom: gi === ingredientGroups.length - 1 ? 0 : "16px" }}
               >
                 {group.name ? (
                   <p
@@ -5198,14 +5209,14 @@ function StudioLayout({
                       color: c.inkSoft,
                       fontSize: `${d.ingredientGroupLabelFontSize}px`,
                       letterSpacing: "0.18em",
-                      marginBottom: "6px",
+                      marginBottom: "8px",
                     }}
                   >
                     {studioWebGroupLabel(group.name)}
                   </p>
                 ) : null}
                 <div
-                  className="grid gap-x-4"
+                  className="grid gap-x-5"
                   style={{
                     gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
                   }}
@@ -5222,15 +5233,26 @@ function StudioLayout({
                               marginBottom:
                                 ii === colItems.length - 1
                                   ? 0
-                                  : `${d.ingredientFontSize * 0.4}px`,
+                                  : `${d.ingredientFontSize * 0.55}px`,
                             }}
                           >
+                            {/* Akzent-Dot */}
                             <span
-                              className="shrink-0 text-right font-semibold tabular-nums"
+                              className="shrink-0 rounded-full"
+                              style={{
+                                width: `${dotSize}px`,
+                                height: `${dotSize}px`,
+                                backgroundColor: pack.mood.accent,
+                                marginTop: `${d.ingredientFontSize * 0.55}px`,
+                                marginRight: "9px",
+                              }}
+                            />
+                            <span
+                              className="shrink-0 text-right font-display italic font-bold tabular-nums"
                               style={{
                                 width: amountColWidth,
                                 paddingRight: "10px",
-                                color: c.ink,
+                                color: pack.mood.accent,
                                 fontSize: `${d.ingredientFontSize}px`,
                                 lineHeight: 1.55,
                               }}

@@ -7963,8 +7963,10 @@ const STUDIO_DENSITY: Record<
   // KEINE Story (zu wenig Platz). Worst-Case-Budget: 16 Zutaten + 10 Steps
   // (score 31) muss auf eine Seite passen.
   compact: {
-    heroWidth: 92,
-    heroHeight: 115,
+    // Hero ist jetzt "bleed" in die obere rechte Ecke der Seite — größer
+    // als bisher und absolute positioniert. Magazin-Spread-Look.
+    heroWidth: 130,
+    heroHeight: 156,
     headerGap: 12,
     titleFontSize: 21,
     subtitleFontSize: 8.5,
@@ -7999,8 +8001,8 @@ const STUDIO_DENSITY: Record<
   // Moderater Hero, klare Step-Choreographie, optionale Story. Worst-Case:
   // 9 Zutaten + 7 Steps muss noch sauber auf eine Seite passen.
   balanced: {
-    heroWidth: 110,
-    heroHeight: 138,
+    heroWidth: 165,
+    heroHeight: 198,
     headerGap: 18,
     titleFontSize: 26,
     subtitleFontSize: 10,
@@ -8033,8 +8035,8 @@ const STUDIO_DENSITY: Record<
   // noch entspannt passen. Konservativ kalibriert sodass flex:1-Spacer
   // den Restraum schluckt ohne dass Body ueberlaeuft.
   spacious: {
-    heroWidth: 132,
-    heroHeight: 165,
+    heroWidth: 195,
+    heroHeight: 234,
     headerGap: 22,
     titleFontSize: 32,
     subtitleFontSize: 11.5,
@@ -8218,27 +8220,28 @@ function pickIngredientColumns(itemCount: number): 1 | 2 | 3 {
 function StudioIngredientsGrid({
   groups,
   density,
+  accent,
   ink,
   inkSoft,
 }: {
   groups: IngredientGroup[];
   density: (typeof STUDIO_DENSITY)["balanced"];
+  accent: string;
   ink: string;
   inkSoft: string;
 }) {
-  // Zutaten als Definition-List-Grid: fixe Mengen-Spalte (rechts-aligned,
-  // tabular-numerals) gefolgt vom Namen. Spalten-Anzahl skaliert mit der
-  // Zutaten-Menge (siehe pickIngredientColumns). Group-Labels ("Für die
-  // Soße") spannen jeweils volle Breite, dann beginnt das Grid darunter
-  // von Neuem — so bleibt die Lesbarkeit pro Sub-Gruppe erhalten.
-  const amountColWidth =
-    density.ingredientFontSize * 3.6; // ~36-40pt je nach FontSize, hält "350 g" + "1 EL" sauber rechts-bündig
+  // Editorial-Stil: kleiner accent-farbiger Punkt vor jeder Zutat, Mengen
+  // in Fraunces Italic Bold (gleicher Stil wie die Step-Numbers — gibt
+  // einen visuellen Reim zwischen Zubereitung und Zutaten). Spalten-Anzahl
+  // skaliert mit der Zutaten-Menge (siehe pickIngredientColumns). Group-
+  // Labels ("Für die Soße") spannen jeweils volle Breite, dann beginnt
+  // das Grid darunter von Neuem.
+  const amountColWidth = density.ingredientFontSize * 3.4;
+  const dotSize = Math.max(2.5, density.ingredientFontSize * 0.3);
   return (
     <View>
       {groups.map((group, gi) => {
         const cols = pickIngredientColumns(group.items.length);
-        // Items in Spalten verteilen — kolumnen-major fuer Lesefluss
-        // top-to-bottom-left-to-right (Recipe-Standard).
         const perCol = Math.ceil(group.items.length / cols);
         const columns: typeof group.items[] = [];
         for (let i = 0; i < cols; i++) {
@@ -8248,7 +8251,7 @@ function StudioIngredientsGrid({
           <View
             key={gi}
             style={{
-              marginBottom: gi === groups.length - 1 ? 0 : 10,
+              marginBottom: gi === groups.length - 1 ? 0 : 12,
             }}
           >
             {group.name ? (
@@ -8260,17 +8263,18 @@ function StudioIngredientsGrid({
                   color: inkSoft,
                   letterSpacing: 1.5,
                   textTransform: "uppercase",
-                  marginBottom: 5,
+                  marginBottom: 6,
                 }}
               >
                 {studioGroupLabel(group.name)}
               </Text>
             ) : null}
-            <View style={{ flexDirection: "row", gap: 16 }}>
+            <View style={{ flexDirection: "row", gap: 18 }}>
               {columns.map((colItems, ci) => (
                 <View key={ci} style={{ flex: 1 }}>
                   {colItems.map((it, ii) => {
                     const amount = formatIngredientAmount(it.amount);
+                    const itemSpacing = density.ingredientFontSize * 0.55;
                     return (
                       <View
                         key={ii}
@@ -8278,19 +8282,31 @@ function StudioIngredientsGrid({
                           flexDirection: "row",
                           alignItems: "flex-start",
                           marginBottom:
-                            ii === colItems.length - 1
-                              ? 0
-                              : density.ingredientFontSize * 0.4,
+                            ii === colItems.length - 1 ? 0 : itemSpacing,
                         }}
                       >
+                        {/* Akzent-Dot vor jedem Item — vertikal mit der
+                            Text-Baseline ausgerichtet via marginTop = ca.
+                            erste-Zeile-Mitte minus halbe Dot-Höhe. */}
+                        <View
+                          style={{
+                            width: dotSize,
+                            height: dotSize,
+                            borderRadius: dotSize / 2,
+                            backgroundColor: accent,
+                            marginTop: density.ingredientFontSize * 0.55,
+                            marginRight: 7,
+                          }}
+                        />
                         <Text
                           style={{
                             width: amountColWidth,
-                            fontFamily: "Inter",
+                            fontFamily: "Fraunces",
+                            fontStyle: "italic",
+                            fontWeight: 700,
                             fontSize: density.ingredientFontSize,
-                            fontWeight: 600,
                             lineHeight: density.ingredientLineHeight,
-                            color: ink,
+                            color: accent,
                             textAlign: "right",
                             paddingRight: 8,
                           }}
@@ -8410,17 +8426,78 @@ function StudioPage({
       ? null
       : `${pad2(recipe.number)} / ${pad2(totalRecipes)}`;
 
+  // Title-Spalte muss vor dem Bleed-Hero enden. headerColPaddingRight wird
+  // an Eyebrow + Title-Block angewendet damit Texte sich nicht unter den
+  // Hero schieben. Hero ragt von right=0 bis x=pageWidth-heroWidth.
+  const headerColPaddingRight = d.heroWidth + 14 - PAGE_PADDING;
+
   return (
     <Page
       size="A4"
       style={{
         backgroundColor: c.bg,
-        paddingTop: d.paddingTop,
-        paddingBottom: d.paddingBottom,
-        paddingHorizontal: PAGE_PADDING,
+        // Padding komplett raus — Hero kann jetzt bis in die obere rechte
+        // Ecke "bleeden". Content-Wrapper kuemmert sich um Innenabstaende.
+        padding: 0,
         fontFamily: "Inter",
       }}
     >
+      {/* ───── Hero "Bleed" — top-right corner, bis zur Page-Kante ───── */}
+      {/* absolute top:0, right:0 — Hero ragt bis in die Ecke wie ein
+          Magazin-Spread. Die Title-Spalte bekommt rechts genug Padding
+          damit der Text nicht unter das Bild laeuft. */}
+      <View
+        style={{
+          position: "absolute",
+          top: 0,
+          right: 0,
+          width: d.heroWidth,
+          height: d.heroHeight,
+          backgroundColor: blendWithWhite(t.accent, 0.85),
+          overflow: "hidden",
+        }}
+      >
+        {heroDataUri ? (
+          <Image
+            src={heroDataUri}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+          />
+        ) : (
+          <View
+            style={{
+              width: "100%",
+              height: "100%",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: d.heroWidth * 0.45,
+                color: withAlpha(t.accent, 0.4),
+                lineHeight: 1,
+              }}
+            >
+              {recipe.title.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* ───── Content-Wrapper mit flex:1 fuer Footer-am-Bottom ─────── */}
+      <View
+        style={{
+          flexGrow: 1,
+          paddingTop: d.paddingTop,
+          paddingHorizontal: PAGE_PADDING,
+          paddingBottom: d.paddingBottom,
+        }}
+      >
       {/* ───── Eyebrow-Strip ───────────────────────────────────────────── */}
       <View
         style={{
@@ -8428,6 +8505,7 @@ function StudioPage({
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: 10,
+          paddingRight: headerColPaddingRight,
         }}
       >
         <Text
@@ -8461,109 +8539,63 @@ function StudioPage({
           height: 0.5,
           backgroundColor: c.divider,
           marginBottom: d.headerGap,
+          marginRight: headerColPaddingRight,
         }}
       />
 
-      {/* ───── Header: Title links + Hero rechts ──────────────────────── */}
+      {/* ───── Header: Title-Spalte links, Hero ist bereits Bleed-Bild ─ */}
       <View
         style={{
-          flexDirection: "row",
-          alignItems: "flex-start",
-          gap: 18,
+          paddingRight: headerColPaddingRight,
           marginBottom: d.sectionGap,
         }}
       >
-        <View style={{ flex: 1, paddingRight: 4 }}>
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontSize: finalTitleSize,
+            fontWeight: 500,
+            color: c.ink,
+            lineHeight: 1.05,
+            marginBottom: 8,
+          }}
+        >
+          {recipe.title}
+        </Text>
+        {/* Kurzer accent-farbiger Strich als Title-Akzent. */}
+        <View
+          style={{
+            width: 24,
+            height: 1.5,
+            backgroundColor: t.accent,
+            marginBottom: 10,
+          }}
+        />
+        {recipe.subtitle ? (
           <Text
             style={{
               fontFamily: "Fraunces",
-              fontSize: finalTitleSize,
-              fontWeight: 500,
-              color: c.ink,
-              lineHeight: 1.05,
-              marginBottom: 8,
-            }}
-          >
-            {recipe.title}
-          </Text>
-          {/* Kurzer accent-farbiger Strich als Title-Akzent — dezenter
-              "Buchcover"-Beat. Nur 24pt breit; nicht über die ganze Spalte. */}
-          <View
-            style={{
-              width: 24,
-              height: 1.5,
-              backgroundColor: t.accent,
-              marginBottom: 10,
-            }}
-          />
-          {recipe.subtitle ? (
-            <Text
-              style={{
-                fontFamily: "Fraunces",
-                fontSize: d.subtitleFontSize,
-                fontStyle: "italic",
-                color: c.inkSoft,
-                lineHeight: 1.45,
-                marginBottom: 12,
-              }}
-            >
-              {recipe.subtitle}
-            </Text>
-          ) : null}
-          <Text
-            style={{
-              fontFamily: "Inter",
-              fontSize: d.specFontSize,
-              fontWeight: 600,
+              fontSize: d.subtitleFontSize,
+              fontStyle: "italic",
               color: c.inkSoft,
-              letterSpacing: 2,
+              lineHeight: 1.45,
+              marginBottom: 12,
             }}
           >
-            {specs.join("  ·  ")}
+            {recipe.subtitle}
           </Text>
-        </View>
-        {/* Hero-Container 4:5 Portrait. Wenn kein Hero-Bild da ist, wird
-            stattdessen ein dezenter Color-Field-Block mit dem Title-Initial
-            als Crest gerendert — kein leerer Rahmen. */}
-        <View
+        ) : null}
+        <Text
           style={{
-            width: d.heroWidth,
-            height: d.heroHeight,
-            backgroundColor: blendWithWhite(t.accent, 0.85),
-            overflow: "hidden",
+            fontFamily: "Inter",
+            fontSize: d.specFontSize,
+            fontWeight: 600,
+            color: c.inkSoft,
+            letterSpacing: 2,
           }}
         >
-          {heroDataUri ? (
-            <Image
-              src={heroDataUri}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-              }}
-            />
-          ) : (
-            <View
-              style={{
-                width: "100%",
-                height: "100%",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text
-                style={{
-                  fontFamily: "Fraunces",
-                  fontSize: d.heroWidth * 0.5,
-                  color: withAlpha(t.accent, 0.4),
-                  lineHeight: 1,
-                }}
-              >
-                {recipe.title.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
-        </View>
+          {specs.join("  ·  ")}
+        </Text>
       </View>
 
       <View
@@ -8744,6 +8776,7 @@ function StudioPage({
       <StudioIngredientsGrid
         groups={ingredientGroups}
         density={d}
+        accent={t.accent}
         ink={c.ink}
         inkSoft={c.inkSoft}
       />
@@ -8870,6 +8903,7 @@ function StudioPage({
           />
         ) : null}
       </View>
+      </View>{/* end of Content-Wrapper */}
     </Page>
   );
 }
