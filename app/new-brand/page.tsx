@@ -8,6 +8,7 @@ import type {
   Brand,
   BrandAudienceAnalysis,
   BrandPlatform,
+  BrandVoiceProfile,
 } from "@/lib/brands";
 import {
   addCustomBrand,
@@ -73,6 +74,10 @@ export default function NewBrandPage() {
   // persistiert. null = noch nichts analysiert oder Audience-Call failed.
   const [detectedAudience, setDetectedAudience] =
     useState<BrandAudienceAnalysis | null>(null);
+  // Voice-Profil aus dem KI-Analyzer (Tonalitaets-DNA fuer alle spaeteren
+  // Text-Generierungen — Pack-Titel, Description, Foreword). Beim Save in
+  // brand.voiceProfile persistiert. null = noch nichts analysiert oder Call failed.
+  const [detectedVoice, setDetectedVoice] = useState<BrandVoiceProfile | null>(null);
   const [followersCount, setFollowersCount] = useState<number | null>(null);
   // Style-Template-Auswahl ist deaktiviert (Mai 2026): jeder Creator
   // bekommt seine Brand-DNA als Code-Brand in lib/ai/brand-image-style.ts
@@ -140,6 +145,13 @@ export default function NewBrandPage() {
         setDetectedAudience(data.audience as BrandAudienceAnalysis);
       } else {
         setDetectedAudience(null);
+      }
+      // Voice-Profil ist optional — wenn die Analyse fehlschlaegt, fallen
+      // spaetere Text-Pipelines auf Bio/Tagline-basierte Defaults zurueck.
+      if (data.voiceProfile) {
+        setDetectedVoice(data.voiceProfile as BrandVoiceProfile);
+      } else {
+        setDetectedVoice(null);
       }
       const audienceNote = data.audience
         ? " · Zielgruppe analysiert"
@@ -260,6 +272,10 @@ export default function NewBrandPage() {
       // Audience-Insights aus dem KI-Analyzer (optional — wenn der Audience-
       // Call gescheitert ist, lassen wir das Feld weg).
       ...(detectedAudience ? { audienceAnalysis: detectedAudience } : {}),
+      // Voice-Profil aus dem KI-Analyzer (Tonalitaets-DNA). Wird von allen
+      // spaeteren Pack-Text-Pipelines gelesen. Optional — fehlt es, fallen
+      // die Pipelines auf Bio-basierte Defaults zurueck.
+      ...(detectedVoice ? { voiceProfile: detectedVoice } : {}),
       // imageStyle wird bewusst NICHT gesetzt — Brand-DNA wird per
       // Code-Brand in lib/ai/brand-image-style.ts hand-kalibriert.
     };
@@ -429,8 +445,8 @@ export default function NewBrandPage() {
                     type="text"
                     placeholder={
                       platform === "tiktok"
-                        ? "@bienesfitlife"
-                        : "@bienesfitlife"
+                        ? "@creator-handle"
+                        : "@creator-handle"
                     }
                     value={socialHandle}
                     onChange={(e) => setSocialHandle(e.target.value)}

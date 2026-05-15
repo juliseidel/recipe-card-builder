@@ -2,6 +2,7 @@ import { NextResponse, after } from "next/server";
 import {
   getSuggestionById,
   updateSuggestionStatus,
+  getReelsByIds,
 } from "@/lib/creator-reels-server";
 import {
   buildPackFromReels,
@@ -9,6 +10,8 @@ import {
   triggerEnrichForBuiltPack,
 } from "@/lib/reel-library/pack-builder";
 import { brandMoodPresets } from "@/lib/brand-presets";
+import { loadBrand } from "@/lib/custom-brands-server";
+import { generatePackMeta } from "@/lib/ai/generate-pack-meta";
 import type { CardLayout } from "@/lib/packs";
 
 // Annahme eines Pack-Vorschlags. Triggert die volle Pack-Erstellungs-
@@ -150,16 +153,45 @@ export async function POST(req: Request, { params }: RouteParams) {
   const baseSlug = slugifyPack(suggestion.title) || "pack";
   const slug = `${baseSlug}-${Date.now().toString(36).slice(-4)}`;
 
+  // Texte aus der Suggestion werden mit der neuen Brand-Voice-Pipeline
+  // regeneriert, falls moeglich. Suggestions, die vor der Pipeline-V2
+  // generiert wurden, klingen sonst nach generischer KI — und der User
+  // wuerde den schlechten Text uebernehmen ohne es zu merken. Re-Generate
+  // ist non-blocking: bei Fehler oder fehlenden Reels fallen wir auf den
+  // gespeicherten Suggestion-Text zurueck.
+  let finalTitle = suggestion.title;
+  let finalSubtitle = suggestion.subtitle;
+  let finalTagline = suggestion.tagline;
+  let finalDescription = suggestion.description;
+  let finalCategory = suggestion.category;
+  try {
+    const brand = await loadBrand(suggestion.brand_slug);
+    const reels = await getReelsByIds(suggestion.reel_ids);
+    if (brand && reels.length >= 3) {
+      const meta = await generatePackMeta(reels, brand);
+      finalTitle = meta.title || finalTitle;
+      finalSubtitle = meta.subtitle || finalSubtitle;
+      finalTagline = meta.tagline || finalTagline;
+      finalDescription = meta.description || finalDescription;
+      finalCategory = meta.category || finalCategory;
+    }
+  } catch (err) {
+    console.warn(
+      "[pack-suggestions/accept] re-generate meta failed (fallback to stored suggestion text):",
+      err instanceof Error ? err.message : err
+    );
+  }
+
   const result = await buildPackFromReels({
     brandSlug: suggestion.brand_slug,
     reelIds: suggestion.reel_ids,
     pack: {
       slug,
-      title: suggestion.title,
-      subtitle: suggestion.subtitle,
-      tagline: suggestion.tagline,
-      description: suggestion.description,
-      category: suggestion.category,
+      title: finalTitle,
+      subtitle: finalSubtitle,
+      tagline: finalTagline,
+      description: finalDescription,
+      category: finalCategory,
       mood: packMood,
       displayFont,
       cardLayout: overrideLayout ?? cardLayout,

@@ -1,12 +1,24 @@
-import { callGemini } from "./gemini";
 import type { ReelRow } from "@/lib/creator-reels-server";
 import type { Brand } from "@/lib/brands";
+import {
+  formatVoiceProfileForPrompt,
+  formatCaptionFewShot,
+  ensureBrandVoiceProfile,
+} from "./analyze-voice-profile";
+import { generateWithCritique } from "./text-generation-pipeline";
 
-// Generiert Pack-Title + Beschreibung aus einer Reel-Auswahl. Wird vom
-// Auto-Pack-Generator (Phase 4 UI) genutzt, wenn der User per Filter
-// einen Pack aus 5-15 Reels zusammenbaut. Gemini Flash bekommt die
-// Reel-Titles + Metadaten und schlaegt einen Pack-Titel vor — in der
-// Stimme der Creatorin, nicht in Marketing-Sprache.
+// Generiert Pack-Title + Beschreibung aus einer Reel-Auswahl.
+//
+// Brand-agnostische, qualitaetsgesicherte Pipeline (Mai 2026 v2):
+//   1. Voice-Profil des Brands als System-Instruction (formality, tone,
+//      vokabel-anker, brand-tabus)
+//   2. Few-Shot mit 3-5 echten Reel-Captions des Creators
+//   3. Live-Recipe-Titel + Mood-Hints im User-Prompt (nicht nur Reel-IDs)
+//   4. 3 Kandidaten parallel mit Temperatur-Spread, dann Self-Critique
+//   5. Banned-Phrases-Check, Retry-Pass falls noetig
+//
+// Brand ohne voiceProfile: Fallback auf generic-but-bio-based Profil.
+// Funktioniert sofort fuer jeden neuen Creator ohne manuelle Setup.
 
 export type GeneratedPackMeta = {
   title: string;
@@ -14,8 +26,8 @@ export type GeneratedPackMeta = {
   tagline: string;
   description: string;
   category: string;
-  /** Empfohlene Mood-ID aus brand-presets (cream/sage/linen/amber) basierend
-   *  auf der Reel-Selektion. UI kann dem User folgen oder ueberschreiben. */
+  /** Empfohlene Mood-ID aus brand-presets basierend auf der Reel-Selektion.
+   *  UI kann dem User folgen oder ueberschreiben. */
   moodHint: "cream" | "sage" | "linen" | "amber";
 };
 
@@ -24,26 +36,28 @@ const RESPONSE_SCHEMA = {
   properties: {
     title: {
       type: "string",
-      description: "Kurzer Pack-Titel auf Deutsch, max 40 chars.",
+      description:
+        "Pack-Titel auf der Sprache des Creators (meist Deutsch). 15-40 chars. Knackig, konkret, NICHT generisch.",
     },
     subtitle: {
       type: "string",
-      description: "Eine Zeile Untertitel, max 80 chars.",
+      description:
+        "Eine Zeile Untertitel, 30-80 chars. Schaerft das Pack-Versprechen.",
     },
     tagline: {
       type: "string",
       description:
-        "Teaser mit 2-3 konkreten Recipe-Titles aus der Auswahl, max 120 chars.",
+        "Teaser mit 2-3 KONKRETEN Recipe-Titles aus der Liste, kommagetrennt. Max 120 chars.",
     },
     description: {
       type: "string",
       description:
-        "2-3 Saetze Pack-Beschreibung auf Deutsch — PERSOENLICH in der Stimme der Creatorin, du-Form, NICHT Marketing. Bezieht sich konkret auf 1-2 Rezepte aus der Auswahl. KEINE Floskeln wie 'angesagteste', 'perfekte Sammlung', 'Trends nicht verpassen'. KEINE Anfuehrungszeichen.",
+        "2-3 Saetze Pack-Beschreibung in der Stimme des Creators. 140-280 chars. Bezieht sich konkret auf 1-2 Rezepte aus der Liste. NICHT Marketing.",
     },
     category: {
       type: "string",
       description:
-        "Eine Kategorie-Bezeichnung (Fruehstueck, Snacks, Backen, Mittagessen, etc.).",
+        "Eine Kategorie-Bezeichnung passend zum Pack (Frühstück, Snacks, Backen, Mittagessen, Mealprep, etc.).",
     },
     moodHint: {
       type: "string",
@@ -55,42 +69,59 @@ const RESPONSE_SCHEMA = {
   required: ["title", "subtitle", "tagline", "description", "category", "moodHint"],
 };
 
-function systemInstructionFor(brand: Brand | null): string {
+function buildSystemInstruction(brand: Brand | null): string {
+  const name = brand?.name ?? "die Creatorin";
   const intro = brand
     ? `Du baust Pack-Metadaten fuer einen Recipe-Pack von ${brand.name} (${brand.handle}). Bio: "${brand.bio}". Tagline: "${brand.tagline}".`
     : `Du baust Pack-Metadaten fuer einen Recipe-Pack-Generator.`;
 
+  const voiceBlock = formatVoiceProfileForPrompt(brand?.voiceProfile, name);
+  const fewShotBlock = formatCaptionFewShot(brand?.voiceProfile);
+
   return `${intro}
 
-Aufgabe: gegeben eine Liste ausgewaehlter Recipe-Reels, generiere einen einpraegsamen Pack-Titel + Subtitle + Tagline + Description + passendes Mood-Preset.
+Aufgabe: gegeben eine Liste ausgewaehlter Recipe-Reels, generiere einen Pack-Titel + Subtitle + Tagline + Description + passendes Mood-Preset.
 
-Tonalitaet (sehr wichtig):
-- Sprich in der ICH-Form als ob ${brand?.name ?? "die Creatorin"} selbst spricht. Du-Form fuer die Leserin.
-- Warm, persoenlich, "wie zu einer Freundin am Kuechentisch".
-- KEINE Marketing-Floskeln. Verboten: "angesagteste", "perfekte Auswahl", "Trends nicht verpassen", "koestliche Rezepte", "Geschmackserlebnis".
-- KEINE Werbesprache, KEINE Anfuehrungszeichen, KEINE Hashtags, KEINE Emojis.
-- Konkret statt abstrakt: nicht "leckere Snacks", sondern "Frozen Yoghurt Cups, Marzipan-Kugeln und Pudding ohne Zucker".
+${voiceBlock}
 
-Regeln:
-- Pack-Titel max 40 chars, knackig auf Deutsch.
-- Tagline nennt 2-3 konkrete Rezept-Namen aus der Liste, kommagetrennt.
-- Description: 2-3 Saetze in ${brand?.name ?? "der Creatorin"}s Stimme. Erzaehlt warum du DIESE Rezepte gewaehlt hast, fuer wen oder welchen Anlass. Bezieht sich konkret auf 1-2 Rezepte aus der Liste.
+${fewShotBlock}
+
+GENERATIONS-REGELN:
+- Sprich in der ICH-Form als ob ${name} selbst spricht.
+- KEINE Marketing-Floskeln. Tabu: "angesagteste", "perfekte Auswahl", "Trends nicht verpassen", "koestliche Rezepte", "Geschmackserlebnis", "die besten", "must-have", "Lass dich inspirieren".
+- KEINE Emojis, KEINE Hashtags, KEINE Anfuehrungszeichen, KEINE Em-Dashes (—).
+- Konkret statt abstrakt: nicht "leckere Snacks", sondern "Frozen Yoghurt Cups, Pudding ohne Zucker und Pina Colada Energy Balls".
+- Pack-Titel: 15-40 chars, knackig.
+- Tagline: nennt 2-3 konkrete Rezept-Namen aus der gelieferten Liste, kommagetrennt.
+- Description: 2-3 Saetze in ${name}s Stimme. Erzaehlt warum DIESE Rezepte gewaehlt sind, fuer wen oder welchen Anlass. Verweist konkret auf 1-2 Rezepte aus der Liste — nicht erfinden.
 - moodHint passt sich an:
     - Suesses/Backwaren -> "amber" oder "cream"
     - Veggies/Bowls/Healthy -> "sage"
     - Editorial/Premium/Modern -> "linen"
     - Allround/Hauptmahlzeiten -> "cream"
 
-Beispiele GUTE Description (nicht kopieren, nimm dir Stil):
-- "Diese Rezepte sind meine Antwort auf 'aber dann hab ich doch nichts auf dem Teller'. XL-Wraps und Frittata, alles unter 450 kcal, alles sattmachend."
-- "Hier sind die Rezepte, die diesen Monat bei euch am besten angekommen sind. Vom Trauben Eis Snack bis zu den Pina Colada Energy Balls."
-
-Beispiele SCHLECHTE Description (nie so):
-- "Diese koestliche Sammlung praesentiert die angesagtesten Rezepte..." (Marketing)
-- "Perfekt fuer jeden Anlass!" (Floskel)
-- "🤍 Lass dich inspirieren 🥹" (Emoji)
-
 Antworte AUSSCHLIESSLICH im JSON-Schema.`;
+}
+
+function buildUserPrompt(reels: ReelRow[]): string {
+  const reelLines = reels
+    .slice(0, 30)
+    .map((r) => {
+      const date = r.posted_at?.slice(0, 10) ?? "—";
+      const tags = [r.meal_type, r.cuisine, r.main_ingredient]
+        .filter(Boolean)
+        .join("/");
+      const title = r.recipe_title || r.caption.slice(0, 60);
+      return `• ${title} (${tags || "?"}, ${date})`;
+    })
+    .join("\n");
+
+  return `Anzahl ausgewaehlter Reels: ${reels.length}
+
+Reel-Auswahl (NUR diese Rezepte sind im Pack — alles in Description/Tagline MUSS sich auf diese beziehen, nichts dazu erfinden):
+${reelLines}
+
+Generiere Pack-Metadaten im JSON-Schema.`;
 }
 
 export async function generatePackMeta(
@@ -101,22 +132,68 @@ export async function generatePackMeta(
     throw new Error("generatePackMeta: keine Reels uebergeben");
   }
 
-  const reelLines = reels
-    .slice(0, 30)
-    .map((r) => {
-      const date = r.posted_at?.slice(0, 10) ?? "—";
-      return `• ${r.recipe_title || r.caption.slice(0, 60)} (${r.meal_type ?? "?"}, ${r.cuisine ?? "?"}, ${date})`;
-    })
-    .join("\n");
+  // Lazy-Backfill: wenn der Brand kein Voice-Profil hat, leiten wir es
+  // jetzt aus den DB-Captions ab + persistieren. Naechster Call profitiert.
+  const brandSafe = await ensureBrandVoiceProfile(brand);
+  const brandBanned = brandSafe?.voiceProfile?.bannedPhrases ?? [];
 
-  return await callGemini<GeneratedPackMeta>({
-    prompt: `Anzahl ausgewaehlter Reels: ${reels.length}\n\nReel-Auswahl:\n${reelLines}\n\nGeneriere Pack-Metadaten im JSON-Schema.`,
+  const result = await generateWithCritique<GeneratedPackMeta>({
     schema: RESPONSE_SCHEMA,
-    systemInstruction: systemInstructionFor(brand ?? null),
-    temperature: 0.55,
+    generationPrompt: buildUserPrompt(reels),
+    generationSystemInstruction: buildSystemInstruction(brandSafe),
+    candidateCount: 3,
+    generationTemperature: 0.75,
     maxOutputTokens: 1024,
-    thinkingBudget: 0,
-    retries: 1,
-    model: "flash",
+    brandBannedPhrases: brandBanned,
+    bannedCheckFields: ["title", "subtitle", "tagline", "description"],
+    scorableFields: [
+      {
+        key: "title",
+        label: "Pack-Titel",
+        minLength: 8,
+        maxLength: 40,
+        goodCriteria:
+          "Knackig, konkret, unverwechselbar. Klingt nach echtem Creator, nicht nach KI-Sammlung.",
+      },
+      {
+        key: "subtitle",
+        label: "Subtitle",
+        minLength: 20,
+        maxLength: 80,
+        goodCriteria: "Schaerft das Pack-Versprechen in einem Satz, ohne Floskeln.",
+      },
+      {
+        key: "tagline",
+        label: "Tagline",
+        minLength: 30,
+        maxLength: 120,
+        goodCriteria:
+          "Nennt 2-3 ECHTE Rezeptnamen aus der Auswahl, kommagetrennt. Keine erfundenen Gerichte.",
+      },
+      {
+        key: "description",
+        label: "Description",
+        minLength: 140,
+        maxLength: 280,
+        goodCriteria:
+          "2-3 Saetze in der Stimme des Creators, bezieht sich konkret auf 1-2 Rezepte. Klingt persoenlich, nicht generisch.",
+      },
+    ],
+    preFilter: (c) => {
+      // Hard-Reject wenn moodHint enum-violation
+      if (!["cream", "sage", "linen", "amber"].includes(c.moodHint)) return true;
+      // Hard-Reject wenn ein Pflichtfeld leer
+      if (!c.title?.trim() || !c.description?.trim()) return true;
+      return false;
+    },
+    debugTag: "generate-pack-meta",
   });
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log(
+      `[generate-pack-meta] passes=${result.passes} cleanCount=${result.cleanCount} winnerBannedHits=${result.winnerBannedHits.length}`
+    );
+  }
+
+  return result.winner;
 }

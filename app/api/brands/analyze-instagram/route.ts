@@ -12,6 +12,7 @@ import {
 } from "@/lib/integrations/platform";
 import { analyzeCreatorIdentity } from "@/lib/ai/analyze-creator-identity";
 import { analyzeAudience } from "@/lib/ai/analyze-audience";
+import { analyzeVoiceProfile } from "@/lib/ai/analyze-voice-profile";
 // Style-Template-Selection ist bewusst deaktiviert (Mai 2026): jeder neue
 // Creator bekommt seine Brand-DNA hand-kalibriert als Code-Brand in
 // lib/ai/brand-image-style.ts. Automatische Template-Wahl produzierte
@@ -148,17 +149,21 @@ export async function POST(req: Request) {
     }
   }
 
-  // ─── 3. Identity + Audience parallel ────────────────────────────────────
-  // Beide Gemini-Flash-Calls laufen unabhaengig — wir starten sie parallel
-  // damit der User die volle Insight-Karte in einem Rutsch bekommt. Wenn
-  // einer der beiden failed, gibt der andere trotzdem ein Ergebnis zurueck.
+  // ─── 3. Identity + Audience + Voice-Profile parallel ────────────────────
+  // Drei Gemini-Flash-Calls laufen unabhaengig parallel:
+  //   - Identity: Name/Bio/Tagline/Niche/Signature (Pflicht — Onboarding-Bruch wenn fail)
+  //   - Audience: Demographic/Interests/Painpoints (optional — UI faellt zurueck)
+  //   - Voice-Profile: Tonalitaets-DNA aus Captions (optional — Pack-Pipelines
+  //     fallen auf generic-Defaults zurueck wenn fail; spaeterer Pack-Gen
+  //     triggert dann lazy Re-Compute)
   //
   // Style-Template-Selection bleibt deaktiviert: jeder neue Creator
   // bekommt seine Brand-DNA als Code-Brand in lib/ai/brand-image-style.ts
   // hand-kalibriert.
-  const [identityResult, audienceResult] = await Promise.allSettled([
+  const [identityResult, audienceResult, voiceResult] = await Promise.allSettled([
     analyzeCreatorIdentity(profile),
     analyzeAudience(profile, platform),
+    analyzeVoiceProfile(profile),
   ]);
 
   if (identityResult.status === "rejected") {
@@ -195,11 +200,22 @@ export async function POST(req: Request) {
     );
   }
 
+  const voiceProfile = voiceResult.status === "fulfilled" ? voiceResult.value : null;
+  if (voiceResult.status === "rejected") {
+    console.warn(
+      "[analyze-instagram] voice-profile analysis failed (non-fatal):",
+      voiceResult.reason instanceof Error
+        ? voiceResult.reason.message
+        : voiceResult.reason
+    );
+  }
+
   return NextResponse.json({
     ok: true,
     platform,
     identity,
     audience,
+    voiceProfile,
     avatarUrl,
     // imageStyle ist immer null — wird per Code-Brand in
     // lib/ai/brand-image-style.ts gesetzt, nicht via Onboarding.

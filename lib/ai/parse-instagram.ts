@@ -4,6 +4,12 @@ import type {
   NutritionBasis,
   RecipeStep,
 } from "@/lib/recipes";
+import type { Brand } from "@/lib/brands";
+import {
+  formatVoiceProfileForPrompt,
+  formatCaptionFewShot,
+  ensureBrandVoiceProfile,
+} from "./analyze-voice-profile";
 
 // Was wir aus einer Instagram-Caption extrahieren wollen. Spiegelt die Felder
 // des Editor-Forms (app/[brand]/[pack]/new/page.tsx) — alles, was der User
@@ -178,27 +184,52 @@ const RESPONSE_SCHEMA = {
   ],
 };
 
-const SYSTEM_INSTRUCTION = `Du bist ein präziser Rezept-Parser für Instagram-Captions deutscher Food-Creator (Schwerpunkt: Bienesfitlife, Fitness-Backwerk, MORE Nutrition).
+function buildSystemInstruction(brand?: Brand | null): string {
+  const brandLine = brand
+    ? `Quelle: ${brand.name} (${brand.handle}). Bio: "${brand.bio}".`
+    : "";
+  const voiceBlock = brand
+    ? formatVoiceProfileForPrompt(brand.voiceProfile, brand.name)
+    : "";
+  const fewShotBlock = brand
+    ? formatCaptionFewShot(brand.voiceProfile)
+    : "";
+
+  // Sprache aus voiceProfile ableiten, default Deutsch wenn unklar. So
+  // funktioniert der Parser auch fuer englischsprachige Creator ohne dass
+  // er Captions in falsche Zielsprache uebersetzt.
+  const lang = brand?.voiceProfile?.language;
+  const langName = lang === "en" ? "Englisch" : "Deutsch";
+  const langCode = lang === "en" ? "en" : "de";
+
+  return `Du bist ein praeziser Rezept-Parser fuer Social-Media-Captions von Food-Creatorn — egal welche Plattform oder Nische.
+
+${brandLine}
+
+${voiceBlock}
+
+${fewShotBlock}
 
 Deine Aufgabe: Aus der Caption ein vollstaendiges, druckfertiges Rezept extrahieren — strukturiert nach dem JSON-Schema.
 
 Regeln:
-• ALLES auf Deutsch — Zutaten, Schritte, Tags, Beschreibung. Auch wenn Caption Englisch sprenkelt.
-• MENGEN exakt aus der Caption übernehmen ('200 g', '1 EL', '2 Eier'). Wenn unklar: 'n. A.'
-• Schritte als kurze, klare Saetze (du-Form, gerne imperativ: 'Vermische die Zutaten').
-• Hashtags und Affiliate-Codes ('Code BIENE') NICHT in description — die gehoeren weg.
-• Nährwerte aus Caption übernehmen ('✅ 394 kcal · 31g Protein'). Wenn nicht da: alle 0 + notes-Hinweis.
-• nutritionBasis: 'piece' bei Backwerk wo pro Stück angegeben (Cookie, Muffin, Pancake). 'portion' default. 'per100g' wenn explizit '/100 g'.
-• Tags: 3-6 thematische Schlagworte ('High Protein', 'Mealprep', 'Ohne Backen'). NIE mit '#'-Prefix. Marken nur wenn relevant ('MORE Nutrition' nicht als Tag).
-• subtitle: nur wenn die Caption einen offensichtlichen Untertitel hat (z. B. nach dem Titel ein Stichpunkt-Satz). Sonst leer.
-• description: 1-3 Saetze, Bienes warmer Ton, du-Form, ohne Hashtag-Salat.
-• Sub-Gruppen ('Fuer den Teig:', 'Fuer die Glasur:'): explizit als group-Feld bei Zutaten UND Schritten markieren.
-• KONSISTENZ (wichtig!): Jede Zutat in 'ingredients' MUSS irgendwo im Rezept-Ablauf vorkommen — entweder direkt namentlich in einem Schritt-Text, oder implizit als Teil von 'Alle trockenen Zutaten vermengen' / 'Alle Zutaten verrühren'. Wenn eine Zutat weder explizit noch implizit verwendet wird, lass sie weg. Niemals Geister-Zutaten zurückgeben (z. B. 'MORE Zerup' wenn der Sirup nirgendwo im Workflow auftaucht).
+• ALLES auf ${langName} (${langCode}) — Zutaten, Schritte, Tags, Beschreibung. Auch wenn Caption andere Sprachen sprenkelt.
+• MENGEN exakt aus der Caption uebernehmen ('200 g', '1 EL', '2 Eier'). Wenn unklar: 'n. A.'
+• Schritte als kurze, klare Saetze, gerne imperativ (z. B. 'Vermische die Zutaten' bei Du-Form, 'Mix the ingredients' im Englischen).
+• Hashtags und Affiliate-Codes NICHT in description — die gehoeren weg.
+• Naehrwerte aus Caption uebernehmen ('✅ 394 kcal · 31g Protein'). Wenn nicht da: alle 0 + notes-Hinweis.
+• nutritionBasis: 'piece' bei Backwerk wo pro Stueck angegeben (Cookie, Muffin, Pancake). 'portion' default. 'per100g' wenn explizit '/100 g'.
+• Tags: 3-6 thematische Schlagworte (z. B. 'High Protein', 'Mealprep', 'Ohne Backen', 'Low Carb'). NIE mit '#'-Prefix. Marken nur wenn relevant (Marken-Erwaehnung in Caption ist KEIN Tag — nur thematische Schlagworte).
+• subtitle: nur wenn die Caption einen offensichtlichen Untertitel hat. Sonst leer.
+• description: 1-3 Saetze im Stil des Creators (siehe Voice-Profil oben). Wenn kein Voice-Profil verfuegbar: warm, persoenlich, du-Form, ohne Hashtag-Salat.
+• Sub-Gruppen ('Fuer den Teig:', 'Fuer die Glasur:', 'For the dough:'): explizit als group-Feld bei Zutaten UND Schritten markieren.
+• KONSISTENZ (wichtig!): Jede Zutat in 'ingredients' MUSS irgendwo im Rezept-Ablauf vorkommen — entweder direkt namentlich in einem Schritt-Text, oder implizit als Teil von 'Alle trockenen Zutaten vermengen'. Wenn eine Zutat weder explizit noch implizit verwendet wird, lass sie weg. Niemals Geister-Zutaten zurueckgeben.
 • confidence:
-  - 'high' wenn klare Zutatenliste + nummerierte Schritte + Nährwerte
-  - 'medium' wenn Rezept erkennbar aber Lücken (z. B. keine Nährwerte)
-  - 'low' wenn die Caption überwiegend Story / Werbung ist und kaum Rezept-Info
-• Antworte AUSSCHLIESSLICH im JSON-Schema — keine Erklärungen davor oder dahinter.`;
+  - 'high' wenn klare Zutatenliste + nummerierte Schritte + Naehrwerte
+  - 'medium' wenn Rezept erkennbar aber Luecken (z. B. keine Naehrwerte)
+  - 'low' wenn die Caption ueberwiegend Story / Werbung ist und kaum Rezept-Info
+• Antworte AUSSCHLIESSLICH im JSON-Schema — keine Erklaerungen davor oder dahinter.`;
+}
 
 const URL_REGEX = /https?:\/\/[^\s)]+/g;
 const HASHTAG_LINE_REGEX = /(^|\n)\s*(?:#\w+\s*)+(?:\n|$)/g;
@@ -227,7 +258,7 @@ export type ParseResult =
 
 export async function parseRecipeFromCaption(
   caption: string,
-  options?: { username?: string | null }
+  options?: { username?: string | null; brand?: Brand | null }
 ): Promise<ParseResult> {
   const cleaned = preprocessCaption(caption);
   if (cleaned.length < 30) {
@@ -237,6 +268,12 @@ export async function parseRecipeFromCaption(
         "Caption zu kurz für ein Rezept. Wahrscheinlich nur Story / Bildunterschrift.",
     };
   }
+
+  // Brand mit Voice-Profil lazy laden falls noetig — gibt Gemini die richtige
+  // Tonalitaet fuer die Description-Generierung mit.
+  const brandWithVoice = options?.brand
+    ? ((await ensureBrandVoiceProfile(options.brand)) ?? options.brand)
+    : null;
 
   const userHint = options?.username
     ? `Quelle: @${options.username} auf Instagram.\n\n`
@@ -249,7 +286,7 @@ export async function parseRecipeFromCaption(
     raw = await callGemini<RawGeminiResponse>({
       prompt,
       schema: RESPONSE_SCHEMA,
-      systemInstruction: SYSTEM_INSTRUCTION,
+      systemInstruction: buildSystemInstruction(brandWithVoice),
       temperature: 0.2,
       maxOutputTokens: 8192,
       thinkingBudget: 0,

@@ -11,6 +11,7 @@ import {
 } from "@/lib/integrations/apify-tiktok";
 import { detectPlatformFromUrl } from "@/lib/integrations/platform";
 import { parseRecipeFromCaption } from "@/lib/ai/parse-instagram";
+import { loadBrand } from "@/lib/custom-brands-server";
 
 // Recipe-Import via Social-Media-Link. Frueher Instagram-only — seit
 // Mai 2026 erkennt der Endpoint auch TikTok-Links und routet automatisch
@@ -26,7 +27,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  let body: { url?: string };
+  let body: { url?: string; brandSlug?: string };
   try {
     body = await req.json();
   } catch {
@@ -43,6 +44,12 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
+
+  // Optional: brandSlug aus Body laden, damit der Parser die Description
+  // im Voice-Profil-Stil des Workspaces generiert. Wenn kein brandSlug
+  // mitkommt (z. B. von externen Callern), faellt der Parser auf
+  // brand-agnostische Defaults zurueck.
+  const brand = body.brandSlug ? await loadBrand(body.brandSlug) : null;
 
   // ─── Plattform-Detection aus URL ─────────────────────────────────────────
   // Auto-Detection statt Tab-Switch: User wirft Link rein, wir routen.
@@ -101,6 +108,7 @@ export async function POST(req: Request) {
   // ─── 2. Gemini: Caption → strukturiertes Rezept ────────────────────────
   const parsed = await parseRecipeFromCaption(post.caption, {
     username: post.ownerUsername,
+    brand,
   });
 
   if (!parsed.ok) {

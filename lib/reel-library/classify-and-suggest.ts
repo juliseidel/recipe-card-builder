@@ -100,6 +100,7 @@ export async function runClassificationAndSuggestions(opts: {
       const suggestions = await suggestPacks({
         brandName: brand?.name ?? brandSlug,
         recipeReels,
+        brand,
       });
       if (suggestions.length > 0) {
         // Vor neuer Generierung: vorhandene pending-Vorschlaege loeschen,
