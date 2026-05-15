@@ -8938,8 +8938,16 @@ const FEATURE_COLORS = {
   divider: "#d5c4ad",
 } as const;
 
+// Eigene Density-Stufe — Feature hat zusaetzlich "ultra" weil die schmale
+// Content-Spalte (~210 pt usable, vs Studio's ~520 pt) typisch 2–3 Zeilen
+// pro Step braucht. Bei Recipes mit 9+ Steps + 10+ Zutaten reicht das
+// generische compact (Studio-Standard) nicht — Inhalt overflowed sonst auf
+// eine zweite Page. Ultra ist die garantierte One-Page-Stufe fuer
+// content-schwere Karten.
+type FeatureDensityTier = "spacious" | "balanced" | "compact" | "ultra";
+
 const FEATURE_DENSITY: Record<
-  Density,
+  FeatureDensityTier,
   {
     contentWidthPct: number; // 0..1 — Anteil der Page-Breite
     fadeWidth: number; // pt — Soft-Fade-Overlay
@@ -8974,86 +8982,122 @@ const FEATURE_DENSITY: Record<
     eyebrowFontSize: number;
   }
 > = {
-  // Compact — score >= 22 (z.B. 14 Zutaten + 12 Steps). Content schrumpft,
-  // Hero wird breiter (Foto bleibt Star), Typo wird dichter.
+  // Ultra — score >= 26 (z.B. 11 Zutaten + 9 Steps wie Protein-Kaiserschmarrn,
+  // oder 8 Zutaten + 12 Steps). Aggressivste Stufe damit die Page auch bei
+  // sehr text-heavy Steps nicht overflowed. Story versteckt, Mikros direkt
+  // unter Macros (kein eigener Section-Header), Section-Gaps minimal.
+  ultra: {
+    contentWidthPct: 0.44,
+    fadeWidth: 56,
+    contentPadH: 20,
+    contentPadTop: 22,
+    contentPadBottom: 18,
+    titleFontSize: 17,
+    storyFontSize: 7.5,
+    storyLineHeight: 1.35,
+    metaFontSize: 7,
+    metaIconSize: 9,
+    metaRowGap: 12,
+    macroFontSize: 8,
+    macroLabelFontSize: 6,
+    macroRowGap: 8,
+    sectionLabelFontSize: 6.5,
+    sectionLabelGapTop: 7,
+    sectionLabelGapBottom: 4,
+    ingredientFontSize: 7.5,
+    ingredientLineHeight: 1.35,
+    ingredientGap: 1.5,
+    ingredientGroupLabelFontSize: 6.5,
+    ingredientColumnGap: 10,
+    stepNumColWidth: 13,
+    stepNumFontSize: 8,
+    stepFontSize: 7.5,
+    stepLineHeight: 1.3,
+    stepGap: 3.5,
+    microsFontSize: 7,
+    microsLineHeight: 1.3,
+    footerFontSize: 6.5,
+    eyebrowFontSize: 6.5,
+  },
+  // Compact — score 16-25 (typische Hauptmahlzeit). Dichter als balanced,
+  // Story aus, Mikros immer noch als eigene Section damit lesbar.
   compact: {
     contentWidthPct: 0.42,
     fadeWidth: 60,
     contentPadH: 24,
-    contentPadTop: 28,
-    contentPadBottom: 24,
-    titleFontSize: 21,
-    storyFontSize: 8.5,
-    storyLineHeight: 1.45,
-    metaFontSize: 8,
-    metaIconSize: 10,
-    metaRowGap: 16,
-    macroFontSize: 9,
-    macroLabelFontSize: 6.5,
-    macroRowGap: 10,
-    sectionLabelFontSize: 7,
-    sectionLabelGapTop: 12,
-    sectionLabelGapBottom: 7,
-    ingredientFontSize: 8,
-    ingredientLineHeight: 1.5,
-    ingredientGap: 2,
-    ingredientGroupLabelFontSize: 7,
-    ingredientColumnGap: 12,
-    stepNumColWidth: 16,
-    stepNumFontSize: 9,
-    stepFontSize: 8.5,
-    stepLineHeight: 1.4,
-    stepGap: 5,
-    microsFontSize: 7.5,
-    microsLineHeight: 1.4,
-    footerFontSize: 7,
-    eyebrowFontSize: 7,
+    contentPadTop: 26,
+    contentPadBottom: 22,
+    titleFontSize: 19,
+    storyFontSize: 8,
+    storyLineHeight: 1.4,
+    metaFontSize: 7.5,
+    metaIconSize: 9.5,
+    metaRowGap: 14,
+    macroFontSize: 8.5,
+    macroLabelFontSize: 6.2,
+    macroRowGap: 9,
+    sectionLabelFontSize: 6.8,
+    sectionLabelGapTop: 10,
+    sectionLabelGapBottom: 6,
+    ingredientFontSize: 7.8,
+    ingredientLineHeight: 1.42,
+    ingredientGap: 1.8,
+    ingredientGroupLabelFontSize: 6.8,
+    ingredientColumnGap: 11,
+    stepNumColWidth: 14,
+    stepNumFontSize: 8.5,
+    stepFontSize: 8,
+    stepLineHeight: 1.35,
+    stepGap: 4.5,
+    microsFontSize: 7.2,
+    microsLineHeight: 1.35,
+    footerFontSize: 6.8,
+    eyebrowFontSize: 6.8,
   },
-  // Balanced — score 15-21 (Standard). Mid-range — Title atmet, Zutaten in
-  // 2 Spalten lesbar, Steps mit gutem Spacing.
+  // Balanced — score 11-15 (mittlere Komplexitaet). Standard-Lesbarkeit,
+  // Title atmet, Story optional sichtbar.
   balanced: {
     contentWidthPct: 0.44,
-    fadeWidth: 70,
+    fadeWidth: 68,
     contentPadH: 28,
-    contentPadTop: 36,
-    contentPadBottom: 30,
-    titleFontSize: 27,
-    storyFontSize: 9.5,
-    storyLineHeight: 1.55,
-    metaFontSize: 9,
+    contentPadTop: 34,
+    contentPadBottom: 28,
+    titleFontSize: 25,
+    storyFontSize: 9,
+    storyLineHeight: 1.5,
+    metaFontSize: 8.5,
     metaIconSize: 11,
     metaRowGap: 18,
-    macroFontSize: 10,
-    macroLabelFontSize: 7,
-    macroRowGap: 12,
-    sectionLabelFontSize: 7.5,
-    sectionLabelGapTop: 16,
-    sectionLabelGapBottom: 9,
-    ingredientFontSize: 9,
-    ingredientLineHeight: 1.6,
-    ingredientGap: 3,
-    ingredientGroupLabelFontSize: 7.5,
-    ingredientColumnGap: 14,
-    stepNumColWidth: 18,
-    stepNumFontSize: 10,
-    stepFontSize: 9.5,
-    stepLineHeight: 1.5,
-    stepGap: 7,
-    microsFontSize: 8.5,
-    microsLineHeight: 1.5,
-    footerFontSize: 7.5,
-    eyebrowFontSize: 7.5,
+    macroFontSize: 9.5,
+    macroLabelFontSize: 6.8,
+    macroRowGap: 11,
+    sectionLabelFontSize: 7.3,
+    sectionLabelGapTop: 14,
+    sectionLabelGapBottom: 8,
+    ingredientFontSize: 8.8,
+    ingredientLineHeight: 1.55,
+    ingredientGap: 2.5,
+    ingredientGroupLabelFontSize: 7.3,
+    ingredientColumnGap: 13,
+    stepNumColWidth: 17,
+    stepNumFontSize: 9.8,
+    stepFontSize: 9.2,
+    stepLineHeight: 1.48,
+    stepGap: 6,
+    microsFontSize: 8.2,
+    microsLineHeight: 1.48,
+    footerFontSize: 7.3,
+    eyebrowFontSize: 7.3,
   },
-  // Spacious — score <= 14 (z.B. 5 Zutaten + 4 Steps). Title gross,
-  // Story-Block sichtbar wenn vorhanden, weite Step-Choreographie, alles
-  // atmet ohne dass die Page halbleer wirkt.
+  // Spacious — score <= 10 (wenig Content). Grosser Title, Story sichtbar,
+  // weite Step-Choreographie damit die Page nicht halbleer wirkt.
   spacious: {
     contentWidthPct: 0.46,
     fadeWidth: 78,
     contentPadH: 32,
     contentPadTop: 44,
     contentPadBottom: 36,
-    titleFontSize: 33,
+    titleFontSize: 32,
     storyFontSize: 10.5,
     storyLineHeight: 1.62,
     metaFontSize: 9.5,
@@ -9081,6 +9125,25 @@ const FEATURE_DENSITY: Record<
     eyebrowFontSize: 8,
   },
 };
+
+// Feature-eigene Density-Logik. Steps werden doppelt gewichtet, weil sie in
+// der schmalen ~210 pt Content-Spalte typisch 2-3 Zeilen pro Step belegen,
+// waehrend Zutaten (2-spaltig) nur 1 Zeile pro Item sind. Niedrigere
+// Schwellen als der generische getDensity() — ein Recipe mit score 18 ist
+// in Studio "balanced", aber in Feature schon "compact".
+//
+// recipe.tweaks.densityOverride wird respektiert; "ultra" gibt's nicht im
+// User-Tweak, also mappt expliziter "compact"-Tweak auf compact.
+function featureGetDensity(recipe: Recipe): FeatureDensityTier {
+  if (recipe.tweaks?.densityOverride) {
+    return recipe.tweaks.densityOverride;
+  }
+  const score = recipe.ingredients.length + recipe.steps.length * 2;
+  if (score >= 26) return "ultra";
+  if (score >= 16) return "compact";
+  if (score <= 10) return "spacious";
+  return "balanced";
+}
 
 // Title-Auto-Shrink — analog zu studioTitleScale. Content-Spalte ist
 // schmaler (~250 pt usable) als Studio (~300 pt), daher aggressivere Stufen.
@@ -9370,8 +9433,12 @@ function FeaturePage({
   hideRecipeIndex,
 }: RecipeCardPdfProps) {
   const t = packTheme(pack);
-  const baseDensity = getDensity(recipe);
+  // Feature-eigene Density (4 Stufen mit "ultra" fuer content-schwere Cards).
+  // NICHT getDensity() aus dem generischen Helper, weil die schmale Content-
+  // Spalte deutlich aggressiveres Sizing braucht als Studio.
+  const baseDensity = featureGetDensity(recipe);
   const d = FEATURE_DENSITY[baseDensity];
+  const isDense = baseDensity === "compact" || baseDensity === "ultra";
 
   // ─── Dynamische Mood-Farben fuer Content-BG + Ink ─────────────────────
   // Cream-Tint vom Pack-Mood — beige bei honey, sage-creme bei sage etc.
@@ -9417,7 +9484,16 @@ function FeaturePage({
   const microsToShow = micros.slice(0, 4);
 
   const macros = featureMacroEntries(recipe);
-  const showStory = shouldShowStory(recipe) && baseDensity !== "compact";
+  // Story nur bei balanced/spacious zeigen — bei compact/ultra ist die Page
+  // schon dicht gepackt, eine zusaetzliche Story wuerde overflowen.
+  const showStory =
+    shouldShowStory(recipe) &&
+    (baseDensity === "balanced" || baseDensity === "spacious");
+  // Mikros bei ultra/compact direkt unter Macros (kein eigener Section-
+  // Header) — spart ~25 pt. Bei balanced/spacious bleibt der eigene Block
+  // mit "REICH AN"-Label fuer Lesbarkeit.
+  const microsInline = showMicros && isDense;
+  const microsAsSection = showMicros && !isDense;
   const totalMin = totalTime(recipe);
   const servings = servingsCountLabel(recipe);
 
@@ -9607,51 +9683,82 @@ function FeaturePage({
           </View>
         </View>
 
-        {/* Macros-Pills — kompakt inline, nur wenn Werte > 0 */}
-        {macros.length > 0 ? (
+        {/* Macros-Pills + (bei compact/ultra) Mikros-Inline darunter.
+            Bei isDense wandert die Mikros-Zeile aus der eigenen Section ins
+            Macro-Stripe hinein — spart einen Section-Label-Block (~25 pt). */}
+        {macros.length > 0 || microsInline ? (
           <View
             style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              alignItems: "baseline",
-              gap: d.macroRowGap,
               paddingTop: 10,
               borderTopWidth: 0.5,
               borderTopColor: divider,
             }}
           >
-            {macros.map((m) => (
+            {macros.length > 0 ? (
               <View
-                key={m.label}
                 style={{
                   flexDirection: "row",
+                  flexWrap: "wrap",
                   alignItems: "baseline",
-                  gap: 3,
+                  gap: d.macroRowGap,
                 }}
               >
-                <Text
-                  style={{
-                    fontFamily: "Inter",
-                    fontSize: d.macroFontSize,
-                    fontWeight: 700,
-                    color: ink,
-                  }}
-                >
-                  {m.value}
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: "Inter",
-                    fontSize: d.macroLabelFontSize,
-                    fontWeight: 700,
-                    color: inkSubtle,
-                    letterSpacing: 1.2,
-                  }}
-                >
-                  {m.label}
-                </Text>
+                {macros.map((m) => (
+                  <View
+                    key={m.label}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "baseline",
+                      gap: 3,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: "Inter",
+                        fontSize: d.macroFontSize,
+                        fontWeight: 700,
+                        color: ink,
+                      }}
+                    >
+                      {m.value}
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: "Inter",
+                        fontSize: d.macroLabelFontSize,
+                        fontWeight: 700,
+                        color: inkSubtle,
+                        letterSpacing: 1.2,
+                      }}
+                    >
+                      {m.label}
+                    </Text>
+                  </View>
+                ))}
               </View>
-            ))}
+            ) : null}
+            {microsInline ? (
+              <Text
+                style={{
+                  fontFamily: "Inter",
+                  fontStyle: "italic",
+                  fontSize: d.microsFontSize,
+                  color: inkSoft,
+                  lineHeight: d.microsLineHeight,
+                  marginTop: macros.length > 0 ? 4 : 0,
+                }}
+              >
+                Reich an{" "}
+                {microsToShow
+                  .map(
+                    (m) =>
+                      `${m.name}${
+                        typeof m.pctDaily === "number" ? ` ${m.pctDaily} %` : ""
+                      }`
+                  )
+                  .join(" · ")}
+              </Text>
+            ) : null}
           </View>
         ) : null}
 
@@ -9709,8 +9816,10 @@ function FeaturePage({
           </View>
         )}
 
-        {/* Section: Mikros (zwischen Zutaten und Steps — nur wenn da) */}
-        {showMicros ? (
+        {/* Section: Mikros (zwischen Zutaten und Steps — nur bei sparse-
+            Modi balanced/spacious. Bei compact/ultra ist die Mikros-Zeile
+            schon im Macro-Stripe oben gerendert (microsInline). */}
+        {microsAsSection ? (
           <>
             <FeatureSectionLabel
               label="Reich an"

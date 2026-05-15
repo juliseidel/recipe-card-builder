@@ -5412,48 +5412,75 @@ type FeatureWebDensity = {
   contentPadTop: number;
 };
 
-const FEATURE_WEB_DENSITY: Record<WebDensity, FeatureWebDensity> = {
+type FeatureWebDensityTier =
+  | "spacious"
+  | "balanced"
+  | "compact"
+  | "ultra";
+
+const FEATURE_WEB_DENSITY: Record<FeatureWebDensityTier, FeatureWebDensity> = {
+  ultra: {
+    contentWidthPct: 0.44,
+    titleFontSize: 21,
+    storyFontSize: 9.5,
+    metaFontSize: 9.5,
+    metaIconSize: 12,
+    macroFontSize: 10.5,
+    macroLabelFontSize: 8,
+    sectionLabelFontSize: 8.5,
+    ingredientFontSize: 9.5,
+    ingredientGroupLabelFontSize: 8.5,
+    stepFontSize: 9.5,
+    stepNumFontSize: 10.5,
+    stepNumColWidth: 18,
+    stepGap: 5,
+    microsFontSize: 9,
+    footerFontSize: 8.5,
+    eyebrowFontSize: 8.5,
+    contentPad: 22,
+    contentPadTop: 28,
+  },
   compact: {
     contentWidthPct: 0.42,
-    titleFontSize: 26,
-    storyFontSize: 11,
-    metaFontSize: 11,
-    metaIconSize: 14,
-    macroFontSize: 13,
-    macroLabelFontSize: 9.5,
-    sectionLabelFontSize: 10,
-    ingredientFontSize: 11.5,
-    ingredientGroupLabelFontSize: 10,
-    stepFontSize: 11.5,
-    stepNumFontSize: 13,
+    titleFontSize: 24,
+    storyFontSize: 10.5,
+    metaFontSize: 10.5,
+    metaIconSize: 13,
+    macroFontSize: 12,
+    macroLabelFontSize: 9,
+    sectionLabelFontSize: 9.5,
+    ingredientFontSize: 11,
+    ingredientGroupLabelFontSize: 9.5,
+    stepFontSize: 11,
+    stepNumFontSize: 12.5,
     stepNumColWidth: 22,
-    stepGap: 7,
-    microsFontSize: 10.5,
-    footerFontSize: 10,
-    eyebrowFontSize: 10,
+    stepGap: 6.5,
+    microsFontSize: 10,
+    footerFontSize: 9.5,
+    eyebrowFontSize: 9.5,
     contentPad: 28,
-    contentPadTop: 36,
+    contentPadTop: 34,
   },
   balanced: {
     contentWidthPct: 0.44,
-    titleFontSize: 34,
-    storyFontSize: 13,
+    titleFontSize: 32,
+    storyFontSize: 12.5,
     metaFontSize: 12,
-    metaIconSize: 16,
+    metaIconSize: 15,
     macroFontSize: 14,
     macroLabelFontSize: 10,
     sectionLabelFontSize: 10.5,
-    ingredientFontSize: 13,
-    ingredientGroupLabelFontSize: 11,
-    stepFontSize: 13,
-    stepNumFontSize: 15,
-    stepNumColWidth: 26,
-    stepGap: 9,
-    microsFontSize: 11.5,
+    ingredientFontSize: 12.5,
+    ingredientGroupLabelFontSize: 10.5,
+    stepFontSize: 12.5,
+    stepNumFontSize: 14,
+    stepNumColWidth: 25,
+    stepGap: 8.5,
+    microsFontSize: 11,
     footerFontSize: 10.5,
     eyebrowFontSize: 10,
     contentPad: 34,
-    contentPadTop: 44,
+    contentPadTop: 42,
   },
   spacious: {
     contentWidthPct: 0.46,
@@ -5477,6 +5504,21 @@ const FEATURE_WEB_DENSITY: Record<WebDensity, FeatureWebDensity> = {
     contentPadTop: 52,
   },
 };
+
+// Feature-eigene Density (4-stufig) — analog zur PDF-Version. Niedrigere
+// Schwellen + extra "ultra" Stufe weil die schmale Content-Spalte
+// (~42-46 % der Page-Breite) deutlich aggressiveres Sizing braucht als
+// generische 3-Stufen-Density.
+function featureWebGetDensity(recipe: Recipe): FeatureWebDensityTier {
+  if (recipe.tweaks?.densityOverride) {
+    return recipe.tweaks.densityOverride;
+  }
+  const score = recipe.ingredients.length + recipe.steps.length * 2;
+  if (score >= 26) return "ultra";
+  if (score >= 16) return "compact";
+  if (score <= 10) return "spacious";
+  return "balanced";
+}
 
 function featureWebTitleScale(title: string): number {
   const len = title.length;
@@ -5696,9 +5738,17 @@ function FeatureLayout({
   totalRecipes,
   enriching,
 }: RecipeCardFullProps) {
-  const density = webGetDensity(recipe);
+  // Feature-eigene Density (4 Stufen mit "ultra") — siehe featureWebGetDensity.
+  const density = featureWebGetDensity(recipe);
   const d = FEATURE_WEB_DENSITY[density];
-  const showStory = webShouldShowStory(recipe) && density !== "compact";
+  const isDense = density === "compact" || density === "ultra";
+  // Story versteckt bei compact + ultra — Platzersparnis fuer dichte Cards.
+  const showStory =
+    webShouldShowStory(recipe) &&
+    (density === "balanced" || density === "spacious");
+  // Mikros direkt unter Macros bei compact/ultra (spart Section-Label).
+  const microsInline = density === "compact" || density === "ultra";
+  const microsAsSection = !microsInline;
 
   const titleScale =
     featureWebTitleScale(recipe.title) +
@@ -5924,42 +5974,69 @@ function FeatureLayout({
           </div>
         </div>
 
-        {/* Macros */}
-        {macros.length > 0 ? (
+        {/* Macros + Mikros-Inline (bei compact/ultra) */}
+        {macros.length > 0 || (microsInline && micros.length > 0) ? (
           <div
-            className="flex flex-wrap items-baseline pt-3"
+            className="pt-3"
             style={{
               borderTop: `0.5px solid ${divider}`,
-              gap: "14px",
             }}
           >
-            {macros.map((m) => (
-              <span
-                key={m.label}
-                className="flex items-baseline"
-                style={{ gap: "4px" }}
+            {macros.length > 0 ? (
+              <div
+                className="flex flex-wrap items-baseline"
+                style={{ gap: "14px" }}
               >
-                <span
-                  className="font-bold"
-                  style={{
-                    color: ink,
-                    fontSize: `${d.macroFontSize}px`,
-                  }}
-                >
-                  {m.value}
-                </span>
-                <span
-                  className="font-bold"
-                  style={{
-                    color: inkSubtle,
-                    fontSize: `${d.macroLabelFontSize}px`,
-                    letterSpacing: "0.12em",
-                  }}
-                >
-                  {m.label}
-                </span>
-              </span>
-            ))}
+                {macros.map((m) => (
+                  <span
+                    key={m.label}
+                    className="flex items-baseline"
+                    style={{ gap: "4px" }}
+                  >
+                    <span
+                      className="font-bold"
+                      style={{
+                        color: ink,
+                        fontSize: `${d.macroFontSize}px`,
+                      }}
+                    >
+                      {m.value}
+                    </span>
+                    <span
+                      className="font-bold"
+                      style={{
+                        color: inkSubtle,
+                        fontSize: `${d.macroLabelFontSize}px`,
+                        letterSpacing: "0.12em",
+                      }}
+                    >
+                      {m.label}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            {microsInline && micros.length > 0 ? (
+              <p
+                className="italic"
+                style={{
+                  color: inkSoft,
+                  fontSize: `${d.microsFontSize}px`,
+                  lineHeight: 1.45,
+                  marginTop: macros.length > 0 ? "4px" : 0,
+                }}
+              >
+                Reich an{" "}
+                {micros
+                  .map(
+                    (m) =>
+                      `${m.name}${
+                        typeof m.pctDaily === "number" ? ` ${m.pctDaily} %` : ""
+                      }`
+                  )
+                  .join(" · ")}
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -6018,8 +6095,9 @@ function FeatureLayout({
           </div>
         )}
 
-        {/* Mikros */}
-        {enriching?.micros ? (
+        {/* Mikros als eigene Section — nur bei balanced/spacious. Bei
+            compact/ultra sind sie schon im Macro-Stripe oben gerendert. */}
+        {microsAsSection && enriching?.micros ? (
           <>
             <FeatureSectionLabelWeb
               label="Reich an"
@@ -6028,7 +6106,7 @@ function FeatureLayout({
             />
             <MicrosSkeletonStrip pack={pack} />
           </>
-        ) : micros.length > 0 ? (
+        ) : microsAsSection && micros.length > 0 ? (
           <>
             <FeatureSectionLabelWeb
               label="Reich an"
