@@ -60,17 +60,31 @@ export async function getCustomBrandServer(
   return (data?.data as Brand | undefined) ?? undefined;
 }
 
-// Kombinierter Loader: Code-Brand zuerst (sync, ohne DB-Roundtrip), sonst
-// DB-Lookup. Diese Funktion sollten alle async Server-Components benutzen,
-// die mit Brand-URLs umgehen — sie deckt beide Quellen ab.
+// Kombinierter Loader: Code-Brand fuer Identity-Felder (Tokens, Fonts,
+// Avatar, Name), DB fuer AI-computed Optional-Felder (voiceProfile,
+// audienceAnalysis, imageStyle) wenn Code-Brand sie nicht hat.
+//
+// Warum mergen: Code-Brands (Biene, Julia) sollen ihre kuratierten
+// Identity-Felder behalten, aber gleichzeitig vom Lazy-Backfill der
+// Voice-Profile profitieren. Ohne Merge wuerde das in DB persistierte
+// Profil eines Code-Brands beim Lookup ignoriert.
 //
 // `getBrand(slug)` aus lib/brands.ts bleibt sync und code-only fuer
-// Backward-Compat (Client-Components, generateStaticParams, sync
-// Helpers). Die kombinieren wir nur dort, wo nötig.
+// Backward-Compat (Client-Components, generateStaticParams, sync Helpers).
 export async function loadBrand(slug: string): Promise<Brand | undefined> {
   const code = codeBrands.find((b) => b.slug === slug);
-  if (code) return code;
-  return await getCustomBrandServer(slug);
+  const db = await getCustomBrandServer(slug);
+
+  // Beide vorhanden → Code wins for Identity, DB fills optional AI-Felder
+  if (code && db) {
+    return {
+      ...code,
+      voiceProfile: code.voiceProfile ?? db.voiceProfile,
+      audienceAnalysis: code.audienceAnalysis ?? db.audienceAnalysis,
+      imageStyle: code.imageStyle ?? db.imageStyle,
+    };
+  }
+  return code ?? db;
 }
 
 // Alle Brands fuer den Workspace-Hub. Code-Brands first (Biene oben als
@@ -90,15 +104,17 @@ export async function brandExists(slug: string): Promise<boolean> {
 }
 
 // ─── Field-Update-Helpers — fuer Lazy-Backfill und manuelle Edits ────────
-// Patcht ein einzelnes Feld in brand.data (JSONB-Spalte). Macht ein
-// SELECT+UPDATE atomar via Supabase. Wirft, wenn der Brand kein DB-Eintrag
-// hat (= Code-Brand) — Caller soll das fangen und in-memory fallen lassen.
-async function patchBrandData(
+// Patcht ein einzelnes Feld in brand.data (JSONB-Spalte) und macht ein
+// UPSERT — falls der Brand noch keinen DB-Eintrag hat (Code-Brand), wird
+// einer angelegt mit dem Code-Brand-Object als Basis + Patch. Damit
+// funktioniert Persistenz von AI-Computed-Feldern (voiceProfile, etc.)
+// auch fuer Code-Brands wie Biene, ohne ihre Identity-Felder zu duplizieren.
+async function upsertBrandData(
   slug: string,
   patch: Partial<Brand>
 ): Promise<void> {
   if (!hasServerSupabase()) {
-    throw new Error("patchBrandData: Supabase not configured");
+    throw new Error("upsertBrandData: Supabase not configured");
   }
   const supabase = getServerSupabase();
   const { data: row, error: readErr } = await supabase
@@ -107,21 +123,38 @@ async function patchBrandData(
     .eq("slug", slug)
     .maybeSingle();
   if (readErr) throw readErr;
-  if (!row) throw new Error(`patchBrandData: brand '${slug}' not found in DB`);
-  const merged = { ...(row.data as Brand), ...patch };
-  const { error: writeErr } = await supabase
+
+  if (row) {
+    // Bestehender DB-Eintrag → einfaches Update
+    const merged = { ...(row.data as Brand), ...patch };
+    const { error: writeErr } = await supabase
+      .from("brands")
+      .update({ data: merged })
+      .eq("slug", slug);
+    if (writeErr) throw writeErr;
+    return;
+  }
+
+  // Kein DB-Eintrag → checken ob Code-Brand, dann Stub anlegen
+  const code = codeBrands.find((b) => b.slug === slug);
+  if (!code) {
+    throw new Error(`upsertBrandData: brand '${slug}' not found (kein Code- noch DB-Brand)`);
+  }
+  // Stub mit Code-Brand-Object als Basis. Beim spaeteren loadBrand() gewinnt
+  // der Code-Brand fuer Identity-Felder — der DB-Stub liefert nur die
+  // AI-computed Optional-Felder ueber den Merge in loadBrand().
+  const stub = { ...code, ...patch };
+  const { error: insertErr } = await supabase
     .from("brands")
-    .update({ data: merged })
-    .eq("slug", slug);
-  if (writeErr) throw writeErr;
+    .insert({ slug, data: stub });
+  if (insertErr) throw insertErr;
 }
 
-/** Persistiert das Voice-Profil eines Brands. Wird vom Lazy-Backfill und
- *  vom Onboarding-Refresh-Endpoint genutzt. Wirft fuer Code-Brands ohne
- *  DB-Eintrag — Caller soll das defensiv abfangen. */
+/** Persistiert das Voice-Profil eines Brands. Funktioniert fuer DB-Brands
+ *  und Code-Brands gleichermassen (legt ggf. DB-Stub fuer Code-Brands an). */
 export async function updateBrandVoiceProfile(
   slug: string,
   voiceProfile: Brand["voiceProfile"]
 ): Promise<void> {
-  await patchBrandData(slug, { voiceProfile });
+  await upsertBrandData(slug, { voiceProfile });
 }
