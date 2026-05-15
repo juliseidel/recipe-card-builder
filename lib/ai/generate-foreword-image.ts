@@ -1,5 +1,6 @@
 import type { Pack } from "@/lib/packs";
 import { generateImage, downloadImage } from "./bfl-flux";
+import { callGemini } from "./gemini";
 
 // Foreword still-life image generator. Sits OUTSIDE the recipe-hero and
 // pack-cover pipelines on purpose — those are tuned for plated dishes
@@ -84,9 +85,9 @@ const PACK_STYLES: Record<string, ForewordImageStyle> = {
   },
 };
 
-// Built-in fallback for custom packs. Generic but tonally neutral — the
-// arrangement reads as "a creator's well-loved kitchen" without committing
-// to a specific cuisine register.
+// Built-in fallback for custom packs ohne erkennbares Theme. Generic
+// aber tonally neutral — der letzte Ausweg wenn weder PACK_STYLES noch
+// styleFromTitle noch Gemini-Inference einen Treffer haben.
 const FALLBACK_STYLE: ForewordImageStyle = {
   subject:
     "a small wooden chopping board with two or three loose ingredients arranged around it, one ceramic bowl, one folded linen kitchen towel",
@@ -95,6 +96,86 @@ const FALLBACK_STYLE: ForewordImageStyle = {
   colorCast: "warm neutral cream",
   angle: "overhead 80° angle",
 };
+
+// Gemini-Inference fuer Custom-Packs: wenn weder PACK_STYLES noch
+// styleFromTitle greifen (z.B. fuer einen Pack mit Titel "Sommer-Spass"),
+// laesst Gemini einen passenden Still-Life-Style aus dem Pack-Kontext
+// ableiten. Das ist 1 extra Gemini-Call beim Pack-Enrich — laeuft async
+// im Hintergrund, ist also kein UX-Issue.
+//
+// Brand-agnostisch by design: jeder neue Creator bekommt fuer JEDEN
+// seiner Custom-Packs einen gut passenden Foreword-Style ohne dass jemand
+// PACK_STYLES manuell pflegen muss.
+const STYLE_INFERENCE_SCHEMA = {
+  type: "object",
+  properties: {
+    subject: {
+      type: "string",
+      description:
+        "1-2 Saetze beschreibung der Still-Life-Arrangement. Englisch. KEINE Personen, kein angerichtetes Gericht. Konkrete Items: z.B. 'a small ceramic bowl of fresh strawberries beside three vanilla pods on a folded linen napkin'. Max 200 chars.",
+    },
+    surface: {
+      type: "string",
+      description:
+        "Englischer Surface-Hint, max 60 chars. Beispiele: 'weathered pale-wood baker's table', 'natural unbleached linen', 'pale grey concrete counter', 'warm-toned dark walnut wood'.",
+    },
+    lighting: {
+      type: "string",
+      description:
+        "Englischer Lighting-Hint, max 120 chars. Beispiele: 'soft morning window light from the left, gentle shadows', 'bright high-noon kitchen light, clean shadows'.",
+    },
+    colorCast: {
+      type: "string",
+      description:
+        "Englischer Color-Cast-Hint, max 40 chars. Beispiele: 'warm cream', 'sage-green tinged daylight white', 'honey-amber warm'.",
+    },
+    angle: {
+      type: "string",
+      description:
+        "Englischer Camera-Angle-Hint, max 60 chars. Beispiele: 'overhead 90° flat-lay', '30-40° three-quarter view', 'overhead 75° angle with editorial tilt'.",
+    },
+  },
+  required: ["subject", "surface", "lighting", "colorCast", "angle"],
+};
+
+async function inferStyleViaGemini(pack: Pack): Promise<ForewordImageStyle | null> {
+  try {
+    const result = await callGemini<ForewordImageStyle>({
+      prompt: `Generate a still-life Foreword-Image-Style for this recipe pack. The image is the opening page of a printed cookbook chapter — it should evoke the THEME of the pack visually, NOT show a finished dish.
+
+Pack-Title: ${pack.title}
+Pack-Subtitle: ${pack.subtitle ?? "—"}
+Pack-Tagline: ${pack.tagline ?? "—"}
+Pack-Category: ${pack.category ?? "—"}
+Pack-Description: ${pack.description ?? "—"}
+
+Pick subject items that THEMATICALLY anchor the pack (e.g. for "Sommer-BBQ" → tongs + fresh herbs; for "Date-Night" → two wine glasses + linen napkin; for "Schnell + Einfach" → timer + simple knife + cutting board). Avoid plated meals, hands, faces.`,
+      schema: STYLE_INFERENCE_SCHEMA,
+      systemInstruction:
+        "You generate visual still-life style descriptions for editorial cookbook foreword images. Always answer in English (Flux understands English best). Be concrete and sensory. Never include people, faces, hands, or plated food.",
+      temperature: 0.6,
+      maxOutputTokens: 1024,
+      thinkingBudget: 0,
+      retries: 1,
+      model: "flash",
+    });
+    // Sanity-Check: alle Felder müssen non-empty sein
+    if (!result.subject?.trim() || !result.surface?.trim()) return null;
+    return {
+      subject: result.subject.trim().slice(0, 240),
+      surface: result.surface.trim().slice(0, 80),
+      lighting: result.lighting?.trim().slice(0, 140) || "soft window light, gentle shadows",
+      colorCast: result.colorCast?.trim().slice(0, 60) || "warm neutral cream",
+      angle: result.angle?.trim().slice(0, 80) || "overhead 80° angle",
+    };
+  } catch (err) {
+    console.warn(
+      "[generate-foreword-image] inferStyleViaGemini failed:",
+      err instanceof Error ? err.message : err
+    );
+    return null;
+  }
+}
 
 // Title-keyword heuristic fallback — fuer Custom-Packs ohne expliziten
 // PACK_STYLES-Eintrag. Matched gaengige Pack-Themen aus dem Titel, damit
@@ -185,9 +266,21 @@ export type ForewordImageBuildResult = {
 
 // Builds the final Flux prompt from a pack's style recipe. Exposed so the
 // generation script can log/audit prompts before spending API credit.
-export function buildForewordImagePrompt(pack: Pack): ForewordImageBuildResult {
+//
+// Style-Resolution-Reihenfolge:
+//   1. PACK_STYLES — hand-getunte Bienen-Packs (statisch)
+//   2. styleFromTitle — Keyword-Heuristik (Airfryer, Snack, Backwelt, etc.)
+//   3. Gemini-Inference — fuer Custom-Packs mit eigenem Thema
+//   4. FALLBACK_STYLE — letzter Notnagel
+//
+// Async geworden seit v2: Schritt 3 macht einen Gemini-Call. Caller sind
+// schon async (generateForewordImage, das Script).
+export async function buildForewordImagePrompt(pack: Pack): Promise<ForewordImageBuildResult> {
   const style =
-    PACK_STYLES[pack.slug] ?? styleFromTitle(pack.title) ?? FALLBACK_STYLE;
+    PACK_STYLES[pack.slug] ??
+    styleFromTitle(pack.title) ??
+    (await inferStyleViaGemini(pack)) ??
+    FALLBACK_STYLE;
   const prompt = [
     `An editorial still-life photograph for the opening page of a recipe booklet.`,
     `${style.subject}, sitting on ${style.surface}, photographed ${style.angle}.`,
@@ -208,7 +301,7 @@ export async function generateForewordImage(
   pack: Pack,
   opts: { seed?: number } = {}
 ): Promise<Buffer> {
-  const { prompt, negative } = buildForewordImagePrompt(pack);
+  const { prompt, negative } = await buildForewordImagePrompt(pack);
   const result = await generateImage({
     prompt,
     negativePrompt: negative,

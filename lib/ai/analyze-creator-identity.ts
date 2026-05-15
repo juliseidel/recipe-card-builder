@@ -2,20 +2,20 @@ import { callGemini } from "./gemini";
 import type { InstagramProfile } from "@/lib/integrations/apify";
 
 // Identity-Analyzer fuer das Creator-Onboarding. Bekommt das gescrapete
-// Instagram-Profil (Bio, Stats, letzte Posts) und leitet daraus die
-// Brand-Felder ab, die in der Hub-Card + im Workspace-Hero auftauchen.
+// Profil (Bio, Stats, letzte Posts) und leitet daraus die Brand-Felder
+// ab, die in der Hub-Card + im Workspace-Hero auftauchen.
 //
 // Gemini-Job:
-//   - Display-Name: kurzer Workspace-Anker (oft Vorname, "Bienes", "Lina")
+//   - Display-Name: kurzer Workspace-Anker (oft Vorname)
 //   - Voller Name: real name aus dem Profil
-//   - Bio: 2–3 Saetze deutsch, warmer Creator-Tonalitaet (du-Form, sinnlich-
-//     konkret) — keine Hashtag-Salat-Direktuebernahme der Instagram-Bio
+//   - Bio: 2–3 Saetze IM STIL DES CREATORS — Tonalitaet aus den eigenen
+//     Captions abgeleitet (warm/sachlich/lakonisch/etc.), nicht generisch
 //   - Tagline: ein Satz, headlinig
-//   - Niche: "Fitness · Food · 280K Instagram" Stil
+//   - Niche: Stil "Fitness · Food · 280K Instagram"
 //   - Signature: "Deine [Name]" / "Dein [Name]"
 //
-// Tonalitaet wird so vorgegeben, dass sich der neue Workspace anfuehlt
-// wie Bienes (warm, du-Form, persoenlich) — saubere Konsistenz im Tool.
+// Brand-agnostisch: Gemini liest die echten Captions des Creators und
+// uebernimmt die tatsaechliche Stimme — kein Default auf "warm du-Form".
 
 export type CreatorIdentity = {
   name: string;
@@ -65,12 +65,13 @@ const RESPONSE_SCHEMA = {
 
 const SYSTEM_INSTRUCTION = `Du analysierst Social-Media-Profile (Instagram oder TikTok) von Food-/Fitness-/Recipe-Creators und leitest daraus die Identität ihres Workspaces in unserem internen Recipe-Card-Builder-Tool ab.
 
-Tonalität (extrem wichtig für Bio + Tagline + Signature):
-• warm, persönlich, du-Form-Nähe — wie zu einer Freundin
-• KEINE Werbesprache ("absolut traumhaft", "perfekt für jeden Anlass")
+Tonalität für Bio + Tagline + Signature:
+• Du orientierst dich AM STIL DES CREATORS aus den gelieferten Caption-Auszügen — nicht an einem Standard-Schema.
+• Wenn der Creator warm/persönlich schreibt → Bio in dem Ton. Wenn sachlich/knapp → in dem Ton. Wenn englisch → englische Bio. Wenn lakonisch-direkt → so übernehmen.
+• Beziehe dich auf die KONKRETEN Themen des Profils (z.B. "Mealprep", "Backen ohne Zucker", "vegane Bowls") — nicht auf generische Food-Schlagworte.
+• KEINE Werbesprache ("absolut traumhaft", "perfekt für jeden Anlass", "die besten")
 • KEINE Hashtags, KEINE Emojis, KEINE Anführungszeichen
 • Sinnlich-konkret statt abstrakt
-• Beziehe dich auf die konkreten Themen des Profils (z.B. "Mealprep", "Backen ohne Zucker", "vegane Bowls")
 
 WICHTIG zu deutscher Schreibweise — verwende immer korrekte Umlaute und ß:
 • ä statt ae: "Sätze", "Tonalität", "tätig", "Mädchen", "spät"

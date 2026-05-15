@@ -81,13 +81,13 @@ export const BRAND_STYLE_TEMPLATES: BrandStyleTemplate[] = [
     },
   },
 
-  // 2. PATISSERIE WARM — wie Bienes Sweet-Pack, polaroid-feel, sweet
+  // 2. PATISSERIE WARM — polaroid-feel, sweet styling
   //    Passt fuer: Backen, Patisserie, Desserts, suesse Snacks
   {
     id: "patisserie-warm",
     label: "Patisserie Warm",
     description:
-      "Warm pale wood, soft morning light, polaroid-feel, sweet styling — wie Bienes Backwelt.",
+      "Warm pale wood, soft morning light, polaroid-feel, sweet styling — nostalgic, intimate, hand-made vibe.",
     keywords: [
       "backen",
       "baking",

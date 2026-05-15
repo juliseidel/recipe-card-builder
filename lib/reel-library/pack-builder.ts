@@ -4,6 +4,7 @@ import { parseRecipeFromCaption } from "@/lib/ai/parse-instagram";
 import { moodPresets } from "@/lib/pack-presets";
 import type { Pack, PackMood, CardLayout } from "@/lib/packs";
 import type { Recipe } from "@/lib/recipes";
+import { loadBrand } from "@/lib/custom-brands-server";
 
 // Gemeinsame Logik fuer das Anlegen eines Packs aus einer Reel-Auswahl.
 // Wird von zwei Endpoints genutzt:
@@ -86,11 +87,17 @@ export async function buildPackFromReels(
   const reels = await getReelsByIds(opts.reelIds);
   if (reels.length === 0) return null;
 
+  // Brand laden, damit der Parser die Description im Voice-Profil-Stil
+  // des Workspaces generiert. Ohne brand-Kontext faellt der Parser auf
+  // generische Defaults zurueck — fuer Recipe-Cards eines bestimmten
+  // Workspaces wollen wir das vermeiden.
+  const brand = await loadBrand(opts.brandSlug);
+
   // 1. Parse alle Captions parallel. Promise.allSettled — wir tolerieren
   // einzelne Fails (zu kurze Caption, KI fail't), kappen aber bei <3
   // Erfolgen (zu wenig fuer ein sinnvolles Pack).
   const parsedSettled = await Promise.allSettled(
-    reels.map((r) => parseRecipeFromCaption(r.caption))
+    reels.map((r) => parseRecipeFromCaption(r.caption, { brand }))
   );
 
   type ParsedEntry = {

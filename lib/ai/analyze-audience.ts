@@ -78,7 +78,7 @@ const RESPONSE_SCHEMA = {
     summary: {
       type: "string",
       description:
-        "1-2 Sätze Audience-Zusammenfassung. Warm-faktisch, ohne Marketing-Sprech. Max 260 Zeichen. Beispiel: 'Überwiegend Frauen Mitte 20 bis Mitte 30, die nach Feierabend schnelle Protein-Rezepte suchen und sich von Bienes warmer du-Form-Tonalität abholen lassen.'",
+        "1-2 Sätze Audience-Zusammenfassung. Faktisch, ohne Marketing-Sprech. Beschreibt: WER folgt diesem Creator (Demografie + Kontext), WAS suchen die Follower hier (konkret, nicht generisch), und WARUM (welcher Tone/Vorteil holt sie ab). Max 260 Zeichen. Sei konkret, kein Standard-Schema — die Antwort muss zu DIESEM Creator passen, nicht zu einem generischen Food-Influencer.",
     },
   },
   required: [

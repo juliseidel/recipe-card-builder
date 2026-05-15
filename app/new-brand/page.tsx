@@ -445,8 +445,8 @@ export default function NewBrandPage() {
                     type="text"
                     placeholder={
                       platform === "tiktok"
-                        ? "@bienesfitlife"
-                        : "@bienesfitlife"
+                        ? "@creator-handle"
+                        : "@creator-handle"
                     }
                     value={socialHandle}
                     onChange={(e) => setSocialHandle(e.target.value)}
