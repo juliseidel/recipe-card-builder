@@ -225,6 +225,7 @@ export async function POST(req: Request) {
     "amber",
     "newspaper",
     "restaurant",
+    "studio",
   ];
   let resolvedLayout: import("@/lib/packs").CardLayout;
   if (overrides.layout && VALID_LAYOUTS.includes(overrides.layout as import("@/lib/packs").CardLayout)) {
