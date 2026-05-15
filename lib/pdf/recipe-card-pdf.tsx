@@ -7885,14 +7885,44 @@ function restaurantGroupLabel(name: string): string {
 //     der wird per hideRecipeIndex unterdrückt für Single-PDF-Export)
 //   - Footer-Mikros-Zeile bricht nicht um (max 4 Mikros enforced)
 
-const STUDIO_COLORS = {
-  bg: "#ffffff",
-  ink: "#1a1a1a",
-  inkSoft: "#4a4a4a",
-  inkSubtle: "#8a8a8a",
-  inkFaint: "#bcbcbc",
-  divider: "#e6e6e6",
-} as const;
+// Studio-Farben werden dynamisch aus dem Pack-Mood abgeleitet — der
+// Hintergrund nimmt mood.background auf, die Schrift folgt mood.ink/inkSoft.
+// Inkfaint + Divider sind alpha-Variationen des mood.ink fuer Konsistenz
+// ueber alle Pack-Farben hinweg (Lavender, Sage, Honey, etc).
+function studioColors(pack: Pack): {
+  bg: string;
+  ink: string;
+  inkSoft: string;
+  inkSubtle: string;
+  inkFaint: string;
+  divider: string;
+} {
+  return {
+    bg: pack.mood.background,
+    ink: pack.mood.ink,
+    inkSoft: pack.mood.inkSoft,
+    inkSubtle: withAlpha(pack.mood.ink, 0.58),
+    inkFaint: withAlpha(pack.mood.ink, 0.32),
+    divider: withAlpha(pack.mood.ink, 0.18),
+  };
+}
+
+// Studio-eigene Density-Heuristik. Step-First-Layout braucht mehr Atemraum
+// als die globale getDensity()-Funktion vorgibt, damit kurze Recipes nicht
+// halbleer wirken. Schwellen verschoben:
+//   global: spacious <= 14, compact >= 22
+//   studio: spacious <= 17, compact >= 22
+// Damit faellt z.B. 9 Zutaten + 5 Steps (score 16.5) hier in spacious und
+// bekommt grossen Hero + grossen Title + weite Step-Gaps. Bei viel Content
+// (>= 22) bleibt es bei compact wie global. recipe.tweaks.densityOverride
+// gewinnt weiterhin gegen die Auto-Heuristik.
+function getStudioDensity(recipe: Recipe): Density {
+  if (recipe.tweaks?.densityOverride) return recipe.tweaks.densityOverride;
+  const score = recipe.ingredients.length + recipe.steps.length * 1.5;
+  if (score >= 22) return "compact";
+  if (score <= 17) return "spacious";
+  return "balanced";
+}
 
 const STUDIO_DENSITY: Record<
   Density,
@@ -7989,37 +8019,39 @@ const STUDIO_DENSITY: Record<
     paddingTop: 36,
     paddingBottom: 28,
   },
-  // Spacious — score <= 14 (wenig Content, z.B. 3-Zutaten-Eisbowl). Großer
-  // Hero, weite Step-Choreographie, Story als Pull-Quote eingebaut um die
-  // Karte voll wirken zu lassen ohne aufgebläht zu sein.
+  // Spacious — score <= 17 (kurze Recipes, z.B. 9 Zutaten + 5 Steps oder
+  // 3-Zutaten-Eisbowl). Großer Hero, weite Step-Choreographie, Story als
+  // Pull-Quote eingebaut. Werte deutlich grosszuegiger als balanced damit
+  // die Karte voll wirkt ohne aufgeblaeht — fuellt den vertikalen Raum,
+  // damit der Footer nicht im Whitespace haengt.
   spacious: {
-    heroWidth: 130,
-    heroHeight: 163,
-    headerGap: 22,
-    titleFontSize: 34,
-    subtitleFontSize: 11.5,
-    specFontSize: 9,
-    sectionLabelFontSize: 8,
-    sectionGap: 18,
-    sectionGapAfterLabel: 14,
-    stepNumSize: 22,
-    stepNumColWidth: 36,
-    stepFontSize: 10.5,
-    stepLineHeight: 1.6,
-    stepGap: 11,
-    stepGroupLabelFontSize: 9.5,
-    ingredientFontSize: 10,
-    ingredientLineHeight: 1.75,
-    ingredientGroupLabelFontSize: 9,
-    storyFontSize: 10.5,
-    storyLineHeight: 1.65,
-    macroFontSize: 10.5,
-    macroLabelFontSize: 8,
-    microsFontSize: 9,
-    footerFontSize: 8,
-    eyebrowFontSize: 7.5,
-    paddingTop: 42,
-    paddingBottom: 32,
+    heroWidth: 150,
+    heroHeight: 188,
+    headerGap: 28,
+    titleFontSize: 40,
+    subtitleFontSize: 12.5,
+    specFontSize: 9.5,
+    sectionLabelFontSize: 8.5,
+    sectionGap: 24,
+    sectionGapAfterLabel: 18,
+    stepNumSize: 26,
+    stepNumColWidth: 42,
+    stepFontSize: 11.5,
+    stepLineHeight: 1.7,
+    stepGap: 16,
+    stepGroupLabelFontSize: 10,
+    ingredientFontSize: 11,
+    ingredientLineHeight: 1.85,
+    ingredientGroupLabelFontSize: 9.5,
+    storyFontSize: 11.5,
+    storyLineHeight: 1.75,
+    macroFontSize: 12,
+    macroLabelFontSize: 8.5,
+    microsFontSize: 9.5,
+    footerFontSize: 8.5,
+    eyebrowFontSize: 8,
+    paddingTop: 48,
+    paddingBottom: 36,
   },
 };
 
@@ -8061,10 +8093,12 @@ function StudioSectionLabel({
   label,
   density,
   accent,
+  divider,
 }: {
   label: string;
   density: (typeof STUDIO_DENSITY)["balanced"];
   accent: string;
+  divider: string;
 }) {
   // Sektion-Header zentriert, mit horizontalen Linien links + rechts. Caps
   // + Letterspacing geben dem Layout den Editorial-Beat.
@@ -8077,7 +8111,7 @@ function StudioSectionLabel({
         marginBottom: density.sectionGapAfterLabel,
       }}
     >
-      <View style={{ flex: 1, height: 0.5, backgroundColor: STUDIO_COLORS.divider }} />
+      <View style={{ flex: 1, height: 0.5, backgroundColor: divider }} />
       <Text
         style={{
           fontFamily: "Inter",
@@ -8090,7 +8124,7 @@ function StudioSectionLabel({
       >
         {label}
       </Text>
-      <View style={{ flex: 1, height: 0.5, backgroundColor: STUDIO_COLORS.divider }} />
+      <View style={{ flex: 1, height: 0.5, backgroundColor: divider }} />
     </View>
   );
 }
@@ -8100,12 +8134,16 @@ function StudioStepRow({
   text,
   density,
   accent,
+  ink,
+  divider,
   isLast,
 }: {
   index: number;
   text: string;
   density: (typeof STUDIO_DENSITY)["balanced"];
   accent: string;
+  ink: string;
+  divider: string;
   isLast: boolean;
 }) {
   // Big-Number-Spalte links (Fraunces, accent-color), vertikaler dünner
@@ -8143,7 +8181,7 @@ function StudioStepRow({
         style={{
           width: 0.6,
           alignSelf: "stretch",
-          backgroundColor: STUDIO_COLORS.divider,
+          backgroundColor: divider,
           marginRight: 12,
           marginTop: 3,
         }}
@@ -8154,7 +8192,7 @@ function StudioStepRow({
           fontFamily: "Inter",
           fontSize: density.stepFontSize,
           lineHeight: density.stepLineHeight,
-          color: STUDIO_COLORS.ink,
+          color: ink,
           paddingTop: 1,
         }}
       >
@@ -8167,9 +8205,13 @@ function StudioStepRow({
 function StudioIngredientsInline({
   groups,
   density,
+  ink,
+  inkSoft,
 }: {
   groups: IngredientGroup[];
   density: (typeof STUDIO_DENSITY)["balanced"];
+  ink: string;
+  inkSoft: string;
 }) {
   // Zutaten als fluider Text mit ·-Trennern. Jede Sub-Gruppe ("Für den Teig")
   // bekommt eine eigene Zeile mit Group-Label davor. Wrappt natürlich — bei
@@ -8201,7 +8243,7 @@ function StudioIngredientsInline({
                   fontFamily: "Inter",
                   fontSize: density.ingredientGroupLabelFontSize,
                   fontWeight: 600,
-                  color: STUDIO_COLORS.inkSoft,
+                  color: inkSoft,
                   letterSpacing: 1.5,
                   textTransform: "uppercase",
                   marginBottom: 3,
@@ -8215,7 +8257,7 @@ function StudioIngredientsInline({
                 fontFamily: "Inter",
                 fontSize: density.ingredientFontSize,
                 lineHeight: density.ingredientLineHeight,
-                color: STUDIO_COLORS.ink,
+                color: ink,
               }}
             >
               {items}
@@ -8245,7 +8287,12 @@ function StudioPage({
   hideRecipeIndex,
 }: RecipeCardPdfProps) {
   const t = packTheme(pack);
-  const density = getDensity(recipe);
+  const c = studioColors(pack);
+  // Studio nutzt eine eigene Density-Heuristik mit grosszuegigerer
+  // Spacious-Schwelle (siehe getStudioDensity) — kurze Recipes sollen
+  // grossen Hero + grossen Title bekommen statt mit balanced-Sizes
+  // halbleer auf der Karte zu sitzen.
+  const density = getStudioDensity(recipe);
   const d = STUDIO_DENSITY[density];
   const showStory =
     shouldShowStory(recipe) && density !== "compact";
@@ -8304,7 +8351,7 @@ function StudioPage({
     <Page
       size="A4"
       style={{
-        backgroundColor: STUDIO_COLORS.bg,
+        backgroundColor: c.bg,
         paddingTop: d.paddingTop,
         paddingBottom: d.paddingBottom,
         paddingHorizontal: PAGE_PADDING,
@@ -8325,7 +8372,7 @@ function StudioPage({
             fontFamily: "Inter",
             fontSize: d.eyebrowFontSize,
             fontWeight: 600,
-            color: STUDIO_COLORS.inkSubtle,
+            color: c.inkSubtle,
             letterSpacing: 2.5,
             textTransform: "uppercase",
           }}
@@ -8338,7 +8385,7 @@ function StudioPage({
               fontFamily: "Inter",
               fontSize: d.eyebrowFontSize,
               fontWeight: 500,
-              color: STUDIO_COLORS.inkFaint,
+              color: c.inkFaint,
               letterSpacing: 1.5,
             }}
           >
@@ -8349,7 +8396,7 @@ function StudioPage({
       <View
         style={{
           height: 0.5,
-          backgroundColor: STUDIO_COLORS.divider,
+          backgroundColor: c.divider,
           marginBottom: d.headerGap,
         }}
       />
@@ -8369,7 +8416,7 @@ function StudioPage({
               fontFamily: "Fraunces",
               fontSize: finalTitleSize,
               fontWeight: 500,
-              color: STUDIO_COLORS.ink,
+              color: c.ink,
               lineHeight: 1.05,
               marginBottom: 8,
             }}
@@ -8392,7 +8439,7 @@ function StudioPage({
                 fontFamily: "Fraunces",
                 fontSize: d.subtitleFontSize,
                 fontStyle: "italic",
-                color: STUDIO_COLORS.inkSoft,
+                color: c.inkSoft,
                 lineHeight: 1.45,
                 marginBottom: 12,
               }}
@@ -8405,7 +8452,7 @@ function StudioPage({
               fontFamily: "Inter",
               fontSize: d.specFontSize,
               fontWeight: 600,
-              color: STUDIO_COLORS.inkSoft,
+              color: c.inkSoft,
               letterSpacing: 2,
             }}
           >
@@ -8419,7 +8466,7 @@ function StudioPage({
           style={{
             width: d.heroWidth,
             height: d.heroHeight,
-            backgroundColor: blendWithWhite(t.accent, 0.92),
+            backgroundColor: blendWithWhite(t.accent, 0.85),
             overflow: "hidden",
           }}
         >
@@ -8459,7 +8506,7 @@ function StudioPage({
       <View
         style={{
           height: 0.5,
-          backgroundColor: STUDIO_COLORS.divider,
+          backgroundColor: c.divider,
           marginBottom: d.sectionGap,
         }}
       />
@@ -8469,6 +8516,7 @@ function StudioPage({
         label="Die Choreographie"
         density={d}
         accent={t.accent}
+        divider={c.divider}
       />
       {rightSteps.length === 0 ? (
         <View>
@@ -8481,7 +8529,7 @@ function StudioPage({
                     fontFamily: "Inter",
                     fontSize: d.stepGroupLabelFontSize,
                     fontWeight: 600,
-                    color: STUDIO_COLORS.inkSoft,
+                    color: c.inkSoft,
                     letterSpacing: 1.5,
                     textTransform: "uppercase",
                     marginTop: i === 0 ? 0 : d.stepGap,
@@ -8500,6 +8548,8 @@ function StudioPage({
                 text={item.text}
                 density={d}
                 accent={t.accent}
+                ink={c.ink}
+                divider={c.divider}
                 isLast={isLast}
               />
             );
@@ -8518,7 +8568,7 @@ function StudioPage({
                       fontFamily: "Inter",
                       fontSize: d.stepGroupLabelFontSize,
                       fontWeight: 600,
-                      color: STUDIO_COLORS.inkSoft,
+                      color: c.inkSoft,
                       letterSpacing: 1.5,
                       textTransform: "uppercase",
                       marginTop: i === 0 ? 0 : d.stepGap,
@@ -8536,6 +8586,8 @@ function StudioPage({
                   text={item.text}
                   density={d}
                   accent={t.accent}
+                  ink={c.ink}
+                  divider={c.divider}
                   isLast={i === leftSteps.length - 1}
                 />
               );
@@ -8551,7 +8603,7 @@ function StudioPage({
                       fontFamily: "Inter",
                       fontSize: d.stepGroupLabelFontSize,
                       fontWeight: 600,
-                      color: STUDIO_COLORS.inkSoft,
+                      color: c.inkSoft,
                       letterSpacing: 1.5,
                       textTransform: "uppercase",
                       marginTop: i === 0 ? 0 : d.stepGap,
@@ -8569,6 +8621,8 @@ function StudioPage({
                   text={item.text}
                   density={d}
                   accent={t.accent}
+                  ink={c.ink}
+                  divider={c.divider}
                   isLast={i === rightSteps.length - 1}
                 />
               );
@@ -8600,7 +8654,7 @@ function StudioPage({
               fontFamily: "Fraunces",
               fontSize: d.storyFontSize,
               fontStyle: "italic",
-              color: STUDIO_COLORS.inkSoft,
+              color: c.inkSoft,
               lineHeight: d.storyLineHeight,
               textAlign: "center",
             }}
@@ -8617,19 +8671,25 @@ function StudioPage({
         label="Zutaten"
         density={d}
         accent={t.accent}
+        divider={c.divider}
       />
-      <StudioIngredientsInline groups={ingredientGroups} density={d} />
+      <StudioIngredientsInline
+        groups={ingredientGroups}
+        density={d}
+        ink={c.ink}
+        inkSoft={c.inkSoft}
+      />
 
       {/* ───── Footer: Macros + Mikros prose + handle + QR ───────────── */}
-      {/* Spacer drückt den Footer nach unten — bleibt aber kein hartes
-          flex:1, sonst rutscht der Footer bei kurzen Recipes vom Inhalt weg
-          und sieht abgesetzt aus. marginTop:auto + minHeight:0 hält den
-          Block am Body, schiebt aber wenn Platz da ist. */}
-      <View style={{ flex: 1, minHeight: 12 }} />
+      {/* Footer klebt am Body — bei sparse Content wandert die Lücke nach
+          UNTEN unter den Footer statt zwischen Body und Footer aufzureißen.
+          Wenn der Content nicht reicht, fuellen spacious-Sizes (groesserer
+          Hero, groesserer Title, weite Step-Gaps) den vertikalen Raum. */}
+      <View style={{ marginTop: d.sectionGap + 4 }} />
       <View
         style={{
           height: 0.5,
-          backgroundColor: STUDIO_COLORS.divider,
+          backgroundColor: c.divider,
           marginBottom: 10,
         }}
       />
@@ -8657,7 +8717,7 @@ function StudioPage({
                   fontFamily: "Fraunces",
                   fontSize: d.macroFontSize,
                   fontWeight: 500,
-                  color: STUDIO_COLORS.ink,
+                  color: c.ink,
                 }}
               >
                 {m.value}
@@ -8667,7 +8727,7 @@ function StudioPage({
                   fontFamily: "Inter",
                   fontSize: d.macroLabelFontSize,
                   fontWeight: 600,
-                  color: STUDIO_COLORS.inkSubtle,
+                  color: c.inkSubtle,
                   letterSpacing: 1.5,
                 }}
               >
@@ -8678,7 +8738,7 @@ function StudioPage({
                   style={{
                     fontFamily: "Inter",
                     fontSize: d.macroLabelFontSize,
-                    color: STUDIO_COLORS.inkFaint,
+                    color: c.inkFaint,
                     marginLeft: 6,
                   }}
                 >
@@ -8695,7 +8755,7 @@ function StudioPage({
             fontFamily: "Fraunces",
             fontSize: d.microsFontSize,
             fontStyle: "italic",
-            color: STUDIO_COLORS.inkSoft,
+            color: c.inkSoft,
             textAlign: "center",
             marginBottom: 10,
             lineHeight: 1.4,
@@ -8725,7 +8785,7 @@ function StudioPage({
             fontFamily: "Inter",
             fontSize: d.footerFontSize,
             fontWeight: 500,
-            color: STUDIO_COLORS.inkSubtle,
+            color: c.inkSubtle,
             letterSpacing: 1.5,
           }}
         >

@@ -4661,14 +4661,49 @@ function restaurantGroupLabelWeb(name: string): string {
 // Druckausgabe ist die PDF-Page. Visuelle Beats müssen 1:1 matchen damit
 // der User keinen Bruch zwischen Vorschau und Druck spürt.
 // ════════════════════════════════════════════════
-const STUDIO_WEB = {
-  bg: "#ffffff",
-  ink: "#1a1a1a",
-  inkSoft: "#4a4a4a",
-  inkSubtle: "#8a8a8a",
-  inkFaint: "#bcbcbc",
-  divider: "#e6e6e6",
-} as const;
+// Studio-Farben werden vom Pack-Mood abgeleitet (Mirror der PDF-Funktion
+// studioColors). Background ist die Mood-Background-Farbe, Schriftfarben
+// folgen mood.ink/inkSoft, abgeleitete Farben sind alpha-Variationen.
+function studioWebColors(pack: Pack): {
+  bg: string;
+  ink: string;
+  inkSoft: string;
+  inkSubtle: string;
+  inkFaint: string;
+  divider: string;
+} {
+  const ink = pack.mood.ink;
+  return {
+    bg: pack.mood.background,
+    ink,
+    inkSoft: pack.mood.inkSoft,
+    inkSubtle: hexWithAlpha(ink, 0.58),
+    inkFaint: hexWithAlpha(ink, 0.32),
+    divider: hexWithAlpha(ink, 0.18),
+  };
+}
+
+// CSS-rgba aus Hex + Alpha. Inline statt Import von lib/pdf/theme um den
+// Web-Bundle nicht auf react-pdf zu coupling.
+function hexWithAlpha(hex: string, alpha: number): string {
+  const clean = hex.replace("#", "");
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// Web-Mirror von getStudioDensity (lib/pdf/recipe-card-pdf.tsx). Spacious-
+// Schwelle ist grosszuegiger als globales getDensity (<= 17 statt <= 14)
+// damit kurze Recipes grossen Hero + grossen Title bekommen statt halbleer
+// auf der Karte zu sitzen.
+function studioWebDensity(recipe: Recipe): WebDensity {
+  if (recipe.tweaks?.densityOverride) return recipe.tweaks.densityOverride;
+  const score = recipe.ingredients.length + recipe.steps.length * 1.5;
+  if (score >= 22) return "compact";
+  if (score <= 17) return "spacious";
+  return "balanced";
+}
 
 // Density-Stufen für Web — gleiche Werte wie STUDIO_DENSITY im PDF (in px
 // statt pt, aber die Skalierung gleicht aus weil der Web-Preview ohnehin
@@ -4744,26 +4779,26 @@ const STUDIO_WEB_DENSITY: Record<
     sectionGap: 22,
   },
   spacious: {
-    heroWidth: 184,
-    heroHeight: 230,
-    titleFontSize: 44,
-    subtitleFontSize: 15,
-    specFontSize: 11.5,
-    sectionLabelFontSize: 11,
-    stepNumSize: 30,
-    stepNumColWidth: 50,
-    stepFontSize: 14,
-    stepGap: 14,
-    stepGroupLabelFontSize: 12.5,
-    ingredientFontSize: 13.5,
-    ingredientGroupLabelFontSize: 11.5,
-    storyFontSize: 14,
-    macroFontSize: 15,
-    macroLabelFontSize: 10.5,
-    microsFontSize: 12,
-    footerFontSize: 11,
-    eyebrowFontSize: 10.5,
-    sectionGap: 26,
+    heroWidth: 208,
+    heroHeight: 260,
+    titleFontSize: 52,
+    subtitleFontSize: 16,
+    specFontSize: 12,
+    sectionLabelFontSize: 11.5,
+    stepNumSize: 34,
+    stepNumColWidth: 58,
+    stepFontSize: 15,
+    stepGap: 20,
+    stepGroupLabelFontSize: 13,
+    ingredientFontSize: 14.5,
+    ingredientGroupLabelFontSize: 12,
+    storyFontSize: 15,
+    macroFontSize: 16.5,
+    macroLabelFontSize: 11,
+    microsFontSize: 13,
+    footerFontSize: 11.5,
+    eyebrowFontSize: 11,
+    sectionGap: 32,
   },
 };
 
@@ -4790,17 +4825,16 @@ function StudioSectionLabelWeb({
   label,
   fontSize,
   accent,
+  divider,
 }: {
   label: string;
   fontSize: number;
   accent: string;
+  divider: string;
 }) {
   return (
     <div className="my-6 flex items-center gap-3">
-      <div
-        className="h-px flex-1"
-        style={{ backgroundColor: STUDIO_WEB.divider }}
-      />
+      <div className="h-px flex-1" style={{ backgroundColor: divider }} />
       <span
         className="font-semibold uppercase"
         style={{
@@ -4811,10 +4845,7 @@ function StudioSectionLabelWeb({
       >
         {label}
       </span>
-      <div
-        className="h-px flex-1"
-        style={{ backgroundColor: STUDIO_WEB.divider }}
-      />
+      <div className="h-px flex-1" style={{ backgroundColor: divider }} />
     </div>
   );
 }
@@ -4824,11 +4855,15 @@ function StudioStepRowWeb({
   text,
   density,
   accent,
+  ink,
+  divider,
 }: {
   index: number;
   text: string;
   density: (typeof STUDIO_WEB_DENSITY)["balanced"];
   accent: string;
+  ink: string;
+  divider: string;
 }) {
   return (
     <div className="flex items-start">
@@ -4851,14 +4886,14 @@ function StudioStepRowWeb({
         className="mx-3 self-stretch"
         style={{
           width: "0.5px",
-          backgroundColor: STUDIO_WEB.divider,
+          backgroundColor: divider,
           marginTop: "4px",
         }}
       />
       <p
         className="flex-1 pt-px"
         style={{
-          color: STUDIO_WEB.ink,
+          color: ink,
           fontSize: `${density.stepFontSize}px`,
           lineHeight: 1.55,
         }}
@@ -4875,7 +4910,10 @@ function StudioLayout({
   recipe,
   totalRecipes,
 }: RecipeCardFullProps) {
-  const density = webGetDensity(recipe);
+  const c = studioWebColors(pack);
+  // Studio-eigene Density-Heuristik mit grosszuegigerer Spacious-Schwelle —
+  // kurze Recipes bekommen grosse Sizes statt halbleer balanced.
+  const density = studioWebDensity(recipe);
   const d = STUDIO_WEB_DENSITY[density];
   const showStory = webShouldShowStory(recipe) && density !== "compact";
   const titleScale =
@@ -4933,7 +4971,7 @@ function StudioLayout({
               key={`${keyPrefix}-gl-${i}`}
               className="font-semibold uppercase"
               style={{
-                color: STUDIO_WEB.inkSoft,
+                color: c.inkSoft,
                 fontSize: `${d.stepGroupLabelFontSize}px`,
                 letterSpacing: "0.16em",
                 marginTop: i === 0 ? 0 : `${d.stepGap + 2}px`,
@@ -4955,6 +4993,8 @@ function StudioLayout({
               text={item.text}
               density={d}
               accent={pack.mood.accent}
+              ink={c.ink}
+              divider={c.divider}
             />
           </div>
         );
@@ -4967,7 +5007,7 @@ function StudioLayout({
       className="mx-auto w-full max-w-[960px] overflow-hidden rounded-[var(--radius-card)] border bg-white"
       style={{
         ...baseShellStyle(pack, brand),
-        backgroundColor: STUDIO_WEB.bg,
+        backgroundColor: c.bg,
       }}
     >
       <div className="px-8 pt-10 pb-8 sm:px-14 sm:pt-12 sm:pb-10">
@@ -4976,7 +5016,7 @@ function StudioLayout({
           <span
             className="font-semibold uppercase"
             style={{
-              color: STUDIO_WEB.inkSubtle,
+              color: c.inkSubtle,
               fontSize: `${d.eyebrowFontSize}px`,
               letterSpacing: "0.32em",
             }}
@@ -4987,7 +5027,7 @@ function StudioLayout({
             <span
               className="font-medium"
               style={{
-                color: STUDIO_WEB.inkFaint,
+                color: c.inkFaint,
                 fontSize: `${d.eyebrowFontSize}px`,
                 letterSpacing: "0.2em",
               }}
@@ -4998,7 +5038,7 @@ function StudioLayout({
         </div>
         <div
           className="mb-7 h-px"
-          style={{ backgroundColor: STUDIO_WEB.divider }}
+          style={{ backgroundColor: c.divider }}
         />
 
         {/* Header: Title links + Hero rechts */}
@@ -5007,7 +5047,7 @@ function StudioLayout({
             <h1
               className="font-display font-medium"
               style={{
-                color: STUDIO_WEB.ink,
+                color: c.ink,
                 fontSize: `${finalTitleSize}px`,
                 lineHeight: 1.05,
               }}
@@ -5022,7 +5062,7 @@ function StudioLayout({
               <p
                 className="font-display italic"
                 style={{
-                  color: STUDIO_WEB.inkSoft,
+                  color: c.inkSoft,
                   fontSize: `${d.subtitleFontSize}px`,
                   lineHeight: 1.45,
                   marginBottom: "14px",
@@ -5034,7 +5074,7 @@ function StudioLayout({
             <p
               className="font-semibold uppercase"
               style={{
-                color: STUDIO_WEB.inkSoft,
+                color: c.inkSoft,
                 fontSize: `${d.specFontSize}px`,
                 letterSpacing: "0.26em",
               }}
@@ -5080,7 +5120,7 @@ function StudioLayout({
 
         <div
           className="mt-8 h-px"
-          style={{ backgroundColor: STUDIO_WEB.divider }}
+          style={{ backgroundColor: c.divider }}
         />
 
         {/* Choreographie */}
@@ -5088,6 +5128,7 @@ function StudioLayout({
           label="Die Choreographie"
           fontSize={d.sectionLabelFontSize}
           accent={pack.mood.accent}
+          divider={c.divider}
         />
         {rightSteps.length === 0 ? (
           renderStepBlock(leftSteps, "single")
@@ -5110,7 +5151,7 @@ function StudioLayout({
             <p
               className="font-display text-center italic"
               style={{
-                color: STUDIO_WEB.inkSoft,
+                color: c.inkSoft,
                 fontSize: `${d.storyFontSize}px`,
                 lineHeight: 1.55,
               }}
@@ -5127,6 +5168,7 @@ function StudioLayout({
           label="Zutaten"
           fontSize={d.sectionLabelFontSize}
           accent={pack.mood.accent}
+          divider={c.divider}
         />
         <div>
           {ingredientGroups.map((group, gi) => {
@@ -5148,7 +5190,7 @@ function StudioLayout({
                   <p
                     className="font-semibold uppercase"
                     style={{
-                      color: STUDIO_WEB.inkSoft,
+                      color: c.inkSoft,
                       fontSize: `${d.ingredientGroupLabelFontSize}px`,
                       letterSpacing: "0.18em",
                       marginBottom: "4px",
@@ -5159,7 +5201,7 @@ function StudioLayout({
                 ) : null}
                 <p
                   style={{
-                    color: STUDIO_WEB.ink,
+                    color: c.ink,
                     fontSize: `${d.ingredientFontSize}px`,
                     lineHeight: 1.7,
                   }}
@@ -5174,7 +5216,7 @@ function StudioLayout({
         {/* Footer */}
         <div
           className="mt-8 h-px"
-          style={{ backgroundColor: STUDIO_WEB.divider }}
+          style={{ backgroundColor: c.divider }}
         />
         {macros.length > 0 ? (
           <div className="mt-4 flex flex-wrap items-baseline justify-center gap-x-4 gap-y-1">
@@ -5186,7 +5228,7 @@ function StudioLayout({
                 <span
                   className="font-display font-medium"
                   style={{
-                    color: STUDIO_WEB.ink,
+                    color: c.ink,
                     fontSize: `${d.macroFontSize}px`,
                   }}
                 >
@@ -5195,7 +5237,7 @@ function StudioLayout({
                 <span
                   className="font-semibold uppercase"
                   style={{
-                    color: STUDIO_WEB.inkSubtle,
+                    color: c.inkSubtle,
                     fontSize: `${d.macroLabelFontSize}px`,
                     letterSpacing: "0.18em",
                   }}
@@ -5206,7 +5248,7 @@ function StudioLayout({
                   <span
                     className="ml-1"
                     style={{
-                      color: STUDIO_WEB.inkFaint,
+                      color: c.inkFaint,
                       fontSize: `${d.macroLabelFontSize}px`,
                     }}
                   >
@@ -5221,7 +5263,7 @@ function StudioLayout({
           <p
             className="mt-3 text-center font-display italic"
             style={{
-              color: STUDIO_WEB.inkSoft,
+              color: c.inkSoft,
               fontSize: `${d.microsFontSize}px`,
               lineHeight: 1.5,
             }}
@@ -5242,7 +5284,7 @@ function StudioLayout({
           <span
             className="font-medium uppercase"
             style={{
-              color: STUDIO_WEB.inkSubtle,
+              color: c.inkSubtle,
               fontSize: `${d.footerFontSize}px`,
               letterSpacing: "0.2em",
             }}
