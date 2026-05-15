@@ -5129,26 +5129,10 @@ function StudioLayout({
           style={{ backgroundColor: c.divider }}
         />
 
-        {/* Zubereitung */}
-        <StudioSectionLabelWeb
-          label="Zubereitung"
-          fontSize={d.sectionLabelFontSize}
-          accent={pack.mood.accent}
-          divider={c.divider}
-        />
-        {rightSteps.length === 0 ? (
-          renderStepBlock(leftSteps, "single")
-        ) : (
-          <div className="grid grid-cols-2 gap-6">
-            {renderStepBlock(leftSteps, "L")}
-            {renderStepBlock(rightSteps, "R")}
-          </div>
-        )}
-
-        {/* Story-Pull-Quote (nur spacious + sparse) */}
+        {/* Story als Lead-Paragraph (UNTER Header, VOR Zubereitung) */}
         {showStory && recipe.description?.trim() ? (
           <div
-            className="mx-auto my-7 flex max-w-xl flex-col items-center px-4"
+            className="mx-auto mt-6 mb-2 flex max-w-xl flex-col items-center px-4"
           >
             <div
               className="mb-3 h-[1px] w-3.5"
@@ -5165,11 +5149,27 @@ function StudioLayout({
               {recipe.description}
             </p>
           </div>
+        ) : null}
+
+        {/* Zubereitung */}
+        <StudioSectionLabelWeb
+          label="Zubereitung"
+          fontSize={d.sectionLabelFontSize}
+          accent={pack.mood.accent}
+          divider={c.divider}
+        />
+        {rightSteps.length === 0 ? (
+          renderStepBlock(leftSteps, "single")
         ) : (
-          <div style={{ height: `${d.sectionGap}px` }} />
+          <div className="grid grid-cols-2 gap-6">
+            {renderStepBlock(leftSteps, "L")}
+            {renderStepBlock(rightSteps, "R")}
+          </div>
         )}
 
-        {/* Zutaten Inline */}
+        <div style={{ height: `${d.sectionGap}px` }} />
+
+        {/* Zutaten als responsive Grid (1/2/3-Spalten) */}
         <StudioSectionLabelWeb
           label="Zutaten"
           fontSize={d.sectionLabelFontSize}
@@ -5178,19 +5178,18 @@ function StudioLayout({
         />
         <div>
           {ingredientGroups.map((group, gi) => {
-            const inline = group.items
-              .map((it) => {
-                const amount = formatIngredientAmount(it.amount);
-                const note = it.note ? ` (${it.note})` : "";
-                return amount
-                  ? `${amount}  ${it.name}${note}`
-                  : `${it.name}${note}`;
-              })
-              .join("  ·  ");
+            const cols =
+              group.items.length <= 4 ? 1 : group.items.length >= 11 ? 3 : 2;
+            const perCol = Math.ceil(group.items.length / cols);
+            const columns: typeof group.items[] = [];
+            for (let i = 0; i < cols; i++) {
+              columns.push(group.items.slice(i * perCol, (i + 1) * perCol));
+            }
+            const amountColWidth = `${d.ingredientFontSize * 3.6}px`;
             return (
               <div
                 key={gi}
-                style={{ marginBottom: gi === ingredientGroups.length - 1 ? 0 : "10px" }}
+                style={{ marginBottom: gi === ingredientGroups.length - 1 ? 0 : "14px" }}
               >
                 {group.name ? (
                   <p
@@ -5199,21 +5198,70 @@ function StudioLayout({
                       color: c.inkSoft,
                       fontSize: `${d.ingredientGroupLabelFontSize}px`,
                       letterSpacing: "0.18em",
-                      marginBottom: "4px",
+                      marginBottom: "6px",
                     }}
                   >
                     {studioWebGroupLabel(group.name)}
                   </p>
                 ) : null}
-                <p
+                <div
+                  className="grid gap-x-4"
                   style={{
-                    color: c.ink,
-                    fontSize: `${d.ingredientFontSize}px`,
-                    lineHeight: 1.7,
+                    gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
                   }}
                 >
-                  {inline}
-                </p>
+                  {columns.map((colItems, ci) => (
+                    <div key={ci}>
+                      {colItems.map((it, ii) => {
+                        const amount = formatIngredientAmount(it.amount);
+                        return (
+                          <div
+                            key={ii}
+                            className="flex items-start"
+                            style={{
+                              marginBottom:
+                                ii === colItems.length - 1
+                                  ? 0
+                                  : `${d.ingredientFontSize * 0.4}px`,
+                            }}
+                          >
+                            <span
+                              className="shrink-0 text-right font-semibold tabular-nums"
+                              style={{
+                                width: amountColWidth,
+                                paddingRight: "10px",
+                                color: c.ink,
+                                fontSize: `${d.ingredientFontSize}px`,
+                                lineHeight: 1.55,
+                              }}
+                            >
+                              {amount || ""}
+                            </span>
+                            <span
+                              className="flex-1"
+                              style={{
+                                color: c.ink,
+                                fontSize: `${d.ingredientFontSize}px`,
+                                lineHeight: 1.55,
+                              }}
+                            >
+                              {it.name}
+                              {it.note ? (
+                                <span
+                                  className="italic"
+                                  style={{ color: c.inkSoft }}
+                                >
+                                  {" "}
+                                  ({it.note})
+                                </span>
+                              ) : null}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
               </div>
             );
           })}

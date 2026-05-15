@@ -8206,7 +8206,16 @@ function StudioStepRow({
   );
 }
 
-function StudioIngredientsInline({
+// Spalten-Heuristik: passt sich automatisch der Zutaten-Anzahl an damit
+// kurze Listen nicht in 3 schmalen Spalten gequetscht aussehen und lange
+// Listen nicht ueber halbe Seite Vertikalflaeche fressen.
+function pickIngredientColumns(itemCount: number): 1 | 2 | 3 {
+  if (itemCount <= 4) return 1;
+  if (itemCount >= 11) return 3;
+  return 2;
+}
+
+function StudioIngredientsGrid({
   groups,
   density,
   ink,
@@ -8217,28 +8226,29 @@ function StudioIngredientsInline({
   ink: string;
   inkSoft: string;
 }) {
-  // Zutaten als fluider Text mit ·-Trennern. Jede Sub-Gruppe ("Für den Teig")
-  // bekommt eine eigene Zeile mit Group-Label davor. Wrappt natürlich — bei
-  // 16+ Zutaten entstehen 3-4 Zeilen, bei 4 Zutaten passt alles auf eine.
+  // Zutaten als Definition-List-Grid: fixe Mengen-Spalte (rechts-aligned,
+  // tabular-numerals) gefolgt vom Namen. Spalten-Anzahl skaliert mit der
+  // Zutaten-Menge (siehe pickIngredientColumns). Group-Labels ("Für die
+  // Soße") spannen jeweils volle Breite, dann beginnt das Grid darunter
+  // von Neuem — so bleibt die Lesbarkeit pro Sub-Gruppe erhalten.
+  const amountColWidth =
+    density.ingredientFontSize * 3.6; // ~36-40pt je nach FontSize, hält "350 g" + "1 EL" sauber rechts-bündig
   return (
     <View>
       {groups.map((group, gi) => {
-        const items = group.items
-          .map((it) => {
-            const amount = formatIngredientAmount(it.amount);
-            const note = it.note ? ` (${it.note})` : "";
-            // Format: "{amount}  {name}{note}" — zwei spaces zwischen amount
-            // und name lassen die Menge optisch atmen ohne sie zu trennen.
-            return amount
-              ? `${amount}  ${it.name}${note}`
-              : `${it.name}${note}`;
-          })
-          .join("  ·  ");
+        const cols = pickIngredientColumns(group.items.length);
+        // Items in Spalten verteilen — kolumnen-major fuer Lesefluss
+        // top-to-bottom-left-to-right (Recipe-Standard).
+        const perCol = Math.ceil(group.items.length / cols);
+        const columns: typeof group.items[] = [];
+        for (let i = 0; i < cols; i++) {
+          columns.push(group.items.slice(i * perCol, (i + 1) * perCol));
+        }
         return (
           <View
             key={gi}
             style={{
-              marginBottom: gi === groups.length - 1 ? 0 : 6,
+              marginBottom: gi === groups.length - 1 ? 0 : 10,
             }}
           >
             {group.name ? (
@@ -8250,22 +8260,71 @@ function StudioIngredientsInline({
                   color: inkSoft,
                   letterSpacing: 1.5,
                   textTransform: "uppercase",
-                  marginBottom: 3,
+                  marginBottom: 5,
                 }}
               >
                 {studioGroupLabel(group.name)}
               </Text>
             ) : null}
-            <Text
-              style={{
-                fontFamily: "Inter",
-                fontSize: density.ingredientFontSize,
-                lineHeight: density.ingredientLineHeight,
-                color: ink,
-              }}
-            >
-              {items}
-            </Text>
+            <View style={{ flexDirection: "row", gap: 16 }}>
+              {columns.map((colItems, ci) => (
+                <View key={ci} style={{ flex: 1 }}>
+                  {colItems.map((it, ii) => {
+                    const amount = formatIngredientAmount(it.amount);
+                    return (
+                      <View
+                        key={ii}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "flex-start",
+                          marginBottom:
+                            ii === colItems.length - 1
+                              ? 0
+                              : density.ingredientFontSize * 0.4,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            width: amountColWidth,
+                            fontFamily: "Inter",
+                            fontSize: density.ingredientFontSize,
+                            fontWeight: 600,
+                            lineHeight: density.ingredientLineHeight,
+                            color: ink,
+                            textAlign: "right",
+                            paddingRight: 8,
+                          }}
+                        >
+                          {amount || ""}
+                        </Text>
+                        <Text
+                          style={{
+                            flex: 1,
+                            fontFamily: "Inter",
+                            fontSize: density.ingredientFontSize,
+                            lineHeight: density.ingredientLineHeight,
+                            color: ink,
+                          }}
+                        >
+                          {it.name}
+                          {it.note ? (
+                            <Text
+                              style={{
+                                color: inkSoft,
+                                fontStyle: "italic",
+                              }}
+                            >
+                              {" "}
+                              ({it.note})
+                            </Text>
+                          ) : null}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
           </View>
         );
       })}
@@ -8511,9 +8570,45 @@ function StudioPage({
         style={{
           height: 0.5,
           backgroundColor: c.divider,
-          marginBottom: d.sectionGap,
+          marginBottom: showStory ? 16 : d.sectionGap,
         }}
       />
+
+      {/* ───── Story als Lead-Paragraph (vor Zubereitung) ─────────────── */}
+      {/* Story sitzt jetzt UNTER dem Header und VOR der Zubereitung — wie
+          ein redaktioneller Lead in Editorial-Magazinen. Vorher war sie
+          zwischen Steps und Zutaten, was den Lesefluss bricht. Italic
+          Fraunces zentriert mit Akzent-Strich darueber. */}
+      {showStory ? (
+        <View
+          style={{
+            marginBottom: d.sectionGap,
+            paddingHorizontal: 18,
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: 14,
+              height: 0.8,
+              backgroundColor: t.accent,
+              marginBottom: 10,
+            }}
+          />
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: d.storyFontSize,
+              fontStyle: "italic",
+              color: c.inkSoft,
+              lineHeight: d.storyLineHeight,
+              textAlign: "center",
+            }}
+          >
+            {recipe.description}
+          </Text>
+        </View>
+      ) : null}
 
       {/* ───── Zubereitung (Big-Number Steps) ─────────────────────────── */}
       <StudioSectionLabel
@@ -8635,49 +8730,18 @@ function StudioPage({
         </View>
       )}
 
-      {/* ───── Optional Story-Pull-Quote ──────────────────────────────── */}
-      {showStory ? (
-        <View
-          style={{
-            marginTop: d.sectionGap,
-            marginBottom: d.sectionGap,
-            paddingHorizontal: 24,
-            alignItems: "center",
-          }}
-        >
-          <View
-            style={{
-              width: 14,
-              height: 0.8,
-              backgroundColor: t.accent,
-              marginBottom: 10,
-            }}
-          />
-          <Text
-            style={{
-              fontFamily: "Fraunces",
-              fontSize: d.storyFontSize,
-              fontStyle: "italic",
-              color: c.inkSoft,
-              lineHeight: d.storyLineHeight,
-              textAlign: "center",
-            }}
-          >
-            {recipe.description}
-          </Text>
-        </View>
-      ) : (
-        <View style={{ height: d.sectionGap }} />
-      )}
+      {/* Spacer zwischen Steps und Zutaten — kein Story-Block mehr hier
+          (Story sitzt jetzt UNTER dem Header). */}
+      <View style={{ height: d.sectionGap }} />
 
-      {/* ───── Zutaten (Inline-Linie) ─────────────────────────────────── */}
+      {/* ───── Zutaten (responsive 1/2/3-Spalten-Grid) ────────────────── */}
       <StudioSectionLabel
         label="Zutaten"
         density={d}
         accent={t.accent}
         divider={c.divider}
       />
-      <StudioIngredientsInline
+      <StudioIngredientsGrid
         groups={ingredientGroups}
         density={d}
         ink={c.ink}
