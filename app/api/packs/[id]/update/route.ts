@@ -56,6 +56,7 @@ const VALID_LAYOUTS: CardLayout[] = [
   "newspaper",
   "restaurant",
   "studio",
+  "feature",
 ];
 
 function sanitizeMood(mood: unknown): PackMood | undefined {
