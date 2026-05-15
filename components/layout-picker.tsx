@@ -852,6 +852,71 @@ export function LayoutThumbnail({
           />
         </>
       )}
+      {layout === "feature" && (
+        <>
+          {/* Cinematic Split — Content links ~42 %, Hero rechts ~58 % full-bleed */}
+          {/* Hero-Block rechts (volle Hoehe) */}
+          <rect
+            x="20"
+            y="0"
+            width="28"
+            height="36"
+            fill={fill}
+            opacity="0.7"
+          />
+          {/* Soft-Fade an der linken Foto-Kante (zwei abgestufte Bands) */}
+          <rect
+            x="19"
+            y="0"
+            width="2.5"
+            height="36"
+            fill={bg}
+            opacity="0.55"
+          />
+          <rect
+            x="21"
+            y="0"
+            width="2"
+            height="36"
+            fill={bg}
+            opacity="0.25"
+          />
+          {/* Title-Stack links */}
+          <rect x="2.5" y="3" width="14" height="2.2" rx="0.4" fill={stroke} />
+          <rect x="2.5" y="6" width="9" height="2.2" rx="0.4" fill={stroke} />
+          <rect x="2.5" y="9.2" width="4" height="0.8" rx="0.2" fill={fill} />
+          {/* Meta-Row (Zeit + Personen Icons) */}
+          <circle cx="3.6" cy="12.5" r="0.7" fill="none" stroke={stroke} strokeWidth="0.2" />
+          <rect x="5" y="12.1" width="4" height="0.8" rx="0.2" fill={stroke} opacity="0.6" />
+          <circle cx="10.6" cy="12.5" r="0.6" fill="none" stroke={stroke} strokeWidth="0.2" />
+          <rect x="11.8" y="12.1" width="4.5" height="0.8" rx="0.2" fill={stroke} opacity="0.6" />
+          {/* Section-Label "ZUTATEN" */}
+          <rect x="2.5" y="15" width="0.6" height="0.6" fill={fill} />
+          <rect x="3.7" y="15" width="5" height="0.6" rx="0.1" fill={fill} />
+          {/* Zutaten 2-Spalten */}
+          <rect x="2.5" y="17" width="3.5" height="0.6" rx="0.15" fill={stroke} opacity="0.7" />
+          <rect x="2.5" y="18.2" width="6" height="0.6" rx="0.15" fill={stroke} opacity="0.55" />
+          <rect x="2.5" y="19.4" width="5" height="0.6" rx="0.15" fill={stroke} opacity="0.55" />
+          <rect x="10" y="17" width="3.5" height="0.6" rx="0.15" fill={stroke} opacity="0.7" />
+          <rect x="10" y="18.2" width="5" height="0.6" rx="0.15" fill={stroke} opacity="0.55" />
+          <rect x="10" y="19.4" width="4.5" height="0.6" rx="0.15" fill={stroke} opacity="0.55" />
+          {/* Section-Label "ZUBEREITUNG" */}
+          <rect x="2.5" y="22" width="0.6" height="0.6" fill={fill} />
+          <rect x="3.7" y="22" width="7" height="0.6" rx="0.1" fill={fill} />
+          {/* Steps nummeriert */}
+          <rect x="2.5" y="24" width="1" height="1" fill={fill} />
+          <rect x="4" y="24.2" width="12" height="0.55" rx="0.1" fill={stroke} opacity="0.55" />
+          <rect x="2.5" y="26" width="1" height="1" fill={fill} />
+          <rect x="4" y="26.2" width="13" height="0.55" rx="0.1" fill={stroke} opacity="0.55" />
+          <rect x="2.5" y="28" width="1" height="1" fill={fill} />
+          <rect x="4" y="28.2" width="11" height="0.55" rx="0.1" fill={stroke} opacity="0.55" />
+          <rect x="2.5" y="30" width="1" height="1" fill={fill} />
+          <rect x="4" y="30.2" width="12" height="0.55" rx="0.1" fill={stroke} opacity="0.55" />
+          {/* Footer-Linie + handle */}
+          <rect x="2.5" y="32.5" width="14.5" height="0.3" fill={stroke} opacity="0.25" />
+          <rect x="2.5" y="33.5" width="6" height="0.7" rx="0.15" fill={stroke} opacity="0.4" />
+        </>
+      )}
     </svg>
   );
 }

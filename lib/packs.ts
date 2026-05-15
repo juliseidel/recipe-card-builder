@@ -72,7 +72,8 @@ export type CardLayout =
   // Spec siehe docs/LAYOUT_RULES.md.
   | "newspaper" // Broadsheet-Editorial: Drop-Cap Lead + 3-Spalten + Spreadsheet-Mikros
   | "restaurant" // Fine-Dining-Speisekarte: Cream + Gold, quadrat. Hero mit Gold-Border, Dot-Leader-Zutaten, Roman-Steps, Wine-Notes-Mikros
-  | "studio"; // Step-First Choreographie: kleiner Hero rechts oben, große Step-Numbers links, Zutaten als Inline-Linie, Mikros als prose. Auto-Fit über 3 Density-Stufen + Title-Auto-Shrink + Step-Spaltenwechsel ab 10+ Steps.
+  | "studio" // Step-First Choreographie: kleiner Hero rechts oben, große Step-Numbers links, Zutaten als Inline-Linie, Mikros als prose. Auto-Fit über 3 Density-Stufen + Title-Auto-Shrink + Step-Spaltenwechsel ab 10+ Steps.
+  | "feature"; // Cinematic Split: Content links ~42% auf warmem Cream-Tint, Hero rechts ~58% full-bleed mit Soft-Fade in den Content. Editorial-Magazin-Stil, sans-serif. Auto-Fit über 3 Density-Stufen + Title-Shrink + adaptive Zutaten-Spalten (2→1 bei <6 items) + Step-Font-Shrink ab 8+ Schritten.
 
 export type Pack = {
   slug: string;

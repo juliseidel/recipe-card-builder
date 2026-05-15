@@ -68,6 +68,12 @@ const VARIANTS: Record<
   // klare Typografie, Magazine-Tonalität, kein Tint. Kein dedizierter
   // Foreword nötig, weil das Recipe-Layout selbst genug Distinktion bringt.
   studio: EditorialForewordPage,
+  // Feature-Foreword: das Feature-Recipe-Layout ist Cinematic-Split mit
+  // grossem Hero rechts und Cream-Content links. Editorial-Foreword passt
+  // visuell — Pack-Mood-Background als Frame, weisse Card mit Hero oben,
+  // Greeting in italic Fraunces. Der Lese-Beat baut sauber zur Recipe-
+  // Card-Seite ueber (auch Hero-zentriert, auch warmes Tint).
+  feature: EditorialForewordPage,
 };
 
 export function ForewordPage(props: ForewordPageProps) {

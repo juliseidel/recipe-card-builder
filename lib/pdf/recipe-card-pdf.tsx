@@ -77,6 +77,7 @@ const LAYOUTS: Record<CardLayout, (p: RecipeCardPdfProps) => React.JSX.Element> 
   newspaper: NewspaperPage,
   restaurant: RestaurantPage,
   studio: StudioPage,
+  feature: FeaturePage,
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -8800,6 +8801,1042 @@ function StudioPage({
             }}
           />
         ) : null}
+      </View>
+    </Page>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// LAYOUT 11: FEATURE — Cinematic Split (Phase D, ab 2026-05-15)
+// ═════════════════════════════════════════════════════════════════════════════
+// Editorial-Magazin-Split: Content links (~42 %) auf warmem Cream-Tint (vom
+// Pack-Mood abgeleitet), grosses Hero-Foto rechts (~58 %) full-bleed mit
+// Soft-Fade in den Content-Bereich. Sans-Serif, ruhige Hierarchie, foto-
+// zentriert. Vorlage: User-Mockup mit Vegetable-Saute-Pasta.
+//
+// Was Feature einzigartig macht (klare Distinktion zu den 10 anderen):
+//   - Foto rechts dominiert (alle anderen Layouts: Foto klein/zentriert/
+//     oben/in-Card; Feature: full-bleed asymmetrisch)
+//   - Soft-Fade zwischen Foto und Content via Svg-LinearGradient — kein
+//     hartes Edge, das Foto blendet sanft in den Content
+//   - Content-Background warmes Cream aus Pack-Mood (blendWithWhite),
+//     nicht white/cream-static — passt zur Brand-Color des Packs
+//   - Zutaten in adaptiven 2 Spalten (Hauptzutaten + Sub-Group oder
+//     Item-Split), bei <6 Items auf 1 Spalte zusammen
+//   - Mikros als kompakter Italic-Strip ZWISCHEN Zutaten und Steps —
+//     nicht am Footer wie Studio, nicht im Body wie Editorial
+//   - Steps nummeriert mit kleinen "1." Numerals (nicht Big-Number wie
+//     Studio, nicht Roman wie Restaurant)
+//   - Meta-Row mit echten Icons (Clock + People) statt Text-Strip
+//
+// Auto-Fit garantiert Single-Page:
+//   - 3 Density-Stufen via getDensity() (compact / balanced / spacious)
+//   - Title-Auto-Shrink via featureTitleScale() (1.0 / 0.85 / 0.72 / 0.62)
+//   - Step-Font-Shrink ab 8+ Steps (-1 pt) und ab 12+ Steps (-2 pt) —
+//     Content-Bereich ist zu schmal fuer 2-Spalten-Steps wie Studio
+//   - Ingredients-Auto-Layout: 1 Spalte bei <6 Items, 2 Spalten sonst
+//   - Story-Block nur bei spacious + shouldShowStory
+//   - Mikros max 4 sichtbar, fallen weg wenn nicht vorhanden
+//   - Story/Mikros koennen einzeln fehlen ohne dass Whitespace entsteht —
+//     flex-Spacer schiebt Footer immer an die untere Page-Kante
+//
+// Hero-Fade-Implementation:
+//   - Foto liegt absolut rechts (heroLeft .. PAGE_WIDTH), full-height
+//   - Daneben ein 70 pt breites Svg-Overlay mit LinearGradient vom
+//     Content-BG (Opacity 1) zu transparent — masked die linke Foto-Kante
+//   - Render-order: Page-BG (cream) → Hero (absolute, right) → Fade-Svg
+//     (absolute, at-edge) → Content (oben, links)
+//
+// Color-Strategy:
+//   - contentBg: blendWithWhite(t.bg, 0.62) — warmer Cream-Tint aus Mood
+//   - ink: t.ink (dark warm aus Mood, ueber alle Packs schwarz-genug)
+//   - inkSoft / inkSubtle: aus Mood abgeleitet (60/45 % Opacity-Schritte)
+//   - accent: t.accent (Pack-Mood-Akzent fuer Title-Strich + Section-Caps)
+//
+// Anti-Patterns aus LAYOUT_RULES.md adressiert:
+//   - Em-dashes (–/—) im Body durch · ersetzt
+//   - Pack-Nummerierung nicht im Card-Druck (Eyebrow zeigt Recipe-Index)
+//   - Footer-Strip bricht nicht um (max 4 Mikros enforced)
+//   - Title-Wrap via softWrapTitle (Bindestrich-Words werden brechbar)
+
+const FEATURE_COLORS = {
+  // Static fallback wenn Mood-Mix fehlschlaegt. Wird ueberschrieben vom
+  // dynamischen contentBg im FeaturePage-Renderer.
+  contentBg: "#f0e2d2",
+  ink: "#2a1f15",
+  inkSoft: "#5e4b3a",
+  inkSubtle: "#8a7964",
+  inkFaint: "#bba898",
+  divider: "#d5c4ad",
+} as const;
+
+const FEATURE_DENSITY: Record<
+  Density,
+  {
+    contentWidthPct: number; // 0..1 — Anteil der Page-Breite
+    fadeWidth: number; // pt — Soft-Fade-Overlay
+    contentPadH: number;
+    contentPadTop: number;
+    contentPadBottom: number;
+    titleFontSize: number;
+    storyFontSize: number;
+    storyLineHeight: number;
+    metaFontSize: number;
+    metaIconSize: number;
+    metaRowGap: number;
+    macroFontSize: number;
+    macroLabelFontSize: number;
+    macroRowGap: number;
+    sectionLabelFontSize: number;
+    sectionLabelGapTop: number;
+    sectionLabelGapBottom: number;
+    ingredientFontSize: number;
+    ingredientLineHeight: number;
+    ingredientGap: number;
+    ingredientGroupLabelFontSize: number;
+    ingredientColumnGap: number;
+    stepNumColWidth: number;
+    stepNumFontSize: number;
+    stepFontSize: number;
+    stepLineHeight: number;
+    stepGap: number;
+    microsFontSize: number;
+    microsLineHeight: number;
+    footerFontSize: number;
+    eyebrowFontSize: number;
+  }
+> = {
+  // Compact — score >= 22 (z.B. 14 Zutaten + 12 Steps). Content schrumpft,
+  // Hero wird breiter (Foto bleibt Star), Typo wird dichter.
+  compact: {
+    contentWidthPct: 0.42,
+    fadeWidth: 60,
+    contentPadH: 24,
+    contentPadTop: 28,
+    contentPadBottom: 24,
+    titleFontSize: 21,
+    storyFontSize: 8.5,
+    storyLineHeight: 1.45,
+    metaFontSize: 8,
+    metaIconSize: 10,
+    metaRowGap: 16,
+    macroFontSize: 9,
+    macroLabelFontSize: 6.5,
+    macroRowGap: 10,
+    sectionLabelFontSize: 7,
+    sectionLabelGapTop: 12,
+    sectionLabelGapBottom: 7,
+    ingredientFontSize: 8,
+    ingredientLineHeight: 1.5,
+    ingredientGap: 2,
+    ingredientGroupLabelFontSize: 7,
+    ingredientColumnGap: 12,
+    stepNumColWidth: 16,
+    stepNumFontSize: 9,
+    stepFontSize: 8.5,
+    stepLineHeight: 1.4,
+    stepGap: 5,
+    microsFontSize: 7.5,
+    microsLineHeight: 1.4,
+    footerFontSize: 7,
+    eyebrowFontSize: 7,
+  },
+  // Balanced — score 15-21 (Standard). Mid-range — Title atmet, Zutaten in
+  // 2 Spalten lesbar, Steps mit gutem Spacing.
+  balanced: {
+    contentWidthPct: 0.44,
+    fadeWidth: 70,
+    contentPadH: 28,
+    contentPadTop: 36,
+    contentPadBottom: 30,
+    titleFontSize: 27,
+    storyFontSize: 9.5,
+    storyLineHeight: 1.55,
+    metaFontSize: 9,
+    metaIconSize: 11,
+    metaRowGap: 18,
+    macroFontSize: 10,
+    macroLabelFontSize: 7,
+    macroRowGap: 12,
+    sectionLabelFontSize: 7.5,
+    sectionLabelGapTop: 16,
+    sectionLabelGapBottom: 9,
+    ingredientFontSize: 9,
+    ingredientLineHeight: 1.6,
+    ingredientGap: 3,
+    ingredientGroupLabelFontSize: 7.5,
+    ingredientColumnGap: 14,
+    stepNumColWidth: 18,
+    stepNumFontSize: 10,
+    stepFontSize: 9.5,
+    stepLineHeight: 1.5,
+    stepGap: 7,
+    microsFontSize: 8.5,
+    microsLineHeight: 1.5,
+    footerFontSize: 7.5,
+    eyebrowFontSize: 7.5,
+  },
+  // Spacious — score <= 14 (z.B. 5 Zutaten + 4 Steps). Title gross,
+  // Story-Block sichtbar wenn vorhanden, weite Step-Choreographie, alles
+  // atmet ohne dass die Page halbleer wirkt.
+  spacious: {
+    contentWidthPct: 0.46,
+    fadeWidth: 78,
+    contentPadH: 32,
+    contentPadTop: 44,
+    contentPadBottom: 36,
+    titleFontSize: 33,
+    storyFontSize: 10.5,
+    storyLineHeight: 1.62,
+    metaFontSize: 9.5,
+    metaIconSize: 12,
+    metaRowGap: 20,
+    macroFontSize: 11,
+    macroLabelFontSize: 7.5,
+    macroRowGap: 14,
+    sectionLabelFontSize: 8,
+    sectionLabelGapTop: 20,
+    sectionLabelGapBottom: 11,
+    ingredientFontSize: 9.5,
+    ingredientLineHeight: 1.7,
+    ingredientGap: 4,
+    ingredientGroupLabelFontSize: 8,
+    ingredientColumnGap: 16,
+    stepNumColWidth: 20,
+    stepNumFontSize: 11,
+    stepFontSize: 10,
+    stepLineHeight: 1.6,
+    stepGap: 9,
+    microsFontSize: 9,
+    microsLineHeight: 1.55,
+    footerFontSize: 8,
+    eyebrowFontSize: 8,
+  },
+};
+
+// Title-Auto-Shrink — analog zu studioTitleScale. Content-Spalte ist
+// schmaler (~250 pt usable) als Studio (~300 pt), daher aggressivere Stufen.
+function featureTitleScale(title: string): number {
+  const len = title.length;
+  if (len <= 14) return 1;
+  if (len <= 22) return 0.86;
+  if (len <= 32) return 0.74;
+  if (len <= 44) return 0.64;
+  return 0.56;
+}
+
+// Step-Font-Shrink: Content-Spalte ist zu schmal fuer 2-Spalten-Steps wie
+// Studio, also stattdessen progressive Font-Verkleinerung. Verhindert dass
+// 12+ Steps ueberlaufen. Wert wird auf stepFontSize/stepNumFontSize/stepGap
+// gleichzeitig angewandt, damit die Choreographie proportional bleibt.
+function featureStepFontShrink(stepCount: number): number {
+  if (stepCount >= 12) return -1.5;
+  if (stepCount >= 8) return -0.7;
+  return 0;
+}
+
+// Macros — nur Werte > 0. Selbe Regel wie Studio.
+function featureMacroEntries(
+  recipe: Recipe
+): Array<{ label: string; value: string }> {
+  const n = recipe.nutrition;
+  const entries: Array<{ label: string; value: string }> = [];
+  if (n.kcal > 0) entries.push({ label: "KCAL", value: String(n.kcal) });
+  if (n.protein > 0) entries.push({ label: "P", value: `${n.protein} g` });
+  if (n.carbs > 0) entries.push({ label: "KH", value: `${n.carbs} g` });
+  if (n.fat > 0) entries.push({ label: "F", value: `${n.fat} g` });
+  return entries;
+}
+
+// Zutaten-Layout: bei wenigen Items 1 Spalte, sonst 2 Spalten. Bei mehreren
+// Sub-Groups wird die erste Gruppe links, restliche rechts gerendert; bei
+// einer einzigen Gruppe wird sie 50/50 in zwei Listen halbiert (kein
+// duplicater Gruppen-Name rechts).
+type IngredientColumnPlan = {
+  twoCol: boolean;
+  leftBlocks: IngredientGroup[];
+  rightBlocks: IngredientGroup[];
+};
+
+function featurePlanIngredientColumns(
+  groups: IngredientGroup[]
+): IngredientColumnPlan {
+  const totalItems = groups.reduce((s, g) => s + g.items.length, 0);
+  if (totalItems < 6) {
+    return { twoCol: false, leftBlocks: groups, rightBlocks: [] };
+  }
+  if (groups.length >= 2) {
+    // Mehrere Gruppen: Haupt-Gruppe links, Sub-Gruppen rechts. Wenn die
+    // erste Gruppe ueberproportional gross ist (z.B. 12 Haupt + 2 Sauce),
+    // splitten wir die main-Gruppe auf — damit beide Spalten gleich lang
+    // sind und der Reader nicht eine endlose linke Liste liest.
+    const first = groups[0];
+    const rest = groups.slice(1);
+    const restCount = rest.reduce((s, g) => s + g.items.length, 0);
+    if (first.items.length > restCount * 2.5 && first.items.length >= 6) {
+      const half = Math.ceil(first.items.length / 2);
+      return {
+        twoCol: true,
+        leftBlocks: [{ name: first.name, items: first.items.slice(0, half) }],
+        rightBlocks: [
+          { name: null, items: first.items.slice(half) },
+          ...rest,
+        ],
+      };
+    }
+    return { twoCol: true, leftBlocks: [first], rightBlocks: rest };
+  }
+  // Genau 1 Gruppe mit 6+ Items: 50/50 Split, second-half ohne Label.
+  const g = groups[0];
+  const half = Math.ceil(g.items.length / 2);
+  return {
+    twoCol: true,
+    leftBlocks: [{ name: g.name, items: g.items.slice(0, half) }],
+    rightBlocks: [{ name: null, items: g.items.slice(half) }],
+  };
+}
+
+// Sub-Group-Label: "Für die X" Regel wie restaurantGroupLabel & studioGroupLabel.
+function featureGroupLabel(name: string): string {
+  return /^(den|die|das)\s/i.test(name) ? `Für ${name.toLowerCase()}` : name;
+}
+
+// ─── Inline-SVG-Icons (Clock + People) — sans-serif clean, scaled by size ─
+function FeatureClockIcon({ size, color }: { size: number; color: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Circle
+        cx="12"
+        cy="12"
+        r="9.5"
+        stroke={color}
+        strokeWidth="1.5"
+        fill="none"
+      />
+      <Path
+        d="M12 6.5 L12 12 L15.5 13.8"
+        stroke={color}
+        strokeWidth="1.5"
+        fill="none"
+      />
+    </Svg>
+  );
+}
+
+function FeaturePeopleIcon({ size, color }: { size: number; color: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Circle
+        cx="9"
+        cy="8.5"
+        r="3"
+        stroke={color}
+        strokeWidth="1.5"
+        fill="none"
+      />
+      <Circle
+        cx="16.5"
+        cy="9.5"
+        r="2.4"
+        stroke={color}
+        strokeWidth="1.5"
+        fill="none"
+      />
+      <Path
+        d="M3.5 20.5 C 3.5 16, 6 14.5, 9 14.5 C 12 14.5, 14.5 16, 14.5 20.5"
+        stroke={color}
+        strokeWidth="1.5"
+        fill="none"
+      />
+      <Path
+        d="M15 20.5 C 15 17.5, 17 16.5, 18.5 16.5 C 20 16.5, 20.5 17.5, 20.5 20.5"
+        stroke={color}
+        strokeWidth="1.5"
+        fill="none"
+      />
+    </Svg>
+  );
+}
+
+// Section-Label im Feature-Stil: kleiner Accent-Punkt links + caps-Label.
+// Im Gegensatz zu Studio (Linien beidseitig) hier links-bündig, weil
+// Content-Spalte schmal ist und beidseitige Linien zu eng wirken.
+function FeatureSectionLabel({
+  label,
+  density,
+  accent,
+}: {
+  label: string;
+  density: (typeof FEATURE_DENSITY)["balanced"];
+  accent: string;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 7,
+        marginTop: density.sectionLabelGapTop,
+        marginBottom: density.sectionLabelGapBottom,
+      }}
+    >
+      <View
+        style={{
+          width: 5,
+          height: 5,
+          backgroundColor: accent,
+        }}
+      />
+      <Text
+        style={{
+          fontFamily: "Inter",
+          fontSize: density.sectionLabelFontSize,
+          fontWeight: 700,
+          color: accent,
+          letterSpacing: 2.2,
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function FeatureIngredientBlock({
+  group,
+  density,
+  inkPrimary,
+  inkSecondary,
+  isLast,
+}: {
+  group: IngredientGroup;
+  density: (typeof FEATURE_DENSITY)["balanced"];
+  inkPrimary: string;
+  inkSecondary: string;
+  isLast: boolean;
+}) {
+  return (
+    <View style={{ marginBottom: isLast ? 0 : density.ingredientGap + 4 }}>
+      {group.name ? (
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: density.ingredientGroupLabelFontSize,
+            fontWeight: 700,
+            color: inkSecondary,
+            letterSpacing: 1.4,
+            textTransform: "uppercase",
+            marginBottom: 4,
+          }}
+        >
+          {featureGroupLabel(group.name)}
+        </Text>
+      ) : null}
+      {group.items.map((it, i) => {
+        const amount = formatIngredientAmount(it.amount);
+        // Zutaten-Zeile: amount fett dunkel, name leicht heller, note in
+        // klammern. Layout-Beat aehnelt dem Mockup (kein Dot-Leader, keine
+        // Zahlen-Tabellen, einfach lesbar).
+        return (
+          <View
+            key={`ing-${i}`}
+            style={{
+              marginBottom: density.ingredientGap,
+              flexDirection: "row",
+              alignItems: "baseline",
+              gap: 4,
+              flexWrap: "wrap",
+            }}
+          >
+            {amount ? (
+              <Text
+                style={{
+                  fontFamily: "Inter",
+                  fontSize: density.ingredientFontSize,
+                  fontWeight: 600,
+                  color: inkPrimary,
+                  lineHeight: density.ingredientLineHeight,
+                }}
+              >
+                {amount}
+              </Text>
+            ) : null}
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: density.ingredientFontSize,
+                color: inkPrimary,
+                lineHeight: density.ingredientLineHeight,
+                flexShrink: 1,
+              }}
+            >
+              {it.name}
+              {it.note ? (
+                <Text
+                  style={{
+                    fontFamily: "Inter",
+                    fontStyle: "italic",
+                    fontSize: density.ingredientFontSize - 0.5,
+                    color: inkSecondary,
+                  }}
+                >
+                  {` (${it.note})`}
+                </Text>
+              ) : null}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function FeaturePage({
+  brand,
+  pack,
+  recipe,
+  totalRecipes,
+  heroDataUri,
+  qrDataUri,
+  hideRecipeIndex,
+}: RecipeCardPdfProps) {
+  const t = packTheme(pack);
+  const baseDensity = getDensity(recipe);
+  const d = FEATURE_DENSITY[baseDensity];
+
+  // ─── Dynamische Mood-Farben fuer Content-BG + Ink ─────────────────────
+  // Cream-Tint vom Pack-Mood — beige bei honey, sage-creme bei sage etc.
+  // 62 % Weiss-Mix gibt warmes Pastell ohne den Mood zu verfaelschen.
+  // Fallback auf statisches Cream wenn Mix-Operation fehlt.
+  const contentBg = blendWithWhite(t.bg, 0.62);
+  const ink = t.ink;
+  const inkSoft = t.inkSoft;
+  const inkSubtle = blendWithWhite(t.ink, 0.45);
+  const inkFaint = blendWithWhite(t.ink, 0.65);
+  const divider = blendWithWhite(t.accent, 0.6);
+
+  // ─── Title-Scale + Auto-Shrink ────────────────────────────────────────
+  const titleScale =
+    featureTitleScale(recipe.title) + (recipe.tweaks?.titleScale ?? 0) * 0.03;
+  const finalTitleSize = Math.round(d.titleFontSize * titleScale * 10) / 10;
+
+  // ─── Step-Font-Shrink basierend auf Step-Count ─────────────────────────
+  const stepShrink = featureStepFontShrink(recipe.steps.length);
+  const stepFontSize = d.stepFontSize + stepShrink;
+  const stepNumFontSize = d.stepNumFontSize + stepShrink;
+  const stepGap = Math.max(d.stepGap + stepShrink * 0.5, 3);
+
+  // ─── Daten vorbereiten ────────────────────────────────────────────────
+  const grouped = groupIngredients(recipe.ingredients);
+  const ingPlan = featurePlanIngredientColumns(grouped);
+  const stepGroups = groupSteps(recipe.steps);
+  const flatSteps: Array<
+    | { kind: "group-label"; label: string }
+    | { kind: "step"; index: number; text: string }
+  > = [];
+  stepGroups.forEach((g) => {
+    if (g.name) {
+      flatSteps.push({ kind: "group-label", label: featureGroupLabel(g.name) });
+    }
+    g.items.forEach((it) => {
+      flatSteps.push({ kind: "step", index: it.index, text: it.text });
+    });
+  });
+
+  const micros = visibleMicros(recipe);
+  const showMicros = micros.length > 0 && shouldShowMicros(recipe);
+  const microsToShow = micros.slice(0, 4);
+
+  const macros = featureMacroEntries(recipe);
+  const showStory = shouldShowStory(recipe) && baseDensity !== "compact";
+  const totalMin = totalTime(recipe);
+  const servings = servingsCountLabel(recipe);
+
+  const indexLabel =
+    hideRecipeIndex || totalRecipes <= 0
+      ? null
+      : `${pad2(recipe.number)} / ${pad2(totalRecipes)}`;
+
+  // ─── Page-Geometrie ───────────────────────────────────────────────────
+  // A4: 595 x 842 pt. Content links, Hero rechts.
+  const PAGE_WIDTH = 595;
+  const PAGE_HEIGHT = 842;
+  const contentWidth = Math.round(PAGE_WIDTH * d.contentWidthPct);
+  const heroWidth = PAGE_WIDTH - contentWidth;
+  // Fade-Overlay ist auf der LINKEN Foto-Kante positioniert.
+  const fadeLeft = contentWidth - 1; // 1pt overlap fuer pixel-tight seam
+
+  return (
+    <Page
+      size="A4"
+      style={{
+        backgroundColor: contentBg,
+        fontFamily: "Inter",
+        color: ink,
+        // Kein padding hier — die Spalten managen ihre eigenen Innenraender.
+      }}
+    >
+      {/* ─── Hero-Foto (full-bleed rechts) ────────────────────────────── */}
+      <View
+        style={{
+          position: "absolute",
+          right: 0,
+          top: 0,
+          width: heroWidth,
+          height: PAGE_HEIGHT,
+          backgroundColor: blendWithWhite(t.accent, 0.9),
+        }}
+      >
+        {heroDataUri ? (
+          <Image
+            src={heroDataUri}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        ) : (
+          <View
+            style={{
+              width: "100%",
+              height: "100%",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: 140,
+                color: withAlpha(t.accent, 0.35),
+                lineHeight: 1,
+              }}
+            >
+              {recipe.title.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* ─── Soft-Fade-Overlay an der linken Foto-Kante ───────────────── */}
+      <Svg
+        width={d.fadeWidth}
+        height={PAGE_HEIGHT}
+        viewBox={`0 0 ${d.fadeWidth} ${PAGE_HEIGHT}`}
+        style={{
+          position: "absolute",
+          left: fadeLeft,
+          top: 0,
+        }}
+      >
+        <Defs>
+          <LinearGradient
+            id="feature-fade"
+            x1="0"
+            y1="0"
+            x2={String(d.fadeWidth)}
+            y2="0"
+          >
+            <Stop offset="0" stopColor={contentBg} stopOpacity={1} />
+            <Stop offset="0.5" stopColor={contentBg} stopOpacity={0.78} />
+            <Stop offset="1" stopColor={contentBg} stopOpacity={0} />
+          </LinearGradient>
+        </Defs>
+        <Rect
+          x="0"
+          y="0"
+          width={d.fadeWidth}
+          height={PAGE_HEIGHT}
+          fill="url(#feature-fade)"
+        />
+      </Svg>
+
+      {/* ─── Content-Spalte links ─────────────────────────────────────── */}
+      <View
+        style={{
+          width: contentWidth,
+          height: PAGE_HEIGHT,
+          paddingTop: d.contentPadTop,
+          paddingBottom: d.contentPadBottom,
+          paddingLeft: d.contentPadH,
+          paddingRight: d.contentPadH,
+          flexDirection: "column",
+        }}
+      >
+        {/* Eyebrow oben (Pack-Title · Index) */}
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 14,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: d.eyebrowFontSize,
+              fontWeight: 700,
+              color: inkSubtle,
+              letterSpacing: 2.2,
+              textTransform: "uppercase",
+            }}
+          >
+            {pack.title}
+          </Text>
+          {indexLabel ? (
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: d.eyebrowFontSize,
+                fontWeight: 500,
+                color: inkFaint,
+                letterSpacing: 1.4,
+              }}
+            >
+              {indexLabel}
+            </Text>
+          ) : null}
+        </View>
+
+        {/* Title + Akzent-Strich */}
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: finalTitleSize,
+            fontWeight: 700,
+            color: ink,
+            lineHeight: 1.05,
+            letterSpacing: -0.4,
+          }}
+        >
+          {softWrapTitle(recipe.title)}
+        </Text>
+        <View
+          style={{
+            width: 28,
+            height: 2,
+            backgroundColor: t.accent,
+            marginTop: 8,
+            marginBottom: 12,
+          }}
+        />
+
+        {/* Subtitle (wenn gesetzt, kompakt) */}
+        {recipe.subtitle ? (
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontStyle: "italic",
+              fontSize: d.storyFontSize + 0.5,
+              color: inkSoft,
+              lineHeight: 1.4,
+              marginBottom: 8,
+            }}
+          >
+            {recipe.subtitle}
+          </Text>
+        ) : null}
+
+        {/* Optional Story — nur wenn shouldShowStory && nicht compact */}
+        {showStory ? (
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: d.storyFontSize,
+              color: inkSoft,
+              lineHeight: d.storyLineHeight,
+              marginBottom: 6,
+            }}
+          >
+            {recipe.description}
+          </Text>
+        ) : null}
+
+        {/* Meta-Row: Clock-Icon + Zeit | People-Icon + Portionen */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: d.metaRowGap,
+            marginTop: 14,
+            marginBottom: 14,
+          }}
+        >
+          {totalMin > 0 ? (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 7,
+              }}
+            >
+              <FeatureClockIcon size={d.metaIconSize} color={inkSoft} />
+              <Text
+                style={{
+                  fontFamily: "Inter",
+                  fontSize: d.metaFontSize,
+                  fontWeight: 500,
+                  color: inkSoft,
+                }}
+              >
+                {totalMin} Min
+              </Text>
+            </View>
+          ) : null}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 7,
+            }}
+          >
+            <FeaturePeopleIcon size={d.metaIconSize} color={inkSoft} />
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: d.metaFontSize,
+                fontWeight: 500,
+                color: inkSoft,
+              }}
+            >
+              {servings}
+            </Text>
+          </View>
+        </View>
+
+        {/* Macros-Pills — kompakt inline, nur wenn Werte > 0 */}
+        {macros.length > 0 ? (
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              alignItems: "baseline",
+              gap: d.macroRowGap,
+              paddingTop: 10,
+              borderTopWidth: 0.5,
+              borderTopColor: divider,
+            }}
+          >
+            {macros.map((m) => (
+              <View
+                key={m.label}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "baseline",
+                  gap: 3,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: "Inter",
+                    fontSize: d.macroFontSize,
+                    fontWeight: 700,
+                    color: ink,
+                  }}
+                >
+                  {m.value}
+                </Text>
+                <Text
+                  style={{
+                    fontFamily: "Inter",
+                    fontSize: d.macroLabelFontSize,
+                    fontWeight: 700,
+                    color: inkSubtle,
+                    letterSpacing: 1.2,
+                  }}
+                >
+                  {m.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {/* Section: Zutaten */}
+        <FeatureSectionLabel
+          label="Zutaten"
+          density={d}
+          accent={t.accent}
+        />
+        {ingPlan.twoCol ? (
+          <View
+            style={{
+              flexDirection: "row",
+              gap: d.ingredientColumnGap,
+              alignItems: "flex-start",
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              {ingPlan.leftBlocks.map((g, i) => (
+                <FeatureIngredientBlock
+                  key={`L-${i}`}
+                  group={g}
+                  density={d}
+                  inkPrimary={ink}
+                  inkSecondary={inkSoft}
+                  isLast={i === ingPlan.leftBlocks.length - 1}
+                />
+              ))}
+            </View>
+            <View style={{ flex: 1 }}>
+              {ingPlan.rightBlocks.map((g, i) => (
+                <FeatureIngredientBlock
+                  key={`R-${i}`}
+                  group={g}
+                  density={d}
+                  inkPrimary={ink}
+                  inkSecondary={inkSoft}
+                  isLast={i === ingPlan.rightBlocks.length - 1}
+                />
+              ))}
+            </View>
+          </View>
+        ) : (
+          <View>
+            {ingPlan.leftBlocks.map((g, i) => (
+              <FeatureIngredientBlock
+                key={`S-${i}`}
+                group={g}
+                density={d}
+                inkPrimary={ink}
+                inkSecondary={inkSoft}
+                isLast={i === ingPlan.leftBlocks.length - 1}
+              />
+            ))}
+          </View>
+        )}
+
+        {/* Section: Mikros (zwischen Zutaten und Steps — nur wenn da) */}
+        {showMicros ? (
+          <>
+            <FeatureSectionLabel
+              label="Reich an"
+              density={d}
+              accent={t.accent}
+            />
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontStyle: "italic",
+                fontSize: d.microsFontSize,
+                color: inkSoft,
+                lineHeight: d.microsLineHeight,
+              }}
+            >
+              {microsToShow
+                .map(
+                  (m) =>
+                    `${m.name}${
+                      typeof m.pctDaily === "number" ? ` ${m.pctDaily} %` : ""
+                    }`
+                )
+                .join(" · ")}
+            </Text>
+          </>
+        ) : null}
+
+        {/* Section: Zubereitung */}
+        <FeatureSectionLabel
+          label="Zubereitung"
+          density={d}
+          accent={t.accent}
+        />
+        <View>
+          {flatSteps.map((item, i) => {
+            if (item.kind === "group-label") {
+              return (
+                <Text
+                  key={`sgl-${i}`}
+                  style={{
+                    fontFamily: "Inter",
+                    fontSize: d.ingredientGroupLabelFontSize,
+                    fontWeight: 700,
+                    color: inkSoft,
+                    letterSpacing: 1.4,
+                    textTransform: "uppercase",
+                    marginTop: i === 0 ? 0 : stepGap + 2,
+                    marginBottom: Math.max(stepGap - 2, 3),
+                  }}
+                >
+                  {item.label}
+                </Text>
+              );
+            }
+            return (
+              <View
+                key={`s-${item.index}`}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  marginBottom: stepGap,
+                }}
+              >
+                <View
+                  style={{
+                    width: d.stepNumColWidth,
+                    paddingTop: 1,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: "Inter",
+                      fontSize: stepNumFontSize,
+                      fontWeight: 700,
+                      color: t.accent,
+                      lineHeight: 1,
+                    }}
+                  >
+                    {item.index + 1}.
+                  </Text>
+                </View>
+                <Text
+                  style={{
+                    flex: 1,
+                    fontFamily: "Inter",
+                    fontSize: stepFontSize,
+                    lineHeight: d.stepLineHeight,
+                    color: ink,
+                  }}
+                >
+                  {item.text}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+
+        {/* Spacer + Footer — flex:1 schiebt Footer immer an die Page-Kante */}
+        <View style={{ flex: 1, minHeight: 8 }} />
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            paddingTop: 10,
+            borderTopWidth: 0.5,
+            borderTopColor: divider,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: d.footerFontSize,
+              fontWeight: 600,
+              color: inkSubtle,
+              letterSpacing: 1.3,
+            }}
+          >
+            {brand.handle}
+          </Text>
+          {qrDataUri ? (
+            <Image
+              src={qrDataUri}
+              style={{
+                width: 22,
+                height: 22,
+              }}
+            />
+          ) : null}
+        </View>
       </View>
     </Page>
   );

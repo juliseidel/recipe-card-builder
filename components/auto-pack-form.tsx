@@ -2643,6 +2643,70 @@ function LayoutThumbnail({
         </>
       );
       break;
+    case "feature":
+      // Cinematic-Split: warmes Cream-Tint links (~42 %), grosses Hero
+      // rechts (~58 %) mit Soft-Fade in den Content. Title + Meta + Macros +
+      // 2-Spalten Zutaten + nummerierte Steps + Mikros-Strip.
+      body = (
+        <>
+          {/* Hero rechts full-bleed */}
+          <rect x="28" y="0" width="42" height="52" fill={accent} opacity="0.7" />
+          {/* Soft-Fade-Bands an der linken Foto-Kante */}
+          <rect x="26" y="0" width="3" height="52" fill="#fff" opacity="0.5" />
+          <rect x="29" y="0" width="2.5" height="52" fill="#fff" opacity="0.25" />
+          {/* Eyebrow oben links */}
+          <rect x="4" y="3" width="12" height="0.7" rx="0.2" fill={inkSoft} opacity="0.4" />
+          {/* Title-Stack */}
+          <rect x="4" y="6" width="20" height="2.2" rx="0.3" fill={inkSoft} opacity="0.92" />
+          <rect x="4" y="9" width="14" height="2.2" rx="0.3" fill={inkSoft} opacity="0.92" />
+          <rect x="4" y="12" width="4" height="0.7" rx="0.2" fill={accent} />
+          {/* Meta-Row (Zeit + Personen) */}
+          <circle cx="5" cy="15.2" r="0.9" fill="none" stroke={inkSoft} strokeWidth="0.25" opacity="0.7" />
+          <rect x="6.5" y="14.7" width="5" height="1" rx="0.2" fill={inkSoft} opacity="0.55" />
+          <circle cx="13" cy="15.2" r="0.8" fill="none" stroke={inkSoft} strokeWidth="0.25" opacity="0.7" />
+          <rect x="14.5" y="14.7" width="6" height="1" rx="0.2" fill={inkSoft} opacity="0.55" />
+          {/* Macros-Pills */}
+          <line x1="4" y1="17.5" x2="25" y2="17.5" stroke={inkSoft} strokeWidth="0.2" opacity="0.3" />
+          <rect x="4" y="18.5" width="2.5" height="1.2" rx="0.2" fill={inkSoft} opacity="0.85" />
+          <rect x="7" y="18.7" width="3" height="0.9" rx="0.2" fill={inkSoft} opacity="0.4" />
+          <rect x="11" y="18.5" width="2.5" height="1.2" rx="0.2" fill={inkSoft} opacity="0.85" />
+          <rect x="14" y="18.7" width="2.5" height="0.9" rx="0.2" fill={inkSoft} opacity="0.4" />
+          <rect x="17.5" y="18.5" width="2.5" height="1.2" rx="0.2" fill={inkSoft} opacity="0.85" />
+          <rect x="20.5" y="18.7" width="2.5" height="0.9" rx="0.2" fill={inkSoft} opacity="0.4" />
+          {/* Section "ZUTATEN" */}
+          <rect x="4" y="22" width="0.7" height="0.7" fill={accent} />
+          <rect x="5.2" y="22" width="6" height="0.7" rx="0.15" fill={accent} />
+          {/* 2-Spalten Zutaten */}
+          <rect x="4" y="24" width="4" height="0.7" rx="0.15" fill={inkSoft} opacity="0.75" />
+          <rect x="4" y="25.4" width="7" height="0.7" rx="0.15" fill={inkSoft} opacity="0.6" />
+          <rect x="4" y="26.8" width="6" height="0.7" rx="0.15" fill={inkSoft} opacity="0.6" />
+          <rect x="14" y="24" width="3.5" height="0.7" rx="0.15" fill={inkSoft} opacity="0.75" />
+          <rect x="14" y="25.4" width="6" height="0.7" rx="0.15" fill={inkSoft} opacity="0.6" />
+          <rect x="14" y="26.8" width="5" height="0.7" rx="0.15" fill={inkSoft} opacity="0.6" />
+          {/* Section "REICH AN" */}
+          <rect x="4" y="29.5" width="0.7" height="0.7" fill={accent} />
+          <rect x="5.2" y="29.5" width="6" height="0.7" rx="0.15" fill={accent} />
+          {/* Mikros-Prose-Italic */}
+          <rect x="4" y="31.4" width="18" height="0.8" rx="0.2" fill={inkSoft} opacity="0.45" />
+          {/* Section "ZUBEREITUNG" */}
+          <rect x="4" y="34" width="0.7" height="0.7" fill={accent} />
+          <rect x="5.2" y="34" width="8" height="0.7" rx="0.15" fill={accent} />
+          {/* Nummerierte Steps */}
+          <text x="4" y="37.5" fontSize="2.4" fill={accent} fontWeight="700">1.</text>
+          <rect x="7" y="36.5" width="17" height="0.7" rx="0.15" fill={inkSoft} opacity="0.6" />
+          <rect x="7" y="37.7" width="14" height="0.7" rx="0.15" fill={inkSoft} opacity="0.6" />
+          <text x="4" y="41" fontSize="2.4" fill={accent} fontWeight="700">2.</text>
+          <rect x="7" y="40" width="17" height="0.7" rx="0.15" fill={inkSoft} opacity="0.6" />
+          <rect x="7" y="41.2" width="13" height="0.7" rx="0.15" fill={inkSoft} opacity="0.6" />
+          <text x="4" y="44.5" fontSize="2.4" fill={accent} fontWeight="700">3.</text>
+          <rect x="7" y="43.5" width="15" height="0.7" rx="0.15" fill={inkSoft} opacity="0.6" />
+          <rect x="7" y="44.7" width="12" height="0.7" rx="0.15" fill={inkSoft} opacity="0.6" />
+          {/* Footer */}
+          <line x1="4" y1="48" x2="25" y2="48" stroke={inkSoft} strokeWidth="0.2" opacity="0.3" />
+          <rect x="4" y="49" width="9" height="0.7" rx="0.15" fill={inkSoft} opacity="0.45" />
+        </>
+      );
+      break;
   }
   return (
     <svg

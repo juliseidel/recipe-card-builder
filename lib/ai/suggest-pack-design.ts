@@ -73,6 +73,16 @@ const LAYOUT_OPTIONS: { id: CardLayout; description: string }[] = [
     description:
       "Fine-Dining-Speisekarte: Cream-BG mit Gold-Akzenten. Hero quadratisch mit Gold-Border, italic Display-Title, Diamant-Ornamente. Dot-Leader-Zutaten, Roman-Numerals-Steps, Wine-Notes-Mikros. Date-Night, festliche Dinner, Premium-Hauptmahlzeiten, Wein-begleitete Kollektionen.",
   },
+  {
+    id: "studio",
+    description:
+      "Step-First-Choreographie. Pure-White-Background ohne Tint, kleiner 4:5-Portrait-Hero rechts oben, Big-Number-Steps mit vertikalem Pace-Beat als Hauptbuehne, Zutaten als fluide Inline-Linie unten, Mikros als Italic-Prose ('Reich an Vitamin C 44 %...'). Editorial-Buchstil. Passt zu Recipes wo die Technik wichtiger als die Zutaten ist (Pasta-Klassiker, Saucen, Eintoepfe, Fermentation, Baking-Techniken).",
+  },
+  {
+    id: "feature",
+    description:
+      "Cinematic-Split-Layout im Magazin-Stil: Content links ~42 % auf warmem Cream-Tint (von Mood abgeleitet), grosses Hero-Foto rechts ~58 % full-bleed mit Soft-Fade in den Content. Sans-Serif, ruhige Hierarchie. Zutaten in zwei adaptive Spalten (Hauptzutaten + Gewuerze/Beilagen, merged bei <6 Items), Steps nummeriert einspaltig, Mikros als kompakter Pill-Strip. Passt zu foto-starken Recipes wo das Bild verkauft: einfache Hauptmahlzeiten (Pasta, Bowls, Salate, Stir-Fries), Brunch-Klassiker, moderne Comfort-Food-Karten, Recipes mit ruhigem Editorial-Anspruch und starkem Hero.",
+  },
 ];
 
 const MOOD_OPTIONS = [
@@ -132,7 +142,7 @@ const RESPONSE_SCHEMA = {
     layout: {
       type: "string",
       description:
-        'Empfohlenes Layout, einer aus: "amber", "editorial", "patisserie", "minimal", "vital", "dashboard", "sport", "newspaper", "restaurant", "studio". Studio = Step-First-Choreographie mit kleinem Portrait-Hero rechts, Big-Number-Steps als Hauptbühne, Inline-Zutaten unten; passt zu Recipes wo die Technik wichtiger als die Zutaten ist (Pasta-Klassiker, Saucen, Eintöpfe, Fermentation, Baking-Techniken).',
+        'Empfohlenes Layout, einer aus: "amber", "editorial", "patisserie", "minimal", "vital", "dashboard", "sport", "newspaper", "restaurant", "studio", "feature". Studio = Step-First-Choreographie mit kleinem Portrait-Hero rechts, Big-Number-Steps als Hauptbühne, Inline-Zutaten unten; passt zu Recipes wo die Technik wichtiger als die Zutaten ist (Pasta-Klassiker, Saucen, Eintöpfe, Fermentation, Baking-Techniken). Feature = Cinematic-Split mit Content links auf Cream-Tint und großem Hero-Foto rechts mit Soft-Fade; Zutaten in 2 Spalten + nummerierte Steps; passt zu foto-starken Mahlzeiten mit ruhigem Editorial-Anspruch (Pasta, Bowls, Salate, Brunch-Klassiker).',
     },
     layoutReason: {
       type: "string",

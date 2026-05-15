@@ -85,6 +85,14 @@ export const layoutPresets: LayoutPreset[] = [
     bestFor:
       "Recipes wo die Technik wichtiger als die Zutaten ist (Pasta-Klassiker, Saucen, Eintöpfe, Fermentation, Baking-Techniken, Hauptmahlzeiten mit klarer Abfolge)",
   },
+  {
+    id: "feature",
+    title: "Feature (Cinematic Split)",
+    description:
+      "Editorial-Split-Layout im Magazin-Stil: Content links auf warmem Cream-Tint (~42 % Breite), großes Hero-Foto rechts full-bleed (~58 %) mit Soft-Fade in den Content-Bereich. Sans-Serif-Typografie, ruhige Hierarchie, Zutaten in zwei Spalten (Hauptzutaten + Gewürze/Beilagen) die bei wenig Content automatisch auf eine Spalte zusammenfließen. Steps nummeriert links, Mikronährstoffe als kompakter Strip vor den Schritten, Story als optionaler italic Block unter dem Titel. Auto-Fit über 3 Density-Stufen, Title-Shrink, Step-Font-Shrink ab 8+ Schritten — bleibt immer auf einer Seite, kein Waste bei kurzen Recipes.",
+    bestFor:
+      "Foto-starke Recipes mit ruhiger Hierarchie: einfache Hauptmahlzeiten (Pasta, Bowls, Salate, Stir-Fries), Brunch-Klassiker, Magazin-Editorial-Vibe, Recipes wo das Bild verkauft",
+  },
 ];
 
 // Mood presets — eight pre-tuned palettes that pass contrast checks and look

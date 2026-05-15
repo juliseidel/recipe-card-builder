@@ -150,6 +150,8 @@ export function RecipeCardFull(props: RecipeCardFullProps) {
       return <RestaurantLayout {...props} />;
     case "studio":
       return <StudioLayout {...props} />;
+    case "feature":
+      return <FeatureLayout {...props} />;
   }
 }
 
@@ -5291,6 +5293,791 @@ function StudioLayout({
           >
             {brand.handle} · {pack.title}
           </span>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+// ════════════════════════════════════════════════
+// LAYOUT 11 (Phase D): FEATURE — Cinematic Split (Web-Mirror)
+//
+// Spiegel von lib/pdf/recipe-card-pdf.tsx#FeaturePage. Content links auf
+// warmem Cream-Tint (~44 %), grosses Hero rechts (~56 %) mit Soft-Fade in
+// den Content via CSS-Gradient. Adaptive Zutaten-Spalten (2 → 1 bei <6
+// items), Mikros als kompakter Strip zwischen Zutaten und Steps,
+// nummerierte Steps mit kleinen Numerals, Macros-Pills unter dem Meta-Row.
+//
+// Visuelle Beats matchen 1:1 zur PDF-Page — keine Brueche zwischen Live-
+// Preview und Druckausgabe. Web nutzt absolute Pixel statt PT, daher leicht
+// groessere Werte; Proportionen bleiben gleich.
+// ════════════════════════════════════════════════
+
+// Lokale blendWithWhite-Funktion — gleicher Math wie lib/pdf/theme#blendWithWhite,
+// aber inline um Client/Server-Compat des recipe-card-full-Files nicht zu brechen.
+function featureBlendWithWhite(hex: string, whiteRatio: number): string {
+  const clean = hex.replace("#", "");
+  const full =
+    clean.length === 3
+      ? clean
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : clean;
+  const num = parseInt(full, 16);
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  const ratio = Math.max(0, Math.min(1, whiteRatio));
+  const blend = (c: number) => Math.round(c + (255 - c) * ratio);
+  return (
+    "#" +
+    [blend(r), blend(g), blend(b)]
+      .map((v) => v.toString(16).padStart(2, "0"))
+      .join("")
+  );
+}
+
+type FeatureWebDensity = {
+  contentWidthPct: number;
+  titleFontSize: number;
+  storyFontSize: number;
+  metaFontSize: number;
+  metaIconSize: number;
+  macroFontSize: number;
+  macroLabelFontSize: number;
+  sectionLabelFontSize: number;
+  ingredientFontSize: number;
+  ingredientGroupLabelFontSize: number;
+  stepFontSize: number;
+  stepNumFontSize: number;
+  stepNumColWidth: number;
+  stepGap: number;
+  microsFontSize: number;
+  footerFontSize: number;
+  eyebrowFontSize: number;
+  contentPad: number;
+  contentPadTop: number;
+};
+
+const FEATURE_WEB_DENSITY: Record<WebDensity, FeatureWebDensity> = {
+  compact: {
+    contentWidthPct: 0.42,
+    titleFontSize: 26,
+    storyFontSize: 11,
+    metaFontSize: 11,
+    metaIconSize: 14,
+    macroFontSize: 13,
+    macroLabelFontSize: 9.5,
+    sectionLabelFontSize: 10,
+    ingredientFontSize: 11.5,
+    ingredientGroupLabelFontSize: 10,
+    stepFontSize: 11.5,
+    stepNumFontSize: 13,
+    stepNumColWidth: 22,
+    stepGap: 7,
+    microsFontSize: 10.5,
+    footerFontSize: 10,
+    eyebrowFontSize: 10,
+    contentPad: 28,
+    contentPadTop: 36,
+  },
+  balanced: {
+    contentWidthPct: 0.44,
+    titleFontSize: 34,
+    storyFontSize: 13,
+    metaFontSize: 12,
+    metaIconSize: 16,
+    macroFontSize: 14,
+    macroLabelFontSize: 10,
+    sectionLabelFontSize: 10.5,
+    ingredientFontSize: 13,
+    ingredientGroupLabelFontSize: 11,
+    stepFontSize: 13,
+    stepNumFontSize: 15,
+    stepNumColWidth: 26,
+    stepGap: 9,
+    microsFontSize: 11.5,
+    footerFontSize: 10.5,
+    eyebrowFontSize: 10,
+    contentPad: 34,
+    contentPadTop: 44,
+  },
+  spacious: {
+    contentWidthPct: 0.46,
+    titleFontSize: 42,
+    storyFontSize: 14,
+    metaFontSize: 13,
+    metaIconSize: 18,
+    macroFontSize: 16,
+    macroLabelFontSize: 10.5,
+    sectionLabelFontSize: 11,
+    ingredientFontSize: 14,
+    ingredientGroupLabelFontSize: 11.5,
+    stepFontSize: 14,
+    stepNumFontSize: 16,
+    stepNumColWidth: 30,
+    stepGap: 12,
+    microsFontSize: 12,
+    footerFontSize: 11,
+    eyebrowFontSize: 10.5,
+    contentPad: 40,
+    contentPadTop: 52,
+  },
+};
+
+function featureWebTitleScale(title: string): number {
+  const len = title.length;
+  if (len <= 14) return 1;
+  if (len <= 22) return 0.86;
+  if (len <= 32) return 0.74;
+  if (len <= 44) return 0.64;
+  return 0.56;
+}
+
+function featureWebStepShrink(stepCount: number): number {
+  if (stepCount >= 12) return -1.5;
+  if (stepCount >= 8) return -0.7;
+  return 0;
+}
+
+function featureWebMacros(
+  recipe: Recipe
+): Array<{ label: string; value: string }> {
+  const n = recipe.nutrition;
+  const entries: Array<{ label: string; value: string }> = [];
+  if (n.kcal > 0) entries.push({ label: "KCAL", value: String(n.kcal) });
+  if (n.protein > 0) entries.push({ label: "P", value: `${n.protein} g` });
+  if (n.carbs > 0) entries.push({ label: "KH", value: `${n.carbs} g` });
+  if (n.fat > 0) entries.push({ label: "F", value: `${n.fat} g` });
+  return entries;
+}
+
+function featureWebGroupLabel(name: string): string {
+  return /^(den|die|das)\s/i.test(name) ? `Für ${name.toLowerCase()}` : name;
+}
+
+type FeatureColumnPlan = {
+  twoCol: boolean;
+  leftBlocks: IngredientGroup[];
+  rightBlocks: IngredientGroup[];
+};
+
+function featureWebPlanColumns(groups: IngredientGroup[]): FeatureColumnPlan {
+  const totalItems = groups.reduce((s, g) => s + g.items.length, 0);
+  if (totalItems < 6) {
+    return { twoCol: false, leftBlocks: groups, rightBlocks: [] };
+  }
+  if (groups.length >= 2) {
+    const first = groups[0];
+    const rest = groups.slice(1);
+    const restCount = rest.reduce((s, g) => s + g.items.length, 0);
+    if (first.items.length > restCount * 2.5 && first.items.length >= 6) {
+      const half = Math.ceil(first.items.length / 2);
+      return {
+        twoCol: true,
+        leftBlocks: [{ name: first.name, items: first.items.slice(0, half) }],
+        rightBlocks: [
+          { name: null, items: first.items.slice(half) },
+          ...rest,
+        ],
+      };
+    }
+    return { twoCol: true, leftBlocks: [first], rightBlocks: rest };
+  }
+  const g = groups[0];
+  const half = Math.ceil(g.items.length / 2);
+  return {
+    twoCol: true,
+    leftBlocks: [{ name: g.name, items: g.items.slice(0, half) }],
+    rightBlocks: [{ name: null, items: g.items.slice(half) }],
+  };
+}
+
+function FeatureClockIconWeb({ size, color }: { size: number; color: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+    >
+      <circle cx="12" cy="12" r="9.5" stroke={color} strokeWidth="1.5" />
+      <path
+        d="M12 6.5 L12 12 L15.5 13.8"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function FeaturePeopleIconWeb({ size, color }: { size: number; color: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+    >
+      <circle cx="9" cy="8.5" r="3" stroke={color} strokeWidth="1.5" />
+      <circle cx="16.5" cy="9.5" r="2.4" stroke={color} strokeWidth="1.5" />
+      <path
+        d="M3.5 20.5 C 3.5 16, 6 14.5, 9 14.5 C 12 14.5, 14.5 16, 14.5 20.5"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M15 20.5 C 15 17.5, 17 16.5, 18.5 16.5 C 20 16.5, 20.5 17.5, 20.5 20.5"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function FeatureSectionLabelWeb({
+  label,
+  fontSize,
+  accent,
+}: {
+  label: string;
+  fontSize: number;
+  accent: string;
+}) {
+  return (
+    <div className="mt-5 mb-2.5 flex items-center gap-2">
+      <span
+        style={{
+          width: "6px",
+          height: "6px",
+          backgroundColor: accent,
+          display: "inline-block",
+        }}
+      />
+      <span
+        className="font-semibold uppercase"
+        style={{
+          color: accent,
+          fontSize: `${fontSize}px`,
+          letterSpacing: "0.28em",
+        }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function FeatureIngredientBlockWeb({
+  group,
+  density,
+  inkPrimary,
+  inkSecondary,
+  isLast,
+}: {
+  group: IngredientGroup;
+  density: FeatureWebDensity;
+  inkPrimary: string;
+  inkSecondary: string;
+  isLast: boolean;
+}) {
+  return (
+    <div style={{ marginBottom: isLast ? 0 : "10px" }}>
+      {group.name ? (
+        <p
+          className="font-semibold uppercase"
+          style={{
+            color: inkSecondary,
+            fontSize: `${density.ingredientGroupLabelFontSize}px`,
+            letterSpacing: "0.16em",
+            marginBottom: "5px",
+          }}
+        >
+          {featureWebGroupLabel(group.name)}
+        </p>
+      ) : null}
+      {group.items.map((it, i) => {
+        const amount = formatIngredientAmount(it.amount);
+        return (
+          <p
+            key={`ing-${i}`}
+            style={{
+              color: inkPrimary,
+              fontSize: `${density.ingredientFontSize}px`,
+              lineHeight: 1.55,
+              marginBottom: "3px",
+            }}
+          >
+            {amount ? (
+              <span style={{ fontWeight: 600 }}>{amount}</span>
+            ) : null}
+            {amount ? " " : ""}
+            {it.name}
+            {it.note ? (
+              <span
+                style={{
+                  fontStyle: "italic",
+                  color: inkSecondary,
+                  fontSize: `${density.ingredientFontSize - 0.5}px`,
+                }}
+              >
+                {` (${it.note})`}
+              </span>
+            ) : null}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+function FeatureLayout({
+  brand,
+  pack,
+  recipe,
+  totalRecipes,
+  enriching,
+}: RecipeCardFullProps) {
+  const density = webGetDensity(recipe);
+  const d = FEATURE_WEB_DENSITY[density];
+  const showStory = webShouldShowStory(recipe) && density !== "compact";
+
+  const titleScale =
+    featureWebTitleScale(recipe.title) +
+    (recipe.tweaks?.titleScale ?? 0) * 0.03;
+  const finalTitleSize = Math.round(d.titleFontSize * titleScale * 10) / 10;
+
+  const stepShrink = featureWebStepShrink(recipe.steps.length);
+  const stepFontSize = d.stepFontSize + stepShrink;
+  const stepNumFontSize = d.stepNumFontSize + stepShrink;
+  const stepGap = Math.max(d.stepGap + stepShrink * 0.5, 4);
+
+  const ingredientGroups = groupIngredients(recipe.ingredients);
+  const ingPlan = featureWebPlanColumns(ingredientGroups);
+  const stepGroups = groupRecipeSteps(recipe.steps);
+  const flatSteps: Array<
+    | { kind: "group-label"; label: string }
+    | { kind: "step"; index: number; text: string }
+  > = [];
+  stepGroups.forEach((g) => {
+    if (g.name) {
+      flatSteps.push({ kind: "group-label", label: featureWebGroupLabel(g.name) });
+    }
+    g.items.forEach((it) =>
+      flatSteps.push({ kind: "step", index: it.index, text: it.text })
+    );
+  });
+
+  const micros = visibleMicros(recipe).slice(0, 4);
+  const macros = featureWebMacros(recipe);
+
+  const totalMin = recipe.prepTime + (recipe.cookTime ?? 0);
+  const portionLabel = recipe.servings === 1 ? "Portion" : "Portionen";
+  const servingsLabel =
+    recipe.nutritionBasis === "piece"
+      ? `${recipe.servings} ${recipe.servings === 1 ? "Stück" : "Stücke"}`
+      : `${recipe.servings} ${portionLabel}`;
+
+  const indexLabel =
+    totalRecipes > 0
+      ? `${String(recipe.number).padStart(2, "0")} / ${String(totalRecipes).padStart(2, "0")}`
+      : null;
+
+  // Dynamische Mood-Farben
+  const contentBg = featureBlendWithWhite(pack.mood.background, 0.62);
+  const ink = pack.mood.ink;
+  const inkSoft = pack.mood.inkSoft;
+  const inkSubtle = featureBlendWithWhite(pack.mood.ink, 0.45);
+  const inkFaint = featureBlendWithWhite(pack.mood.ink, 0.65);
+  const divider = featureBlendWithWhite(pack.mood.accent, 0.6);
+  const heroPlaceholderBg = featureBlendWithWhite(pack.mood.accent, 0.88);
+
+  // Soft-Fade als CSS-Gradient — vom contentBg an der linken Foto-Kante
+  // bis transparent, ueber 72px. Browser-native, kein Svg-Overhead.
+  const fadeGradient = `linear-gradient(to right, ${contentBg} 0%, ${contentBg}cc 38%, transparent 100%)`;
+
+  return (
+    <article
+      className="mx-auto w-full max-w-[960px] overflow-hidden rounded-[var(--radius-card)] border"
+      style={{
+        ...baseShellStyle(pack, brand),
+        backgroundColor: contentBg,
+        aspectRatio: "595 / 842",
+        position: "relative",
+      }}
+    >
+      {/* Hero rechts (absolut positioniert, full-bleed) */}
+      <div
+        className="absolute top-0 right-0 h-full overflow-hidden"
+        style={{
+          width: `${(1 - d.contentWidthPct) * 100}%`,
+          backgroundColor: heroPlaceholderBg,
+        }}
+      >
+        {enriching?.hero ? (
+          <HeroSkeleton pack={pack} />
+        ) : recipe.hero ? (
+          <Image
+            src={recipe.hero}
+            alt={recipe.title}
+            fill
+            sizes="(min-width: 1024px) 540px, 50vw"
+            className="object-cover content-fade-in"
+            priority
+            quality={95}
+          />
+        ) : (
+          <div
+            className="flex h-full w-full items-center justify-center font-display"
+            style={{
+              color: pack.mood.accent + "55",
+              fontSize: "180px",
+              lineHeight: 1,
+            }}
+          >
+            {recipe.title.charAt(0).toUpperCase()}
+          </div>
+        )}
+
+        {/* Soft-Fade-Overlay an der linken Foto-Kante */}
+        <div
+          className="pointer-events-none absolute top-0 left-0 h-full"
+          style={{
+            width: "14%",
+            background: fadeGradient,
+          }}
+        />
+      </div>
+
+      {/* Content links */}
+      <div
+        className="relative flex h-full flex-col"
+        style={{
+          width: `${d.contentWidthPct * 100}%`,
+          padding: `${d.contentPadTop}px ${d.contentPad}px ${d.contentPad}px`,
+        }}
+      >
+        {/* Eyebrow */}
+        <div className="mb-3 flex items-center justify-between">
+          <span
+            className="font-bold uppercase"
+            style={{
+              color: inkSubtle,
+              fontSize: `${d.eyebrowFontSize}px`,
+              letterSpacing: "0.24em",
+            }}
+          >
+            {pack.title}
+          </span>
+          {indexLabel ? (
+            <span
+              className="font-medium"
+              style={{
+                color: inkFaint,
+                fontSize: `${d.eyebrowFontSize}px`,
+                letterSpacing: "0.16em",
+              }}
+            >
+              {indexLabel}
+            </span>
+          ) : null}
+        </div>
+
+        {/* Title + Akzent-Strich */}
+        <h1
+          className="font-bold"
+          style={{
+            color: ink,
+            fontSize: `${finalTitleSize}px`,
+            lineHeight: 1.05,
+            letterSpacing: "-0.01em",
+          }}
+        >
+          {recipe.title}
+        </h1>
+        <div
+          className="mt-2 mb-3"
+          style={{
+            width: "32px",
+            height: "2px",
+            backgroundColor: pack.mood.accent,
+          }}
+        />
+
+        {/* Subtitle */}
+        {recipe.subtitle ? (
+          <p
+            className="italic"
+            style={{
+              color: inkSoft,
+              fontSize: `${d.storyFontSize + 0.5}px`,
+              lineHeight: 1.45,
+              marginBottom: "8px",
+            }}
+          >
+            {recipe.subtitle}
+          </p>
+        ) : null}
+
+        {/* Story */}
+        {showStory && recipe.description?.trim() ? (
+          <p
+            style={{
+              color: inkSoft,
+              fontSize: `${d.storyFontSize}px`,
+              lineHeight: 1.55,
+              marginBottom: "8px",
+            }}
+          >
+            {recipe.description}
+          </p>
+        ) : null}
+
+        {/* Meta-Row */}
+        <div
+          className="mt-3 mb-3 flex flex-wrap items-center"
+          style={{ gap: "18px" }}
+        >
+          {totalMin > 0 ? (
+            <div className="flex items-center gap-2">
+              <FeatureClockIconWeb size={d.metaIconSize} color={inkSoft} />
+              <span
+                className="font-medium"
+                style={{
+                  color: inkSoft,
+                  fontSize: `${d.metaFontSize}px`,
+                }}
+              >
+                {totalMin} Min
+              </span>
+            </div>
+          ) : null}
+          <div className="flex items-center gap-2">
+            <FeaturePeopleIconWeb size={d.metaIconSize} color={inkSoft} />
+            <span
+              className="font-medium"
+              style={{
+                color: inkSoft,
+                fontSize: `${d.metaFontSize}px`,
+              }}
+            >
+              {servingsLabel}
+            </span>
+          </div>
+        </div>
+
+        {/* Macros */}
+        {macros.length > 0 ? (
+          <div
+            className="flex flex-wrap items-baseline pt-3"
+            style={{
+              borderTop: `0.5px solid ${divider}`,
+              gap: "14px",
+            }}
+          >
+            {macros.map((m) => (
+              <span
+                key={m.label}
+                className="flex items-baseline"
+                style={{ gap: "4px" }}
+              >
+                <span
+                  className="font-bold"
+                  style={{
+                    color: ink,
+                    fontSize: `${d.macroFontSize}px`,
+                  }}
+                >
+                  {m.value}
+                </span>
+                <span
+                  className="font-bold"
+                  style={{
+                    color: inkSubtle,
+                    fontSize: `${d.macroLabelFontSize}px`,
+                    letterSpacing: "0.12em",
+                  }}
+                >
+                  {m.label}
+                </span>
+              </span>
+            ))}
+          </div>
+        ) : null}
+
+        {/* Zutaten */}
+        <FeatureSectionLabelWeb
+          label="Zutaten"
+          fontSize={d.sectionLabelFontSize}
+          accent={pack.mood.accent}
+        />
+        {ingPlan.twoCol ? (
+          <div
+            className="grid"
+            style={{
+              gridTemplateColumns: "1fr 1fr",
+              gap: "16px",
+              alignItems: "flex-start",
+            }}
+          >
+            <div>
+              {ingPlan.leftBlocks.map((g, i) => (
+                <FeatureIngredientBlockWeb
+                  key={`L-${i}`}
+                  group={g}
+                  density={d}
+                  inkPrimary={ink}
+                  inkSecondary={inkSoft}
+                  isLast={i === ingPlan.leftBlocks.length - 1}
+                />
+              ))}
+            </div>
+            <div>
+              {ingPlan.rightBlocks.map((g, i) => (
+                <FeatureIngredientBlockWeb
+                  key={`R-${i}`}
+                  group={g}
+                  density={d}
+                  inkPrimary={ink}
+                  inkSecondary={inkSoft}
+                  isLast={i === ingPlan.rightBlocks.length - 1}
+                />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div>
+            {ingPlan.leftBlocks.map((g, i) => (
+              <FeatureIngredientBlockWeb
+                key={`S-${i}`}
+                group={g}
+                density={d}
+                inkPrimary={ink}
+                inkSecondary={inkSoft}
+                isLast={i === ingPlan.leftBlocks.length - 1}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Mikros */}
+        {enriching?.micros ? (
+          <>
+            <FeatureSectionLabelWeb
+              label="Reich an"
+              fontSize={d.sectionLabelFontSize}
+              accent={pack.mood.accent}
+            />
+            <MicrosSkeletonStrip pack={pack} />
+          </>
+        ) : micros.length > 0 ? (
+          <>
+            <FeatureSectionLabelWeb
+              label="Reich an"
+              fontSize={d.sectionLabelFontSize}
+              accent={pack.mood.accent}
+            />
+            <p
+              className="italic"
+              style={{
+                color: inkSoft,
+                fontSize: `${d.microsFontSize}px`,
+                lineHeight: 1.5,
+              }}
+            >
+              {micros
+                .map(
+                  (m) =>
+                    `${m.name}${
+                      typeof m.pctDaily === "number" ? ` ${m.pctDaily} %` : ""
+                    }`
+                )
+                .join(" · ")}
+            </p>
+          </>
+        ) : null}
+
+        {/* Steps */}
+        <FeatureSectionLabelWeb
+          label="Zubereitung"
+          fontSize={d.sectionLabelFontSize}
+          accent={pack.mood.accent}
+        />
+        <div>
+          {flatSteps.map((item, i) => {
+            if (item.kind === "group-label") {
+              return (
+                <p
+                  key={`sgl-${i}`}
+                  className="font-bold uppercase"
+                  style={{
+                    color: inkSoft,
+                    fontSize: `${d.ingredientGroupLabelFontSize}px`,
+                    letterSpacing: "0.16em",
+                    marginTop: i === 0 ? 0 : `${stepGap + 2}px`,
+                    marginBottom: `${Math.max(stepGap - 2, 4)}px`,
+                  }}
+                >
+                  {item.label}
+                </p>
+              );
+            }
+            return (
+              <div
+                key={`s-${item.index}`}
+                className="flex items-start"
+                style={{ marginBottom: `${stepGap}px` }}
+              >
+                <span
+                  className="shrink-0 font-bold"
+                  style={{
+                    width: `${d.stepNumColWidth}px`,
+                    color: pack.mood.accent,
+                    fontSize: `${stepNumFontSize}px`,
+                    lineHeight: 1,
+                    paddingTop: "2px",
+                  }}
+                >
+                  {item.index + 1}.
+                </span>
+                <p
+                  className="flex-1"
+                  style={{
+                    color: ink,
+                    fontSize: `${stepFontSize}px`,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {item.text}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Spacer + Footer */}
+        <div style={{ flex: 1, minHeight: "10px" }} />
+        <div
+          className="flex items-center justify-between pt-3"
+          style={{ borderTop: `0.5px solid ${divider}` }}
+        >
+          <span
+            className="font-semibold"
+            style={{
+              color: inkSubtle,
+              fontSize: `${d.footerFontSize}px`,
+              letterSpacing: "0.12em",
+            }}
+          >
+            {brand.handle}
+          </span>
+          <BeeIcon brandSlug={brand.slug} size={14} />
         </div>
       </div>
     </article>

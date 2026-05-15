@@ -69,6 +69,23 @@ function moodForCategory(category: string): {
       displayFont: "fraunces",
     };
   }
+  // Brunch / Pasta / Bowls / Salate / Stir-Fries → Feature (foto-stark,
+  // Cinematic-Split mit warmem Cream-Tint).
+  if (
+    c.includes("brunch") ||
+    c.includes("pasta") ||
+    c.includes("bowl") ||
+    c.includes("salat") ||
+    c.includes("salad") ||
+    c.includes("stir") ||
+    c.includes("foto")
+  ) {
+    return {
+      packMood: pickMoodById("apricot"),
+      cardLayout: "feature",
+      displayFont: "inter-tight",
+    };
+  }
   // Default: warm-honey + editorial
   return {
     packMood: pickMoodById("honey"),
@@ -108,6 +125,7 @@ const VALID_LAYOUTS: readonly CardLayout[] = [
   "newspaper",
   "restaurant",
   "studio",
+  "feature",
 ] as const;
 
 export async function POST(req: Request, { params }: RouteParams) {
