@@ -114,7 +114,7 @@ const RESPONSE_SCHEMA = {
     layout: {
       type: "string",
       description:
-        'Empfohlenes Layout, einer aus: "amber", "editorial", "patisserie", "minimal", "vital", "dashboard", "sport", "newspaper", "restaurant".',
+        'Empfohlenes Layout, einer aus: "amber", "editorial", "patisserie", "minimal", "vital", "dashboard", "sport", "newspaper", "restaurant", "studio". Studio = Step-First-Choreographie mit kleinem Portrait-Hero rechts, Big-Number-Steps als Hauptbühne, Inline-Zutaten unten; passt zu Recipes wo die Technik wichtiger als die Zutaten ist (Pasta-Klassiker, Saucen, Eintöpfe, Fermentation, Baking-Techniken).',
     },
     layoutReason: {
       type: "string",

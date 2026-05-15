@@ -2596,6 +2596,53 @@ function LayoutThumbnail({
         </>
       );
       break;
+    case "studio":
+      // Step-First Choreographie: Title-Stack links + 4:5 Portrait-Hero
+      // rechts, Big-Number-Steps mit vertikalem Pace-Beat als Hauptbühne,
+      // Inline-Zutaten unten, Footer-Doppellinie. Pure-White-Background.
+      body = (
+        <>
+          {/* Pure-White Background override */}
+          <rect x="0" y="0" width="70" height="52" rx="4" fill="#ffffff" />
+          {/* Eyebrow-Linie ganz oben */}
+          <rect x="4" y="3" width="20" height="0.8" rx="0.2" fill={inkSoft} opacity="0.4" />
+          <line x1="4" y1="5" x2="66" y2="5" stroke={inkSoft} strokeWidth="0.3" opacity="0.25" />
+          {/* Header — Title-Stack links */}
+          <rect x="4" y="7.5" width="22" height="2.4" rx="0.3" fill={inkSoft} opacity="0.9" />
+          <rect x="4" y="11" width="16" height="2.4" rx="0.3" fill={inkSoft} opacity="0.9" />
+          <rect x="4" y="15" width="6" height="0.8" rx="0.2" fill={accent} />
+          <rect x="4" y="17.5" width="20" height="1" rx="0.2" fill={inkSoft} opacity="0.35" />
+          {/* Portrait-Hero 4:5 rechts */}
+          <rect x="46" y="7" width="18" height="22" rx="0.5" fill={accent} opacity="0.65" />
+          {/* Trennlinie zum Choreographie-Block */}
+          <line x1="4" y1="31" x2="66" y2="31" stroke={inkSoft} strokeWidth="0.3" opacity="0.25" />
+          {/* Sektions-Label "DIE CHOREOGRAPHIE" als kleine Linien-Punkt-Linien */}
+          <line x1="18" y1="33.5" x2="26" y2="33.5" stroke={inkSoft} strokeWidth="0.2" opacity="0.3" />
+          <rect x="27" y="32.8" width="16" height="1.2" rx="0.2" fill={accent} />
+          <line x1="44" y1="33.5" x2="52" y2="33.5" stroke={inkSoft} strokeWidth="0.2" opacity="0.3" />
+          {/* Big-Number-Steps mit Pace-Beat-Strich */}
+          <text x="4" y="39" fontSize="3" fill={accent} fontWeight="500">01</text>
+          <line x1="11" y1="36.5" x2="11" y2="39.5" stroke={inkSoft} strokeWidth="0.2" opacity="0.3" />
+          <rect x="13" y="37.3" width="34" height="0.8" rx="0.2" fill={inkSoft} opacity="0.6" />
+          <rect x="13" y="38.6" width="28" height="0.8" rx="0.2" fill={inkSoft} opacity="0.6" />
+          <text x="4" y="43.5" fontSize="3" fill={accent} fontWeight="500">02</text>
+          <line x1="11" y1="41" x2="11" y2="44" stroke={inkSoft} strokeWidth="0.2" opacity="0.3" />
+          <rect x="13" y="41.8" width="38" height="0.8" rx="0.2" fill={inkSoft} opacity="0.6" />
+          <rect x="13" y="43.1" width="24" height="0.8" rx="0.2" fill={inkSoft} opacity="0.6" />
+          {/* Footer-Trennlinie */}
+          <line x1="4" y1="46" x2="66" y2="46" stroke={inkSoft} strokeWidth="0.3" opacity="0.25" />
+          {/* Macros-Zeile zentriert */}
+          <rect x="14" y="47.5" width="3" height="1.4" rx="0.2" fill={inkSoft} opacity="0.8" />
+          <rect x="18" y="47.7" width="6" height="1" rx="0.2" fill={inkSoft} opacity="0.45" />
+          <rect x="26" y="47.5" width="3" height="1.4" rx="0.2" fill={inkSoft} opacity="0.8" />
+          <rect x="30" y="47.7" width="6" height="1" rx="0.2" fill={inkSoft} opacity="0.45" />
+          <rect x="38" y="47.5" width="3" height="1.4" rx="0.2" fill={inkSoft} opacity="0.8" />
+          <rect x="42" y="47.7" width="6" height="1" rx="0.2" fill={inkSoft} opacity="0.45" />
+          {/* Mikros-Prose-Italic */}
+          <rect x="12" y="50" width="46" height="0.8" rx="0.2" fill={inkSoft} opacity="0.4" />
+        </>
+      );
+      break;
   }
   return (
     <svg
