@@ -1,6 +1,7 @@
 "use client";
 
 import { getSupabase } from "./supabase";
+import { triggerPackMetaSync } from "./pack-meta-sync";
 
 export type HiddenKey = `${string}|${string}|${string}`;
 
@@ -48,6 +49,8 @@ export async function hideRecipe(
     console.error("[hidden-recipes] hideRecipe", error);
     return false;
   }
+  // Soft-Delete eines Bienen-Rezepts aendert den Pack-Inhalt → Auto-Sync
+  triggerPackMetaSync(brandSlug, packSlug);
   return true;
 }
 
@@ -68,5 +71,6 @@ export async function restoreRecipe(
     console.error("[hidden-recipes] restoreRecipe", error);
     return false;
   }
+  triggerPackMetaSync(brandSlug, packSlug);
   return true;
 }

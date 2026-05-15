@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
 import { PdfExportButton } from "./pdf-export-button";
@@ -36,6 +37,19 @@ export function PackActions({ brand, pack, customPackId }: PackActionsProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {customPackId ? (
+            <Link
+              href={`/${brand.slug}/${pack.slug}/edit`}
+              className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[12px] font-medium transition hover:opacity-80"
+              style={{
+                borderColor: pack.mood.ink,
+                color: pack.mood.ink,
+                background: pack.mood.background,
+              }}
+            >
+              Pack bearbeiten
+            </Link>
+          ) : null}
           {customPackId ? (
             <PackCoverRerollButton
               packId={customPackId}

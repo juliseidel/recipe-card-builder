@@ -100,6 +100,15 @@ export type Pack = {
    *  `public/brands/<brand>/forewords/<slug>.jpg` auf der Disk. Bei
    *  Custom-Packs wird dieses Feld beim Anlegen via Flux 2 Pro gefuellt. */
   forewordImage?: string;
+  /** Liste der Pack-Felder, die der User manuell editiert hat. Wird vom
+   *  Auto-Sync (`/api/packs/[id]/regenerate-meta`) gelesen: jedes Feld
+   *  in dieser Liste wird beim automatischen Re-Generate (z.B. nach
+   *  Recipe-Add/Delete) UEBERSPRUNGEN, damit die User-Edits nicht
+   *  verloren gehen. Feldnamen wie 'title', 'subtitle', 'tagline',
+   *  'description', 'category', 'mood', 'displayFont', 'cardLayout',
+   *  'coverImage', 'forewordImage', 'foreword.greeting', 'foreword.story',
+   *  'foreword.signoff', 'foreword.outro'. */
+  editedFields?: string[];
 };
 
 export const packs: Pack[] = [

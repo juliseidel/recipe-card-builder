@@ -128,6 +128,76 @@ export async function getHiddenRecipeCountsForBrand(
   return counts;
 }
 
+// ─── Pack-Edit-Helpers — fuer den Pack-Editor + Auto-Sync ────────────────
+
+/** Patcht ein Custom-Pack mit Teilfeldern. Merged das Patch-Objekt in
+ *  pack.data (JSONB), bewahrt alle anderen Felder. Wenn newlyEditedFields
+ *  gesetzt: fuegt sie zu pack.data.editedFields hinzu (deduplicated) —
+ *  das blockiert spaeter den Auto-Sync fuer diese Felder. */
+export async function updateCustomPackData(
+  packId: string,
+  patch: Partial<Pack>,
+  opts: { newlyEditedFields?: string[] } = {}
+): Promise<Pack | null> {
+  if (!hasServerSupabase()) return null;
+  const supabase: SupabaseClient = getServerSupabase();
+
+  const { data: row, error: readErr } = await supabase
+    .from("packs")
+    .select("data")
+    .eq("id", packId)
+    .maybeSingle();
+  if (readErr || !row) {
+    console.warn("[packs-server] updateCustomPackData read", readErr);
+    return null;
+  }
+  const current = row.data as Pack;
+  const currentEdited = new Set(current.editedFields ?? []);
+  for (const field of opts.newlyEditedFields ?? []) {
+    currentEdited.add(field);
+  }
+  const merged: Pack = {
+    ...current,
+    ...patch,
+    editedFields: [...currentEdited],
+    // Mood/foreword sind Sub-Objekte — saubere Tiefen-Merge fuer beides
+    ...(patch.mood ? { mood: { ...current.mood, ...patch.mood } } : {}),
+    ...(patch.foreword
+      ? { foreword: { ...current.foreword, ...patch.foreword } }
+      : {}),
+  };
+
+  const { error: writeErr } = await supabase
+    .from("packs")
+    .update({ data: merged })
+    .eq("id", packId);
+  if (writeErr) {
+    console.warn("[packs-server] updateCustomPackData write", writeErr);
+    return null;
+  }
+  return merged;
+}
+
+/** Findet die Pack-Row anhand brandSlug + packSlug (statt pack.id) — nuetzlich
+ *  fuer Auto-Sync-Hooks die nach Recipe-Mutation die zugehoerige Pack-ID
+ *  brauchen. Returnt null fuer kuratierte (Code-)Packs ohne DB-Eintrag. */
+export async function findCustomPackIdBySlug(
+  brandSlug: string,
+  packSlug: string
+): Promise<string | null> {
+  if (!hasServerSupabase()) return null;
+  const supabase: SupabaseClient = getServerSupabase();
+  const { data, error } = await supabase
+    .from("packs")
+    .select("id")
+    .eq("brand_slug", brandSlug)
+    .eq("pack_slug", packSlug)
+    .eq("is_custom", true)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data.id as string;
+}
+
 // Same as above but also returns the row IDs so the workspace grid can
 // wire up per-pack delete buttons. Carries createdAt onto the pack so
 // mergeAndRenumberPacks can sort custom packs in creation order

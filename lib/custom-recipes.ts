@@ -3,6 +3,7 @@
 import type { Recipe } from "./recipes";
 import { recipes as staticRecipes } from "./recipes";
 import { getSupabase } from "./supabase";
+import { triggerPackMetaSync } from "./pack-meta-sync";
 
 export type CustomRecipe = Recipe & {
   id: string;
@@ -144,16 +145,30 @@ export async function addCustomRecipe(
     console.error("[recipes-db] addCustomRecipe", error);
     return null;
   }
+  // Pack-Meta-Auto-Sync: neuer Recipe → Pack-Texte koennten veraltete
+  // Rezeptnamen nennen oder die Aussage des Packs nicht mehr stimmen.
+  // Server respektiert pack.editedFields[].
+  triggerPackMetaSync(brandSlug, packSlug);
   return rowToCustomRecipe(data);
 }
 
 export async function removeCustomRecipe(id: string): Promise<boolean> {
   const supabase = getSupabase();
   if (!supabase) return false;
+  // Vor dem Delete brandSlug+packSlug ermitteln, damit wir nach erfolgreichem
+  // Delete den Auto-Sync triggern koennen.
+  const { data: row } = await supabase
+    .from("recipes")
+    .select("brand_slug, pack_slug")
+    .eq("id", id)
+    .maybeSingle();
   const { error } = await supabase.from("recipes").delete().eq("id", id);
   if (error) {
     console.error("[recipes-db] removeCustomRecipe", error);
     return false;
+  }
+  if (row?.brand_slug && row?.pack_slug) {
+    triggerPackMetaSync(row.brand_slug, row.pack_slug);
   }
   return true;
 }
@@ -188,7 +203,11 @@ export async function updateCustomRecipe(
     console.error("[recipes-db] updateCustomRecipe", error);
     return null;
   }
-  return rowToCustomRecipe(data);
+  const result = rowToCustomRecipe(data);
+  // Auch Title/Inhalt-Edits eines bestehenden Recipes triggern Auto-Sync,
+  // weil die Pack-Tagline/Description konkrete Rezeptnamen referenzieren kann.
+  triggerPackMetaSync(data.brand_slug, data.pack_slug);
+  return result;
 }
 
 // Fetch a single custom recipe by id — needed for the edit-page's initial
