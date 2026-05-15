@@ -8444,8 +8444,9 @@ function StudioPage({
     >
       {/* ───── Hero "Bleed" — top-right corner, bis zur Page-Kante ───── */}
       {/* absolute top:0, right:0 — Hero ragt bis in die Ecke wie ein
-          Magazin-Spread. Die Title-Spalte bekommt rechts genug Padding
-          damit der Text nicht unter das Bild laeuft. */}
+          Magazin-Spread. Die innere Ecke (unten-links) ist abgerundet,
+          damit das Bild organisch in die Karte fliesst statt scharfes
+          Quadrat. Die anderen drei Ecken bleiben buendig mit der Page-Kante. */}
       <View
         style={{
           position: "absolute",
@@ -8453,6 +8454,7 @@ function StudioPage({
           right: 0,
           width: d.heroWidth,
           height: d.heroHeight,
+          borderBottomLeftRadius: 28,
           backgroundColor: blendWithWhite(t.accent, 0.85),
           overflow: "hidden",
         }}
@@ -8547,7 +8549,6 @@ function StudioPage({
       <View
         style={{
           paddingRight: headerColPaddingRight,
-          marginBottom: d.sectionGap,
         }}
       >
         <Text
@@ -8598,23 +8599,29 @@ function StudioPage({
         </Text>
       </View>
 
+      {/* Spacer 1: Header → Trennlinie/Story. Bei compact fix, sonst
+          flex-grow damit der Raum sich proportional verteilt. */}
+      {density === "compact" ? (
+        <View style={{ height: d.sectionGap }} />
+      ) : (
+        <View style={{ flexGrow: 0.35, minHeight: d.sectionGap }} />
+      )}
+
       <View
         style={{
           height: 0.5,
           backgroundColor: c.divider,
-          marginBottom: showStory ? 16 : d.sectionGap,
         }}
       />
 
       {/* ───── Story als Lead-Paragraph (vor Zubereitung) ─────────────── */}
-      {/* Story sitzt jetzt UNTER dem Header und VOR der Zubereitung — wie
-          ein redaktioneller Lead in Editorial-Magazinen. Vorher war sie
-          zwischen Steps und Zutaten, was den Lesefluss bricht. Italic
-          Fraunces zentriert mit Akzent-Strich darueber. */}
+      {/* Story sitzt UNTER dem Header und VOR der Zubereitung — wie ein
+          redaktioneller Lead in Editorial-Magazinen. Italic Fraunces
+          zentriert mit Akzent-Strich darueber. */}
       {showStory ? (
         <View
           style={{
-            marginBottom: d.sectionGap,
+            paddingTop: 18,
             paddingHorizontal: 18,
             alignItems: "center",
           }}
@@ -8641,6 +8648,13 @@ function StudioPage({
           </Text>
         </View>
       ) : null}
+
+      {/* Spacer 2: Story/Trennlinie → Zubereitung. */}
+      {density === "compact" ? (
+        <View style={{ height: d.sectionGap }} />
+      ) : (
+        <View style={{ flexGrow: 0.45, minHeight: d.sectionGap }} />
+      )}
 
       {/* ───── Zubereitung (Big-Number Steps) ─────────────────────────── */}
       <StudioSectionLabel
@@ -8762,9 +8776,12 @@ function StudioPage({
         </View>
       )}
 
-      {/* Spacer zwischen Steps und Zutaten — kein Story-Block mehr hier
-          (Story sitzt jetzt UNTER dem Header). */}
-      <View style={{ height: d.sectionGap }} />
+      {/* Spacer 3: Zubereitung → Zutaten. */}
+      {density === "compact" ? (
+        <View style={{ height: d.sectionGap }} />
+      ) : (
+        <View style={{ flexGrow: 0.6, minHeight: d.sectionGap }} />
+      )}
 
       {/* ───── Zutaten (responsive 1/2/3-Spalten-Grid) ────────────────── */}
       <StudioSectionLabel
@@ -8782,12 +8799,12 @@ function StudioPage({
       />
 
       {/* ───── Footer: Macros + Mikros prose + handle + QR ───────────── */}
-      {/* flex:1-Spacer drueckt den Footer ans Page-Bottom — die ganze A4-
-          Seite wird visuell genutzt. Spacious-Sizes (groesserer Hero, weite
-          Step-Gaps) reduzieren die Spacer-Hoehe, sodass der Body nicht im
-          oberen Drittel klebt. min-height verhindert kollabieren bei
-          ueberlangem Body. */}
-      <View style={{ flex: 1, minHeight: d.sectionGap }} />
+      {/* Spacer 4 (vor Footer): das groesste Gewicht, damit der Footer am
+          Page-Bottom klebt. Bei balanced/spacious verteilt sich der freie
+          Raum proportional zu den anderen Spacern (0.35 + 0.45 + 0.6 + 1.0
+          = 2.4 gesamt; dieser Spacer kriegt ~42% des Restraums). Bei
+          compact: flex:1 vor Footer + alle anderen sind fixed sectionGaps. */}
+      <View style={{ flexGrow: 1, minHeight: d.sectionGap }} />
       <View
         style={{
           height: 0.5,

@@ -5020,12 +5020,14 @@ function StudioLayout({
         backgroundColor: c.bg,
       }}
     >
-      {/* Hero "Bleed" — rechts oben, bis zur Ecke der Karte */}
+      {/* Hero "Bleed" — rechts oben, bis zur Ecke der Karte. Innere Ecke
+          (unten-links) ist abgerundet damit das Bild organisch fliesst. */}
       <div
         className="absolute top-0 right-0 overflow-hidden"
         style={{
           width: `${d.heroWidth}px`,
           height: `${d.heroHeight}px`,
+          borderBottomLeftRadius: "28px",
           backgroundColor: pack.mood.background + "60",
         }}
       >
