@@ -2,50 +2,71 @@ import type { Recipe } from "@/lib/recipes";
 import type { Pack } from "@/lib/packs";
 import type { Brand } from "@/lib/brands";
 import { callGemini } from "./gemini";
+import {
+  formatVoiceProfileForPrompt,
+  formatCaptionFewShot,
+  ensureBrandVoiceProfile,
+} from "./analyze-voice-profile";
+import { findBannedPhrases, buildAvoidHint } from "./banned-phrases";
 
-// Schema is intentionally tiny: one short string. We avoid arrays / nested
-// objects so Gemini stays focused on tone, not structure.
+// Generates a short "Creator's Story" pull-quote for the recipe card —
+// die kurze 2-3-Saetze-Einleitung, die auf sparen Karten (≤10 Zutaten)
+// im Editorial/Patisserie-Layout als Pull-Quote angezeigt wird.
+//
+// Brand-agnostisch (v2, Mai 2026): nutzt Voice-Profil statt hardcoded
+// Biene-Wendungen. Funktioniert fuer jeden Creator mit eigenem Stil.
+//
+// Pipeline ist leichter als Pack-Meta:
+//   - Voice-Profile + Few-Shot in System-Instruction
+//   - Single-Shot Generation (Text ist kurz — Multi-Candidate Overkill)
+//   - Banned-Phrases-Check, Retry mit AVOID-Hint bei Hit
+
 const RESPONSE_SCHEMA = {
   type: "object",
   properties: {
     story: {
       type: "string",
       description:
-        "Eine sehr kurze persönliche Mini-Story (2-3 Sätze, max. 220 Zeichen) zu diesem Rezept, im Stil von Biene (@bienesfitlife). Keine Anführungszeichen, keine Hashtags, kein 'Hi', kein 'Hey'. Direkt in den Geschmack/Stimmung/Anlass einsteigen.",
+        "Eine sehr kurze persoenliche Mini-Story (2-3 Saetze, max 220 Zeichen) zum Rezept, in der Stimme der Creatorin. KEINE Anfuehrungszeichen, Hashtags, Emojis, Em-Dashes. KEIN 'Hi'/'Hey' am Anfang. Direkt in Geschmack/Stimmung/Anlass einsteigen.",
     },
   },
   required: ["story"],
 };
 
-const SYSTEM_INSTRUCTION = `Du schreibst Mini-Stories für Rezeptkarten von Biene (@bienesfitlife) — einer deutschen Creator-Stimme: 819K Instagram, "abnehmen ohne Verzicht ohne Hungern", warm, persönlich, "deine Freundin am Küchentisch".
+function buildSystemInstruction(brand: Brand): string {
+  const voiceBlock = formatVoiceProfileForPrompt(brand.voiceProfile, brand.name);
+  const fewShotBlock = formatCaptionFewShot(brand.voiceProfile);
 
-Tonalität (extrem wichtig):
-• warm, weiblich, persönlich — wie zu einer Freundin
-• keine Werbesprache, keine Floskeln ("genussvoll", "köstlich", "perfekt für")
-• KEINE Übertreibungen ("absolut traumhaft", "unwiderstehlich")
-• KEINE Hashtags, KEINE Emojis, KEINE Anführungszeichen, KEIN "Hi"/"Hey"
-• Bienes typische Wörter: "fluffig", "cremig", "schaumig", "ohne Backen", "in 15 Min", "Mealprep", "ohne Zucker"
-• Sinnlich-konkret statt abstrakt: nicht "lecker", sondern "schmilzt auf der Zunge"
-• Manchmal eine kleine Story / Anlass: "perfekt für Sonntagvormittag", "wenn die Erdbeeren reif sind"
+  return `Du schreibst Mini-Stories fuer Rezeptkarten von ${brand.name} (${brand.handle}). Diese Story ist eine 2-3-Saetze-Einleitung als Pull-Quote auf einer Recipe-Card.
 
-Länge: 2-3 kurze Sätze, max. 220 Zeichen insgesamt. Lieber zu kurz als zu lang.
+Brand-Kontext:
+- Name: ${brand.name}
+- Bio: ${brand.bio}
+- Tagline: ${brand.tagline}
 
-Form:
-• Kein Begrüßung, keine Anrede — direkt in die Story rein
-• Aktivsprache, Präsens
-• Beziehe dich auf die Zutaten/Methode wenn sinnvoll, aber nicht als Aufzählung
-• Manchmal: ein konkreter Sinneseindruck zu Beginn
+${voiceBlock}
 
-Beispiele für gute Stories:
-• "Cremig wie Pudding, aber kommt komplett ohne Zucker aus. Genau das richtige Frühstück für Tage, an denen man Lust auf was Warmes hat — in 10 Minuten ist die Schale fertig."
-• "Mit nur 4 Zutaten und 15 Minuten Backzeit. Außen knusprig, innen fluffig — meine Lieblings-Mealprep für die ganze Woche."
-• "Wenn ich nach dem Training was Süßes brauche, mache ich diese in der Mikrowelle. 30 Sekunden und der Schoko-Pudding ist warm und cremig."
+${fewShotBlock}
 
-Beispiele für SCHLECHTE Stories (nie so):
-• "Dieses köstliche Rezept ist perfekt für …" (Werbesprache)
-• "Hi ihr Lieben! Heute teile ich …" (Anrede)
-• "Absolut traumhaft cremig und unwiderstehlich!!" (Übertreibung)
-• "🤍 fluffig & cremig" (Emoji)`;
+GENERATIONS-REGELN:
+- Schreibe in der Stimme von ${brand.name} — nicht generisch
+- KEINE Werbesprache, keine Floskeln ("genussvoll", "koestlich", "perfekt fuer")
+- KEINE Uebertreibungen ("absolut traumhaft", "unwiderstehlich", "sensationell")
+- KEINE Hashtags, Emojis, Anfuehrungszeichen, Em-Dashes (—)
+- KEIN "Hi"/"Hey" am Anfang — direkt rein
+- Sinnlich-konkret statt abstrakt: nicht "lecker", sondern "schmilzt auf der Zunge", "in 15 Min fertig"
+- Manchmal eine kleine Story / Anlass: "perfekt fuer Sonntagvormittag", "wenn die Erdbeeren reif sind"
+
+LAENGE: 2-3 kurze Saetze, max 220 Zeichen insgesamt. Lieber zu kurz als zu lang.
+
+FORM:
+- Keine Begruessung, keine Anrede — direkt in die Story
+- Aktivsprache, Praesens
+- Beziehe dich auf Zutaten/Methode wenn sinnvoll, aber NICHT als Aufzaehlung
+- Manchmal: ein konkreter Sinneseindruck zu Beginn
+
+Antworte AUSSCHLIESSLICH im JSON-Schema.`;
+}
 
 function formatRecipeForPrompt(
   recipe: Recipe,
@@ -87,40 +108,11 @@ function formatRecipeForPrompt(
     .join("\n");
 }
 
-// Generate a short, on-brand "Bienes Story" for a recipe. Returns a plain
-// string ready to drop into recipe.description. Throws on Gemini failure —
-// caller decides whether to fall back to pack.description.
-export async function generateStory(
-  recipe: Recipe,
-  pack: Pack,
-  brand: Brand
-): Promise<string> {
-  const prompt = [
-    `Schreibe eine kurze persönliche Mini-Story für die folgende Rezeptkarte.`,
-    `Wichtig: Die Story muss zur konkreten Karte passen (Zutaten / Methode / Anlass), nicht generisch.`,
-    ``,
-    formatRecipeForPrompt(recipe, pack, brand),
-    ``,
-    `Antworte nur als JSON nach Schema, ohne Erklärung.`,
-  ].join("\n");
-
-  const result = await callGemini<{ story: string }>({
-    prompt,
-    schema: RESPONSE_SCHEMA,
-    systemInstruction: SYSTEM_INSTRUCTION,
-    // Higher temp than micros — we want voice/personality, not deterministic
-    // extraction. But not so high that we get nonsense.
-    temperature: 0.85,
-    maxOutputTokens: 512,
-    thinkingBudget: 0,
-    retries: 2,
-  });
-
-  // Clean up: trim, strip stray quotes, collapse whitespace, hard-cap length
-  let story = (result.story ?? "").trim();
+function cleanStory(raw: string): string {
+  let story = (raw ?? "").trim();
   story = story.replace(/^["'„«]+|["'"»]+$/g, "");
+  story = story.replace(/\s*[—–]\s*/g, ", "); // Em/En-Dashes → Komma
   story = story.replace(/\s+/g, " ");
-  // Hard cap so we never overflow the pull-quote layouts
   if (story.length > 260) {
     const cut = story.slice(0, 260);
     const lastDot = Math.max(
@@ -130,5 +122,84 @@ export async function generateStory(
     );
     story = lastDot > 100 ? cut.slice(0, lastDot + 1) : cut + "…";
   }
+  return story;
+}
+
+/**
+ * Generate a short, on-brand pull-quote story for a recipe card.
+ * Brand-agnostic — nutzt Voice-Profil falls vorhanden, fallback auf
+ * Bio/Tagline-basierte Generic-Defaults. Throws on Gemini failure.
+ */
+export async function generateStory(
+  recipe: Recipe,
+  pack: Pack,
+  brand: Brand
+): Promise<string> {
+  // Lazy-Backfill — wenn Brand kein Voice-Profil hat, lazy aus DB ableiten
+  const brandWithVoice = (await ensureBrandVoiceProfile(brand)) ?? brand;
+  const brandBanned = brandWithVoice.voiceProfile?.bannedPhrases ?? [];
+
+  const systemInstruction = buildSystemInstruction(brandWithVoice);
+  const prompt = [
+    `Schreibe eine kurze persoenliche Mini-Story fuer die folgende Rezeptkarte.`,
+    `Wichtig: Die Story muss zur konkreten Karte passen (Zutaten/Methode/Anlass), nicht generisch.`,
+    ``,
+    formatRecipeForPrompt(recipe, pack, brandWithVoice),
+    ``,
+    `Antworte nur als JSON nach Schema, ohne Erklaerung.`,
+  ].join("\n");
+
+  // Pass 1: normale Generation
+  let result: { story: string };
+  try {
+    result = await callGemini<{ story: string }>({
+      prompt,
+      schema: RESPONSE_SCHEMA,
+      systemInstruction,
+      temperature: 0.85,
+      maxOutputTokens: 512,
+      thinkingBudget: 0,
+      retries: 2,
+    });
+  } catch (err) {
+    throw err;
+  }
+
+  let story = cleanStory(result.story);
+  let hits = findBannedPhrases(story, brandBanned);
+
+  // Retry-Pass mit explizitem AVOID-Hint bei Banned-Hit
+  if (hits.length > 0) {
+    const avoidHint = buildAvoidHint(brandBanned);
+    const observedFloskel = hits.map((h) => h.phrase).slice(0, 6);
+    try {
+      const retry = await callGemini<{ story: string }>({
+        prompt: `${prompt}\n\n${avoidHint}\n\nDein vorheriger Versuch hatte diese Probleme: ${observedFloskel.map((p) => `"${p}"`).join(", ")}. Schreibe es komplett anders.`,
+        schema: RESPONSE_SCHEMA,
+        systemInstruction,
+        temperature: 0.75,
+        maxOutputTokens: 512,
+        thinkingBudget: 0,
+        retries: 1,
+      });
+      const retryClean = cleanStory(retry.story);
+      const retryHits = findBannedPhrases(retryClean, brandBanned);
+      // Nur uebernehmen wenn Retry tatsaechlich besser (weniger Hits)
+      if (retryHits.length < hits.length) {
+        story = retryClean;
+        hits = retryHits;
+      }
+    } catch {
+      // Retry-Fail → wir behalten Pass-1-Output mit Banned-Hits.
+      // Besser als gar nichts, und der Caller kann nach Hits filtern wenn noetig.
+    }
+  }
+
+  if (process.env.NODE_ENV !== "production" && hits.length > 0) {
+    console.log(
+      `[generate-story] residual banned hits for ${recipe.slug}: ${hits.map((h) => h.phrase).join(", ")}`
+    );
+  }
+
   return story;
 }
