@@ -7908,20 +7908,22 @@ function studioColors(pack: Pack): {
   };
 }
 
-// Studio-eigene Density-Heuristik. Step-First-Layout braucht mehr Atemraum
-// als die globale getDensity()-Funktion vorgibt, damit kurze Recipes nicht
-// halbleer wirken. Schwellen verschoben:
+// Studio-eigene Density-Heuristik. Step-First-Layout braucht VIEL mehr
+// Atemraum als die globale getDensity()-Funktion vorgibt, damit kurze
+// Recipes nicht halbleer wirken. Schwellen verschoben:
 //   global: spacious <= 14, compact >= 22
-//   studio: spacious <= 17, compact >= 22
-// Damit faellt z.B. 9 Zutaten + 5 Steps (score 16.5) hier in spacious und
-// bekommt grossen Hero + grossen Title + weite Step-Gaps. Bei viel Content
-// (>= 22) bleibt es bei compact wie global. recipe.tweaks.densityOverride
+//   studio: spacious <= 20, compact >= 24
+// Damit fallen z.B. 8 Zutaten + 7 Steps (score 18.5, Milky-Hazelnut-Eis)
+// oder 9 Zutaten + 5 Steps (score 16.5, Big-Mac-Fries) in spacious und
+// bekommen grossen Hero + grossen Title + weite Step-Gaps die zusammen mit
+// dem flex:1-Footer-Spacer die ganze A4-Seite ausfuellen. Erst ab 16+
+// Zutaten oder 10+ Steps kippt es auf compact. recipe.tweaks.densityOverride
 // gewinnt weiterhin gegen die Auto-Heuristik.
 function getStudioDensity(recipe: Recipe): Density {
   if (recipe.tweaks?.densityOverride) return recipe.tweaks.densityOverride;
   const score = recipe.ingredients.length + recipe.steps.length * 1.5;
-  if (score >= 22) return "compact";
-  if (score <= 17) return "spacious";
+  if (score >= 24) return "compact";
+  if (score <= 20) return "spacious";
   return "balanced";
 }
 
@@ -7970,11 +7972,14 @@ const STUDIO_DENSITY: Record<
     sectionLabelFontSize: 7,
     sectionGap: 11,
     sectionGapAfterLabel: 9,
-    stepNumSize: 15,
-    stepNumColWidth: 26,
+    // stepNumSize = stepFontSize: gleiche Glyph-Metriken garantieren
+    // Baseline-Alignment zwischen Number und Body-Text. Visuelle
+    // Prominenz kommt aus Font (Fraunces Italic Bold) + Akzent-Farbe.
+    stepNumSize: 9,
+    stepNumColWidth: 22,
     stepFontSize: 9,
-    stepLineHeight: 1.4,
-    stepGap: 5,
+    stepLineHeight: 1.45,
+    stepGap: 6,
     stepGroupLabelFontSize: 8,
     ingredientFontSize: 8.5,
     ingredientLineHeight: 1.55,
@@ -7989,70 +7994,69 @@ const STUDIO_DENSITY: Record<
     paddingTop: 30,
     paddingBottom: 22,
   },
-  // Balanced — score 15-21 (Standard). Hero mittel, Choreographie atmet,
-  // Story optional je nach shouldShowStory.
+  // Balanced — score 21-23 (selten, nur sehr dichte Mid-Recipes).
   balanced: {
-    heroWidth: 110,
-    heroHeight: 138,
-    headerGap: 18,
-    titleFontSize: 28,
-    subtitleFontSize: 10.5,
-    specFontSize: 8.5,
-    sectionLabelFontSize: 7.5,
-    sectionGap: 14,
-    sectionGapAfterLabel: 11,
-    stepNumSize: 19,
-    stepNumColWidth: 32,
-    stepFontSize: 10,
-    stepLineHeight: 1.5,
-    stepGap: 8,
+    heroWidth: 120,
+    heroHeight: 150,
+    headerGap: 20,
+    titleFontSize: 32,
+    subtitleFontSize: 11,
+    specFontSize: 9,
+    sectionLabelFontSize: 8,
+    sectionGap: 18,
+    sectionGapAfterLabel: 14,
+    stepNumSize: 10.5,
+    stepNumColWidth: 26,
+    stepFontSize: 10.5,
+    stepLineHeight: 1.55,
+    stepGap: 11,
     stepGroupLabelFontSize: 9,
-    ingredientFontSize: 9.5,
-    ingredientLineHeight: 1.65,
+    ingredientFontSize: 10,
+    ingredientLineHeight: 1.7,
     ingredientGroupLabelFontSize: 8.5,
-    storyFontSize: 10,
-    storyLineHeight: 1.55,
-    macroFontSize: 10,
-    macroLabelFontSize: 7.5,
-    microsFontSize: 8.5,
-    footerFontSize: 7.5,
+    storyFontSize: 10.5,
+    storyLineHeight: 1.6,
+    macroFontSize: 11,
+    macroLabelFontSize: 8,
+    microsFontSize: 9,
+    footerFontSize: 8,
     eyebrowFontSize: 7.5,
-    paddingTop: 36,
-    paddingBottom: 28,
+    paddingTop: 40,
+    paddingBottom: 30,
   },
-  // Spacious — score <= 17 (kurze Recipes, z.B. 9 Zutaten + 5 Steps oder
-  // 3-Zutaten-Eisbowl). Großer Hero, weite Step-Choreographie, Story als
-  // Pull-Quote eingebaut. Werte deutlich grosszuegiger als balanced damit
-  // die Karte voll wirkt ohne aufgeblaeht — fuellt den vertikalen Raum,
-  // damit der Footer nicht im Whitespace haengt.
+  // Spacious — score <= 20 (Mainstream-Recipes wie 8 Zutaten + 7 Steps).
+  // Großer Hero, weite Step-Choreographie, Story als Pull-Quote eingebaut.
+  // Sizes deutlich großzuegiger damit die Karte zusammen mit dem flex:1-
+  // Footer-Spacer wirklich die ganze A4-Seite fuellt — der User soll
+  // nicht das Gefuehl haben dass unten die Seite leer ist.
   spacious: {
-    heroWidth: 150,
-    heroHeight: 188,
-    headerGap: 28,
-    titleFontSize: 40,
-    subtitleFontSize: 12.5,
-    specFontSize: 9.5,
-    sectionLabelFontSize: 8.5,
-    sectionGap: 24,
-    sectionGapAfterLabel: 18,
-    stepNumSize: 26,
-    stepNumColWidth: 42,
-    stepFontSize: 11.5,
-    stepLineHeight: 1.7,
-    stepGap: 16,
-    stepGroupLabelFontSize: 10,
-    ingredientFontSize: 11,
+    heroWidth: 170,
+    heroHeight: 213,
+    headerGap: 32,
+    titleFontSize: 44,
+    subtitleFontSize: 13,
+    specFontSize: 10,
+    sectionLabelFontSize: 9,
+    sectionGap: 26,
+    sectionGapAfterLabel: 20,
+    stepNumSize: 12.5,
+    stepNumColWidth: 30,
+    stepFontSize: 12.5,
+    stepLineHeight: 1.65,
+    stepGap: 18,
+    stepGroupLabelFontSize: 10.5,
+    ingredientFontSize: 11.5,
     ingredientLineHeight: 1.85,
-    ingredientGroupLabelFontSize: 9.5,
-    storyFontSize: 11.5,
+    ingredientGroupLabelFontSize: 10,
+    storyFontSize: 12,
     storyLineHeight: 1.75,
-    macroFontSize: 12,
-    macroLabelFontSize: 8.5,
-    microsFontSize: 9.5,
-    footerFontSize: 8.5,
-    eyebrowFontSize: 8,
-    paddingTop: 48,
-    paddingBottom: 36,
+    macroFontSize: 13,
+    macroLabelFontSize: 9,
+    microsFontSize: 10,
+    footerFontSize: 9,
+    eyebrowFontSize: 8.5,
+    paddingTop: 54,
+    paddingBottom: 42,
   },
 };
 
@@ -8147,10 +8151,13 @@ function StudioStepRow({
   divider: string;
   isLast: boolean;
 }) {
-  // Big-Number-Spalte links (Fraunces, accent-color), vertikaler dünner
-  // Strich als Pace-Beat, Text rechts (Inter, ink). Bei isLast wird der
-  // bottom-padding kleiner damit der Footer näher an die letzte Step kommt
-  // (visueller Beat-Abschluss).
+  // Number-Glyph + Text-Glyph werden mit IDENTISCHER fontSize, fontFamily
+  // und lineHeight gerendert. Yoga aligned damit beide Baselines garantiert
+  // auf derselben Y-Linie — das ist der gleiche Trick wie in StepsList
+  // (siehe Editorial/Patisserie/Vital). Die Number wirkt trotz gleicher
+  // Größe als statementiges Pace-Beat-Element, weil sie in Fraunces Italic
+  // Bold und Akzent-Farbe gerendert wird gegen Inter Regular Body-Text.
+  // Step-Num-FontSize ist ueber STUDIO_DENSITY nun = stepFontSize.
   return (
     <View
       style={{
@@ -8159,32 +8166,26 @@ function StudioStepRow({
         marginBottom: isLast ? 0 : density.stepGap,
       }}
     >
-      <View
+      <Text
         style={{
           width: density.stepNumColWidth,
-          alignItems: "flex-start",
-          paddingTop: 1,
+          fontFamily: "Fraunces",
+          fontSize: density.stepNumSize,
+          fontStyle: "italic",
+          fontWeight: 700,
+          color: accent,
+          lineHeight: density.stepLineHeight,
         }}
       >
-        <Text
-          style={{
-            fontFamily: "Fraunces",
-            fontSize: density.stepNumSize,
-            fontWeight: 500,
-            color: accent,
-            lineHeight: 1,
-          }}
-        >
-          {pad2(index + 1)}
-        </Text>
-      </View>
+        {pad2(index + 1)}
+      </Text>
       <View
         style={{
           width: 0.6,
           alignSelf: "stretch",
           backgroundColor: divider,
           marginRight: 12,
-          marginTop: 3,
+          marginTop: 2,
         }}
       />
       <Text
@@ -8194,7 +8195,6 @@ function StudioStepRow({
           fontSize: density.stepFontSize,
           lineHeight: density.stepLineHeight,
           color: ink,
-          paddingTop: 1,
         }}
       >
         {text}
@@ -8512,9 +8512,9 @@ function StudioPage({
         }}
       />
 
-      {/* ───── Choreographie (Big-Number Steps) ───────────────────────── */}
+      {/* ───── Zubereitung (Big-Number Steps) ─────────────────────────── */}
       <StudioSectionLabel
-        label="Die Choreographie"
+        label="Zubereitung"
         density={d}
         accent={t.accent}
         divider={c.divider}
@@ -8682,11 +8682,12 @@ function StudioPage({
       />
 
       {/* ───── Footer: Macros + Mikros prose + handle + QR ───────────── */}
-      {/* Footer klebt am Body — bei sparse Content wandert die Lücke nach
-          UNTEN unter den Footer statt zwischen Body und Footer aufzureißen.
-          Wenn der Content nicht reicht, fuellen spacious-Sizes (groesserer
-          Hero, groesserer Title, weite Step-Gaps) den vertikalen Raum. */}
-      <View style={{ marginTop: d.sectionGap + 4 }} />
+      {/* flex:1-Spacer drueckt den Footer ans Page-Bottom — die ganze A4-
+          Seite wird visuell genutzt. Spacious-Sizes (groesserer Hero, weite
+          Step-Gaps) reduzieren die Spacer-Hoehe, sodass der Body nicht im
+          oberen Drittel klebt. min-height verhindert kollabieren bei
+          ueberlangem Body. */}
+      <View style={{ flex: 1, minHeight: d.sectionGap }} />
       <View
         style={{
           height: 0.5,

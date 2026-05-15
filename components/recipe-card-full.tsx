@@ -4695,15 +4695,15 @@ function hexWithAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-// Web-Mirror von getStudioDensity (lib/pdf/recipe-card-pdf.tsx). Spacious-
-// Schwelle ist grosszuegiger als globales getDensity (<= 17 statt <= 14)
-// damit kurze Recipes grossen Hero + grossen Title bekommen statt halbleer
-// auf der Karte zu sitzen.
+// Web-Mirror von getStudioDensity. Spacious bis score <= 20 (statt globales
+// <= 14), compact ab >= 24. Mainstream-Recipes (8 Zutaten + 7 Steps =
+// score 18.5) bekommen damit grossen Hero, weite Step-Gaps und fuellen
+// die Vorschau-Karte vollstaendig statt halbleer zu sitzen.
 function studioWebDensity(recipe: Recipe): WebDensity {
   if (recipe.tweaks?.densityOverride) return recipe.tweaks.densityOverride;
   const score = recipe.ingredients.length + recipe.steps.length * 1.5;
-  if (score >= 22) return "compact";
-  if (score <= 17) return "spacious";
+  if (score >= 24) return "compact";
+  if (score <= 20) return "spacious";
   return "balanced";
 }
 
@@ -4743,10 +4743,13 @@ const STUDIO_WEB_DENSITY: Record<
     subtitleFontSize: 12,
     specFontSize: 10,
     sectionLabelFontSize: 10,
-    stepNumSize: 20,
-    stepNumColWidth: 36,
+    // stepNumSize = stepFontSize: gleiche Glyph-Metriken garantieren
+    // Baseline-Alignment zwischen Step-Number und Step-Text. Mirror der
+    // PDF-Loesung (Patisserie/Editorial/Vital nutzen denselben Trick).
+    stepNumSize: 12,
+    stepNumColWidth: 28,
     stepFontSize: 12,
-    stepGap: 7,
+    stepGap: 8,
     stepGroupLabelFontSize: 11,
     ingredientFontSize: 11.5,
     ingredientGroupLabelFontSize: 10,
@@ -4759,48 +4762,48 @@ const STUDIO_WEB_DENSITY: Record<
     sectionGap: 18,
   },
   balanced: {
-    heroWidth: 156,
-    heroHeight: 195,
-    titleFontSize: 36,
-    subtitleFontSize: 14,
-    specFontSize: 11,
-    sectionLabelFontSize: 10.5,
-    stepNumSize: 26,
-    stepNumColWidth: 44,
+    heroWidth: 168,
+    heroHeight: 210,
+    titleFontSize: 38,
+    subtitleFontSize: 14.5,
+    specFontSize: 11.5,
+    sectionLabelFontSize: 11,
+    stepNumSize: 13,
+    stepNumColWidth: 32,
     stepFontSize: 13,
-    stepGap: 11,
+    stepGap: 13,
     stepGroupLabelFontSize: 12,
     ingredientFontSize: 13,
     ingredientGroupLabelFontSize: 11,
-    storyFontSize: 13,
-    macroFontSize: 14,
+    storyFontSize: 13.5,
+    macroFontSize: 14.5,
     macroLabelFontSize: 10,
-    microsFontSize: 11.5,
+    microsFontSize: 12,
     footerFontSize: 10.5,
     eyebrowFontSize: 10,
-    sectionGap: 22,
+    sectionGap: 24,
   },
   spacious: {
-    heroWidth: 208,
-    heroHeight: 260,
-    titleFontSize: 52,
-    subtitleFontSize: 16,
-    specFontSize: 12,
-    sectionLabelFontSize: 11.5,
-    stepNumSize: 34,
-    stepNumColWidth: 58,
+    heroWidth: 232,
+    heroHeight: 290,
+    titleFontSize: 56,
+    subtitleFontSize: 17,
+    specFontSize: 12.5,
+    sectionLabelFontSize: 12,
+    stepNumSize: 15,
+    stepNumColWidth: 38,
     stepFontSize: 15,
-    stepGap: 20,
-    stepGroupLabelFontSize: 13,
-    ingredientFontSize: 14.5,
-    ingredientGroupLabelFontSize: 12,
-    storyFontSize: 15,
-    macroFontSize: 16.5,
+    stepGap: 22,
+    stepGroupLabelFontSize: 13.5,
+    ingredientFontSize: 15,
+    ingredientGroupLabelFontSize: 12.5,
+    storyFontSize: 15.5,
+    macroFontSize: 17,
     macroLabelFontSize: 11,
     microsFontSize: 13,
     footerFontSize: 11.5,
     eyebrowFontSize: 11,
-    sectionGap: 32,
+    sectionGap: 36,
   },
 };
 
@@ -4867,37 +4870,38 @@ function StudioStepRowWeb({
   ink: string;
   divider: string;
 }) {
+  // Number + Text mit identischer fontSize und lineHeight, damit beide
+  // Baselines garantiert auf derselben Y-Linie sitzen. Number durch Font
+  // (Fraunces Italic Bold) + Akzent-Farbe prominent.
+  const lineHeight = 1.65;
   return (
     <div className="flex items-start">
-      <div
-        className="shrink-0 pt-px"
-        style={{ width: `${density.stepNumColWidth}px` }}
+      <span
+        className="shrink-0 font-display italic"
+        style={{
+          width: `${density.stepNumColWidth}px`,
+          color: accent,
+          fontSize: `${density.stepNumSize}px`,
+          fontWeight: 700,
+          lineHeight,
+        }}
       >
-        <span
-          className="font-display font-medium"
-          style={{
-            color: accent,
-            fontSize: `${density.stepNumSize}px`,
-            lineHeight: 1,
-          }}
-        >
-          {String(index + 1).padStart(2, "0")}
-        </span>
-      </div>
+        {String(index + 1).padStart(2, "0")}
+      </span>
       <div
         className="mx-3 self-stretch"
         style={{
           width: "0.5px",
           backgroundColor: divider,
-          marginTop: "4px",
+          marginTop: "5px",
         }}
       />
       <p
-        className="flex-1 pt-px"
+        className="flex-1"
         style={{
           color: ink,
           fontSize: `${density.stepFontSize}px`,
-          lineHeight: 1.55,
+          lineHeight,
         }}
       >
         {text}
@@ -5125,9 +5129,9 @@ function StudioLayout({
           style={{ backgroundColor: c.divider }}
         />
 
-        {/* Choreographie */}
+        {/* Zubereitung */}
         <StudioSectionLabelWeb
-          label="Die Choreographie"
+          label="Zubereitung"
           fontSize={d.sectionLabelFontSize}
           accent={pack.mood.accent}
           divider={c.divider}
