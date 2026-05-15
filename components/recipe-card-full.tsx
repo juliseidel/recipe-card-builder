@@ -16,6 +16,15 @@ import {
   MicrosSkeletonBanner,
   MicrosSkeletonStrip,
 } from "./enrichment-skeletons";
+import {
+  featureGroupLabel,
+  featureMacroEntries,
+  featurePlanIngredientColumns,
+  featureStepFontShrink,
+  featureTitleScale,
+  pickFeatureDensity,
+  type FeatureDensityTier,
+} from "@/lib/pdf/feature-fit";
 
 // While a custom recipe waits for Gemini micros + Flux hero we want the
 // card itself to make the gap visible — otherwise the pack-cover fallback
@@ -5466,9 +5475,34 @@ type FeatureWebDensityTier =
   | "spacious"
   | "balanced"
   | "compact"
-  | "ultra";
+  | "ultra"
+  | "extreme";
 
 const FEATURE_WEB_DENSITY: Record<FeatureWebDensityTier, FeatureWebDensity> = {
+  // Extreme — letzter Resort, kombiniert mit Smart-Truncation. PDF-Mirror
+  // mit ~1.25x Skalierung (Web rendert auf groesserem Container als
+  // 595x842 pt, daher minimale Schriftgroessen leicht hoeher).
+  extreme: {
+    contentWidthPct: 0.46,
+    titleFontSize: 18,
+    storyFontSize: 8.5,
+    metaFontSize: 8.5,
+    metaIconSize: 10.5,
+    macroFontSize: 9.5,
+    macroLabelFontSize: 7.5,
+    sectionLabelFontSize: 7.5,
+    ingredientFontSize: 8.5,
+    ingredientGroupLabelFontSize: 7.5,
+    stepFontSize: 8.5,
+    stepNumFontSize: 9.5,
+    stepNumColWidth: 16,
+    stepGap: 4,
+    microsFontSize: 8.5,
+    footerFontSize: 8,
+    eyebrowFontSize: 8,
+    contentPad: 18,
+    contentPadTop: 22,
+  },
   ultra: {
     contentWidthPct: 0.44,
     titleFontSize: 21,
@@ -5555,88 +5589,6 @@ const FEATURE_WEB_DENSITY: Record<FeatureWebDensityTier, FeatureWebDensity> = {
   },
 };
 
-// Feature-eigene Density (4-stufig) — analog zur PDF-Version. Niedrigere
-// Schwellen + extra "ultra" Stufe weil die schmale Content-Spalte
-// (~42-46 % der Page-Breite) deutlich aggressiveres Sizing braucht als
-// generische 3-Stufen-Density.
-function featureWebGetDensity(recipe: Recipe): FeatureWebDensityTier {
-  if (recipe.tweaks?.densityOverride) {
-    return recipe.tweaks.densityOverride;
-  }
-  const score = recipe.ingredients.length + recipe.steps.length * 2;
-  if (score >= 26) return "ultra";
-  if (score >= 16) return "compact";
-  if (score <= 10) return "spacious";
-  return "balanced";
-}
-
-function featureWebTitleScale(title: string): number {
-  const len = title.length;
-  if (len <= 14) return 1;
-  if (len <= 22) return 0.86;
-  if (len <= 32) return 0.74;
-  if (len <= 44) return 0.64;
-  return 0.56;
-}
-
-function featureWebStepShrink(stepCount: number): number {
-  if (stepCount >= 12) return -1.5;
-  if (stepCount >= 8) return -0.7;
-  return 0;
-}
-
-function featureWebMacros(
-  recipe: Recipe
-): Array<{ label: string; value: string }> {
-  const n = recipe.nutrition;
-  const entries: Array<{ label: string; value: string }> = [];
-  if (n.kcal > 0) entries.push({ label: "KCAL", value: String(n.kcal) });
-  if (n.protein > 0) entries.push({ label: "P", value: `${n.protein} g` });
-  if (n.carbs > 0) entries.push({ label: "KH", value: `${n.carbs} g` });
-  if (n.fat > 0) entries.push({ label: "F", value: `${n.fat} g` });
-  return entries;
-}
-
-function featureWebGroupLabel(name: string): string {
-  return /^(den|die|das)\s/i.test(name) ? `Für ${name.toLowerCase()}` : name;
-}
-
-type FeatureColumnPlan = {
-  twoCol: boolean;
-  leftBlocks: IngredientGroup[];
-  rightBlocks: IngredientGroup[];
-};
-
-function featureWebPlanColumns(groups: IngredientGroup[]): FeatureColumnPlan {
-  const totalItems = groups.reduce((s, g) => s + g.items.length, 0);
-  if (totalItems < 6) {
-    return { twoCol: false, leftBlocks: groups, rightBlocks: [] };
-  }
-  if (groups.length >= 2) {
-    const first = groups[0];
-    const rest = groups.slice(1);
-    const restCount = rest.reduce((s, g) => s + g.items.length, 0);
-    if (first.items.length > restCount * 2.5 && first.items.length >= 6) {
-      const half = Math.ceil(first.items.length / 2);
-      return {
-        twoCol: true,
-        leftBlocks: [{ name: first.name, items: first.items.slice(0, half) }],
-        rightBlocks: [
-          { name: null, items: first.items.slice(half) },
-          ...rest,
-        ],
-      };
-    }
-    return { twoCol: true, leftBlocks: [first], rightBlocks: rest };
-  }
-  const g = groups[0];
-  const half = Math.ceil(g.items.length / 2);
-  return {
-    twoCol: true,
-    leftBlocks: [{ name: g.name, items: g.items.slice(0, half) }],
-    rightBlocks: [{ name: null, items: g.items.slice(half) }],
-  };
-}
 
 function FeatureClockIconWeb({ size, color }: { size: number; color: string }) {
   return (
@@ -5743,7 +5695,7 @@ function FeatureIngredientBlockWeb({
             marginBottom: "5px",
           }}
         >
-          {featureWebGroupLabel(group.name)}
+          {featureGroupLabel(group.name)}
         </p>
       ) : null}
       {group.items.map((it, i) => {
@@ -5788,30 +5740,28 @@ function FeatureLayout({
   totalRecipes,
   enriching,
 }: RecipeCardFullProps) {
-  // Feature-eigene Density (4 Stufen mit "ultra") — siehe featureWebGetDensity.
-  const density = featureWebGetDensity(recipe);
+  // Geteilter Picker mit Pixel-Estimation — SELBES Tier wie PDF-Renderer
+  // damit Editor-Preview und Druck immer matched.
+  const mode = pickFeatureDensity(recipe);
+  const density = mode.density;
   const d = FEATURE_WEB_DENSITY[density];
-  const isDense = density === "compact" || density === "ultra";
-  // Story versteckt bei compact + ultra — Platzersparnis fuer dichte Cards.
-  const showStory =
-    webShouldShowStory(recipe) &&
-    (density === "balanced" || density === "spacious");
-  // Mikros direkt unter Macros bei compact/ultra (spart Section-Label).
-  const microsInline = density === "compact" || density === "ultra";
-  const microsAsSection = !microsInline;
+  const showStory = webShouldShowStory(recipe) && mode.showStory && !mode.truncateStory;
+  const showSubtitle = mode.showSubtitle && !mode.truncateSubtitle;
+  const microsInline = mode.microsInline;
+  const microsAsSection = mode.microsAsSection;
 
   const titleScale =
-    featureWebTitleScale(recipe.title) +
+    featureTitleScale(recipe.title) +
     (recipe.tweaks?.titleScale ?? 0) * 0.03;
   const finalTitleSize = Math.round(d.titleFontSize * titleScale * 10) / 10;
 
-  const stepShrink = featureWebStepShrink(recipe.steps.length);
+  const stepShrink = featureStepFontShrink(recipe.steps.length);
   const stepFontSize = d.stepFontSize + stepShrink;
   const stepNumFontSize = d.stepNumFontSize + stepShrink;
   const stepGap = Math.max(d.stepGap + stepShrink * 0.5, 4);
 
   const ingredientGroups = groupIngredients(recipe.ingredients);
-  const ingPlan = featureWebPlanColumns(ingredientGroups);
+  const ingPlan = featurePlanIngredientColumns(ingredientGroups);
   const stepGroups = groupRecipeSteps(recipe.steps);
   const flatSteps: Array<
     | { kind: "group-label"; label: string }
@@ -5819,7 +5769,7 @@ function FeatureLayout({
   > = [];
   stepGroups.forEach((g) => {
     if (g.name) {
-      flatSteps.push({ kind: "group-label", label: featureWebGroupLabel(g.name) });
+      flatSteps.push({ kind: "group-label", label: featureGroupLabel(g.name) });
     }
     g.items.forEach((it) =>
       flatSteps.push({ kind: "step", index: it.index, text: it.text })
@@ -5827,7 +5777,7 @@ function FeatureLayout({
   });
 
   const micros = visibleMicros(recipe).slice(0, 4);
-  const macros = featureWebMacros(recipe);
+  const macros = featureMacroEntries(recipe);
 
   const totalMin = recipe.prepTime + (recipe.cookTime ?? 0);
   const portionLabel = recipe.servings === 1 ? "Portion" : "Portionen";
@@ -5977,8 +5927,8 @@ function FeatureLayout({
           }}
         />
 
-        {/* Subtitle */}
-        {recipe.subtitle ? (
+        {/* Subtitle — nur wenn showSubtitle (Truncation-Fallback). */}
+        {recipe.subtitle && showSubtitle ? (
           <p
             className="italic"
             style={{

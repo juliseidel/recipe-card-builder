@@ -33,6 +33,18 @@ import {
 import { packTheme, withAlpha, blendWithWhite, PAGE_PADDING } from "./theme";
 import { BeeIcon } from "./bee-icon";
 import { formatIngredientAmount } from "@/lib/format-ingredient";
+import {
+  FEATURE_DENSITY,
+  PAGE_USABLE_PT,
+  featureGroupLabel,
+  featurePlanIngredientColumns,
+  featureMacroEntries,
+  featureStepFontShrink,
+  featureTitleScale,
+  pickFeatureDensity,
+  type FeatureDensityTier,
+  type FeatureRenderMode,
+} from "./feature-fit";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public entry — returns a single A4 page rendered in the matching layout.
@@ -9034,300 +9046,6 @@ const FEATURE_COLORS = {
   divider: "#d5c4ad",
 } as const;
 
-// Eigene Density-Stufe — Feature hat zusaetzlich "ultra" weil die schmale
-// Content-Spalte (~210 pt usable, vs Studio's ~520 pt) typisch 2–3 Zeilen
-// pro Step braucht. Bei Recipes mit 9+ Steps + 10+ Zutaten reicht das
-// generische compact (Studio-Standard) nicht — Inhalt overflowed sonst auf
-// eine zweite Page. Ultra ist die garantierte One-Page-Stufe fuer
-// content-schwere Karten.
-type FeatureDensityTier = "spacious" | "balanced" | "compact" | "ultra";
-
-const FEATURE_DENSITY: Record<
-  FeatureDensityTier,
-  {
-    contentWidthPct: number; // 0..1 — Anteil der Page-Breite
-    fadeWidth: number; // pt — Soft-Fade-Overlay
-    contentPadH: number;
-    contentPadTop: number;
-    contentPadBottom: number;
-    titleFontSize: number;
-    storyFontSize: number;
-    storyLineHeight: number;
-    metaFontSize: number;
-    metaIconSize: number;
-    metaRowGap: number;
-    macroFontSize: number;
-    macroLabelFontSize: number;
-    macroRowGap: number;
-    sectionLabelFontSize: number;
-    sectionLabelGapTop: number;
-    sectionLabelGapBottom: number;
-    ingredientFontSize: number;
-    ingredientLineHeight: number;
-    ingredientGap: number;
-    ingredientGroupLabelFontSize: number;
-    ingredientColumnGap: number;
-    stepNumColWidth: number;
-    stepNumFontSize: number;
-    stepFontSize: number;
-    stepLineHeight: number;
-    stepGap: number;
-    microsFontSize: number;
-    microsLineHeight: number;
-    footerFontSize: number;
-    eyebrowFontSize: number;
-  }
-> = {
-  // Ultra — score >= 26 (z.B. 11 Zutaten + 9 Steps wie Protein-Kaiserschmarrn,
-  // oder 8 Zutaten + 12 Steps). Aggressivste Stufe damit die Page auch bei
-  // sehr text-heavy Steps nicht overflowed. Story versteckt, Mikros direkt
-  // unter Macros (kein eigener Section-Header), Section-Gaps minimal.
-  ultra: {
-    contentWidthPct: 0.44,
-    fadeWidth: 56,
-    contentPadH: 20,
-    contentPadTop: 22,
-    contentPadBottom: 18,
-    titleFontSize: 17,
-    storyFontSize: 7.5,
-    storyLineHeight: 1.35,
-    metaFontSize: 7,
-    metaIconSize: 9,
-    metaRowGap: 12,
-    macroFontSize: 8,
-    macroLabelFontSize: 6,
-    macroRowGap: 8,
-    sectionLabelFontSize: 6.5,
-    sectionLabelGapTop: 7,
-    sectionLabelGapBottom: 4,
-    ingredientFontSize: 7.5,
-    ingredientLineHeight: 1.35,
-    ingredientGap: 1.5,
-    ingredientGroupLabelFontSize: 6.5,
-    ingredientColumnGap: 10,
-    stepNumColWidth: 13,
-    stepNumFontSize: 8,
-    stepFontSize: 7.5,
-    stepLineHeight: 1.3,
-    stepGap: 3.5,
-    microsFontSize: 7,
-    microsLineHeight: 1.3,
-    footerFontSize: 6.5,
-    eyebrowFontSize: 6.5,
-  },
-  // Compact — score 16-25 (typische Hauptmahlzeit). Dichter als balanced,
-  // Story aus, Mikros immer noch als eigene Section damit lesbar.
-  compact: {
-    contentWidthPct: 0.42,
-    fadeWidth: 60,
-    contentPadH: 24,
-    contentPadTop: 26,
-    contentPadBottom: 22,
-    titleFontSize: 19,
-    storyFontSize: 8,
-    storyLineHeight: 1.4,
-    metaFontSize: 7.5,
-    metaIconSize: 9.5,
-    metaRowGap: 14,
-    macroFontSize: 8.5,
-    macroLabelFontSize: 6.2,
-    macroRowGap: 9,
-    sectionLabelFontSize: 6.8,
-    sectionLabelGapTop: 10,
-    sectionLabelGapBottom: 6,
-    ingredientFontSize: 7.8,
-    ingredientLineHeight: 1.42,
-    ingredientGap: 1.8,
-    ingredientGroupLabelFontSize: 6.8,
-    ingredientColumnGap: 11,
-    stepNumColWidth: 14,
-    stepNumFontSize: 8.5,
-    stepFontSize: 8,
-    stepLineHeight: 1.35,
-    stepGap: 4.5,
-    microsFontSize: 7.2,
-    microsLineHeight: 1.35,
-    footerFontSize: 6.8,
-    eyebrowFontSize: 6.8,
-  },
-  // Balanced — score 11-15 (mittlere Komplexitaet). Standard-Lesbarkeit,
-  // Title atmet, Story optional sichtbar.
-  balanced: {
-    contentWidthPct: 0.44,
-    fadeWidth: 68,
-    contentPadH: 28,
-    contentPadTop: 34,
-    contentPadBottom: 28,
-    titleFontSize: 25,
-    storyFontSize: 9,
-    storyLineHeight: 1.5,
-    metaFontSize: 8.5,
-    metaIconSize: 11,
-    metaRowGap: 18,
-    macroFontSize: 9.5,
-    macroLabelFontSize: 6.8,
-    macroRowGap: 11,
-    sectionLabelFontSize: 7.3,
-    sectionLabelGapTop: 14,
-    sectionLabelGapBottom: 8,
-    ingredientFontSize: 8.8,
-    ingredientLineHeight: 1.55,
-    ingredientGap: 2.5,
-    ingredientGroupLabelFontSize: 7.3,
-    ingredientColumnGap: 13,
-    stepNumColWidth: 17,
-    stepNumFontSize: 9.8,
-    stepFontSize: 9.2,
-    stepLineHeight: 1.48,
-    stepGap: 6,
-    microsFontSize: 8.2,
-    microsLineHeight: 1.48,
-    footerFontSize: 7.3,
-    eyebrowFontSize: 7.3,
-  },
-  // Spacious — score <= 10 (wenig Content). Grosser Title, Story sichtbar,
-  // weite Step-Choreographie damit die Page nicht halbleer wirkt.
-  spacious: {
-    contentWidthPct: 0.46,
-    fadeWidth: 78,
-    contentPadH: 32,
-    contentPadTop: 44,
-    contentPadBottom: 36,
-    titleFontSize: 32,
-    storyFontSize: 10.5,
-    storyLineHeight: 1.62,
-    metaFontSize: 9.5,
-    metaIconSize: 12,
-    metaRowGap: 20,
-    macroFontSize: 11,
-    macroLabelFontSize: 7.5,
-    macroRowGap: 14,
-    sectionLabelFontSize: 8,
-    sectionLabelGapTop: 20,
-    sectionLabelGapBottom: 11,
-    ingredientFontSize: 9.5,
-    ingredientLineHeight: 1.7,
-    ingredientGap: 4,
-    ingredientGroupLabelFontSize: 8,
-    ingredientColumnGap: 16,
-    stepNumColWidth: 20,
-    stepNumFontSize: 11,
-    stepFontSize: 10,
-    stepLineHeight: 1.6,
-    stepGap: 9,
-    microsFontSize: 9,
-    microsLineHeight: 1.55,
-    footerFontSize: 8,
-    eyebrowFontSize: 8,
-  },
-};
-
-// Feature-eigene Density-Logik. Steps werden doppelt gewichtet, weil sie in
-// der schmalen ~210 pt Content-Spalte typisch 2-3 Zeilen pro Step belegen,
-// waehrend Zutaten (2-spaltig) nur 1 Zeile pro Item sind. Niedrigere
-// Schwellen als der generische getDensity() — ein Recipe mit score 18 ist
-// in Studio "balanced", aber in Feature schon "compact".
-//
-// recipe.tweaks.densityOverride wird respektiert; "ultra" gibt's nicht im
-// User-Tweak, also mappt expliziter "compact"-Tweak auf compact.
-function featureGetDensity(recipe: Recipe): FeatureDensityTier {
-  if (recipe.tweaks?.densityOverride) {
-    return recipe.tweaks.densityOverride;
-  }
-  const score = recipe.ingredients.length + recipe.steps.length * 2;
-  if (score >= 26) return "ultra";
-  if (score >= 16) return "compact";
-  if (score <= 10) return "spacious";
-  return "balanced";
-}
-
-// Title-Auto-Shrink — analog zu studioTitleScale. Content-Spalte ist
-// schmaler (~250 pt usable) als Studio (~300 pt), daher aggressivere Stufen.
-function featureTitleScale(title: string): number {
-  const len = title.length;
-  if (len <= 14) return 1;
-  if (len <= 22) return 0.86;
-  if (len <= 32) return 0.74;
-  if (len <= 44) return 0.64;
-  return 0.56;
-}
-
-// Step-Font-Shrink: Content-Spalte ist zu schmal fuer 2-Spalten-Steps wie
-// Studio, also stattdessen progressive Font-Verkleinerung. Verhindert dass
-// 12+ Steps ueberlaufen. Wert wird auf stepFontSize/stepNumFontSize/stepGap
-// gleichzeitig angewandt, damit die Choreographie proportional bleibt.
-function featureStepFontShrink(stepCount: number): number {
-  if (stepCount >= 12) return -1.5;
-  if (stepCount >= 8) return -0.7;
-  return 0;
-}
-
-// Macros — nur Werte > 0. Selbe Regel wie Studio.
-function featureMacroEntries(
-  recipe: Recipe
-): Array<{ label: string; value: string }> {
-  const n = recipe.nutrition;
-  const entries: Array<{ label: string; value: string }> = [];
-  if (n.kcal > 0) entries.push({ label: "KCAL", value: String(n.kcal) });
-  if (n.protein > 0) entries.push({ label: "P", value: `${n.protein} g` });
-  if (n.carbs > 0) entries.push({ label: "KH", value: `${n.carbs} g` });
-  if (n.fat > 0) entries.push({ label: "F", value: `${n.fat} g` });
-  return entries;
-}
-
-// Zutaten-Layout: bei wenigen Items 1 Spalte, sonst 2 Spalten. Bei mehreren
-// Sub-Groups wird die erste Gruppe links, restliche rechts gerendert; bei
-// einer einzigen Gruppe wird sie 50/50 in zwei Listen halbiert (kein
-// duplicater Gruppen-Name rechts).
-type IngredientColumnPlan = {
-  twoCol: boolean;
-  leftBlocks: IngredientGroup[];
-  rightBlocks: IngredientGroup[];
-};
-
-function featurePlanIngredientColumns(
-  groups: IngredientGroup[]
-): IngredientColumnPlan {
-  const totalItems = groups.reduce((s, g) => s + g.items.length, 0);
-  if (totalItems < 6) {
-    return { twoCol: false, leftBlocks: groups, rightBlocks: [] };
-  }
-  if (groups.length >= 2) {
-    // Mehrere Gruppen: Haupt-Gruppe links, Sub-Gruppen rechts. Wenn die
-    // erste Gruppe ueberproportional gross ist (z.B. 12 Haupt + 2 Sauce),
-    // splitten wir die main-Gruppe auf — damit beide Spalten gleich lang
-    // sind und der Reader nicht eine endlose linke Liste liest.
-    const first = groups[0];
-    const rest = groups.slice(1);
-    const restCount = rest.reduce((s, g) => s + g.items.length, 0);
-    if (first.items.length > restCount * 2.5 && first.items.length >= 6) {
-      const half = Math.ceil(first.items.length / 2);
-      return {
-        twoCol: true,
-        leftBlocks: [{ name: first.name, items: first.items.slice(0, half) }],
-        rightBlocks: [
-          { name: null, items: first.items.slice(half) },
-          ...rest,
-        ],
-      };
-    }
-    return { twoCol: true, leftBlocks: [first], rightBlocks: rest };
-  }
-  // Genau 1 Gruppe mit 6+ Items: 50/50 Split, second-half ohne Label.
-  const g = groups[0];
-  const half = Math.ceil(g.items.length / 2);
-  return {
-    twoCol: true,
-    leftBlocks: [{ name: g.name, items: g.items.slice(0, half) }],
-    rightBlocks: [{ name: null, items: g.items.slice(half) }],
-  };
-}
-
-// Sub-Group-Label: "Für die X" Regel wie restaurantGroupLabel & studioGroupLabel.
-function featureGroupLabel(name: string): string {
-  return /^(den|die|das)\s/i.test(name) ? `Für ${name.toLowerCase()}` : name;
-}
-
 // ─── Inline-SVG-Icons (Clock + People) — sans-serif clean, scaled by size ─
 function FeatureClockIcon({ size, color }: { size: number; color: string }) {
   return (
@@ -9514,12 +9232,14 @@ function FeaturePage({
   hideRecipeIndex,
 }: RecipeCardPdfProps) {
   const t = packTheme(pack);
-  // Feature-eigene Density (4 Stufen mit "ultra" fuer content-schwere Cards).
-  // NICHT getDensity() aus dem generischen Helper, weil die schmale Content-
-  // Spalte deutlich aggressiveres Sizing braucht als Studio.
-  const baseDensity = featureGetDensity(recipe);
+  // Pixel-Estimation-basierter Density-Picker. Garantiert One-Page-Output:
+  // iteriert spacious -> extreme und nimmt die erste Stufe deren geschaetzte
+  // Content-Hoehe auf 842 pt passt. Bei extreme + truncation: Story und
+  // Subtitle werden hart weggekuerzt (FeatureRenderMode.truncate* Flags).
+  const mode = pickFeatureDensity(recipe);
+  const baseDensity = mode.density;
   const d = FEATURE_DENSITY[baseDensity];
-  const isDense = baseDensity === "compact" || baseDensity === "ultra";
+  const isDense = mode.microsInline;
 
   // ─── Dynamische Mood-Farben fuer Content-BG + Ink ─────────────────────
   // Cream-Tint vom Pack-Mood — beige bei honey, sage-creme bei sage etc.
@@ -9565,16 +9285,14 @@ function FeaturePage({
   const microsToShow = micros.slice(0, 4);
 
   const macros = featureMacroEntries(recipe);
-  // Story nur bei balanced/spacious zeigen — bei compact/ultra ist die Page
-  // schon dicht gepackt, eine zusaetzliche Story wuerde overflowen.
-  const showStory =
-    shouldShowStory(recipe) &&
-    (baseDensity === "balanced" || baseDensity === "spacious");
-  // Mikros bei ultra/compact direkt unter Macros (kein eigener Section-
-  // Header) — spart ~25 pt. Bei balanced/spacious bleibt der eigene Block
-  // mit "REICH AN"-Label fuer Lesbarkeit.
-  const microsInline = showMicros && isDense;
-  const microsAsSection = showMicros && !isDense;
+  // Story/Subtitle/Mikros-Position kommen direkt aus dem render-mode (vom
+  // Picker entschieden). truncateStory/truncateSubtitle sind Flags die in
+  // extreme + insufficient-fit gesetzt werden — der Renderer skippt dann
+  // einfach Story / Subtitle. Smart-Truncation als letzter Safety-Net.
+  const showStory = mode.showStory && !mode.truncateStory;
+  const showSubtitle = mode.showSubtitle && !mode.truncateSubtitle;
+  const microsInline = showMicros && mode.microsInline;
+  const microsAsSection = showMicros && mode.microsAsSection;
   const totalMin = totalTime(recipe);
   const servings = servingsCountLabel(recipe);
 
@@ -9681,8 +9399,9 @@ function FeaturePage({
           }}
         />
 
-        {/* Subtitle (wenn gesetzt, kompakt) */}
-        {recipe.subtitle ? (
+        {/* Subtitle — nur bei showSubtitle (Truncation-Fallback skippt
+            das bei extreme + insufficient-fit). */}
+        {recipe.subtitle && showSubtitle ? (
           <Text
             style={{
               fontFamily: "Inter",
