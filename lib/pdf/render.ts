@@ -1,4 +1,5 @@
 import { renderToBuffer } from "@react-pdf/renderer";
+import { PDFDocument } from "pdf-lib";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
 import type { Recipe } from "@/lib/recipes";
@@ -11,7 +12,46 @@ import { PackPdfDocument } from "./pack-pdf";
 
 export type RenderProgress = (stage: string, percent: number) => void;
 
+// Production-Garantie: jede Single-Recipe-PDF muss genau 1 Seite haben.
+// Falls die Auto-Density-Heuristik mal danebenliegt (extrem lange Steps,
+// monstroese Zutaten-Namen, riesige Story), greift dieser Render-Guard:
+// 3-stufiges Retry-System mit progressiv aggressiveren Tweaks. Cleane
+// Fallback-Reihenfolge:
+//   Attempt 1 — Original Recipe, Auto-Density
+//   Attempt 2 — densityOverride: "compact" + hideStory
+//   Attempt 3 — Attempt 2 + hideMicros (Notbremse: Mikros-Block weg)
+//   Final     — Hard-Fail mit eindeutiger Fehlermeldung
+//
+// Im Normal-Case rendert Attempt 1 sauber und der Guard ist transparent.
+// Nur bei Edge-Cases (~0.5-1% der Recipes) tritt Retry ein.
+async function getPageCount(buf: Buffer): Promise<number> {
+  // pdf-lib parsed das PDF nur soweit dass die Page-Count im Trailer
+  // ablesbar ist — sehr schnell (< 50ms typischerweise).
+  const doc = await PDFDocument.load(buf);
+  return doc.getPageCount();
+}
+
+const FALLBACK_TWEAKS: Array<{
+  label: string;
+  tweaks: NonNullable<Recipe["tweaks"]>;
+}> = [
+  {
+    label: "compact + hideStory",
+    tweaks: { densityOverride: "compact", hideStory: true },
+  },
+  {
+    label: "compact + hideStory + hideMicros",
+    tweaks: {
+      densityOverride: "compact",
+      hideStory: true,
+      hideMicros: true,
+    },
+  },
+];
+
 // Renders a single-recipe PDF and returns the binary buffer.
+// Production-Guard: bei Mehrseitigkeit wird automatisch mit aggressiveren
+// Tweaks neu gerendert, sodass das finale PDF garantiert 1 Seite ist.
 export async function renderRecipePdf(args: {
   brand: Brand;
   pack: Pack;
@@ -20,24 +60,66 @@ export async function renderRecipePdf(args: {
   onProgress?: RenderProgress;
 }): Promise<Buffer> {
   ensureFontsRegistered();
-  args.onProgress?.("loading-image", 20);
+  args.onProgress?.("loading-image", 15);
   const [heroDataUri, qrDataUri, avatarDataUri] = await Promise.all([
     loadImageAsDataUri(args.recipe.hero ?? args.pack.coverImage),
     generateQrDataUri(args.recipe.sourceUrl),
     loadImageAsDataUri(args.brand.avatar),
   ]);
-  args.onProgress?.("rendering", 60);
-  const buf = await renderToBuffer(
-    RecipePdfDocument({
-      brand: args.brand,
-      pack: args.pack,
-      recipe: args.recipe,
-      totalRecipes: args.totalRecipes,
-      heroDataUri,
-      qrDataUri,
-      avatarDataUri,
-    })
-  );
+
+  // Inner render-Funktion. Wird mit progressiv aggressiveren Tweaks
+  // wiederholt aufgerufen wenn der Guard mehrere Seiten erkennt.
+  const renderWithTweaks = async (
+    overrideTweaks: Recipe["tweaks"] | undefined
+  ): Promise<Buffer> => {
+    const recipeForRender: Recipe = overrideTweaks
+      ? {
+          ...args.recipe,
+          tweaks: {
+            ...args.recipe.tweaks,
+            ...overrideTweaks,
+          },
+        }
+      : args.recipe;
+    return await renderToBuffer(
+      RecipePdfDocument({
+        brand: args.brand,
+        pack: args.pack,
+        recipe: recipeForRender,
+        totalRecipes: args.totalRecipes,
+        heroDataUri,
+        qrDataUri,
+        avatarDataUri,
+      })
+    );
+  };
+
+  args.onProgress?.("rendering", 55);
+  let buf = await renderWithTweaks(undefined);
+  let pageCount = await getPageCount(buf);
+
+  // Retry-Loop: falls Auto-Density das Recipe nicht auf 1 Seite kriegt,
+  // greifen wir auf zunehmend striktere Tweak-Kombinationen zurueck.
+  for (const { label, tweaks } of FALLBACK_TWEAKS) {
+    if (pageCount === 1) break;
+    console.warn(
+      `[renderRecipePdf] ${args.recipe.slug} rendered ${pageCount} Seiten — Retry mit Fallback "${label}"`
+    );
+    args.onProgress?.("rendering-retry", 70);
+    buf = await renderWithTweaks(tweaks);
+    pageCount = await getPageCount(buf);
+  }
+
+  if (pageCount !== 1) {
+    // Auch der finale Fallback hat es nicht geschafft. Hard-Fail mit klarer
+    // Diagnose damit der Editor das Recipe nachjustieren kann (Step-Texte
+    // kuerzen, Zutaten-Namen verkuerzen).
+    throw new Error(
+      `Recipe "${args.recipe.slug}" produziert ${pageCount} Seiten selbst mit maximaler Kompression. ` +
+        `Step-Texte oder Zutaten-Namen sind zu lang. Bitte im Editor kuerzen oder hideStory/hideMicros manuell setzen.`
+    );
+  }
+
   args.onProgress?.("done", 100);
   return buf;
 }

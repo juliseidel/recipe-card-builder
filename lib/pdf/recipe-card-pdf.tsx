@@ -2005,16 +2005,58 @@ export function softWrapTitle(title: string): string {
 // A recipe with 8 ingredients but only 4 steps (e.g. KI-Süßkartoffel-Muffins)
 // ends up sparse-feeling on A4 — the steps column runs out fast and leaves
 // half the page white. Score-based classification catches that.
+//
+// Char-Bonus: zaehlt zusaetzlich die TATSAECHLICHEN Textlaengen von Steps,
+// Zutaten und Story. Ein Recipe mit 5 sehr langen Steps (jeweils 200+ Zeichen)
+// wird damit hoeher klassifiziert als 5 kurze Steps (~50 Zeichen). Ohne den
+// Bonus klemmte die item-count-Heuristik bei langen Step-Beschreibungen.
+// Schwellen bleiben unveraendert (22/14), nur der Score wird smarter.
 // recipe.tweaks.densityOverride wins over the score when the user has
 // manually picked a density in the editor.
 export function getDensity(recipe: Recipe): Density {
   if (recipe.tweaks?.densityOverride) {
     return recipe.tweaks.densityOverride;
   }
-  const score = recipe.ingredients.length + recipe.steps.length * 1.5;
+  const score = computeDensityScore(recipe);
   if (score >= 22) return "compact";
   if (score <= 14) return "spacious";
   return "balanced";
+}
+
+// Gemeinsamer Score-Compute fuer getDensity (alle Layouts) und
+// getStudioDensity (Studio-spezifisch). Studio nutzt andere Schwellen aber
+// dieselbe Score-Formel — so verhalten sich beide kohaerent.
+//
+// Berechnung:
+//   base       = ingredients.length + steps.length * 1.5
+//   stepBonus  = +1 pro 80 chars step-text ueber erwartetem Mittel (80/Step)
+//   ingBonus   = +1 pro 30 chars ingredient-text ueber erwartetem Mittel (30/Item)
+//   storyBonus = +0.5 pro 100 chars story ueber 150 Basis-Chars
+//
+// Beispiel: 8 Zutaten + 7 Steps mit normalen Laengen -> base 18.5, kein Bonus
+// = 18.5 (balanced bei Studio, balanced bei globalem getDensity).
+// Beispiel: 5 Zutaten + 5 Steps aber Steps avg 250 chars -> base 12.5,
+// stepBonus = (5*250 - 5*80)/80 = 10.6 -> score 23.1 (compact statt sparse).
+export function computeDensityScore(recipe: Recipe): number {
+  const base = recipe.ingredients.length + recipe.steps.length * 1.5;
+  const totalStepChars = recipe.steps.reduce((acc, s) => {
+    const text = typeof s === "string" ? s : s.text;
+    return acc + text.length;
+  }, 0);
+  const totalIngredientChars = recipe.ingredients.reduce((acc, i) => {
+    return acc + i.amount.length + i.name.length + (i.note?.length ?? 0);
+  }, 0);
+  const storyChars = recipe.description?.length ?? 0;
+  const stepBonus = Math.max(
+    0,
+    (totalStepChars - recipe.steps.length * 80) / 80
+  );
+  const ingredientBonus = Math.max(
+    0,
+    (totalIngredientChars - recipe.ingredients.length * 30) / 30
+  );
+  const storyBonus = Math.max(0, (storyChars - 150) / 100) * 0.5;
+  return base + stepBonus + ingredientBonus + storyBonus;
 }
 
 // Whether to render the editorial "Bienes Story" pull-quote. Decoupled from
@@ -7920,7 +7962,10 @@ function studioColors(pack: Pack): {
 // 18.5) = balanced jetzt, nicht spacious — sonst lief der Body ueber.
 function getStudioDensity(recipe: Recipe): Density {
   if (recipe.tweaks?.densityOverride) return recipe.tweaks.densityOverride;
-  const score = recipe.ingredients.length + recipe.steps.length * 1.5;
+  // Nutzt den char-aware Score (siehe computeDensityScore) damit Studio
+  // auf lange Step-Texte und ueberlange Zutaten-Namen genauso reagiert
+  // wie die anderen Layouts — nur mit eigenen Schwellen.
+  const score = computeDensityScore(recipe);
   if (score >= 20) return "compact";
   if (score <= 16) return "spacious";
   return "balanced";

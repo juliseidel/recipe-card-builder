@@ -4695,16 +4695,42 @@ function hexWithAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-// Web-Mirror von getStudioDensity — IDENTISCHE Schwellen damit die Vorschau
-// dieselbe Density-Stufe klassifiziert wie das PDF. compact ab >= 20,
-// spacious bis <= 16, balanced dazwischen. Strikt auf One-Page-Garantie
-// im PDF kalibriert.
+// Web-Mirror von getStudioDensity — IDENTISCHE Schwellen + Score-Formel
+// damit die Vorschau dieselbe Density-Stufe klassifiziert wie das PDF.
+// compact ab >= 20, spacious bis <= 16, balanced dazwischen. Char-Bonus
+// (siehe computeWebDensityScore) reagiert auf lange Step-Texte und
+// ueberlange Zutaten-Namen damit kein Recipe halbleer oder gequetscht
+// gerendert wird.
 function studioWebDensity(recipe: Recipe): WebDensity {
   if (recipe.tweaks?.densityOverride) return recipe.tweaks.densityOverride;
-  const score = recipe.ingredients.length + recipe.steps.length * 1.5;
+  const score = computeWebDensityScore(recipe);
   if (score >= 20) return "compact";
   if (score <= 16) return "spacious";
   return "balanced";
+}
+
+// Mirror von computeDensityScore in lib/pdf/recipe-card-pdf.tsx. Identische
+// Formel: base item-count + char-bonus fuer Steps/Zutaten/Story.
+function computeWebDensityScore(recipe: Recipe): number {
+  const base = recipe.ingredients.length + recipe.steps.length * 1.5;
+  const totalStepChars = recipe.steps.reduce((acc, s) => {
+    const text = typeof s === "string" ? s : s.text;
+    return acc + text.length;
+  }, 0);
+  const totalIngredientChars = recipe.ingredients.reduce((acc, i) => {
+    return acc + i.amount.length + i.name.length + (i.note?.length ?? 0);
+  }, 0);
+  const storyChars = recipe.description?.length ?? 0;
+  const stepBonus = Math.max(
+    0,
+    (totalStepChars - recipe.steps.length * 80) / 80
+  );
+  const ingredientBonus = Math.max(
+    0,
+    (totalIngredientChars - recipe.ingredients.length * 30) / 30
+  );
+  const storyBonus = Math.max(0, (storyChars - 150) / 100) * 0.5;
+  return base + stepBonus + ingredientBonus + storyBonus;
 }
 
 // Density-Stufen für Web — gleiche Werte wie STUDIO_DENSITY im PDF (in px
