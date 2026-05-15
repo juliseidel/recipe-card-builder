@@ -71,7 +71,8 @@ export type CardLayout =
   // Jedes ist eine komplett andere Design-Sprache als die existierenden 7.
   // Spec siehe docs/LAYOUT_RULES.md.
   | "newspaper" // Broadsheet-Editorial: Drop-Cap Lead + 3-Spalten + Spreadsheet-Mikros
-  | "restaurant"; // Fine-Dining-Speisekarte: Cream + Gold, quadrat. Hero mit Gold-Border, Dot-Leader-Zutaten, Roman-Steps, Wine-Notes-Mikros
+  | "restaurant" // Fine-Dining-Speisekarte: Cream + Gold, quadrat. Hero mit Gold-Border, Dot-Leader-Zutaten, Roman-Steps, Wine-Notes-Mikros
+  | "studio"; // Step-First Choreographie: kleiner Hero rechts oben, große Step-Numbers links, Zutaten als Inline-Linie, Mikros als prose. Auto-Fit über 3 Density-Stufen + Title-Auto-Shrink + Step-Spaltenwechsel ab 10+ Steps.
 
 export type Pack = {
   slug: string;

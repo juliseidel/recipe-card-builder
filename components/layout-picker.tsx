@@ -786,6 +786,72 @@ export function LayoutThumbnail({
           />
         </>
       )}
+      {layout === "studio" && (
+        <>
+          {/* Title-stack links, kleines Portrait-Hero rechts */}
+          <rect x="3" y="3" width="16" height="2.5" rx="0.5" fill={stroke} />
+          <rect x="3" y="6.5" width="11" height="2.5" rx="0.5" fill={stroke} />
+          <rect x="3" y="10.5" width="6" height="1" rx="0.3" fill={fill} />
+          <rect
+            x="32"
+            y="3"
+            width="13"
+            height="16"
+            rx="0.8"
+            fill={fill}
+            opacity="0.7"
+          />
+          {/* Big-Number-Steps mit Pace-Beat-Strich */}
+          <rect x="3" y="20" width="2" height="2" fill={fill} />
+          <rect
+            x="7"
+            y="20"
+            width="18"
+            height="1"
+            rx="0.3"
+            fill={stroke}
+            opacity="0.5"
+          />
+          <rect x="3" y="23.5" width="2" height="2" fill={fill} />
+          <rect
+            x="7"
+            y="23.5"
+            width="22"
+            height="1"
+            rx="0.3"
+            fill={stroke}
+            opacity="0.5"
+          />
+          <rect x="3" y="27" width="2" height="2" fill={fill} />
+          <rect
+            x="7"
+            y="27"
+            width="14"
+            height="1"
+            rx="0.3"
+            fill={stroke}
+            opacity="0.5"
+          />
+          {/* Footer-Prose-Linie */}
+          <rect
+            x="3"
+            y="31.5"
+            width="42"
+            height="0.5"
+            fill={stroke}
+            opacity="0.2"
+          />
+          <rect
+            x="12"
+            y="33"
+            width="24"
+            height="1"
+            rx="0.3"
+            fill={stroke}
+            opacity="0.4"
+          />
+        </>
+      )}
     </svg>
   );
 }

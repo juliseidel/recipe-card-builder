@@ -76,6 +76,7 @@ const LAYOUTS: Record<CardLayout, (p: RecipeCardPdfProps) => React.JSX.Element> 
   amber: AmberPage,
   newspaper: NewspaperPage,
   restaurant: RestaurantPage,
+  studio: StudioPage,
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -7808,4 +7809,938 @@ function restaurantGroupLabel(name: string): string {
   return /^(den|die|das)\s/i.test(name)
     ? `Für ${name.toLowerCase()}`
     : name;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// LAYOUT 12 (Phase D): STUDIO — Step-First Choreographie
+// ═════════════════════════════════════════════════════════════════════════════
+// Komplett andere Design-Sprache als alle anderen 9 Layouts. Die Zubereitung
+// wird zum Helden: Big-Number-Stepliste links, kleiner Portrait-Hero rechts
+// oben, Zutaten als fluide Inline-Linie unten, Nährwerte als prose im Footer.
+//
+//   ┌────────────────────────────────────────────────────────────────────┐
+//   │  No 03  ·  DOLCE  ·  03/12                              [recipe id] │  ← Eyebrow
+//   │  ──────────────────────────────────────────────────────────────── │
+//   │                                                                     │
+//   │   Pasta al Limone                          ┌─────────────┐         │
+//   │   ──                                       │             │         │
+//   │   Cremig, schnell, sommerlich              │   HERO 4:5  │         │
+//   │                                            │   Portrait  │         │
+//   │   ⏱ 25 MIN · 4 PORT. · EINFACH             │             │         │
+//   │                                            └─────────────┘         │
+//   │  ──────────────────────────────────────────────────────────────── │
+//   │                                                                     │
+//   │            ─────── DIE CHOREOGRAPHIE ───────                       │
+//   │                                                                     │
+//   │   01  │  Spaghetti in reichlich gesalzenem Wasser kochen.          │
+//   │       │                                                            │
+//   │   02  │  Butter aufschäumen, Zitronenschale dazugeben.             │
+//   │       │                                                            │
+//   │   03  │  Pasta abgießen, in die Butter geben, Parmesan einreiben.  │
+//   │       │                                                            │
+//   │   …                                                                 │
+//   │                                                                     │
+//   │   [optional: Story-Pull-Quote bei spacious-Density]                 │
+//   │                                                                     │
+//   │            ─────── ZUTATEN ───────                                  │
+//   │                                                                     │
+//   │   500 g  Spaghetti  ·  150 g  Parmesan  ·  80 g  Butter            │
+//   │   1  Bio-Zitrone (Schale)  ·  2 EL  Olivenöl  ·  Salz              │
+//   │                                                                     │
+//   │  ──────────────────────────────────────────────────────────────── │
+//   │   300 KCAL  ·  18 g PROTEIN  ·  42 g KH  ·  8 g FETT               │
+//   │   Reich an Vitamin C 44 % · Calcium 23 % · Eisen 18 %.              │
+//   │   @brand · pack                                            [QR]     │
+//   └────────────────────────────────────────────────────────────────────┘
+//
+// Signature-Moves vs den anderen 9 Layouts:
+//   - Step-First: Steps sind der größte Visual-Block (vs alle anderen die
+//     Zutaten + Hero gleichberechtigt behandeln)
+//   - Portrait-Hero 4:5 (alle anderen: square oder full-bleed)
+//   - Mikros als prose ("Reich an …") — restaurant macht das auch, aber
+//     in einem Wine-Notes-Block mit Gold-Diamonds; studio macht es als
+//     pure Editorial-Bildunterschrift ohne Ornamente.
+//   - Zutaten als horizontale Inline-Linie statt Liste/Tabelle (alle
+//     anderen Layouts: vertikale Liste oder zweispaltiges Grid)
+//   - Stepnummern mit vertikalem Strich als visueller Pace-Beat
+//
+// Auto-Fit garantiert Single-Page:
+//   - 3 Density-Stufen via getDensity() — score = ingredients + 1.5·steps
+//   - Title-Auto-Shrink basierend auf title.length (Faktor 1.0 / 0.85 / 0.72)
+//   - Steps schalten ab 10+ Steps auf 2-Spalten um (Step-Splitter)
+//   - Zutaten-Inline-Linie wrappt natürlich (mehr Zeilen bei 16+)
+//   - Story-Block nur bei spacious + shouldShowStory (sonst Platz nehmen)
+//   - Mikros max 4 sichtbar, fallen weg wenn nicht vorhanden
+//
+// Color-Strategy:
+//   - Background pure white (#ffffff) — Editorial-Buchstil, kein Tint
+//   - Ink #1a1a1a für Body, #4a4a4a für Sekundär, #9a9a9a für Eyebrow
+//   - Accent: theme.accent (vom Pack-Mood) für Step-Nummern, Section-Linien,
+//     vertikale Step-Strich-Akzente
+//
+// Anti-Patterns aus LAYOUT_RULES.md alle adressiert:
+//   - keine Em-dashes (–/—) im Body, nur · und einfache -
+//   - StepsList baseline-aligned via flexDirection:row + alignItems:baseline
+//   - Pack-Nummerierung nicht im Card-Druck (Eyebrow zeigt Recipe-Index,
+//     der wird per hideRecipeIndex unterdrückt für Single-PDF-Export)
+//   - Footer-Mikros-Zeile bricht nicht um (max 4 Mikros enforced)
+
+const STUDIO_COLORS = {
+  bg: "#ffffff",
+  ink: "#1a1a1a",
+  inkSoft: "#4a4a4a",
+  inkSubtle: "#8a8a8a",
+  inkFaint: "#bcbcbc",
+  divider: "#e6e6e6",
+} as const;
+
+const STUDIO_DENSITY: Record<
+  Density,
+  {
+    heroWidth: number;
+    heroHeight: number;
+    headerGap: number;
+    titleFontSize: number;
+    subtitleFontSize: number;
+    specFontSize: number;
+    sectionLabelFontSize: number;
+    sectionGap: number;
+    sectionGapAfterLabel: number;
+    stepNumSize: number;
+    stepNumColWidth: number;
+    stepFontSize: number;
+    stepLineHeight: number;
+    stepGap: number;
+    stepGroupLabelFontSize: number;
+    ingredientFontSize: number;
+    ingredientLineHeight: number;
+    ingredientGroupLabelFontSize: number;
+    storyFontSize: number;
+    storyLineHeight: number;
+    macroFontSize: number;
+    macroLabelFontSize: number;
+    microsFontSize: number;
+    footerFontSize: number;
+    eyebrowFontSize: number;
+    paddingTop: number;
+    paddingBottom: number;
+  }
+> = {
+  // Kompakt: viele Zutaten + viele Steps (score >= 22 — z.B. 16-Zutaten-
+  // Mexican-Bowl). Hero schrumpft, Steps + Zutaten werden kleiner und
+  // dichter, Story aus, Section-Labels werden subtiler.
+  compact: {
+    heroWidth: 96,
+    heroHeight: 120,
+    headerGap: 14,
+    titleFontSize: 22,
+    subtitleFontSize: 9,
+    specFontSize: 7.5,
+    sectionLabelFontSize: 7,
+    sectionGap: 11,
+    sectionGapAfterLabel: 9,
+    stepNumSize: 15,
+    stepNumColWidth: 26,
+    stepFontSize: 9,
+    stepLineHeight: 1.4,
+    stepGap: 5,
+    stepGroupLabelFontSize: 8,
+    ingredientFontSize: 8.5,
+    ingredientLineHeight: 1.55,
+    ingredientGroupLabelFontSize: 7.5,
+    storyFontSize: 9,
+    storyLineHeight: 1.45,
+    macroFontSize: 9,
+    macroLabelFontSize: 7,
+    microsFontSize: 7.5,
+    footerFontSize: 7,
+    eyebrowFontSize: 7,
+    paddingTop: 30,
+    paddingBottom: 22,
+  },
+  // Balanced — score 15-21 (Standard). Hero mittel, Choreographie atmet,
+  // Story optional je nach shouldShowStory.
+  balanced: {
+    heroWidth: 110,
+    heroHeight: 138,
+    headerGap: 18,
+    titleFontSize: 28,
+    subtitleFontSize: 10.5,
+    specFontSize: 8.5,
+    sectionLabelFontSize: 7.5,
+    sectionGap: 14,
+    sectionGapAfterLabel: 11,
+    stepNumSize: 19,
+    stepNumColWidth: 32,
+    stepFontSize: 10,
+    stepLineHeight: 1.5,
+    stepGap: 8,
+    stepGroupLabelFontSize: 9,
+    ingredientFontSize: 9.5,
+    ingredientLineHeight: 1.65,
+    ingredientGroupLabelFontSize: 8.5,
+    storyFontSize: 10,
+    storyLineHeight: 1.55,
+    macroFontSize: 10,
+    macroLabelFontSize: 7.5,
+    microsFontSize: 8.5,
+    footerFontSize: 7.5,
+    eyebrowFontSize: 7.5,
+    paddingTop: 36,
+    paddingBottom: 28,
+  },
+  // Spacious — score <= 14 (wenig Content, z.B. 3-Zutaten-Eisbowl). Großer
+  // Hero, weite Step-Choreographie, Story als Pull-Quote eingebaut um die
+  // Karte voll wirken zu lassen ohne aufgebläht zu sein.
+  spacious: {
+    heroWidth: 130,
+    heroHeight: 163,
+    headerGap: 22,
+    titleFontSize: 34,
+    subtitleFontSize: 11.5,
+    specFontSize: 9,
+    sectionLabelFontSize: 8,
+    sectionGap: 18,
+    sectionGapAfterLabel: 14,
+    stepNumSize: 22,
+    stepNumColWidth: 36,
+    stepFontSize: 10.5,
+    stepLineHeight: 1.6,
+    stepGap: 11,
+    stepGroupLabelFontSize: 9.5,
+    ingredientFontSize: 10,
+    ingredientLineHeight: 1.75,
+    ingredientGroupLabelFontSize: 9,
+    storyFontSize: 10.5,
+    storyLineHeight: 1.65,
+    macroFontSize: 10.5,
+    macroLabelFontSize: 8,
+    microsFontSize: 9,
+    footerFontSize: 8,
+    eyebrowFontSize: 7.5,
+    paddingTop: 42,
+    paddingBottom: 32,
+  },
+};
+
+// Title-Auto-Shrink: lange Recipe-Titel (z.B. "Bienes lebensverändernder
+// Frühlings-Sommer-Salat") überfüllen sonst die linke Header-Spalte und
+// brechen in 4+ Zeilen um. Diese Skalierung wird auf titleFontSize multipliziert.
+function studioTitleScale(title: string): number {
+  const len = title.length;
+  if (len <= 18) return 1;
+  if (len <= 30) return 0.88;
+  if (len <= 45) return 0.76;
+  return 0.66;
+}
+
+// Step-Splitter: ab 10 Steps wird die Choreographie zwei-spaltig. Verhindert
+// dass eine 14-Schritt-Anleitung 250 vertikale pt schluckt und Zutaten/Mikros
+// auf eine zweite Seite drückt. Splittet so dass die linke Spalte minimal
+// schwerer ist als die rechte (Magazinregel: linke Spalte voll, rechte atmet).
+function splitStepsForChoreo<T>(items: T[]): { left: T[]; right: T[] } {
+  if (items.length < 10) return { left: items, right: [] };
+  const mid = Math.ceil(items.length / 2);
+  return { left: items.slice(0, mid), right: items.slice(mid) };
+}
+
+// Macro-Stat-Helper: nur Werte > 0 werden gerendert (vermeidet "0 g Fett"-
+// Bullshit bei Smoothies wo Macros teils unvollständig sind). Outputs eine
+// Liste von Label/Value-Paaren in Print-Reihenfolge.
+function studioMacroEntries(recipe: Recipe): Array<{ label: string; value: string }> {
+  const n = recipe.nutrition;
+  const entries: Array<{ label: string; value: string }> = [];
+  if (n.kcal > 0) entries.push({ label: "KCAL", value: String(n.kcal) });
+  if (n.protein > 0) entries.push({ label: "PROTEIN", value: `${n.protein} g` });
+  if (n.carbs > 0) entries.push({ label: "KH", value: `${n.carbs} g` });
+  if (n.fat > 0) entries.push({ label: "FETT", value: `${n.fat} g` });
+  return entries;
+}
+
+function StudioSectionLabel({
+  label,
+  density,
+  accent,
+}: {
+  label: string;
+  density: (typeof STUDIO_DENSITY)["balanced"];
+  accent: string;
+}) {
+  // Sektion-Header zentriert, mit horizontalen Linien links + rechts. Caps
+  // + Letterspacing geben dem Layout den Editorial-Beat.
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+        marginBottom: density.sectionGapAfterLabel,
+      }}
+    >
+      <View style={{ flex: 1, height: 0.5, backgroundColor: STUDIO_COLORS.divider }} />
+      <Text
+        style={{
+          fontFamily: "Inter",
+          fontSize: density.sectionLabelFontSize,
+          fontWeight: 600,
+          color: accent,
+          letterSpacing: 2.4,
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </Text>
+      <View style={{ flex: 1, height: 0.5, backgroundColor: STUDIO_COLORS.divider }} />
+    </View>
+  );
+}
+
+function StudioStepRow({
+  index,
+  text,
+  density,
+  accent,
+  isLast,
+}: {
+  index: number;
+  text: string;
+  density: (typeof STUDIO_DENSITY)["balanced"];
+  accent: string;
+  isLast: boolean;
+}) {
+  // Big-Number-Spalte links (Fraunces, accent-color), vertikaler dünner
+  // Strich als Pace-Beat, Text rechts (Inter, ink). Bei isLast wird der
+  // bottom-padding kleiner damit der Footer näher an die letzte Step kommt
+  // (visueller Beat-Abschluss).
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "flex-start",
+        marginBottom: isLast ? 0 : density.stepGap,
+      }}
+    >
+      <View
+        style={{
+          width: density.stepNumColWidth,
+          alignItems: "flex-start",
+          paddingTop: 1,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontSize: density.stepNumSize,
+            fontWeight: 500,
+            color: accent,
+            lineHeight: 1,
+          }}
+        >
+          {pad2(index + 1)}
+        </Text>
+      </View>
+      <View
+        style={{
+          width: 0.6,
+          alignSelf: "stretch",
+          backgroundColor: STUDIO_COLORS.divider,
+          marginRight: 12,
+          marginTop: 3,
+        }}
+      />
+      <Text
+        style={{
+          flex: 1,
+          fontFamily: "Inter",
+          fontSize: density.stepFontSize,
+          lineHeight: density.stepLineHeight,
+          color: STUDIO_COLORS.ink,
+          paddingTop: 1,
+        }}
+      >
+        {text}
+      </Text>
+    </View>
+  );
+}
+
+function StudioIngredientsInline({
+  groups,
+  density,
+}: {
+  groups: IngredientGroup[];
+  density: (typeof STUDIO_DENSITY)["balanced"];
+}) {
+  // Zutaten als fluider Text mit ·-Trennern. Jede Sub-Gruppe ("Für den Teig")
+  // bekommt eine eigene Zeile mit Group-Label davor. Wrappt natürlich — bei
+  // 16+ Zutaten entstehen 3-4 Zeilen, bei 4 Zutaten passt alles auf eine.
+  return (
+    <View>
+      {groups.map((group, gi) => {
+        const items = group.items
+          .map((it) => {
+            const amount = formatIngredientAmount(it.amount);
+            const note = it.note ? ` (${it.note})` : "";
+            // Format: "{amount}  {name}{note}" — zwei spaces zwischen amount
+            // und name lassen die Menge optisch atmen ohne sie zu trennen.
+            return amount
+              ? `${amount}  ${it.name}${note}`
+              : `${it.name}${note}`;
+          })
+          .join("  ·  ");
+        return (
+          <View
+            key={gi}
+            style={{
+              marginBottom: gi === groups.length - 1 ? 0 : 6,
+            }}
+          >
+            {group.name ? (
+              <Text
+                style={{
+                  fontFamily: "Inter",
+                  fontSize: density.ingredientGroupLabelFontSize,
+                  fontWeight: 600,
+                  color: STUDIO_COLORS.inkSoft,
+                  letterSpacing: 1.5,
+                  textTransform: "uppercase",
+                  marginBottom: 3,
+                }}
+              >
+                {studioGroupLabel(group.name)}
+              </Text>
+            ) : null}
+            <Text
+              style={{
+                fontFamily: "Inter",
+                fontSize: density.ingredientFontSize,
+                lineHeight: density.ingredientLineHeight,
+                color: STUDIO_COLORS.ink,
+              }}
+            >
+              {items}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// "Für" nur bei den/die/das — analog zu restaurantGroupLabel, einheitliche
+// Regel über alle Layouts (LAYOUT_RULES.md §5).
+function studioGroupLabel(name: string): string {
+  return /^(den|die|das)\s/i.test(name)
+    ? `Für ${name.toLowerCase()}`
+    : name;
+}
+
+function StudioPage({
+  brand,
+  pack,
+  recipe,
+  totalRecipes,
+  heroDataUri,
+  qrDataUri,
+  hideRecipeIndex,
+}: RecipeCardPdfProps) {
+  const t = packTheme(pack);
+  const density = getDensity(recipe);
+  const d = STUDIO_DENSITY[density];
+  const showStory =
+    shouldShowStory(recipe) && density !== "compact";
+  const titleScale =
+    studioTitleScale(recipe.title) +
+    (recipe.tweaks?.titleScale ?? 0) * 0.03;
+  // titleScale ist Multiplikator (~0.66 – 1.0), titleScale-tweak schiebt
+  // den Faktor in 3%-Schritten — hält die Bandbreite gezielt klein.
+  const finalTitleSize = Math.round(d.titleFontSize * titleScale * 10) / 10;
+
+  const ingredientGroups = groupIngredients(recipe.ingredients);
+  const stepGroups = groupSteps(recipe.steps);
+
+  // Flatten steps in render order, but preserve group-boundary labels.
+  // Bei sehr wenigen Sub-Gruppen (typisch 1) ist das Ergebnis identisch zur
+  // alten Linear-Liste; bei Bake-Recipes mit "Für den Teig" + "Glasur" bekommt
+  // jede Gruppe ihren eigenen Label-Header.
+  const flatSteps: Array<
+    | { kind: "group-label"; label: string }
+    | { kind: "step"; index: number; text: string }
+  > = [];
+  stepGroups.forEach((g) => {
+    if (g.name) {
+      flatSteps.push({ kind: "group-label", label: studioGroupLabel(g.name) });
+    }
+    g.items.forEach((it) => {
+      flatSteps.push({ kind: "step", index: it.index, text: it.text });
+    });
+  });
+
+  const { left: leftSteps, right: rightSteps } = splitStepsForChoreo(flatSteps);
+
+  const micros = visibleMicros(recipe);
+  const showMicros = micros.length > 0;
+  // Max 4 Mikros in der Footer-Prose — sonst bricht die Zeile um und stört
+  // den Rhythmus. Sortierung kommt schon nach %-Daily aus dem Server-Side
+  // Enrichment.
+  const microsToShow = micros.slice(0, 4);
+
+  const macros = studioMacroEntries(recipe);
+
+  const totalMin = totalTime(recipe);
+  const difficultyLabel = recipe.difficulty.toUpperCase();
+  const servings = servingsCountLabel(recipe);
+  const specs: string[] = [];
+  if (totalMin > 0) specs.push(`${totalMin} MIN`);
+  specs.push(servings.toUpperCase());
+  specs.push(difficultyLabel);
+
+  const indexLabel =
+    hideRecipeIndex || totalRecipes <= 0
+      ? null
+      : `${pad2(recipe.number)} / ${pad2(totalRecipes)}`;
+
+  return (
+    <Page
+      size="A4"
+      style={{
+        backgroundColor: STUDIO_COLORS.bg,
+        paddingTop: d.paddingTop,
+        paddingBottom: d.paddingBottom,
+        paddingHorizontal: PAGE_PADDING,
+        fontFamily: "Inter",
+      }}
+    >
+      {/* ───── Eyebrow-Strip ───────────────────────────────────────────── */}
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 10,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: d.eyebrowFontSize,
+            fontWeight: 600,
+            color: STUDIO_COLORS.inkSubtle,
+            letterSpacing: 2.5,
+            textTransform: "uppercase",
+          }}
+        >
+          {pack.category} · {pack.title}
+        </Text>
+        {indexLabel ? (
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: d.eyebrowFontSize,
+              fontWeight: 500,
+              color: STUDIO_COLORS.inkFaint,
+              letterSpacing: 1.5,
+            }}
+          >
+            {indexLabel}
+          </Text>
+        ) : null}
+      </View>
+      <View
+        style={{
+          height: 0.5,
+          backgroundColor: STUDIO_COLORS.divider,
+          marginBottom: d.headerGap,
+        }}
+      />
+
+      {/* ───── Header: Title links + Hero rechts ──────────────────────── */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "flex-start",
+          gap: 18,
+          marginBottom: d.sectionGap,
+        }}
+      >
+        <View style={{ flex: 1, paddingRight: 4 }}>
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: finalTitleSize,
+              fontWeight: 500,
+              color: STUDIO_COLORS.ink,
+              lineHeight: 1.05,
+              marginBottom: 8,
+            }}
+          >
+            {recipe.title}
+          </Text>
+          {/* Kurzer accent-farbiger Strich als Title-Akzent — dezenter
+              "Buchcover"-Beat. Nur 24pt breit; nicht über die ganze Spalte. */}
+          <View
+            style={{
+              width: 24,
+              height: 1.5,
+              backgroundColor: t.accent,
+              marginBottom: 10,
+            }}
+          />
+          {recipe.subtitle ? (
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: d.subtitleFontSize,
+                fontStyle: "italic",
+                color: STUDIO_COLORS.inkSoft,
+                lineHeight: 1.45,
+                marginBottom: 12,
+              }}
+            >
+              {recipe.subtitle}
+            </Text>
+          ) : null}
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontSize: d.specFontSize,
+              fontWeight: 600,
+              color: STUDIO_COLORS.inkSoft,
+              letterSpacing: 2,
+            }}
+          >
+            {specs.join("  ·  ")}
+          </Text>
+        </View>
+        {/* Hero-Container 4:5 Portrait. Wenn kein Hero-Bild da ist, wird
+            stattdessen ein dezenter Color-Field-Block mit dem Title-Initial
+            als Crest gerendert — kein leerer Rahmen. */}
+        <View
+          style={{
+            width: d.heroWidth,
+            height: d.heroHeight,
+            backgroundColor: blendWithWhite(t.accent, 0.92),
+            overflow: "hidden",
+          }}
+        >
+          {heroDataUri ? (
+            <Image
+              src={heroDataUri}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+              }}
+            />
+          ) : (
+            <View
+              style={{
+                width: "100%",
+                height: "100%",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: "Fraunces",
+                  fontSize: d.heroWidth * 0.5,
+                  color: withAlpha(t.accent, 0.4),
+                  lineHeight: 1,
+                }}
+              >
+                {recipe.title.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+
+      <View
+        style={{
+          height: 0.5,
+          backgroundColor: STUDIO_COLORS.divider,
+          marginBottom: d.sectionGap,
+        }}
+      />
+
+      {/* ───── Choreographie (Big-Number Steps) ───────────────────────── */}
+      <StudioSectionLabel
+        label="Die Choreographie"
+        density={d}
+        accent={t.accent}
+      />
+      {rightSteps.length === 0 ? (
+        <View>
+          {leftSteps.map((item, i) => {
+            if (item.kind === "group-label") {
+              return (
+                <Text
+                  key={`gl-${i}`}
+                  style={{
+                    fontFamily: "Inter",
+                    fontSize: d.stepGroupLabelFontSize,
+                    fontWeight: 600,
+                    color: STUDIO_COLORS.inkSoft,
+                    letterSpacing: 1.5,
+                    textTransform: "uppercase",
+                    marginTop: i === 0 ? 0 : d.stepGap,
+                    marginBottom: d.stepGap - 2,
+                  }}
+                >
+                  {item.label}
+                </Text>
+              );
+            }
+            const isLast = i === leftSteps.length - 1;
+            return (
+              <StudioStepRow
+                key={`s-${item.index}`}
+                index={item.index}
+                text={item.text}
+                density={d}
+                accent={t.accent}
+                isLast={isLast}
+              />
+            );
+          })}
+        </View>
+      ) : (
+        // 2-Spalten-Choreographie ab 10+ Steps. Lückenbreite 18pt.
+        <View style={{ flexDirection: "row", gap: 18 }}>
+          <View style={{ flex: 1 }}>
+            {leftSteps.map((item, i) => {
+              if (item.kind === "group-label") {
+                return (
+                  <Text
+                    key={`lgl-${i}`}
+                    style={{
+                      fontFamily: "Inter",
+                      fontSize: d.stepGroupLabelFontSize,
+                      fontWeight: 600,
+                      color: STUDIO_COLORS.inkSoft,
+                      letterSpacing: 1.5,
+                      textTransform: "uppercase",
+                      marginTop: i === 0 ? 0 : d.stepGap,
+                      marginBottom: d.stepGap - 2,
+                    }}
+                  >
+                    {item.label}
+                  </Text>
+                );
+              }
+              return (
+                <StudioStepRow
+                  key={`ls-${item.index}`}
+                  index={item.index}
+                  text={item.text}
+                  density={d}
+                  accent={t.accent}
+                  isLast={i === leftSteps.length - 1}
+                />
+              );
+            })}
+          </View>
+          <View style={{ flex: 1 }}>
+            {rightSteps.map((item, i) => {
+              if (item.kind === "group-label") {
+                return (
+                  <Text
+                    key={`rgl-${i}`}
+                    style={{
+                      fontFamily: "Inter",
+                      fontSize: d.stepGroupLabelFontSize,
+                      fontWeight: 600,
+                      color: STUDIO_COLORS.inkSoft,
+                      letterSpacing: 1.5,
+                      textTransform: "uppercase",
+                      marginTop: i === 0 ? 0 : d.stepGap,
+                      marginBottom: d.stepGap - 2,
+                    }}
+                  >
+                    {item.label}
+                  </Text>
+                );
+              }
+              return (
+                <StudioStepRow
+                  key={`rs-${item.index}`}
+                  index={item.index}
+                  text={item.text}
+                  density={d}
+                  accent={t.accent}
+                  isLast={i === rightSteps.length - 1}
+                />
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      {/* ───── Optional Story-Pull-Quote ──────────────────────────────── */}
+      {showStory ? (
+        <View
+          style={{
+            marginTop: d.sectionGap,
+            marginBottom: d.sectionGap,
+            paddingHorizontal: 24,
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              width: 14,
+              height: 0.8,
+              backgroundColor: t.accent,
+              marginBottom: 10,
+            }}
+          />
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontSize: d.storyFontSize,
+              fontStyle: "italic",
+              color: STUDIO_COLORS.inkSoft,
+              lineHeight: d.storyLineHeight,
+              textAlign: "center",
+            }}
+          >
+            {recipe.description}
+          </Text>
+        </View>
+      ) : (
+        <View style={{ height: d.sectionGap }} />
+      )}
+
+      {/* ───── Zutaten (Inline-Linie) ─────────────────────────────────── */}
+      <StudioSectionLabel
+        label="Zutaten"
+        density={d}
+        accent={t.accent}
+      />
+      <StudioIngredientsInline groups={ingredientGroups} density={d} />
+
+      {/* ───── Footer: Macros + Mikros prose + handle + QR ───────────── */}
+      {/* Spacer drückt den Footer nach unten — bleibt aber kein hartes
+          flex:1, sonst rutscht der Footer bei kurzen Recipes vom Inhalt weg
+          und sieht abgesetzt aus. marginTop:auto + minHeight:0 hält den
+          Block am Body, schiebt aber wenn Platz da ist. */}
+      <View style={{ flex: 1, minHeight: 12 }} />
+      <View
+        style={{
+          height: 0.5,
+          backgroundColor: STUDIO_COLORS.divider,
+          marginBottom: 10,
+        }}
+      />
+      {macros.length > 0 ? (
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "center",
+            alignItems: "baseline",
+            gap: 14,
+            marginBottom: showMicros ? 6 : 10,
+          }}
+        >
+          {macros.map((m, i) => (
+            <View
+              key={m.label}
+              style={{
+                flexDirection: "row",
+                alignItems: "baseline",
+                gap: 4,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: "Fraunces",
+                  fontSize: d.macroFontSize,
+                  fontWeight: 500,
+                  color: STUDIO_COLORS.ink,
+                }}
+              >
+                {m.value}
+              </Text>
+              <Text
+                style={{
+                  fontFamily: "Inter",
+                  fontSize: d.macroLabelFontSize,
+                  fontWeight: 600,
+                  color: STUDIO_COLORS.inkSubtle,
+                  letterSpacing: 1.5,
+                }}
+              >
+                {m.label}
+              </Text>
+              {i < macros.length - 1 ? (
+                <Text
+                  style={{
+                    fontFamily: "Inter",
+                    fontSize: d.macroLabelFontSize,
+                    color: STUDIO_COLORS.inkFaint,
+                    marginLeft: 6,
+                  }}
+                >
+                  ·
+                </Text>
+              ) : null}
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {showMicros ? (
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontSize: d.microsFontSize,
+            fontStyle: "italic",
+            color: STUDIO_COLORS.inkSoft,
+            textAlign: "center",
+            marginBottom: 10,
+            lineHeight: 1.4,
+          }}
+        >
+          Reich an{" "}
+          {microsToShow
+            .map(
+              (m) =>
+                `${m.name}${
+                  typeof m.pctDaily === "number" ? ` ${m.pctDaily} %` : ""
+                }`
+            )
+            .join(" · ")}
+          .
+        </Text>
+      ) : null}
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontSize: d.footerFontSize,
+            fontWeight: 500,
+            color: STUDIO_COLORS.inkSubtle,
+            letterSpacing: 1.5,
+          }}
+        >
+          {brand.handle} · {pack.title}
+        </Text>
+        {qrDataUri ? (
+          <Image
+            src={qrDataUri}
+            style={{
+              width: 26,
+              height: 26,
+            }}
+          />
+        ) : null}
+      </View>
+    </Page>
+  );
 }

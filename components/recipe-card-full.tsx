@@ -148,7 +148,33 @@ export function RecipeCardFull(props: RecipeCardFullProps) {
       return <NewspaperLayout {...props} />;
     case "restaurant":
       return <RestaurantLayout {...props} />;
+    case "studio":
+      return <StudioLayout {...props} />;
   }
+}
+
+// Mirror of lib/pdf/recipe-card-pdf.tsx#getDensity, but without the
+// recipe.tweaks.densityOverride read — that's a server-side concern we don't
+// surface on the web preview (the preview is for layout-picking, not for
+// per-recipe fine-tuning). Same scoring formula, same thresholds.
+type WebDensity = "compact" | "balanced" | "spacious";
+function webGetDensity(recipe: Recipe): WebDensity {
+  if (recipe.tweaks?.densityOverride) return recipe.tweaks.densityOverride;
+  const score = recipe.ingredients.length + recipe.steps.length * 1.5;
+  if (score >= 22) return "compact";
+  if (score <= 14) return "spacious";
+  return "balanced";
+}
+
+// Title-Auto-Shrink (mirror of studioTitleScale in the PDF renderer). Long
+// recipe titles otherwise blow out the left header column and wrap into 4+
+// lines. Multiplier ranges 0.66 – 1.0.
+function studioWebTitleScale(title: string): number {
+  const len = title.length;
+  if (len <= 18) return 1;
+  if (len <= 30) return 0.88;
+  if (len <= 45) return 0.76;
+  return 0.66;
 }
 
 const baseShellStyle = (pack: Pack, brand: Brand): React.CSSProperties => ({
@@ -4621,4 +4647,610 @@ function restaurantGroupLabelWeb(name: string): string {
   return /^(den|die|das)\s/i.test(name)
     ? `Für ${name.toLowerCase()}`
     : name;
+}
+
+// ════════════════════════════════════════════════
+// LAYOUT 12 (Phase D): STUDIO — Step-First Choreographie (Web-Mirror)
+//
+// Spiegel von lib/pdf/recipe-card-pdf.tsx#StudioPage. Die Zubereitung wird
+// zum Helden: Big-Number-Steps links, kleiner 4:5-Hero rechts oben, Zutaten
+// als fluide Inline-Linie unten, Mikros als prose im Footer. Auto-Fit über
+// webGetDensity (3 Stufen) + studioWebTitleScale + 2-Spalten-Step-Splitter.
+//
+// Diese Web-Variante ist die Live-Preview im Recipe-Editor — die finale
+// Druckausgabe ist die PDF-Page. Visuelle Beats müssen 1:1 matchen damit
+// der User keinen Bruch zwischen Vorschau und Druck spürt.
+// ════════════════════════════════════════════════
+const STUDIO_WEB = {
+  bg: "#ffffff",
+  ink: "#1a1a1a",
+  inkSoft: "#4a4a4a",
+  inkSubtle: "#8a8a8a",
+  inkFaint: "#bcbcbc",
+  divider: "#e6e6e6",
+} as const;
+
+// Density-Stufen für Web — gleiche Werte wie STUDIO_DENSITY im PDF (in px
+// statt pt, aber die Skalierung gleicht aus weil der Web-Preview ohnehin
+// größer dargestellt wird als 595×842 pt). Werte sind als CSS-Stringe
+// ausgedrückt damit Tailwind via inline-style sie direkt frisst.
+const STUDIO_WEB_DENSITY: Record<
+  WebDensity,
+  {
+    heroWidth: number;
+    heroHeight: number;
+    titleFontSize: number;
+    subtitleFontSize: number;
+    specFontSize: number;
+    sectionLabelFontSize: number;
+    stepNumSize: number;
+    stepNumColWidth: number;
+    stepFontSize: number;
+    stepGap: number;
+    stepGroupLabelFontSize: number;
+    ingredientFontSize: number;
+    ingredientGroupLabelFontSize: number;
+    storyFontSize: number;
+    macroFontSize: number;
+    macroLabelFontSize: number;
+    microsFontSize: number;
+    footerFontSize: number;
+    eyebrowFontSize: number;
+    sectionGap: number;
+  }
+> = {
+  compact: {
+    heroWidth: 128,
+    heroHeight: 160,
+    titleFontSize: 26,
+    subtitleFontSize: 12,
+    specFontSize: 10,
+    sectionLabelFontSize: 10,
+    stepNumSize: 20,
+    stepNumColWidth: 36,
+    stepFontSize: 12,
+    stepGap: 7,
+    stepGroupLabelFontSize: 11,
+    ingredientFontSize: 11.5,
+    ingredientGroupLabelFontSize: 10,
+    storyFontSize: 12,
+    macroFontSize: 13,
+    macroLabelFontSize: 9.5,
+    microsFontSize: 10.5,
+    footerFontSize: 10,
+    eyebrowFontSize: 10,
+    sectionGap: 18,
+  },
+  balanced: {
+    heroWidth: 156,
+    heroHeight: 195,
+    titleFontSize: 36,
+    subtitleFontSize: 14,
+    specFontSize: 11,
+    sectionLabelFontSize: 10.5,
+    stepNumSize: 26,
+    stepNumColWidth: 44,
+    stepFontSize: 13,
+    stepGap: 11,
+    stepGroupLabelFontSize: 12,
+    ingredientFontSize: 13,
+    ingredientGroupLabelFontSize: 11,
+    storyFontSize: 13,
+    macroFontSize: 14,
+    macroLabelFontSize: 10,
+    microsFontSize: 11.5,
+    footerFontSize: 10.5,
+    eyebrowFontSize: 10,
+    sectionGap: 22,
+  },
+  spacious: {
+    heroWidth: 184,
+    heroHeight: 230,
+    titleFontSize: 44,
+    subtitleFontSize: 15,
+    specFontSize: 11.5,
+    sectionLabelFontSize: 11,
+    stepNumSize: 30,
+    stepNumColWidth: 50,
+    stepFontSize: 14,
+    stepGap: 14,
+    stepGroupLabelFontSize: 12.5,
+    ingredientFontSize: 13.5,
+    ingredientGroupLabelFontSize: 11.5,
+    storyFontSize: 14,
+    macroFontSize: 15,
+    macroLabelFontSize: 10.5,
+    microsFontSize: 12,
+    footerFontSize: 11,
+    eyebrowFontSize: 10.5,
+    sectionGap: 26,
+  },
+};
+
+function studioWebGroupLabel(name: string): string {
+  return /^(den|die|das)\s/i.test(name)
+    ? `Für ${name.toLowerCase()}`
+    : name;
+}
+
+// Macro-Stat-Helper (mirror der PDF-Version): nur Werte > 0 werden gerendert.
+function studioWebMacros(
+  recipe: Recipe
+): Array<{ label: string; value: string }> {
+  const n = recipe.nutrition;
+  const entries: Array<{ label: string; value: string }> = [];
+  if (n.kcal > 0) entries.push({ label: "KCAL", value: String(n.kcal) });
+  if (n.protein > 0) entries.push({ label: "PROTEIN", value: `${n.protein} g` });
+  if (n.carbs > 0) entries.push({ label: "KH", value: `${n.carbs} g` });
+  if (n.fat > 0) entries.push({ label: "FETT", value: `${n.fat} g` });
+  return entries;
+}
+
+function StudioSectionLabelWeb({
+  label,
+  fontSize,
+  accent,
+}: {
+  label: string;
+  fontSize: number;
+  accent: string;
+}) {
+  return (
+    <div className="my-6 flex items-center gap-3">
+      <div
+        className="h-px flex-1"
+        style={{ backgroundColor: STUDIO_WEB.divider }}
+      />
+      <span
+        className="font-semibold uppercase"
+        style={{
+          color: accent,
+          fontSize: `${fontSize}px`,
+          letterSpacing: "0.3em",
+        }}
+      >
+        {label}
+      </span>
+      <div
+        className="h-px flex-1"
+        style={{ backgroundColor: STUDIO_WEB.divider }}
+      />
+    </div>
+  );
+}
+
+function StudioStepRowWeb({
+  index,
+  text,
+  density,
+  accent,
+}: {
+  index: number;
+  text: string;
+  density: (typeof STUDIO_WEB_DENSITY)["balanced"];
+  accent: string;
+}) {
+  return (
+    <div className="flex items-start">
+      <div
+        className="shrink-0 pt-px"
+        style={{ width: `${density.stepNumColWidth}px` }}
+      >
+        <span
+          className="font-display font-medium"
+          style={{
+            color: accent,
+            fontSize: `${density.stepNumSize}px`,
+            lineHeight: 1,
+          }}
+        >
+          {String(index + 1).padStart(2, "0")}
+        </span>
+      </div>
+      <div
+        className="mx-3 self-stretch"
+        style={{
+          width: "0.5px",
+          backgroundColor: STUDIO_WEB.divider,
+          marginTop: "4px",
+        }}
+      />
+      <p
+        className="flex-1 pt-px"
+        style={{
+          color: STUDIO_WEB.ink,
+          fontSize: `${density.stepFontSize}px`,
+          lineHeight: 1.55,
+        }}
+      >
+        {text}
+      </p>
+    </div>
+  );
+}
+
+function StudioLayout({
+  brand,
+  pack,
+  recipe,
+  totalRecipes,
+}: RecipeCardFullProps) {
+  const density = webGetDensity(recipe);
+  const d = STUDIO_WEB_DENSITY[density];
+  const showStory = webShouldShowStory(recipe) && density !== "compact";
+  const titleScale =
+    studioWebTitleScale(recipe.title) +
+    (recipe.tweaks?.titleScale ?? 0) * 0.03;
+  const finalTitleSize = Math.round(d.titleFontSize * titleScale * 10) / 10;
+
+  const ingredientGroups = groupIngredients(recipe.ingredients);
+  const stepGroups = groupRecipeSteps(recipe.steps);
+
+  const flatSteps: Array<
+    | { kind: "group-label"; label: string }
+    | { kind: "step"; index: number; text: string }
+  > = [];
+  stepGroups.forEach((g) => {
+    if (g.name)
+      flatSteps.push({ kind: "group-label", label: studioWebGroupLabel(g.name) });
+    g.items.forEach((it) =>
+      flatSteps.push({ kind: "step", index: it.index, text: it.text })
+    );
+  });
+  const useTwoCol = flatSteps.length >= 10;
+  const splitAt = useTwoCol ? Math.ceil(flatSteps.length / 2) : flatSteps.length;
+  const leftSteps = flatSteps.slice(0, splitAt);
+  const rightSteps = useTwoCol ? flatSteps.slice(splitAt) : [];
+
+  const micros = visibleMicros(recipe).slice(0, 4);
+  const macros = studioWebMacros(recipe);
+
+  const totalMin = recipe.prepTime + (recipe.cookTime ?? 0);
+  const specs: string[] = [];
+  if (totalMin > 0) specs.push(`${totalMin} MIN`);
+  const portionLabel = recipe.servings === 1 ? "PORTION" : "PORTIONEN";
+  if (recipe.nutritionBasis === "piece") {
+    specs.push(`${recipe.servings} ${recipe.servings === 1 ? "STÜCK" : "STÜCKE"}`);
+  } else {
+    specs.push(`${recipe.servings} ${portionLabel}`);
+  }
+  specs.push(recipe.difficulty.toUpperCase());
+
+  const indexLabel =
+    totalRecipes > 0
+      ? `${String(recipe.number).padStart(2, "0")} / ${String(totalRecipes).padStart(2, "0")}`
+      : null;
+
+  const renderStepBlock = (
+    items: typeof flatSteps,
+    keyPrefix: string
+  ) => (
+    <div className="space-y-0">
+      {items.map((item, i) => {
+        if (item.kind === "group-label") {
+          return (
+            <p
+              key={`${keyPrefix}-gl-${i}`}
+              className="font-semibold uppercase"
+              style={{
+                color: STUDIO_WEB.inkSoft,
+                fontSize: `${d.stepGroupLabelFontSize}px`,
+                letterSpacing: "0.16em",
+                marginTop: i === 0 ? 0 : `${d.stepGap + 2}px`,
+                marginBottom: `${Math.max(d.stepGap - 4, 4)}px`,
+              }}
+            >
+              {item.label}
+            </p>
+          );
+        }
+        const isLast = i === items.length - 1;
+        return (
+          <div
+            key={`${keyPrefix}-s-${item.index}`}
+            style={{ marginBottom: isLast ? 0 : `${d.stepGap}px` }}
+          >
+            <StudioStepRowWeb
+              index={item.index}
+              text={item.text}
+              density={d}
+              accent={pack.mood.accent}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <article
+      className="mx-auto w-full max-w-[960px] overflow-hidden rounded-[var(--radius-card)] border bg-white"
+      style={{
+        ...baseShellStyle(pack, brand),
+        backgroundColor: STUDIO_WEB.bg,
+      }}
+    >
+      <div className="px-8 pt-10 pb-8 sm:px-14 sm:pt-12 sm:pb-10">
+        {/* Eyebrow */}
+        <div className="mb-3 flex items-center justify-between">
+          <span
+            className="font-semibold uppercase"
+            style={{
+              color: STUDIO_WEB.inkSubtle,
+              fontSize: `${d.eyebrowFontSize}px`,
+              letterSpacing: "0.32em",
+            }}
+          >
+            {pack.category} · {pack.title}
+          </span>
+          {indexLabel ? (
+            <span
+              className="font-medium"
+              style={{
+                color: STUDIO_WEB.inkFaint,
+                fontSize: `${d.eyebrowFontSize}px`,
+                letterSpacing: "0.2em",
+              }}
+            >
+              {indexLabel}
+            </span>
+          ) : null}
+        </div>
+        <div
+          className="mb-7 h-px"
+          style={{ backgroundColor: STUDIO_WEB.divider }}
+        />
+
+        {/* Header: Title links + Hero rechts */}
+        <div className="flex items-start gap-6">
+          <div className="min-w-0 flex-1">
+            <h1
+              className="font-display font-medium"
+              style={{
+                color: STUDIO_WEB.ink,
+                fontSize: `${finalTitleSize}px`,
+                lineHeight: 1.05,
+              }}
+            >
+              {recipe.title}
+            </h1>
+            <div
+              className="mt-3 mb-3 h-[2px] w-7"
+              style={{ backgroundColor: pack.mood.accent }}
+            />
+            {recipe.subtitle ? (
+              <p
+                className="font-display italic"
+                style={{
+                  color: STUDIO_WEB.inkSoft,
+                  fontSize: `${d.subtitleFontSize}px`,
+                  lineHeight: 1.45,
+                  marginBottom: "14px",
+                }}
+              >
+                {recipe.subtitle}
+              </p>
+            ) : null}
+            <p
+              className="font-semibold uppercase"
+              style={{
+                color: STUDIO_WEB.inkSoft,
+                fontSize: `${d.specFontSize}px`,
+                letterSpacing: "0.26em",
+              }}
+            >
+              {specs.join("  ·  ")}
+            </p>
+          </div>
+          <div
+            className="shrink-0 overflow-hidden"
+            style={{
+              width: `${d.heroWidth}px`,
+              height: `${d.heroHeight}px`,
+              backgroundColor: pack.mood.background + "60",
+            }}
+          >
+            {recipe.hero ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <Image
+                src={recipe.hero}
+                alt={recipe.title}
+                width={d.heroWidth * 2}
+                height={d.heroHeight * 2}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div
+                className="flex h-full w-full items-center justify-center"
+                style={{ color: pack.mood.accent + "60" }}
+              >
+                <span
+                  className="font-display"
+                  style={{
+                    fontSize: `${d.heroWidth * 0.5}px`,
+                    lineHeight: 1,
+                  }}
+                >
+                  {recipe.title.charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div
+          className="mt-8 h-px"
+          style={{ backgroundColor: STUDIO_WEB.divider }}
+        />
+
+        {/* Choreographie */}
+        <StudioSectionLabelWeb
+          label="Die Choreographie"
+          fontSize={d.sectionLabelFontSize}
+          accent={pack.mood.accent}
+        />
+        {rightSteps.length === 0 ? (
+          renderStepBlock(leftSteps, "single")
+        ) : (
+          <div className="grid grid-cols-2 gap-6">
+            {renderStepBlock(leftSteps, "L")}
+            {renderStepBlock(rightSteps, "R")}
+          </div>
+        )}
+
+        {/* Story-Pull-Quote (nur spacious + sparse) */}
+        {showStory && recipe.description?.trim() ? (
+          <div
+            className="mx-auto my-7 flex max-w-xl flex-col items-center px-4"
+          >
+            <div
+              className="mb-3 h-[1px] w-3.5"
+              style={{ backgroundColor: pack.mood.accent }}
+            />
+            <p
+              className="font-display text-center italic"
+              style={{
+                color: STUDIO_WEB.inkSoft,
+                fontSize: `${d.storyFontSize}px`,
+                lineHeight: 1.55,
+              }}
+            >
+              {recipe.description}
+            </p>
+          </div>
+        ) : (
+          <div style={{ height: `${d.sectionGap}px` }} />
+        )}
+
+        {/* Zutaten Inline */}
+        <StudioSectionLabelWeb
+          label="Zutaten"
+          fontSize={d.sectionLabelFontSize}
+          accent={pack.mood.accent}
+        />
+        <div>
+          {ingredientGroups.map((group, gi) => {
+            const inline = group.items
+              .map((it) => {
+                const amount = formatIngredientAmount(it.amount);
+                const note = it.note ? ` (${it.note})` : "";
+                return amount
+                  ? `${amount}  ${it.name}${note}`
+                  : `${it.name}${note}`;
+              })
+              .join("  ·  ");
+            return (
+              <div
+                key={gi}
+                style={{ marginBottom: gi === ingredientGroups.length - 1 ? 0 : "10px" }}
+              >
+                {group.name ? (
+                  <p
+                    className="font-semibold uppercase"
+                    style={{
+                      color: STUDIO_WEB.inkSoft,
+                      fontSize: `${d.ingredientGroupLabelFontSize}px`,
+                      letterSpacing: "0.18em",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    {studioWebGroupLabel(group.name)}
+                  </p>
+                ) : null}
+                <p
+                  style={{
+                    color: STUDIO_WEB.ink,
+                    fontSize: `${d.ingredientFontSize}px`,
+                    lineHeight: 1.7,
+                  }}
+                >
+                  {inline}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div
+          className="mt-8 h-px"
+          style={{ backgroundColor: STUDIO_WEB.divider }}
+        />
+        {macros.length > 0 ? (
+          <div className="mt-4 flex flex-wrap items-baseline justify-center gap-x-4 gap-y-1">
+            {macros.map((m, i) => (
+              <span
+                key={m.label}
+                className="flex items-baseline gap-1"
+              >
+                <span
+                  className="font-display font-medium"
+                  style={{
+                    color: STUDIO_WEB.ink,
+                    fontSize: `${d.macroFontSize}px`,
+                  }}
+                >
+                  {m.value}
+                </span>
+                <span
+                  className="font-semibold uppercase"
+                  style={{
+                    color: STUDIO_WEB.inkSubtle,
+                    fontSize: `${d.macroLabelFontSize}px`,
+                    letterSpacing: "0.18em",
+                  }}
+                >
+                  {m.label}
+                </span>
+                {i < macros.length - 1 ? (
+                  <span
+                    className="ml-1"
+                    style={{
+                      color: STUDIO_WEB.inkFaint,
+                      fontSize: `${d.macroLabelFontSize}px`,
+                    }}
+                  >
+                    ·
+                  </span>
+                ) : null}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {micros.length > 0 ? (
+          <p
+            className="mt-3 text-center font-display italic"
+            style={{
+              color: STUDIO_WEB.inkSoft,
+              fontSize: `${d.microsFontSize}px`,
+              lineHeight: 1.5,
+            }}
+          >
+            Reich an{" "}
+            {micros
+              .map(
+                (m) =>
+                  `${m.name}${
+                    typeof m.pctDaily === "number" ? ` ${m.pctDaily} %` : ""
+                  }`
+              )
+              .join(" · ")}
+            .
+          </p>
+        ) : null}
+        <div className="mt-5 flex items-center justify-between">
+          <span
+            className="font-medium uppercase"
+            style={{
+              color: STUDIO_WEB.inkSubtle,
+              fontSize: `${d.footerFontSize}px`,
+              letterSpacing: "0.2em",
+            }}
+          >
+            {brand.handle} · {pack.title}
+          </span>
+        </div>
+      </div>
+    </article>
+  );
 }

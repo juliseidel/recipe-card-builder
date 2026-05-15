@@ -77,6 +77,14 @@ export const layoutPresets: LayoutPreset[] = [
     bestFor:
       "Date-Night-Packs, festliche Dinner-Menus, Premium-Hauptmahlzeiten, edle Desserts, Wein-begleitete Kollektionen, Sonntag-Brunch-Hits",
   },
+  {
+    id: "studio",
+    title: "Studio (Step-First)",
+    description:
+      'Choreographie-Layout: Die Zubereitung wird zum Helden. Kleiner 4:5-Portrait-Hero rechts oben, Big-Number-Steps mit vertikalem Pace-Beat als Hauptbühne, Zutaten als fluide Inline-Linie unten, Mikronährstoffe als prose-Bildunterschrift (Reich an Vitamin C 44 %, Calcium 23 %...). Pure-White-Background, kein Tint - Editorial-Buchstil. Auto-Fit über 3 Density-Stufen, Title-Auto-Shrink, 2-Spalten-Steps ab 10+ Schritten - passt immer auf eine Seite, egal wie viele Zutaten oder Schritte.',
+    bestFor:
+      "Recipes wo die Technik wichtiger als die Zutaten ist (Pasta-Klassiker, Saucen, Eintöpfe, Fermentation, Baking-Techniken, Hauptmahlzeiten mit klarer Abfolge)",
+  },
 ];
 
 // Mood presets — eight pre-tuned palettes that pass contrast checks and look

@@ -63,6 +63,11 @@ const VARIANTS: Record<
   // Gold-Ornamenten, quadr. Hero mit Gold-Border, italic Drop-Cap-Story.
   // Author-Box im Footer mit Avatar (KEIN brand.signature).
   restaurant: RestaurantForewordPage,
+  // Studio-Foreword: das Studio-Recipe-Layout ist Editorial-Buchstil
+  // (Pure White + Pace-Beat-Steps). Editorial-Foreword passt visuell —
+  // klare Typografie, Magazine-Tonalität, kein Tint. Kein dedizierter
+  // Foreword nötig, weil das Recipe-Layout selbst genug Distinktion bringt.
+  studio: EditorialForewordPage,
 };
 
 export function ForewordPage(props: ForewordPageProps) {
