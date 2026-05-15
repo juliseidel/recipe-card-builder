@@ -7908,22 +7908,21 @@ function studioColors(pack: Pack): {
   };
 }
 
-// Studio-eigene Density-Heuristik. Step-First-Layout braucht VIEL mehr
-// Atemraum als die globale getDensity()-Funktion vorgibt, damit kurze
-// Recipes nicht halbleer wirken. Schwellen verschoben:
+// Studio-eigene Density-Heuristik. STRIKT auf One-Page-Garantie kalibriert
+// — Mehrseitigkeit ist absoluter No-Go. Schwellen:
 //   global: spacious <= 14, compact >= 22
-//   studio: spacious <= 20, compact >= 24
-// Damit fallen z.B. 8 Zutaten + 7 Steps (score 18.5, Milky-Hazelnut-Eis)
-// oder 9 Zutaten + 5 Steps (score 16.5, Big-Mac-Fries) in spacious und
-// bekommen grossen Hero + grossen Title + weite Step-Gaps die zusammen mit
-// dem flex:1-Footer-Spacer die ganze A4-Seite ausfuellen. Erst ab 16+
-// Zutaten oder 10+ Steps kippt es auf compact. recipe.tweaks.densityOverride
-// gewinnt weiterhin gegen die Auto-Heuristik.
+//   studio: spacious <= 16, compact >= 20
+// Compact-Schwelle aggressiv (>= 20): sobald ein Recipe ~8 Zutaten + 8 Steps
+// (score 20) hat, greift compact mit kleinen Sizes damit nichts ueberlaeuft.
+// Spacious wirklich nur fuer kurze Recipes (3 Zutaten + 4 Steps = score 9,
+// 6 Zutaten + 4 Steps = score 12). Mittelfeld (17-19) ist balanced mit
+// moderaten Sizes. Aus dem letzten Live-Test: 8 Zutaten + 7 Steps (score
+// 18.5) = balanced jetzt, nicht spacious — sonst lief der Body ueber.
 function getStudioDensity(recipe: Recipe): Density {
   if (recipe.tweaks?.densityOverride) return recipe.tweaks.densityOverride;
   const score = recipe.ingredients.length + recipe.steps.length * 1.5;
-  if (score >= 24) return "compact";
-  if (score <= 20) return "spacious";
+  if (score >= 20) return "compact";
+  if (score <= 16) return "spacious";
   return "balanced";
 }
 
@@ -7959,27 +7958,28 @@ const STUDIO_DENSITY: Record<
     paddingBottom: number;
   }
 > = {
-  // Kompakt: viele Zutaten + viele Steps (score >= 22 — z.B. 16-Zutaten-
-  // Mexican-Bowl). Hero schrumpft, Steps + Zutaten werden kleiner und
-  // dichter, Story aus, Section-Labels werden subtiler.
+  // Kompakt: dichte Recipes (score >= 20 — z.B. 8 Zutaten + 8 Steps,
+  // oder 12 Zutaten + 6 Steps). Hero klein, Steps + Zutaten kompakter,
+  // KEINE Story (zu wenig Platz). Worst-Case-Budget: 16 Zutaten + 10 Steps
+  // (score 31) muss auf eine Seite passen.
   compact: {
-    heroWidth: 96,
-    heroHeight: 120,
-    headerGap: 14,
-    titleFontSize: 22,
-    subtitleFontSize: 9,
+    heroWidth: 92,
+    heroHeight: 115,
+    headerGap: 12,
+    titleFontSize: 21,
+    subtitleFontSize: 8.5,
     specFontSize: 7.5,
     sectionLabelFontSize: 7,
-    sectionGap: 11,
-    sectionGapAfterLabel: 9,
+    sectionGap: 10,
+    sectionGapAfterLabel: 8,
     // stepNumSize = stepFontSize: gleiche Glyph-Metriken garantieren
     // Baseline-Alignment zwischen Number und Body-Text. Visuelle
     // Prominenz kommt aus Font (Fraunces Italic Bold) + Akzent-Farbe.
-    stepNumSize: 9,
-    stepNumColWidth: 22,
-    stepFontSize: 9,
-    stepLineHeight: 1.45,
-    stepGap: 6,
+    stepNumSize: 8.5,
+    stepNumColWidth: 20,
+    stepFontSize: 8.5,
+    stepLineHeight: 1.42,
+    stepGap: 5,
     stepGroupLabelFontSize: 8,
     ingredientFontSize: 8.5,
     ingredientLineHeight: 1.55,
@@ -7991,72 +7991,75 @@ const STUDIO_DENSITY: Record<
     microsFontSize: 7.5,
     footerFontSize: 7,
     eyebrowFontSize: 7,
-    paddingTop: 30,
+    paddingTop: 28,
     paddingBottom: 22,
   },
-  // Balanced — score 21-23 (selten, nur sehr dichte Mid-Recipes).
+  // Balanced — score 17-19 (typischer Mainstream, z.B. 8 Zutaten + 7
+  // Steps = score 18.5 wie der Milky-Hazelnut-Eis im letzten Test).
+  // Moderater Hero, klare Step-Choreographie, optionale Story. Worst-Case:
+  // 9 Zutaten + 7 Steps muss noch sauber auf eine Seite passen.
   balanced: {
-    heroWidth: 120,
-    heroHeight: 150,
-    headerGap: 20,
+    heroWidth: 110,
+    heroHeight: 138,
+    headerGap: 18,
+    titleFontSize: 26,
+    subtitleFontSize: 10,
+    specFontSize: 8.5,
+    sectionLabelFontSize: 7.5,
+    sectionGap: 14,
+    sectionGapAfterLabel: 11,
+    stepNumSize: 10,
+    stepNumColWidth: 24,
+    stepFontSize: 10,
+    stepLineHeight: 1.5,
+    stepGap: 9,
+    stepGroupLabelFontSize: 9,
+    ingredientFontSize: 9.5,
+    ingredientLineHeight: 1.6,
+    ingredientGroupLabelFontSize: 8.5,
+    storyFontSize: 10,
+    storyLineHeight: 1.55,
+    macroFontSize: 10.5,
+    macroLabelFontSize: 8,
+    microsFontSize: 8.5,
+    footerFontSize: 8,
+    eyebrowFontSize: 7.5,
+    paddingTop: 34,
+    paddingBottom: 26,
+  },
+  // Spacious — score <= 16 (kurze Recipes, z.B. 3-Zutaten-Eisbowl, 4
+  // Zutaten + 4 Steps, 6 Zutaten + 4 Steps). Hero größer, Sizes etwas
+  // großzügiger, Story sichtbar. Worst-Case: 7 Zutaten + 6 Steps muss
+  // noch entspannt passen. Konservativ kalibriert sodass flex:1-Spacer
+  // den Restraum schluckt ohne dass Body ueberlaeuft.
+  spacious: {
+    heroWidth: 132,
+    heroHeight: 165,
+    headerGap: 22,
     titleFontSize: 32,
-    subtitleFontSize: 11,
-    specFontSize: 9,
+    subtitleFontSize: 11.5,
+    specFontSize: 9.5,
     sectionLabelFontSize: 8,
     sectionGap: 18,
     sectionGapAfterLabel: 14,
-    stepNumSize: 10.5,
+    stepNumSize: 11,
     stepNumColWidth: 26,
-    stepFontSize: 10.5,
-    stepLineHeight: 1.55,
-    stepGap: 11,
-    stepGroupLabelFontSize: 9,
-    ingredientFontSize: 10,
-    ingredientLineHeight: 1.7,
-    ingredientGroupLabelFontSize: 8.5,
+    stepFontSize: 11,
+    stepLineHeight: 1.6,
+    stepGap: 12,
+    stepGroupLabelFontSize: 9.5,
+    ingredientFontSize: 10.5,
+    ingredientLineHeight: 1.75,
+    ingredientGroupLabelFontSize: 9,
     storyFontSize: 10.5,
-    storyLineHeight: 1.6,
-    macroFontSize: 11,
-    macroLabelFontSize: 8,
+    storyLineHeight: 1.65,
+    macroFontSize: 11.5,
+    macroLabelFontSize: 8.5,
     microsFontSize: 9,
-    footerFontSize: 8,
-    eyebrowFontSize: 7.5,
+    footerFontSize: 8.5,
+    eyebrowFontSize: 8,
     paddingTop: 40,
-    paddingBottom: 30,
-  },
-  // Spacious — score <= 20 (Mainstream-Recipes wie 8 Zutaten + 7 Steps).
-  // Großer Hero, weite Step-Choreographie, Story als Pull-Quote eingebaut.
-  // Sizes deutlich großzuegiger damit die Karte zusammen mit dem flex:1-
-  // Footer-Spacer wirklich die ganze A4-Seite fuellt — der User soll
-  // nicht das Gefuehl haben dass unten die Seite leer ist.
-  spacious: {
-    heroWidth: 170,
-    heroHeight: 213,
-    headerGap: 32,
-    titleFontSize: 44,
-    subtitleFontSize: 13,
-    specFontSize: 10,
-    sectionLabelFontSize: 9,
-    sectionGap: 26,
-    sectionGapAfterLabel: 20,
-    stepNumSize: 12.5,
-    stepNumColWidth: 30,
-    stepFontSize: 12.5,
-    stepLineHeight: 1.65,
-    stepGap: 18,
-    stepGroupLabelFontSize: 10.5,
-    ingredientFontSize: 11.5,
-    ingredientLineHeight: 1.85,
-    ingredientGroupLabelFontSize: 10,
-    storyFontSize: 12,
-    storyLineHeight: 1.75,
-    macroFontSize: 13,
-    macroLabelFontSize: 9,
-    microsFontSize: 10,
-    footerFontSize: 9,
-    eyebrowFontSize: 8.5,
-    paddingTop: 54,
-    paddingBottom: 42,
+    paddingBottom: 32,
   },
 };
 

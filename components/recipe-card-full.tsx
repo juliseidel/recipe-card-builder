@@ -4695,15 +4695,15 @@ function hexWithAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-// Web-Mirror von getStudioDensity. Spacious bis score <= 20 (statt globales
-// <= 14), compact ab >= 24. Mainstream-Recipes (8 Zutaten + 7 Steps =
-// score 18.5) bekommen damit grossen Hero, weite Step-Gaps und fuellen
-// die Vorschau-Karte vollstaendig statt halbleer zu sitzen.
+// Web-Mirror von getStudioDensity — IDENTISCHE Schwellen damit die Vorschau
+// dieselbe Density-Stufe klassifiziert wie das PDF. compact ab >= 20,
+// spacious bis <= 16, balanced dazwischen. Strikt auf One-Page-Garantie
+// im PDF kalibriert.
 function studioWebDensity(recipe: Recipe): WebDensity {
   if (recipe.tweaks?.densityOverride) return recipe.tweaks.densityOverride;
   const score = recipe.ingredients.length + recipe.steps.length * 1.5;
-  if (score >= 24) return "compact";
-  if (score <= 20) return "spacious";
+  if (score >= 20) return "compact";
+  if (score <= 16) return "spacious";
   return "balanced";
 }
 
@@ -4737,19 +4737,19 @@ const STUDIO_WEB_DENSITY: Record<
   }
 > = {
   compact: {
-    heroWidth: 128,
-    heroHeight: 160,
-    titleFontSize: 26,
-    subtitleFontSize: 12,
+    heroWidth: 124,
+    heroHeight: 155,
+    titleFontSize: 24,
+    subtitleFontSize: 11.5,
     specFontSize: 10,
     sectionLabelFontSize: 10,
     // stepNumSize = stepFontSize: gleiche Glyph-Metriken garantieren
     // Baseline-Alignment zwischen Step-Number und Step-Text. Mirror der
     // PDF-Loesung (Patisserie/Editorial/Vital nutzen denselben Trick).
-    stepNumSize: 12,
-    stepNumColWidth: 28,
-    stepFontSize: 12,
-    stepGap: 8,
+    stepNumSize: 11.5,
+    stepNumColWidth: 26,
+    stepFontSize: 11.5,
+    stepGap: 7,
     stepGroupLabelFontSize: 11,
     ingredientFontSize: 11.5,
     ingredientGroupLabelFontSize: 10,
@@ -4759,51 +4759,51 @@ const STUDIO_WEB_DENSITY: Record<
     microsFontSize: 10.5,
     footerFontSize: 10,
     eyebrowFontSize: 10,
-    sectionGap: 18,
+    sectionGap: 16,
   },
   balanced: {
-    heroWidth: 168,
-    heroHeight: 210,
-    titleFontSize: 38,
-    subtitleFontSize: 14.5,
-    specFontSize: 11.5,
-    sectionLabelFontSize: 11,
-    stepNumSize: 13,
-    stepNumColWidth: 32,
-    stepFontSize: 13,
-    stepGap: 13,
+    heroWidth: 152,
+    heroHeight: 190,
+    titleFontSize: 32,
+    subtitleFontSize: 13,
+    specFontSize: 11,
+    sectionLabelFontSize: 10.5,
+    stepNumSize: 12.5,
+    stepNumColWidth: 30,
+    stepFontSize: 12.5,
+    stepGap: 11,
     stepGroupLabelFontSize: 12,
-    ingredientFontSize: 13,
+    ingredientFontSize: 12.5,
     ingredientGroupLabelFontSize: 11,
-    storyFontSize: 13.5,
-    macroFontSize: 14.5,
+    storyFontSize: 13,
+    macroFontSize: 14,
     macroLabelFontSize: 10,
-    microsFontSize: 12,
+    microsFontSize: 11.5,
     footerFontSize: 10.5,
     eyebrowFontSize: 10,
-    sectionGap: 24,
+    sectionGap: 22,
   },
   spacious: {
-    heroWidth: 232,
-    heroHeight: 290,
-    titleFontSize: 56,
-    subtitleFontSize: 17,
-    specFontSize: 12.5,
-    sectionLabelFontSize: 12,
-    stepNumSize: 15,
-    stepNumColWidth: 38,
-    stepFontSize: 15,
-    stepGap: 22,
-    stepGroupLabelFontSize: 13.5,
-    ingredientFontSize: 15,
-    ingredientGroupLabelFontSize: 12.5,
-    storyFontSize: 15.5,
-    macroFontSize: 17,
-    macroLabelFontSize: 11,
-    microsFontSize: 13,
-    footerFontSize: 11.5,
-    eyebrowFontSize: 11,
-    sectionGap: 36,
+    heroWidth: 180,
+    heroHeight: 225,
+    titleFontSize: 42,
+    subtitleFontSize: 15,
+    specFontSize: 12,
+    sectionLabelFontSize: 11.5,
+    stepNumSize: 14,
+    stepNumColWidth: 34,
+    stepFontSize: 14,
+    stepGap: 16,
+    stepGroupLabelFontSize: 13,
+    ingredientFontSize: 14,
+    ingredientGroupLabelFontSize: 12,
+    storyFontSize: 14.5,
+    macroFontSize: 15.5,
+    macroLabelFontSize: 10.5,
+    microsFontSize: 12.5,
+    footerFontSize: 11,
+    eyebrowFontSize: 10.5,
+    sectionGap: 28,
   },
 };
 
