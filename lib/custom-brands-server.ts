@@ -88,3 +88,40 @@ export async function brandExists(slug: string): Promise<boolean> {
   const b = await loadBrand(slug);
   return Boolean(b);
 }
+
+// ─── Field-Update-Helpers — fuer Lazy-Backfill und manuelle Edits ────────
+// Patcht ein einzelnes Feld in brand.data (JSONB-Spalte). Macht ein
+// SELECT+UPDATE atomar via Supabase. Wirft, wenn der Brand kein DB-Eintrag
+// hat (= Code-Brand) — Caller soll das fangen und in-memory fallen lassen.
+async function patchBrandData(
+  slug: string,
+  patch: Partial<Brand>
+): Promise<void> {
+  if (!hasServerSupabase()) {
+    throw new Error("patchBrandData: Supabase not configured");
+  }
+  const supabase = getServerSupabase();
+  const { data: row, error: readErr } = await supabase
+    .from("brands")
+    .select("data")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (readErr) throw readErr;
+  if (!row) throw new Error(`patchBrandData: brand '${slug}' not found in DB`);
+  const merged = { ...(row.data as Brand), ...patch };
+  const { error: writeErr } = await supabase
+    .from("brands")
+    .update({ data: merged })
+    .eq("slug", slug);
+  if (writeErr) throw writeErr;
+}
+
+/** Persistiert das Voice-Profil eines Brands. Wird vom Lazy-Backfill und
+ *  vom Onboarding-Refresh-Endpoint genutzt. Wirft fuer Code-Brands ohne
+ *  DB-Eintrag — Caller soll das defensiv abfangen. */
+export async function updateBrandVoiceProfile(
+  slug: string,
+  voiceProfile: Brand["voiceProfile"]
+): Promise<void> {
+  await patchBrandData(slug, { voiceProfile });
+}

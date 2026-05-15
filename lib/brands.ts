@@ -57,6 +57,53 @@ export type BrandAudienceAnalysis = {
   summary: string;
 };
 
+/** Voice-Profil eines Creators — Tonalitaets-DNA aus den eigenen Reel-
+ *  Captions abgeleitet (lib/ai/analyze-voice-profile.ts). Wird einmalig
+ *  beim Onboarding erzeugt und in brand.data.voiceProfile persistiert.
+ *  Alle Text-Generierungs-Pipelines (Pack-Titel, Description, Foreword)
+ *  ziehen es als Steuersignal — damit klingen die Outputs nach DEM
+ *  Creator, nicht nach generischer KI.
+ *
+ *  Brand-agnostisch: jeder neue Creator bekommt automatisch sein eigenes
+ *  Profil. Code-Brands (Biene, Julia) ohne persistiertes Profil fallen
+ *  auf hardgecodete Defaults zurueck — saubere Backward-Compat. */
+export type BrandVoiceProfile = {
+  /** Welche Anrede der Creator in Captions benutzt. "du" ist Default fuer
+   *  Food/Fitness-Creator. */
+  formality: "du" | "Sie" | "ihr";
+  /** Hauptsprache der Captions. "mixed" wenn der Creator regelmaessig
+   *  zwischen Sprachen wechselt (selten — meist eindeutig de oder en). */
+  language: "de" | "en" | "mixed";
+  /** Emoji-Frequenz in den Captions. Bestimmt ob die KI selber Emojis
+   *  setzen darf (default: NIE in Pack-Metadaten, aber wir merken uns
+   *  den Stil fuer ggf. spaetere Foreword-Texte). */
+  emojiUsage: "none" | "sparse" | "frequent";
+  /** 3-6 Adjektive, die die Stimme treffend beschreiben.
+   *  Beispiele: ["warm", "ehrlich", "selbstironisch"] / ["sachlich",
+   *  "knapp", "fakten-fokussiert"]. */
+  toneDescriptors: string[];
+  /** 4-8 Worte/Phrasen, die der Creator typisch nutzt — Vokabel-Anker.
+   *  Beispiele: ["Schatz", "Bürotage", "Heißhunger"] / ["Hot Girl Walk",
+   *  "Babe", "easy peasy"]. */
+  signaturePhrases: string[];
+  /** 3-8 brand-spezifische Tabu-Worte/Phrasen, die der Creator NIE
+   *  benutzt. Beispiele Biene: ["Diät", "perfekt", "fit"]. Werden in den
+   *  Banned-Phrases-Check additiv zur globalen Default-Liste reingegeben. */
+  bannedPhrases: string[];
+  /** Themen die der Creator nie behandelt. Verhindert Halluzinationen
+   *  wie "before/after"-Vergleiche, extreme Diäten, Kalorien-Shaming.
+   *  Beispiele: ["before/after", "Kalorienzählen", "Verzicht"]. */
+  forbiddenTopics: string[];
+  /** 3-5 echte Caption-Auszüge (full text, max 400 chars) als Few-Shot.
+   *  Werden in jedem Pack-Text-Prompt mit-gezeigt: "So schreibt diese
+   *  Person — orientiere dich am Stil, nicht am Inhalt." Das ist der
+   *  größte Hebel gegen KI-Sound. */
+  captionExamples: string[];
+  /** Wann das Profil zuletzt aktualisiert wurde (ISO8601). Refresh nach
+   *  ~90 Tagen sinnvoll, weil Creator-Stil sich entwickeln kann. */
+  updatedAt: string;
+};
+
 export type Brand = {
   slug: string;
   name: string;
@@ -82,6 +129,11 @@ export type Brand = {
    *  in der Workspace-UI gezeigt und kann vom Pack-Suggester genutzt
    *  werden, um Vorschlaege auf die echte Zielgruppe zu kalibrieren. */
   audienceAnalysis?: BrandAudienceAnalysis;
+  /** Tonalitaets-DNA aus den eigenen Reel-Captions. Wird beim Onboarding
+   *  einmalig generiert (lib/ai/analyze-voice-profile.ts) und von allen
+   *  Text-Generierungs-Pipelines als Steuersignal genutzt. Code-Brands
+   *  ohne Profil fallen auf bio/tagline-basierte Defaults zurueck. */
+  voiceProfile?: BrandVoiceProfile;
 };
 
 export const brands: Brand[] = [

@@ -1,17 +1,29 @@
-import { callGemini } from "./gemini";
 import type { ReelRow } from "@/lib/creator-reels-server";
 import type { Brand } from "@/lib/brands";
 import type { CardLayout } from "@/lib/packs";
+import {
+  formatVoiceProfileForPrompt,
+  formatCaptionFewShot,
+  ensureBrandVoiceProfile,
+} from "./analyze-voice-profile";
+import { generateWithCritique } from "./text-generation-pipeline";
 
 // Pre-Generate Design-Vorschlaege fuer den Auto-Pack-Builder.
+//
 // Wird vom AutoPackForm aufgerufen, wenn der User auf
-// "✨ KI-Auto-Setup" klickt — Gemini Flash schaut auf die ausgewaehlten
-// Reels (Title + meal_type + cuisine + occasion + season + vessel) und
+// "✨ KI-Auto-Setup" klickt — schaut auf die ausgewaehlten Reels und
 // schlaegt:
-//   - 5 Pack-Title-Optionen
-//   - 1 empfohlenes Layout (aus 7) mit Begruendung
-//   - 1 empfohlener Mood-Preset (aus 8) mit Begruendung
+//   - 5 Pack-Title-Optionen (sortiert nach Empfehlung)
+//   - 1 empfohlenes Card-Layout (aus 9)
+//   - 1 empfohlener Mood-Preset (aus 8)
 //   - 1 empfohlener Display-Font (aus 3)
+//   - Subtitle, Tagline, Description, Category
+//   - Surface-Style (solid/gradient/pattern)
+//
+// Brand-agnostische Pipeline (v2):
+//   - Voice-Profil + Few-Shot mit echten Captions
+//   - Multi-Candidate (3 parallel) + Self-Critique
+//   - Banned-Phrases-Check + Retry-Pass
 //
 // User kann jede Suggestion uebernehmen oder eigenes setzen.
 
@@ -54,12 +66,12 @@ const LAYOUT_OPTIONS: { id: CardLayout; description: string }[] = [
   {
     id: "newspaper",
     description:
-      "Broadsheet-Editorial wie New York Times / Guardian. Italic Headline mit Drop-Cap im Lead-Paragraph, Byline 'Von [Brand]', Magazine-Hero mit Bildunterschrift. Zutaten in 3 Spalten (Newspaper-typisch), Schritte in 2 Spalten mit italic Nummern. Naehrwerte als Spreadsheet-Footer-Row mit Doppellinie. Mikros in EIGENER Position (unten als Daten-Zeile) statt seitlich/oben. Passt fuer hochwertige Recipe-Kollektionen mit editorialem Anspruch, Magazin-Pack-Konzepte, Reiseküche, Saisonal, Sonntag-Klassiker.",
+      "Broadsheet-Editorial wie New York Times / Guardian. Italic Headline mit Drop-Cap im Lead-Paragraph, Byline, Magazine-Hero mit Bildunterschrift, 3-Spalten-Zutaten, italic Step-Nummern. Naehrwerte als Spreadsheet-Footer. Editorial-Anspruch, Reisekueche, Saisonal, Sonntag-Klassiker.",
   },
   {
     id: "restaurant",
     description:
-      "Fine-Dining-Speisekarte: Cream-Background (#fcf9f3) mit Gold-Akzenten (#b08842). Hero quadratisch mit duenner Gold-Border, italic Fraunces-Display-Title zentriert, ◆-Diamant-Ornamente. Zutaten mit klassischem Dot-Leader-Pattern (Name....Menge), Schritte mit Roman-Numerals (I, II, III). Mikronaehrstoffe in EIGENER Position: als beschreibender 'Wine Notes'-Block unten ('Reich an Vitamin C, Calcium, frisch wie ein Sommerwein') plus dezenter %-Subline. Maison-Pariser-Bistro-Aesthetik. Passt fuer Date-Night-Packs, festliche Dinners, Premium-Hauptmahlzeiten, edle Desserts, Wein-begleitete Kollektionen, Sonntag-Brunch.",
+      "Fine-Dining-Speisekarte: Cream-BG mit Gold-Akzenten. Hero quadratisch mit Gold-Border, italic Display-Title, Diamant-Ornamente. Dot-Leader-Zutaten, Roman-Numerals-Steps, Wine-Notes-Mikros. Date-Night, festliche Dinner, Premium-Hauptmahlzeiten, Wein-begleitete Kollektionen.",
   },
 ];
 
@@ -80,11 +92,22 @@ const FONT_OPTIONS = [
   { id: "inter-tight", description: "Bold sans, sportlich-clean. Mealprep, Workout, modern-minimalistisch." },
 ];
 
+const VALID_PATTERN_IDS = [
+  "polka",
+  "honeycomb",
+  "crosshatch",
+  "topo",
+  "marble",
+  "stripes",
+  "grid",
+  "confetti",
+] as const;
+
 export type PackDesignSuggestion = {
   titles: string[]; // 5 Optionen, sortiert nach Empfehlung (Index 0 = top)
   layout: CardLayout;
   layoutReason: string;
-  moodId: string; // matched gegen lib/pack-presets.ts moodPresets
+  moodId: string;
   moodReason: string;
   fontId: "fraunces" | "dm-serif" | "inter-tight";
   fontReason: string;
@@ -92,12 +115,7 @@ export type PackDesignSuggestion = {
   subtitle: string;
   tagline: string;
   description: string;
-  /** Empfohlener Surface-Style (solid/gradient/pattern). Default solid
-   *  (klassischer Look). Pattern/Gradient nur wenn es zum Pack-Thema
-   *  passt (z.B. honeycomb fuer Biene-Patisserie, stripes fuer Sport,
-   *  marble fuer Premium-Dessert). */
   surfaceType: "solid" | "gradient" | "pattern";
-  /** Bei pattern: ein patternId aus dem Katalog. Sonst "". */
   patternId: string;
   surfaceReason: string;
 };
@@ -109,7 +127,7 @@ const RESPONSE_SCHEMA = {
       type: "array",
       items: { type: "string" },
       description:
-        "Genau 5 Pack-Titel-Optionen auf Deutsch, je max 40 chars. Index 0 = beste Empfehlung. KEINE Anführungszeichen, KEINE Emojis, KEINE Marketing-Floskeln.",
+        "Genau 5 Pack-Titel-Optionen, je 15-40 chars. Index 0 = beste Empfehlung. STILISTISCH UNTERSCHIEDLICH (nicht 5 Varianten desselben Konzepts).",
     },
     layout: {
       type: "string",
@@ -139,30 +157,30 @@ const RESPONSE_SCHEMA = {
     },
     category: {
       type: "string",
-      description: 'Kategorie-Bezeichnung (Frühstück, Snacks, Backen, Mittagessen, Mealprep, etc.).',
+      description: "Kategorie-Bezeichnung (Frühstück, Snacks, Backen, Mittagessen, Mealprep, etc.).",
     },
     subtitle: {
       type: "string",
-      description: "Eine Zeile Untertitel, max 80 chars.",
+      description: "Eine Zeile Untertitel, 30-80 chars.",
     },
     tagline: {
       type: "string",
-      description: "Teaser mit 2-3 konkreten Recipe-Titles aus der Auswahl, max 120 chars.",
+      description: "Teaser mit 2-3 konkreten Recipe-Titles aus der Auswahl, kommagetrennt, 30-120 chars.",
     },
     description: {
       type: "string",
       description:
-        "2-3 Sätze Pack-Beschreibung auf Deutsch — PERSÖNLICH in der Stimme der Creatorin, du-Form, NICHT Marketing. Bezieht sich konkret auf 1-2 Rezepte. KEINE Floskeln wie 'angesagteste', 'perfekte Sammlung', 'Trends nicht verpassen'. KEINE Anführungszeichen.",
+        "2-3 Saetze Pack-Beschreibung in der Stimme des Creators. 140-280 chars. Bezieht sich konkret auf 1-2 Rezepte aus der Liste.",
     },
     surfaceType: {
       type: "string",
       description:
-        'Surface-Style fuer den Pack-Hintergrund, einer aus: "solid" (klassische einfarbige Flaeche, sicherer Default), "gradient" (Farbverlauf, premium-feel fuer Premium-Themen), "pattern" (Texturmuster, signature-feel). Empfehlung: meistens solid; gradient bei Premium-Sunset-Themen / Brunch / Date-Night; pattern wenn Recipe-Auswahl ein klares Signature hat (Biene-Backwelt → honeycomb, Sport → stripes).',
+        'Surface-Style fuer den Pack-Hintergrund, einer aus: "solid", "gradient", "pattern".',
     },
     patternId: {
       type: "string",
       description:
-        'Bei surfaceType=pattern: einer aus: "polka", "honeycomb", "crosshatch", "topo", "marble", "stripes", "grid", "confetti". Sonst leerer String. polka = leichtere Snacks/Dessert. honeycomb = Biene/Backen/Bowls. crosshatch = Editorial/Premium. topo = Outdoor/BBQ/Adventure. marble = Premium-Patisserie/Dessert. stripes = Sport/Energy/Bold. grid = Mealprep/Strukturiert. confetti = Festlich/Party.',
+        'Bei surfaceType=pattern: einer aus: "polka", "honeycomb", "crosshatch", "topo", "marble", "stripes", "grid", "confetti". Sonst leerer String.',
     },
     surfaceReason: {
       type: "string",
@@ -187,126 +205,101 @@ const RESPONSE_SCHEMA = {
   ],
 };
 
-function systemInstructionFor(brand: Brand | null): string {
+function buildSystemInstruction(brand: Brand | null): string {
+  const name = brand?.name ?? "die Creatorin";
   const intro = brand
-    ? `Du gestaltest einen Recipe-Pack für ${brand.name} (${brand.handle}). Bio: "${brand.bio}". Tagline: "${brand.tagline}".`
+    ? `Du gestaltest einen Recipe-Pack fuer ${brand.name} (${brand.handle}). Bio: "${brand.bio}". Tagline: "${brand.tagline}".`
     : `Du gestaltest einen Recipe-Pack-Generator.`;
 
-  const layoutTable = LAYOUT_OPTIONS.map(
-    (l) => `- "${l.id}": ${l.description}`
-  ).join("\n");
-  const moodTable = MOOD_OPTIONS.map(
-    (m) => `- "${m.id}": ${m.description}`
-  ).join("\n");
-  const fontTable = FONT_OPTIONS.map(
-    (f) => `- "${f.id}": ${f.description}`
-  ).join("\n");
+  const voiceBlock = formatVoiceProfileForPrompt(brand?.voiceProfile, name);
+  const fewShotBlock = formatCaptionFewShot(brand?.voiceProfile);
+
+  const layoutTable = LAYOUT_OPTIONS.map((l) => `- "${l.id}": ${l.description}`).join("\n");
+  const moodTable = MOOD_OPTIONS.map((m) => `- "${m.id}": ${m.description}`).join("\n");
+  const fontTable = FONT_OPTIONS.map((f) => `- "${f.id}": ${f.description}`).join("\n");
 
   return `${intro}
 
-AUFGABE: Gegeben eine Liste ausgewählter Recipe-Reels, schlage:
-1. 5 Pack-Titel-Optionen (Index 0 = beste)
-2. 1 Card-Layout aus 7
+${voiceBlock}
+
+${fewShotBlock}
+
+AUFGABE:
+1. 5 Pack-Titel-Optionen (Index 0 = beste Empfehlung)
+2. 1 Card-Layout aus 9
 3. 1 Mood-Palette aus 8
 4. 1 Display-Font aus 3
 5. Subtitle, Tagline, Description, Category
+6. Surface-Style (solid / gradient / pattern)
 
 PACK-TITEL-REGELN:
-- Max 40 chars je Titel
-- 5 STILISTISCH UNTERSCHIEDLICHE Optionen (nicht 5 Varianten desselben Konzepts!)
-- Beispiele für stilistische Vielfalt: "Feierabend-Klassiker" (deutsch-warm) / "Quick & Cozy" (englisch-modern) / "Mama's Wochenrezepte" (persönlich-emotional) / "Top 10 der Woche" (Charts-Style) / "Bowls & mehr" (minimalistisch)
-- KEINE Marketing-Floskeln: keine "perfekt für...", "die besten...", "angesagteste..."
-- KEINE Anführungszeichen, Emojis, Hashtags
-- Knackig, einprägsam
+- 15-40 chars
+- 5 STILISTISCH UNTERSCHIEDLICHE Optionen (nicht 5 Varianten desselben Konzepts)
+- Beispiele fuer stilistische Vielfalt: persoenlich-emotional / Charts-Style / knapp-minimalistisch / deutsch-warm / englisch-modern
+- KEINE Marketing-Floskeln: keine "perfekt fuer...", "die besten...", "angesagteste...", "must-have"
+- KEINE Anfuehrungszeichen, Emojis, Hashtags, Em-Dashes (—)
+- Knackig, einpraegsam, klingt nach echtem Creator
 
-LAYOUT-AUSWAHL — picke einen aus dieser Liste:
+LAYOUT-AUSWAHL (picke einen):
 ${layoutTable}
 
-MOOD-AUSWAHL — picke einen aus dieser Liste:
+MOOD-AUSWAHL (picke einen):
 ${moodTable}
 
-FONT-AUSWAHL — picke einen aus dieser Liste:
+FONT-AUSWAHL (picke einen):
 ${fontTable}
 
-TONALITÄT für Description/Subtitle/Tagline:
-- ICH-Form als ob ${brand?.name ?? "die Creatorin"} spricht
-- Du-Form für die Leserin
-- Warm, persönlich, "Freundin am Küchentisch"
+TONALITAET fuer Description/Subtitle/Tagline:
+- ICH-Form als ob ${name} spricht
 - KEINE Marketing-Sprache
-- Konkret statt abstrakt — nenn Rezeptnamen, keine Adjektiv-Wolken
+- Konkret statt abstrakt — nenn ECHTE Rezeptnamen aus der gelieferten Liste
 
-PASSUNG sehr wichtig: Layout/Mood/Font sollen ZUR REZEPTAUSWAHL passen.
-- Wenn die Reels Dessert/Backwaren sind → patisserie/amber, lavender/honey, fraunces
-- Wenn Bowls/Healthy → vital, sage/mint, fraunces oder inter-tight
-- Wenn Mealprep → dashboard, sky/cocoa, inter-tight
-- Wenn Snacks → minimal, mint/rose, fraunces
-- Wenn Comfort-Food/Hauptmahlzeiten → amber, honey, fraunces oder dm-serif
-- Wenn das Pack ein Restaurant-/Bistro-Feel haben soll (Date-Night-Dinners,
-  Pariser-Maison-Aesthetik, mehrgaengige Menus, edle Hauptmahlzeiten, Wein-
-  begleitete Rezepte) → restaurant, honey/cocoa/rose, fraunces. Cream-BG mit
-  Gold-Ornamenten, Dot-Leader bei Zutaten, Roman-Numerals bei Steps, Wine-
-  Notes-Block fuer Mikros.
+PASSUNG (Layout/Mood/Font zur Rezeptauswahl):
+- Dessert/Backwaren → patisserie/amber, lavender/honey, fraunces
+- Bowls/Healthy → vital, sage/mint, fraunces oder inter-tight
+- Mealprep → dashboard, sky/cocoa, inter-tight
+- Snacks → minimal, mint/rose, fraunces
+- Comfort-Food/Hauptmahlzeiten → amber, honey, fraunces oder dm-serif
+- Date-Night-Dinners / Pariser-Maison / Wein-begleitet → restaurant, honey/cocoa/rose, fraunces
 
-SURFACE-STYLE (Pack-Hintergrund) — sei mutig wo es passt:
-- DEFAULT: solid — wirkt clean, sicher, immer ok
-- gradient: wenn die Recipe-Auswahl warm/premium/sunset-Vibe hat (Date-Night Pasta, Sommer-BBQ, Cocktails, Sunset-Brunch)
-- pattern: wenn die Auswahl ein klares Signature-Konzept hat
-  - honeycomb: Biene-Brand, Backwaren mit Honig, gesunder Honig-Vibe
+SURFACE-STYLE (sei nicht zwanghaft kreativ — solid sieht oft besser aus):
+- DEFAULT: solid
+- gradient: Sunset-Vibe, Date-Night, Sommer-BBQ, Cocktails
+- pattern: nur wenn klares Signature-Konzept passt
+  - honeycomb: Backwaren mit Honig, gesunder Honig-Vibe
   - polka: Snacks, leichte Desserts, kindlich-cozy
-  - marble: Premium-Patisserie, edle Desserts, Tiramisu
-  - stripes: Sport/Energy, Workout-Snacks, Protein-Focused
+  - marble: Premium-Patisserie, edle Desserts
+  - stripes: Sport/Energy, Workout-Snacks
   - crosshatch: Editorial/Premium-Hauptmahlzeiten
-  - topo: Outdoor/BBQ/Adventure-Food
-  - grid: Mealprep, strukturierte Wochenplanung
-  - confetti: Festliche Packs, Geburtstagskuchen, Party-Snacks
-
-Wenn unsicher: solid. Sei nicht zwanghaft kreativ — solid sieht oft besser aus.
+  - topo: Outdoor/BBQ/Adventure
+  - grid: strukturierte Wochenplanung
+  - confetti: Festliche Packs
 
 Antworte AUSSCHLIESSLICH im JSON-Schema.`;
 }
 
-export async function suggestPackDesign(
-  reels: ReelRow[],
-  brand?: Brand | null
-): Promise<PackDesignSuggestion> {
-  if (reels.length === 0) {
-    throw new Error("suggestPackDesign: keine Reels uebergeben");
-  }
-
+function buildUserPrompt(reels: ReelRow[]): string {
   const reelLines = reels
     .slice(0, 30)
     .map((r) => {
-      const tags = [
-        r.meal_type,
-        r.cuisine,
-        r.main_ingredient,
-        r.occasion,
-        r.season,
-        r.vessel,
-      ]
+      const tags = [r.meal_type, r.cuisine, r.main_ingredient, r.occasion, r.season, r.vessel]
         .filter(Boolean)
         .join("/");
       const dietary = r.dietary?.length ? ` [${r.dietary.join(",")}]` : "";
-      const time = r.estimated_time_minutes
-        ? ` ${r.estimated_time_minutes}min`
-        : "";
+      const time = r.estimated_time_minutes ? ` ${r.estimated_time_minutes}min` : "";
       return `• ${r.recipe_title || r.caption.slice(0, 60)} (${tags})${dietary}${time}`;
     })
     .join("\n");
 
-  const result = await callGemini<PackDesignSuggestion>({
-    prompt: `Anzahl ausgewaehlter Reels: ${reels.length}\n\nReel-Auswahl:\n${reelLines}\n\nGeneriere Design-Vorschlaege im JSON-Schema.`,
-    schema: RESPONSE_SCHEMA,
-    systemInstruction: systemInstructionFor(brand ?? null),
-    temperature: 0.65,
-    maxOutputTokens: 2048,
-    thinkingBudget: 0,
-    retries: 1,
-    model: "flash",
-  });
+  return `Anzahl ausgewaehlter Reels: ${reels.length}
 
-  // Defensive Validierung — falls Gemini einen Wert ausserhalb der enums
-  // liefert (passiert selten), fallback auf safe defaults.
+Reel-Auswahl (NUR diese Rezepte sind im Pack — Titel/Tagline/Description duerfen nur auf diese verweisen, nichts dazu erfinden):
+${reelLines}
+
+Generiere Design-Vorschlaege im JSON-Schema.`;
+}
+
+function applyDefensiveValidation(result: PackDesignSuggestion): PackDesignSuggestion {
   const validLayout = LAYOUT_OPTIONS.find((l) => l.id === result.layout);
   const validMood = MOOD_OPTIONS.find((m) => m.id === result.moodId);
   const validFont = FONT_OPTIONS.find((f) => f.id === result.fontId);
@@ -314,18 +307,9 @@ export async function suggestPackDesign(
     result.surfaceType === "solid" ||
     result.surfaceType === "gradient" ||
     result.surfaceType === "pattern";
-  const validPatterns = [
-    "polka",
-    "honeycomb",
-    "crosshatch",
-    "topo",
-    "marble",
-    "stripes",
-    "grid",
-    "confetti",
-  ];
   const safePatternId =
-    result.surfaceType === "pattern" && validPatterns.includes(result.patternId)
+    result.surfaceType === "pattern" &&
+    (VALID_PATTERN_IDS as readonly string[]).includes(result.patternId)
       ? result.patternId
       : "";
 
@@ -340,4 +324,69 @@ export async function suggestPackDesign(
     surfaceType: validSurface ? result.surfaceType : "solid",
     patternId: safePatternId,
   };
+}
+
+export async function suggestPackDesign(
+  reels: ReelRow[],
+  brand?: Brand | null
+): Promise<PackDesignSuggestion> {
+  if (reels.length === 0) {
+    throw new Error("suggestPackDesign: keine Reels uebergeben");
+  }
+
+  // Lazy-Backfill: wenn der Brand kein Voice-Profil hat, leiten wir es
+  // jetzt aus den DB-Captions ab + persistieren. Naechster Call profitiert.
+  const brandSafe = await ensureBrandVoiceProfile(brand);
+  const brandBanned = brandSafe?.voiceProfile?.bannedPhrases ?? [];
+
+  const result = await generateWithCritique<PackDesignSuggestion>({
+    schema: RESPONSE_SCHEMA,
+    generationPrompt: buildUserPrompt(reels),
+    generationSystemInstruction: buildSystemInstruction(brandSafe),
+    candidateCount: 3,
+    generationTemperature: 0.75,
+    maxOutputTokens: 2048,
+    brandBannedPhrases: brandBanned,
+    bannedCheckFields: ["subtitle", "tagline", "description"],
+    scorableFields: [
+      {
+        key: "subtitle",
+        label: "Subtitle",
+        minLength: 20,
+        maxLength: 80,
+        goodCriteria: "Schaerft das Pack-Versprechen in einem Satz, ohne Floskeln.",
+      },
+      {
+        key: "tagline",
+        label: "Tagline",
+        minLength: 30,
+        maxLength: 120,
+        goodCriteria:
+          "Nennt 2-3 ECHTE Rezeptnamen aus der Auswahl. Keine erfundenen Gerichte.",
+      },
+      {
+        key: "description",
+        label: "Description",
+        minLength: 140,
+        maxLength: 280,
+        goodCriteria:
+          "2-3 Saetze in der Stimme des Creators, bezieht sich konkret auf Rezepte. Klingt persoenlich.",
+      },
+    ],
+    preFilter: (c) => {
+      // Hard-Reject wenn Pflichtfelder fehlen
+      if (!c.description?.trim() || !c.subtitle?.trim()) return true;
+      if (!Array.isArray(c.titles) || c.titles.length < 3) return true;
+      return false;
+    },
+    debugTag: "suggest-pack-design",
+  });
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log(
+      `[suggest-pack-design] passes=${result.passes} cleanCount=${result.cleanCount} winnerBannedHits=${result.winnerBannedHits.length}`
+    );
+  }
+
+  return applyDefensiveValidation(result.winner);
 }
