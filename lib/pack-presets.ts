@@ -95,107 +95,93 @@ export const layoutPresets: LayoutPreset[] = [
   },
 ];
 
-// Mood presets — eight pre-tuned palettes that pass contrast checks and look
-// on-brand for Biene's cream-base universe. Free-form color picker is
-// intentionally not exposed in the editor — the cost of one bad palette
-// (white text on light beige) outweighs the benefit. If we ever need more,
-// we add presets here.
+// Mood presets — 24 hand-tuned Paletten, organisiert in 5 Farbfamilien.
+// Alle Paletten passen Kontrast-Checks (ink auf background min ~6:1, accent
+// auf background min ~4.5:1). Free-Form-Color-Picker bleibt bewusst aus —
+// eine schlechte Palette (weiß auf hellbeige) kostet mehr als ein
+// kuratiertes Set. Wenn wir mehr brauchen, hier dazu — der Pack-Editor
+// gruppiert automatisch nach `family`.
+export type MoodFamily = "warm" | "fresh" | "cool" | "earth" | "statement";
+
 export type MoodPreset = {
   id: string;
   label: string;
   hint: string;
+  family: MoodFamily;
   mood: PackMood;
 };
 
 export const moodPresets: MoodPreset[] = [
-  {
-    id: "lavender",
-    label: "Lavender",
-    hint: "Weich, Patisserie-Vibe — perfekt für Backwaren",
-    mood: {
-      background: "#ddc9e8",
-      accent: "#735090",
-      ink: "#241830",
-      inkSoft: "#503d6b",
-    },
-  },
-  {
-    id: "sage",
-    label: "Sage Green",
-    hint: "Frisch, Volumen-fokus — perfekt für Bowls",
-    mood: {
-      background: "#c8e2a8",
-      accent: "#527a2c",
-      ink: "#1f2a14",
-      inkSoft: "#3f5b22",
-    },
-  },
-  {
-    id: "mint",
-    label: "Mint",
-    hint: "Cool, Apple-Aesthetik — perfekt für Snacks",
-    mood: {
-      background: "#b8dcc9",
-      accent: "#3f7560",
-      ink: "#16291f",
-      inkSoft: "#365546",
-    },
-  },
-  {
-    id: "sky",
-    label: "Sky Blue",
-    hint: "Strukturiert, Notion-Vibe — perfekt für Meal-Prep",
-    mood: {
-      background: "#b4cde4",
-      accent: "#3a6090",
-      ink: "#1a2433",
-      inkSoft: "#3a4866",
-    },
-  },
-  {
-    id: "honey",
-    label: "Honey",
-    hint: "Warmer Honey-Ton — perfekt für Hauptmahlzeiten",
-    mood: {
-      background: "#f4d88d",
-      accent: "#b07a2a",
-      ink: "#2b1f10",
-      inkSoft: "#5e4720",
-    },
-  },
-  {
-    id: "rose",
-    label: "Soft Rose",
-    hint: "Fruchtig-warm, Beeren-Rezepte, Frühstücke",
-    mood: {
-      background: "#f3cdd3",
-      accent: "#a94d61",
-      ink: "#2a1418",
-      inkSoft: "#6b3340",
-    },
-  },
-  {
-    id: "apricot",
-    label: "Apricot",
-    hint: "Warm-orange, Smoothies, Kürbis-Kuchen",
-    mood: {
-      background: "#f7d4b8",
-      accent: "#b8642b",
-      ink: "#2c1810",
-      inkSoft: "#6e3d1d",
-    },
-  },
-  {
-    id: "cocoa",
-    label: "Cocoa Cream",
-    hint: "Tief, Schokoladen-Rezepte, Tiramisu",
-    mood: {
-      background: "#e0cdb6",
-      accent: "#7a4a2a",
-      ink: "#2a1810",
-      inkSoft: "#5a3a23",
-    },
-  },
+  // ─── WARM-PASTEL — sanft, einladend, Patisserie/Frühstück/Süßes ─────────
+  { id: "lavender", label: "Lavender", hint: "Weich, Patisserie-Vibe — perfekt für Backwaren", family: "warm",
+    mood: { background: "#ddc9e8", accent: "#735090", ink: "#241830", inkSoft: "#503d6b" } },
+  { id: "rose", label: "Soft Rose", hint: "Fruchtig-warm, Beeren-Rezepte, Frühstücke", family: "warm",
+    mood: { background: "#f3cdd3", accent: "#a94d61", ink: "#2a1418", inkSoft: "#6b3340" } },
+  { id: "apricot", label: "Apricot", hint: "Warm-orange, Smoothies, Kürbis-Kuchen", family: "warm",
+    mood: { background: "#f7d4b8", accent: "#b8642b", ink: "#2c1810", inkSoft: "#6e3d1d" } },
+  { id: "honey", label: "Honey", hint: "Warmer Honey-Ton — perfekt für Hauptmahlzeiten", family: "warm",
+    mood: { background: "#f4d88d", accent: "#b07a2a", ink: "#2b1f10", inkSoft: "#5e4720" } },
+  { id: "blush", label: "Blush", hint: "Warmes Rosé — Berry-Bowls, Smoothies, Frühstücks-Packs", family: "warm",
+    mood: { background: "#f4dcd2", accent: "#c4716e", ink: "#2e1814", inkSoft: "#6b3530" } },
+  { id: "buttercream", label: "Buttercream", hint: "Cremige Vanille — Kuchen, Cookies, Desserts", family: "warm",
+    mood: { background: "#fae8b8", accent: "#c19140", ink: "#2f2210", inkSoft: "#6d5223" } },
+  { id: "peach", label: "Peach", hint: "Pfirsich — Sommer-Rezepte, Eis, Iced-Drinks", family: "warm",
+    mood: { background: "#fad6c0", accent: "#c66f3d", ink: "#2d1810", inkSoft: "#6e3a1e" } },
+  { id: "mauve", label: "Mauve", hint: "Gedämpftes Rosé-Lila — Premium-Patisserie, Tea-Time", family: "warm",
+    mood: { background: "#e4cad8", accent: "#8a4769", ink: "#2a1620", inkSoft: "#5e2e4a" } },
+
+  // ─── FRESH — natürlich, gesund, Gemüse/Bowls/Healthy ────────────────────
+  { id: "sage", label: "Sage Green", hint: "Frisch, Volumen-fokus — perfekt für Bowls", family: "fresh",
+    mood: { background: "#c8e2a8", accent: "#527a2c", ink: "#1f2a14", inkSoft: "#3f5b22" } },
+  { id: "mint", label: "Mint", hint: "Cool, Apple-Aesthetik — perfekt für Snacks", family: "fresh",
+    mood: { background: "#b8dcc9", accent: "#3f7560", ink: "#16291f", inkSoft: "#365546" } },
+  { id: "eucalyptus", label: "Eucalyptus", hint: "Gedämpftes Grün — Detox, Smoothie-Bowls, Clean Eating", family: "fresh",
+    mood: { background: "#c8d8c5", accent: "#4f7c5d", ink: "#1a2e1f", inkSoft: "#34593d" } },
+  { id: "pistachio", label: "Pistachio", hint: "Helles fröhliches Grün — Pasta-Verde, Frühlings-Rezepte", family: "fresh",
+    mood: { background: "#d8e8b8", accent: "#6e8c3a", ink: "#1c2a14", inkSoft: "#4a6228" } },
+  { id: "moss", label: "Moss", hint: "Wald-Grün — Wild-Kräuter, Pilze, Herbst-Eintöpfe", family: "fresh",
+    mood: { background: "#b8c8a8", accent: "#4a6535", ink: "#1a2014", inkSoft: "#36482d" } },
+
+  // ─── COOL — modern, clean, Notion/Tech/Mealprep ─────────────────────────
+  { id: "sky", label: "Sky Blue", hint: "Strukturiert, Notion-Vibe — perfekt für Meal-Prep", family: "cool",
+    mood: { background: "#b4cde4", accent: "#3a6090", ink: "#1a2433", inkSoft: "#3a4866" } },
+  { id: "mist", label: "Mist", hint: "Gedämpftes Grau-Blau — Editorial-Health, Clean-Minimal", family: "cool",
+    mood: { background: "#d4dde2", accent: "#5d7787", ink: "#1c2429", inkSoft: "#3e505b" } },
+  { id: "powder", label: "Powder", hint: "Sehr helles Pastell-Blau — Sommer-Drinks, Eis-Rezepte", family: "cool",
+    mood: { background: "#d8e2ee", accent: "#6a89a8", ink: "#1d2935", inkSoft: "#44576a" } },
+  { id: "ocean", label: "Ocean", hint: "Türkis-Petrol — Fisch, Seafood, Mediterrane Küche", family: "cool",
+    mood: { background: "#b8d4d4", accent: "#356c70", ink: "#142426", inkSoft: "#2d4c4e" } },
+
+  // ─── EARTH — warm-neutral, rustic, Kaffee/Bäcker/Comfort ────────────────
+  { id: "cocoa", label: "Cocoa Cream", hint: "Tief, Schokoladen-Rezepte, Tiramisu", family: "earth",
+    mood: { background: "#e0cdb6", accent: "#7a4a2a", ink: "#2a1810", inkSoft: "#5a3a23" } },
+  { id: "terracotta", label: "Terracotta", hint: "Rot-Orange-Erde — Mexican, Mediterran, Bohnen-Gerichte", family: "earth",
+    mood: { background: "#e8b89a", accent: "#b85a3a", ink: "#2c1612", inkSoft: "#6b3624" } },
+  { id: "sand", label: "Sand", hint: "Warm-Beige — Reis, Couscous, Brot, Frühstück", family: "earth",
+    mood: { background: "#ecddc4", accent: "#a07a44", ink: "#2a1f10", inkSoft: "#5d4628" } },
+  { id: "camel", label: "Camel", hint: "Gold-Tan — Bratenfond, Karamell, Herbst", family: "earth",
+    mood: { background: "#d8c2a0", accent: "#97703c", ink: "#281e12", inkSoft: "#5c4928" } },
+
+  // ─── STATEMENT — mutig, modern, Premium/Date-Night/Editorial ────────────
+  { id: "coral", label: "Coral", hint: "Lebendiges Orange-Pink — Brunch, BBQ, Sommer-Statement", family: "statement",
+    mood: { background: "#fbb09a", accent: "#d54e3a", ink: "#2b1410", inkSoft: "#6a2d22" } },
+  { id: "burgundy", label: "Burgundy", hint: "Tiefes Weinrot — Date-Night-Dinner, Schokolade, Wein-Pairing", family: "statement",
+    mood: { background: "#d8a8b0", accent: "#8a2a3a", ink: "#28121a", inkSoft: "#5a1f29" } },
+  { id: "mustard", label: "Mustard", hint: "Sattes Senfgelb — Senf-Vinaigrette, Indian, Curry", family: "statement",
+    mood: { background: "#e4cc60", accent: "#8a6a14", ink: "#261d08", inkSoft: "#574308" } },
+  { id: "plum", label: "Plum", hint: "Kräftiges Lila — Premium-Patisserie, Beeren, Pflaumen", family: "statement",
+    mood: { background: "#c8a4c0", accent: "#6a2860", ink: "#1f0c1c", inkSoft: "#461842" } },
+  { id: "saffron", label: "Saffron", hint: "Warmes Safran-Orange — Paella, Risotto, Indian-Cuisine", family: "statement",
+    mood: { background: "#f0c878", accent: "#b8772a", ink: "#2a1d0c", inkSoft: "#5e3d17" } },
+];
+
+// Mood-Familien für gruppierte UI-Anzeige im Pack-Editor.
+export const moodFamilies: Array<{ id: MoodFamily; label: string; hint: string }> = [
+  { id: "warm", label: "Warm-Pastel", hint: "Patisserie, Frühstück, Süßes" },
+  { id: "fresh", label: "Fresh", hint: "Bowls, Veggies, Healthy" },
+  { id: "cool", label: "Cool", hint: "Mealprep, Notion-Vibe, Modern-Minimal" },
+  { id: "earth", label: "Earth", hint: "Rustic, Kaffee, Bäcker, Comfort" },
+  { id: "statement", label: "Statement", hint: "Premium, Date-Night, Editorial" },
 ];
 
 // Display fonts a custom pack can pick. Same three the curated packs use.

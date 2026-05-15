@@ -20,16 +20,42 @@ type PackCoverInput =
 
 // Hex → English colour word so Flux's text encoder anchors the backdrop
 // colour properly. Without the word the model treats the hex as noise.
+// Deckt alle 26 moodPresets aus lib/pack-presets.ts ab. Erweitern wenn
+// neue Paletten dazu kommen — sonst fallt Flux auf generischen "soft
+// pastel"-Anker zurueck und das Cover wird farblich unspezifisch.
 function colourWord(hex: string): string {
   const map: Record<string, string> = {
+    // Warm-Pastel
     "#ddc9e8": "lavender purple",
-    "#c8e2a8": "sage green",
-    "#b8dcc9": "mint green",
-    "#b4cde4": "sky blue",
-    "#f4d88d": "honey yellow",
     "#f3cdd3": "soft rose pink",
     "#f7d4b8": "apricot",
+    "#f4d88d": "honey yellow",
+    "#f4dcd2": "warm blush rosé",
+    "#fae8b8": "buttercream vanilla",
+    "#fad6c0": "peach",
+    "#e4cad8": "muted mauve",
+    // Fresh
+    "#c8e2a8": "sage green",
+    "#b8dcc9": "mint green",
+    "#c8d8c5": "eucalyptus muted green",
+    "#d8e8b8": "pistachio bright green",
+    "#b8c8a8": "moss forest green",
+    // Cool
+    "#b4cde4": "sky blue",
+    "#d4dde2": "soft mist grey-blue",
+    "#d8e2ee": "powder pale blue",
+    "#b8d4d4": "ocean teal turquoise",
+    // Earth
     "#e0cdb6": "cocoa cream beige",
+    "#e8b89a": "terracotta clay",
+    "#ecddc4": "warm sand beige",
+    "#d8c2a0": "camel tan",
+    // Statement
+    "#fbb09a": "vibrant coral pink",
+    "#d8a8b0": "burgundy wine red",
+    "#e4cc60": "rich mustard yellow",
+    "#c8a4c0": "deep plum violet",
+    "#f0c878": "warm saffron orange",
   };
   return map[hex.toLowerCase()] ?? "soft pastel";
 }

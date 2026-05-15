@@ -8,6 +8,7 @@ import type { Pack, PackMood, CardLayout } from "@/lib/packs";
 import {
   layoutPresets,
   moodPresets,
+  moodFamilies,
   displayFontOptions,
 } from "@/lib/pack-presets";
 import { SiteHeader } from "@/components/site-header";
@@ -391,24 +392,43 @@ export function PackEditor({ brand, pack, packId }: PackEditorProps) {
             />
           </FieldRow>
 
-          <FieldRow label="Mood / Farbpalette" hint="Hintergrund, Akzent, Schrift-Farbe des Packs." brand={brand}>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {moodPresets.map((preset) => {
-                const active = preset.mood.background === mood.background && preset.mood.accent === mood.accent;
+          <FieldRow label="Mood / Farbpalette" hint="24 kuratierte Paletten in 5 Farbfamilien. Hintergrund · Akzent · Text-Farbe." brand={brand}>
+            <div className="space-y-5">
+              {moodFamilies.map((family) => {
+                const presetsInFamily = moodPresets.filter((p) => p.family === family.id);
+                if (presetsInFamily.length === 0) return null;
                 return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => setMood(preset.mood)}
-                    className={`rounded-2xl border-2 p-3 text-left text-[12px] transition ${active ? "border-black" : "border-transparent"}`}
-                    style={{ background: preset.mood.background, color: preset.mood.ink }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="h-4 w-4 rounded-full" style={{ background: preset.mood.accent }} />
-                      <span className="font-semibold">{preset.label}</span>
+                  <div key={family.id}>
+                    <div className="mb-2 flex items-baseline justify-between">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: brand.tokens.inkMuted }}>
+                        {family.label}
+                      </span>
+                      <span className="text-[11px]" style={{ color: brand.tokens.inkMuted }}>
+                        {family.hint}
+                      </span>
                     </div>
-                    <span className="mt-1 block opacity-70">{preset.hint}</span>
-                  </button>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {presetsInFamily.map((preset) => {
+                        const active =
+                          preset.mood.background === mood.background && preset.mood.accent === mood.accent;
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => setMood(preset.mood)}
+                            className={`rounded-2xl border-2 p-3 text-left text-[12px] transition ${active ? "border-black" : "border-transparent"}`}
+                            style={{ background: preset.mood.background, color: preset.mood.ink }}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="h-4 w-4 rounded-full" style={{ background: preset.mood.accent }} />
+                              <span className="font-semibold">{preset.label}</span>
+                            </div>
+                            <span className="mt-1 block opacity-70">{preset.hint}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               })}
             </div>

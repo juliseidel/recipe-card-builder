@@ -151,7 +151,7 @@ const RESPONSE_SCHEMA = {
     moodId: {
       type: "string",
       description:
-        'Empfohlene Mood-Palette, einer aus: "lavender", "sage", "mint", "sky", "honey", "rose", "apricot", "cocoa".',
+        'Empfohlene Mood-Palette aus 26 Optionen — siehe MOOD_OPTIONS-Tabelle in der System-Instruction fuer Beschreibungen. Erlaubte Werte: lavender, rose, apricot, honey, blush, buttercream, peach, mauve, sage, mint, eucalyptus, pistachio, moss, sky, mist, powder, ocean, cocoa, terracotta, sand, camel, coral, burgundy, mustard, plum, saffron.',
     },
     moodReason: {
       type: "string",
