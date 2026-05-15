@@ -9367,10 +9367,19 @@ function FeaturePage({
   const PAGE_WIDTH = 595;
   const PAGE_HEIGHT = 842;
   const contentWidth = Math.round(PAGE_WIDTH * d.contentWidthPct);
-  const heroWidth = PAGE_WIDTH - contentWidth;
-  // Fade-Overlay ist auf der LINKEN Foto-Kante positioniert.
-  const fadeLeft = contentWidth - 1; // 1pt overlap fuer pixel-tight seam
+  // Fade-Overlay ist auf der LINKEN Foto-Kante positioniert. 1pt-Overlap
+  // gegen Pixel-Saum zwischen Content-BG und Foto.
+  const fadeLeft = contentWidth - 1;
 
+  // Wichtig: Page nutzt flexDirection: "row" damit Content links und Hero
+  // rechts als zwei NORMAL-FLOW-Flex-Children nebeneinander gerendert
+  // werden. Vorherige Version hatte den Content-View mit `height: 842 pt`
+  // plus padding — zusammen mit der default column-Page hat react-pdf das
+  // als Overflow interpretiert und auf 2-3 Folgeseiten umbrochen (User-Bug
+  // 2026-05-15). Mit row-Layout strecken sich beide Spalten automatisch
+  // auf die volle Page-Hoehe (align-items stretch), kein explicit height
+  // mehr noetig. Das Fade-Svg bleibt absolute, kommt als letztes Child
+  // damit es im z-order ueber Content + Hero liegt.
   return (
     <Page
       size="A4"
@@ -9378,86 +9387,13 @@ function FeaturePage({
         backgroundColor: contentBg,
         fontFamily: "Inter",
         color: ink,
-        // Kein padding hier — die Spalten managen ihre eigenen Innenraender.
+        flexDirection: "row",
       }}
     >
-      {/* ─── Hero-Foto (full-bleed rechts) ────────────────────────────── */}
-      <View
-        style={{
-          position: "absolute",
-          right: 0,
-          top: 0,
-          width: heroWidth,
-          height: PAGE_HEIGHT,
-          backgroundColor: blendWithWhite(t.accent, 0.9),
-        }}
-      >
-        {heroDataUri ? (
-          <Image
-            src={heroDataUri}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        ) : (
-          <View
-            style={{
-              width: "100%",
-              height: "100%",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Text
-              style={{
-                fontFamily: "Fraunces",
-                fontSize: 140,
-                color: withAlpha(t.accent, 0.35),
-                lineHeight: 1,
-              }}
-            >
-              {recipe.title.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* ─── Soft-Fade-Overlay an der linken Foto-Kante ───────────────── */}
-      <Svg
-        width={d.fadeWidth}
-        height={PAGE_HEIGHT}
-        viewBox={`0 0 ${d.fadeWidth} ${PAGE_HEIGHT}`}
-        style={{
-          position: "absolute",
-          left: fadeLeft,
-          top: 0,
-        }}
-      >
-        <Defs>
-          <LinearGradient
-            id="feature-fade"
-            x1="0"
-            y1="0"
-            x2={String(d.fadeWidth)}
-            y2="0"
-          >
-            <Stop offset="0" stopColor={contentBg} stopOpacity={1} />
-            <Stop offset="0.5" stopColor={contentBg} stopOpacity={0.78} />
-            <Stop offset="1" stopColor={contentBg} stopOpacity={0} />
-          </LinearGradient>
-        </Defs>
-        <Rect
-          x="0"
-          y="0"
-          width={d.fadeWidth}
-          height={PAGE_HEIGHT}
-          fill="url(#feature-fade)"
-        />
-      </Svg>
-
-      {/* ─── Content-Spalte links ─────────────────────────────────────── */}
+      {/* ─── Content-Spalte links (erstes Flex-Child) ─────────────────── */}
       <View
         style={{
           width: contentWidth,
-          height: PAGE_HEIGHT,
           paddingTop: d.contentPadTop,
           paddingBottom: d.contentPadBottom,
           paddingLeft: d.contentPadH,
@@ -9842,6 +9778,74 @@ function FeaturePage({
           ) : null}
         </View>
       </View>
+
+      {/* ─── Hero-Spalte rechts (zweites Flex-Child, flex:1 fuellt Rest) ─ */}
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: blendWithWhite(t.accent, 0.9),
+        }}
+      >
+        {heroDataUri ? (
+          <Image
+            src={heroDataUri}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        ) : (
+          <View
+            style={{
+              width: "100%",
+              height: "100%",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: 140,
+                color: withAlpha(t.accent, 0.35),
+                lineHeight: 1,
+              }}
+            >
+              {recipe.title.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* ─── Soft-Fade-Overlay an der linken Foto-Kante (z-top) ────────── */}
+      <Svg
+        width={d.fadeWidth}
+        height={PAGE_HEIGHT}
+        viewBox={`0 0 ${d.fadeWidth} ${PAGE_HEIGHT}`}
+        style={{
+          position: "absolute",
+          left: fadeLeft,
+          top: 0,
+        }}
+      >
+        <Defs>
+          <LinearGradient
+            id="feature-fade"
+            x1="0"
+            y1="0"
+            x2={String(d.fadeWidth)}
+            y2="0"
+          >
+            <Stop offset="0" stopColor={contentBg} stopOpacity={1} />
+            <Stop offset="0.5" stopColor={contentBg} stopOpacity={0.78} />
+            <Stop offset="1" stopColor={contentBg} stopOpacity={0} />
+          </LinearGradient>
+        </Defs>
+        <Rect
+          x="0"
+          y="0"
+          width={d.fadeWidth}
+          height={PAGE_HEIGHT}
+          fill="url(#feature-fade)"
+        />
+      </Svg>
     </Page>
   );
 }
