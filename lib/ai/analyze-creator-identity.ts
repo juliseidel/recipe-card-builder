@@ -24,6 +24,11 @@ export type CreatorIdentity = {
   tagline: string;
   niche: string;
   signature: string;
+  /** Geschlecht des Creators. Wird beim Onboarding aus Vorname + Bio +
+   *  Captions abgeleitet. Steuert die grammatikalisch korrekte Anrede
+   *  ('Dein Martin' vs 'Deine Julia') wenn die signature dem Standard-
+   *  Pattern folgt. 'neutral' fuer Marken-Accounts (z.B. 'Bienesfitlife'). */
+  gender: "male" | "female" | "neutral";
 };
 
 const RESPONSE_SCHEMA = {
@@ -54,13 +59,19 @@ const RESPONSE_SCHEMA = {
       description:
         "Im 'Fitness · Food · 280K Instagram'-Stil. Bullet-Stil mit '·' getrennt. 2-4 Items: Hauptbereich, Sub-Bereich, Reichweite (Follower abgerundet wie '280K', '1.2M'). Max 80 Zeichen.",
     },
+    gender: {
+      type: "string",
+      enum: ["male", "female", "neutral"],
+      description:
+        "Geschlecht des Creators basierend auf Vorname + Bio + Pronomen in den Captions. 'male' = männlich (z.B. Martin, Lukas, Thomas), 'female' = weiblich (z.B. Julia, Lara, Sarah), 'neutral' = Marken-/Unisex-Account ohne klare Person (z.B. 'Bienesfitlife', 'Healthy Kitchen Co.'). KRITISCH: Dieses Feld steuert die grammatikalische Anrede im Druck-PDF ('Dein Martin' vs 'Deine Julia') — bei Unsicherheit konservativ 'neutral' wählen.",
+    },
     signature: {
       type: "string",
       description:
-        "Sign-off im Workspace-Footer. 'Deine [Name]' (weiblich) oder 'Dein [Name]' (maennlich/unbestimmt). Max 30 Zeichen.",
+        "Sign-off im Workspace-Footer / am Ende des Pack-PDFs. Soll zum Voice-Profil des Creators passen — NICHT zwingend 'Dein/Deine [Name]'. Erlaubte Varianten: 'Dein Martin' (klassisch maennlich), 'Deine Julia' (klassisch weiblich), 'Bis bald, Lukas', 'Cheers, Sarah', 'Eure Sophie' (informeller Plural), 'Hab dich lieb, deine Mia' (sehr warm), oder einfach nur der Name wenn der Creator lakonisch schreibt. Max 30 Zeichen. Bei Unsicherheit: 'Dein [Name]' (gender=male) oder 'Deine [Name]' (gender=female) oder einfach 'Bis bald, [Name]' (gender=neutral).",
     },
   },
-  required: ["name", "fullName", "bio", "tagline", "niche", "signature"],
+  required: ["name", "fullName", "bio", "tagline", "niche", "gender", "signature"],
 };
 
 const SYSTEM_INSTRUCTION = `Du analysierst Social-Media-Profile (Instagram oder TikTok) von Food-/Fitness-/Recipe-Creators und leitest daraus die Identität ihres Workspaces in unserem internen Recipe-Card-Builder-Tool ab.
@@ -166,13 +177,32 @@ export async function analyzeCreatorIdentity(
 
   // Defensive sanitization — strip stray quotes, collapse whitespace, cap
   // length pro Feld. Schema-Limits sind Empfehlungen, nicht hart enforced.
+  const cleanName = sanitize(result.name, 25) || "Creator";
+  // Gender-Fallback: wenn Gemini den Wert nicht liefert oder ungueltigen
+  // String returnt, faellt 'neutral' als sicherer Default ein — die
+  // signature kompiliert dann mit dem name ohne grammatikalisches Risiko.
+  const validGenders = new Set(["male", "female", "neutral"]);
+  const gender = (validGenders.has(result.gender)
+    ? result.gender
+    : "neutral") as "male" | "female" | "neutral";
+  // Signature-Fallback: wenn Gemini nichts liefert oder Standard-Pattern
+  // gewuenscht ist, bauen wir die Anrede aus gender + name. So ist
+  // 'Dein Martin' bei male, 'Deine Julia' bei female, neutraler Sign-off
+  // bei neutral (z.B. Marken-Accounts).
+  const fallbackSignature =
+    gender === "male"
+      ? `Dein ${cleanName}`
+      : gender === "female"
+        ? `Deine ${cleanName}`
+        : `Bis bald, ${cleanName}`;
   return {
-    name: sanitize(result.name, 25) || "Creator",
+    name: cleanName,
     fullName: sanitize(result.fullName, 60) || sanitize(result.name, 60) || "Creator",
     bio: sanitize(result.bio, 240) || "Creator-Workspace im Recipe Card Builder.",
     tagline: sanitize(result.tagline, 80) || "Eigener Workspace",
     niche: sanitize(result.niche, 80) || "Food · Recipes",
-    signature: sanitize(result.signature, 30) || `Dein ${sanitize(result.name, 20) || "Creator"}`,
+    gender,
+    signature: sanitize(result.signature, 30) || fallbackSignature,
   };
 }
 
