@@ -11,6 +11,7 @@ import {
 } from "@/lib/recipes";
 import { getServerSupabase } from "@/lib/supabase-server";
 import { renderPackPdf, renderRecipePdf } from "./render";
+import { regeneratePackMeta } from "@/lib/ai/regenerate-pack-meta";
 
 export type PdfJobType = "recipe" | "pack";
 
@@ -169,6 +170,43 @@ export async function processJob(jobId: string): Promise<void> {
       storagePath = `${pack.slug}__${recipe.slug}.pdf`;
       downloadName = `${safeFilename(recipe.title)}.pdf`;
     } else {
+      // BLOCK-ON-SYNC: vor dem Pack-Render synchron sicherstellen, dass
+      // pack.foreword + title/subtitle/tagline/description die AKTUELLE
+      // Recipe-Liste reflektieren. Verhindert die Race-Condition wo der
+      // User direkt nach Recipe-Mutation Pack-PDF downloadet — der
+      // fire-and-forget triggerPackMetaSync wäre dann oft noch nicht
+      // fertig (Gemini ~5-15s) und das PDF würde mit stale foreword
+      // rendern (Lügen-Vorwort: gelöschte Rezepte stehen noch drin).
+      //
+      // force=true ignoriert pack.editedFields[] — bei einem PDF-Download
+      // wollen wir IMMER aktuelle Texte, auch wenn der User vorher manuell
+      // am Vorwort editiert hat. Sonst landen Inkonsistenzen im Druck.
+      //
+      // Wenn die Re-Generation failt (Gemini-Outage, Network), rendern
+      // wir trotzdem weiter mit den alten Texten. Nicht-fatal.
+      await supabase
+        .from("pdf_jobs")
+        .update({ stage: "syncing-foreword", progress: 12 })
+        .eq("id", jobId);
+      try {
+        const sync = await regeneratePackMeta(
+          job.brand_slug,
+          job.pack_slug,
+          { force: true }
+        );
+        if (sync.changed && sync.pack) {
+          // Pack-Reference auf den frischen Stand setzen, damit der
+          // anschließende Render und die Filename-Generation den neuen
+          // title verwendet.
+          Object.assign(pack, sync.pack);
+        }
+      } catch (err) {
+        console.warn(
+          "[pdf-jobs] pre-render foreword sync failed (non-fatal):",
+          err instanceof Error ? err.message : err
+        );
+      }
+
       // Pack PDF includes curated recipes + any custom cards saved into this
       // pack, MINUS any curated cards the user hid from the web grid. Without
       // the hidden filter the PDF would re-introduce deleted-feeling cards
