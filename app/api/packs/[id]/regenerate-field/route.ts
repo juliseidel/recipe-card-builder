@@ -6,7 +6,7 @@ import { generatePackMeta } from "@/lib/ai/generate-pack-meta";
 import { generatePackForeword } from "@/lib/ai/generate-foreword";
 import { generatePackCover } from "@/lib/ai/generate-pack-cover";
 import { generateForewordImage } from "@/lib/ai/generate-foreword-image";
-import { getRecipesForPack } from "@/lib/recipes";
+import { loadVisibleRecipesForPack, type Recipe } from "@/lib/recipes";
 import type { Pack } from "@/lib/packs";
 import type { ReelRow } from "@/lib/creator-reels-server";
 
@@ -62,16 +62,21 @@ async function loadPackAndContext(id: string): Promise<{
 // Re-Generate-Hilfe: lade die Recipes des Packs als "Reel-aehnliche" Inputs
 // fuer generatePackMeta. Generierte/Custom-Rezepte haben keine Reel-Row, also
 // adaptieren wir die Recipe-Daten in das vom Generator erwartete Schema.
+// loadVisibleRecipesForPack mischt static + custom + hidden-Filter, damit
+// auch Custom-Packs (komplett vom User erstellt) eine korrekte Recipe-Liste
+// liefern. Vorher nutzte das hier getRecipesForPack direkt, was bei
+// Custom-Packs eine leere Liste lieferte und die Gemini-Generation blind
+// machte (User-Report: "Re-Roll Vorwort zeigt immer noch geloeschtes Rezept").
 async function recipesAsReelInputs(
-  _brandSlug: string,
+  brandSlug: string,
   packSlug: string
 ): Promise<ReelRow[]> {
-  const recipes = await getRecipesForPack(packSlug);
+  const recipes = await loadVisibleRecipesForPack(brandSlug, packSlug);
   // Adapter: Recipe → ReelRow-Subset (nur Felder die generatePackMeta nutzt:
   // recipe_title, caption, meal_type, cuisine, main_ingredient).
   return recipes.map((r, idx) => ({
     id: `recipe-${idx}-${r.slug}`,
-    brand_slug: _brandSlug,
+    brand_slug: brandSlug,
     ig_id: r.slug,
     post_url: r.sourceUrl ?? null,
     type: "Video",
@@ -157,7 +162,11 @@ export async function POST(req: Request, { params }: RouteParams) {
 
   // ─── Foreword-Text (komplett: greeting+story+signoff+outro) ─────────────
   if (field === "foreword") {
-    const recipes = await getRecipesForPack(ctx.pack.slug);
+    // loadVisibleRecipesForPack: static + custom + hidden-Filter. Vorher
+    // nutzte das hier getRecipesForPack direkt, was bei Custom-Packs
+    // (komplett vom User erstellt) eine leere Liste zurueckgab — der
+    // Re-Roll-Button hatte damit denselben Bug wie der Auto-Sync.
+    const recipes = await loadVisibleRecipesForPack(ctx.brandSlug, ctx.pack.slug);
     const recipeTitles = recipes.map((r) => r.title);
     try {
       const foreword = await generatePackForeword(ctx.pack, brand, recipeTitles);

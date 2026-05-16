@@ -1962,6 +1962,73 @@ export async function getRecipesForPack(
   });
 }
 
+// Laedt ALLE fuer den Pack-PDF-Render sichtbaren Recipes — static aus
+// Code-Brand PLUS custom aus Supabase, minus die vom User versteckten
+// static. Spiegelt EXAKT die Logik aus lib/pdf/job-runner.ts (Pack-PDF-
+// Render), sodass KI-Generation und PDF-Output IMMER dieselbe Recipe-
+// Liste sehen.
+//
+// WICHTIG: getRecipesForPack() returnt allein NUR Code-Recipes (per Design
+// — sonst Doubling im Web-Renderer). Custom-Packs (komplett vom User
+// erstellt) haetten damit eine leere Liste, was alle Recipe-bewussten
+// KI-Pipelines (Pack-Meta, Foreword, Re-Roll) blind macht.
+//
+// Diese Funktion ist die Single-Source-of-Truth fuer "welche Recipes
+// sind im Pack" — nutzen muessen sie alle KI-Trigger-Routes:
+//   - /api/packs/regenerate-meta (Auto-Sync nach Recipe-Mutation)
+//   - /api/packs/[id]/regenerate-field (manueller Re-Roll)
+//   - /api/packs/enrich (initial-Generation, hat es schon richtig gemacht
+//     via direkter Supabase-Query)
+export async function loadVisibleRecipesForPack(
+  brandSlug: string,
+  packSlug: string
+): Promise<Recipe[]> {
+  const staticPromise = getRecipesForPack(packSlug);
+  // Lazy-Imports vermeiden Edge-Runtime-Probleme — supabase-server +
+  // hidden-recipes sind Node-only Module.
+  const { hasServerSupabase, getServerSupabase } = await import(
+    "./supabase-server"
+  );
+  if (!hasServerSupabase()) return staticPromise;
+
+  const supabase = getServerSupabase();
+  const [staticRecipes, customRowsResult, hiddenRowsResult] = await Promise.all([
+    staticPromise,
+    supabase
+      .from("recipes")
+      .select("data, created_at")
+      .eq("pack_slug", packSlug)
+      .eq("is_custom", true),
+    supabase
+      .from("hidden_recipes")
+      .select("recipe_slug")
+      .eq("brand_slug", brandSlug)
+      .eq("pack_slug", packSlug),
+  ]);
+
+  const hiddenSlugs = new Set(
+    (hiddenRowsResult.data ?? [])
+      .map((r: { recipe_slug: string | null }) => r.recipe_slug ?? null)
+      .filter((s: string | null): s is string => Boolean(s))
+  );
+  const visibleStatic = staticRecipes.filter((r) => !hiddenSlugs.has(r.slug));
+
+  const customRecipes: MergeableCustom[] = [];
+  for (const row of (customRowsResult.data ?? []) as Array<{
+    data: Recipe | null;
+    created_at: string;
+  }>) {
+    const recipe = row.data;
+    if (!recipe) continue;
+    customRecipes.push({
+      ...recipe,
+      createdAt: new Date(row.created_at).getTime(),
+    });
+  }
+
+  return mergeAndRenumber(visibleStatic, customRecipes);
+}
+
 export async function getRecipe(
   packSlug: string,
   recipeSlug: string
