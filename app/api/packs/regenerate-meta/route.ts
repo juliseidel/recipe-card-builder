@@ -4,12 +4,7 @@ import { updateCustomPackData, findCustomPackIdBySlug } from "@/lib/custom-packs
 import { loadBrand } from "@/lib/custom-brands-server";
 import { generatePackMeta } from "@/lib/ai/generate-pack-meta";
 import { generatePackForeword } from "@/lib/ai/generate-foreword";
-import {
-  getRecipesForPack,
-  mergeAndRenumber,
-  type MergeableCustom,
-  type Recipe,
-} from "@/lib/recipes";
+import { loadVisibleRecipesForPack, type Recipe } from "@/lib/recipes";
 import type { Pack } from "@/lib/packs";
 import type { ReelRow } from "@/lib/creator-reels-server";
 
@@ -68,60 +63,9 @@ async function loadPack(opts: Body): Promise<{
   };
 }
 
-// Lädt ALLE für den Pack-PDF-Render sichtbaren Recipes — static aus Code-
-// Brand PLUS custom aus Supabase, minus die vom User versteckten static.
-// Spiegelt exakt die Logik aus lib/pdf/job-runner.ts (Pack-PDF-Render),
-// sodass die KI-Generation immer die selbe Recipe-Liste sieht, die im PDF
-// landet.
-//
-// KRITISCH fuer regenerate-meta: getRecipesForPack() allein returnt NUR
-// Code-Recipes (per Design — sonst Doubling im Web-Renderer). Bei einem
-// komplett custom-erstellten Pack waere die Liste leer und das Foreword
-// wuerde mit "REZEPTE im Pack: (leer)" generiert. Folge: die KI haette
-// keine Anker fuer die story und koennte weder Adds noch Deletes
-// reflektieren. Genau dieser Bug hat dazu gefuehrt, dass User-Reports
-// sagen: "ich loesche ein Rezept, aber das Vorwort erwaehnt es weiter".
-async function loadVisibleRecipesForPack(
-  brandSlug: string,
-  packSlug: string
-): Promise<Recipe[]> {
-  const staticPromise = getRecipesForPack(packSlug);
-  if (!hasServerSupabase()) return staticPromise;
-
-  const supabase = getServerSupabase();
-  const [staticRecipes, customRowsResult, hiddenRowsResult] = await Promise.all([
-    staticPromise,
-    supabase
-      .from("recipes")
-      .select("data, created_at")
-      .eq("pack_slug", packSlug)
-      .eq("is_custom", true),
-    supabase
-      .from("hidden_recipes")
-      .select("recipe_slug")
-      .eq("brand_slug", brandSlug)
-      .eq("pack_slug", packSlug),
-  ]);
-
-  const hiddenSlugs = new Set(
-    (hiddenRowsResult.data ?? [])
-      .map((r) => r.recipe_slug as string | undefined)
-      .filter((s): s is string => Boolean(s))
-  );
-  const visibleStatic = staticRecipes.filter((r) => !hiddenSlugs.has(r.slug));
-
-  const customRecipes: MergeableCustom[] = [];
-  for (const row of customRowsResult.data ?? []) {
-    const recipe = row.data as Recipe | undefined;
-    if (!recipe) continue;
-    customRecipes.push({
-      ...recipe,
-      createdAt: new Date(row.created_at as string).getTime(),
-    });
-  }
-
-  return mergeAndRenumber(visibleStatic, customRecipes);
-}
+// loadVisibleRecipesForPack ist jetzt zentral in lib/recipes.ts — nicht
+// mehr inline hier, damit /api/packs/[id]/regenerate-field denselben
+// Helper nutzen kann.
 
 async function recipesAsReelInputs(
   recipes: Recipe[],
