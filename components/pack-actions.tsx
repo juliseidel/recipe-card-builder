@@ -4,6 +4,7 @@ import type { Pack } from "@/lib/packs";
 import { PdfExportButton } from "./pdf-export-button";
 import { PackDeleteButton } from "./pack-delete-button";
 import { PackCoverRerollButton } from "./pack-cover-reroll-button";
+import { PackForewordRerollButton } from "./pack-foreword-reroll-button";
 
 type PackActionsProps = {
   brand: Brand;
@@ -49,6 +50,16 @@ export function PackActions({ brand, pack, customPackId }: PackActionsProps) {
             >
               Pack bearbeiten
             </Link>
+          ) : null}
+          {customPackId ? (
+            <PackForewordRerollButton
+              packId={customPackId}
+              tint={{
+                bg: pack.mood.background,
+                ink: pack.mood.ink,
+                accent: pack.mood.accent,
+              }}
+            />
           ) : null}
           {customPackId ? (
             <PackCoverRerollButton

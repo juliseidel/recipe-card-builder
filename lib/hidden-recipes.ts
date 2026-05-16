@@ -50,7 +50,10 @@ export async function hideRecipe(
     return false;
   }
   // Soft-Delete eines Bienen-Rezepts aendert den Pack-Inhalt → Auto-Sync
-  triggerPackMetaSync(brandSlug, packSlug);
+  // mit force=true: ein verstecktes Rezept darf nicht im Vorwort
+  // namentlich erwaehnt bleiben, auch wenn der User vorher manuell
+  // editiert hat.
+  triggerPackMetaSync(brandSlug, packSlug, { force: true });
   return true;
 }
 
@@ -71,6 +74,8 @@ export async function restoreRecipe(
     console.error("[hidden-recipes] restoreRecipe", error);
     return false;
   }
-  triggerPackMetaSync(brandSlug, packSlug);
+  // force=true: wiederhergestelltes Rezept darf im Vorwort auftauchen
+  // auch wenn der User vorher manuell editiert hat.
+  triggerPackMetaSync(brandSlug, packSlug, { force: true });
   return true;
 }

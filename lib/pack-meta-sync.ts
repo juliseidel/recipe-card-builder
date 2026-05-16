@@ -15,13 +15,23 @@
 
 export function triggerPackMetaSync(
   brandSlug: string,
-  packSlug: string
+  packSlug: string,
+  opts?: { force?: boolean }
 ): void {
   // void: explizit fire-and-forget, kein await
   void fetch("/api/packs/regenerate-meta", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ brandSlug, packSlug }),
+    body: JSON.stringify({
+      brandSlug,
+      packSlug,
+      // force=true ignoriert pack.editedFields[] und regeneriert auch
+      // Felder die der User manuell editiert hat. Bei Recipe-Add/Delete
+      // ist das gewollt: das Vorwort darf NIEMALS gelöschte Rezepte
+      // namentlich erwähnen, auch wenn der User es vorher manuell
+      // umformuliert hat. Sonst landen Lügen-Vorworte im Druck-PDF.
+      ...(opts?.force ? { force: true } : {}),
+    }),
     // keepalive=true: das fetch ueberlebt die aktuelle Page-Navigation,
     // sodass auch ein "speichern + zum Pack-Grid navigieren" den Sync nicht
     // canceled.
