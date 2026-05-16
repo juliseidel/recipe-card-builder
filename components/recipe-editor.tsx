@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type Brand } from "@/lib/brands";
@@ -287,6 +287,19 @@ export function RecipeEditor({
   const [hideMicros, setHideMicros] = useState<boolean>(
     er?.tweaks?.hideMicros ?? false
   );
+  // Titel-Groesse: 3-Stufen-Mapping auf den recipe.tweaks.titleScale Number
+  // (-2..+2). Der User waehlt zwischen klein/normal/gross — fein-granulare
+  // Zwischenwerte (-1, +1) sind im Editor bewusst nicht exponiert, weil
+  // sie keinen sichtbaren Mehrwert bringen und nur die UI vollstopfen.
+  const [titleSize, setTitleSize] = useState<"smaller" | "normal" | "larger">(
+    (er?.tweaks?.titleScale ?? 0) <= -1
+      ? "smaller"
+      : (er?.tweaks?.titleScale ?? 0) >= 1
+        ? "larger"
+        : "normal"
+  );
+  const titleScaleValue: -2 | 0 | 2 =
+    titleSize === "smaller" ? -2 : titleSize === "larger" ? 2 : 0;
 
   // PDF-Live-Preview. blobUrl wird vom Render-Endpoint gesetzt und im
   // <iframe> als src verwendet. previousBlobUrl wird beim naechsten
@@ -420,7 +433,10 @@ export function RecipeEditor({
       // den Effekt vor dem Speichern sieht. Wir packen nur die nicht-
       // default Werte rein, damit der Recipe-Type bei "auto/aus" leer
       // bleibt und nicht gespeicherte Defaults trägt.
-      ...(densityOverride !== "auto" || hideStory || hideMicros
+      ...(densityOverride !== "auto" ||
+      hideStory ||
+      hideMicros ||
+      titleScaleValue !== 0
         ? {
             tweaks: {
               ...(densityOverride !== "auto"
@@ -428,6 +444,9 @@ export function RecipeEditor({
                 : {}),
               ...(hideStory ? { hideStory: true } : {}),
               ...(hideMicros ? { hideMicros: true } : {}),
+              ...(titleScaleValue !== 0
+                ? { titleScale: titleScaleValue }
+                : {}),
             },
           }
         : {}),
@@ -455,6 +474,7 @@ export function RecipeEditor({
     densityOverride,
     hideStory,
     hideMicros,
+    titleScaleValue,
   ]);
 
   // Required fields tracking — used for save-button counter
@@ -574,6 +594,81 @@ export function RecipeEditor({
     setImportedReconciliation(null);
   };
 
+  // PDF-Live-Preview-Refresh: POST current Recipe-State → binary PDF →
+  // Blob-URL → iframe.src. Vorheriger Blob wird revoked.
+  //
+  // Wird sowohl manuell vom Button getriggert als auch automatisch nach
+  // jeder Aenderung am previewRecipe (debounced 2s im useEffect unten).
+  // AbortController sorgt dafuer, dass bei schnellem Tippen der vorige
+  // Fetch abgebrochen wird, statt dass mehrere Renders parallel laufen
+  // und der zuletzt antwortende die UI uebernimmt.
+  //
+  // WICHTIG: Diese Hooks muessen VOR den early-returns weiter unten
+  // stehen, sonst Hook-Rules-Verletzung (react-hooks/rules-of-hooks).
+  const pdfPreviewAbortRef = useRef<AbortController | null>(null);
+  const refreshPdfPreview = useCallback(async () => {
+    if (!brand || !pack || !previewRecipe) return;
+    pdfPreviewAbortRef.current?.abort();
+    const controller = new AbortController();
+    pdfPreviewAbortRef.current = controller;
+    setPdfPreviewLoading(true);
+    setPdfPreviewError(null);
+    try {
+      const res = await fetch("/api/pdf/preview-recipe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brandSlug: brand.slug,
+          packSlug: pack.slug,
+          recipe: previewRecipe,
+          totalRecipes: pack.recipeCount,
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        let msg = `Render fehlgeschlagen (${res.status})`;
+        try {
+          const j = (await res.json()) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          /* response wasn't JSON */
+        }
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      if (previousPdfBlobUrlRef.current) {
+        URL.revokeObjectURL(previousPdfBlobUrlRef.current);
+      }
+      previousPdfBlobUrlRef.current = url;
+      setPdfPreviewBlobUrl(url);
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        // Vorheriger Fetch wurde vom naechsten ersetzt — kein User-facing Fehler.
+        return;
+      }
+      setPdfPreviewError(
+        err instanceof Error ? err.message : "PDF-Render fehlgeschlagen."
+      );
+    } finally {
+      if (pdfPreviewAbortRef.current === controller) {
+        setPdfPreviewLoading(false);
+      }
+    }
+  }, [brand, pack, previewRecipe]);
+
+  // Auto-Refresh: 2s Debounce nach jeder Aenderung am previewRecipe.
+  // Sobald sich was am Recipe aendert (Titel, Zutaten, Tweaks etc.),
+  // wird nach 2s Pause automatisch eine neue PDF-Vorschau gerendert.
+  // Beim Tippen werden vorherige Timer und laufende Fetches gecancelt.
+  useEffect(() => {
+    if (!previewRecipe) return;
+    const timer = setTimeout(() => {
+      void refreshPdfPreview();
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [refreshPdfPreview, previewRecipe]);
+
   if (brand === undefined) {
     return (
       <div className="flex min-h-screen flex-col">
@@ -626,7 +721,10 @@ export function RecipeEditor({
     // take over the rendering without disturbing the rest of the pack.
     if (isEditMode && editing && !editing.id) {
       const hasTweaks =
-        densityOverride !== "auto" || hideStory || hideMicros;
+        densityOverride !== "auto" ||
+        hideStory ||
+        hideMicros ||
+        titleScaleValue !== 0;
       const tweaks = hasTweaks
         ? {
             ...(densityOverride !== "auto"
@@ -634,6 +732,9 @@ export function RecipeEditor({
               : {}),
             ...(hideStory ? { hideStory: true } : {}),
             ...(hideMicros ? { hideMicros: true } : {}),
+            ...(titleScaleValue !== 0
+              ? { titleScale: titleScaleValue }
+              : {}),
           }
         : undefined;
 
@@ -707,7 +808,10 @@ export function RecipeEditor({
       // vom Default. Sonst löschen wir das Feld komplett, damit gespeicherte
       // Recipes ohne Tweaks nicht mit leerem Objekt im JSONB landen.
       const hasTweaks =
-        densityOverride !== "auto" || hideStory || hideMicros;
+        densityOverride !== "auto" ||
+        hideStory ||
+        hideMicros ||
+        titleScaleValue !== 0;
       const tweaks = hasTweaks
         ? {
             ...(densityOverride !== "auto"
@@ -715,6 +819,9 @@ export function RecipeEditor({
               : {}),
             ...(hideStory ? { hideStory: true } : {}),
             ...(hideMicros ? { hideMicros: true } : {}),
+            ...(titleScaleValue !== 0
+              ? { titleScale: titleScaleValue }
+              : {}),
           }
         : undefined;
 
@@ -854,49 +961,9 @@ export function RecipeEditor({
     }, 350);
   };
 
-  // PDF-Live-Preview-Refresh: POST current Recipe-State → binary PDF →
-  // Blob-URL → iframe.src. Manueller Trigger (Button), nicht onChange, weil
-  // ein single-recipe-Render 3-10s dauert. Vorheriger Blob wird revoked.
-  const refreshPdfPreview = async () => {
-    if (!brand || !pack || !previewRecipe) return;
-    setPdfPreviewLoading(true);
-    setPdfPreviewError(null);
-    try {
-      const res = await fetch("/api/pdf/preview-recipe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          brandSlug: brand.slug,
-          packSlug: pack.slug,
-          recipe: previewRecipe,
-          totalRecipes: pack.recipeCount,
-        }),
-      });
-      if (!res.ok) {
-        let msg = `Render fehlgeschlagen (${res.status})`;
-        try {
-          const j = (await res.json()) as { error?: string };
-          if (j.error) msg = j.error;
-        } catch {
-          /* response wasn't JSON */
-        }
-        throw new Error(msg);
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      if (previousPdfBlobUrlRef.current) {
-        URL.revokeObjectURL(previousPdfBlobUrlRef.current);
-      }
-      previousPdfBlobUrlRef.current = url;
-      setPdfPreviewBlobUrl(url);
-    } catch (err) {
-      setPdfPreviewError(
-        err instanceof Error ? err.message : "PDF-Render fehlgeschlagen."
-      );
-    } finally {
-      setPdfPreviewLoading(false);
-    }
-  };
+  // refreshPdfPreview wird oben vor den early-returns als useCallback
+  // definiert, weil React-Hooks-Rules das verlangen. Hier nur noch
+  // referenziert — keine Re-Definition.
 
   // Tag operations — accept both pre-defined chips and free-typed tags.
   const addTag = (raw: string) => {
@@ -1447,6 +1514,42 @@ export function RecipeEditor({
                       onChange={setHideMicros}
                       accent={pack.mood.accent}
                     />
+                  </Field>
+
+                  <Field
+                    label="Titel-Größe"
+                    hint="Macht den Rezept-Titel auf der Karte etwas größer oder kleiner. Hilfreich bei sehr langen oder sehr kurzen Titeln."
+                  >
+                    <div className="flex flex-wrap gap-2">
+                      {(
+                        [
+                          { id: "smaller", label: "Kleiner" },
+                          { id: "normal", label: "Normal" },
+                          { id: "larger", label: "Größer" },
+                        ] as const
+                      ).map((opt) => {
+                        const active = titleSize === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => setTitleSize(opt.id)}
+                            className="rounded-full border px-4 py-1.5 text-[13px] font-medium transition-colors"
+                            style={{
+                              borderColor: active
+                                ? pack.mood.accent
+                                : pack.mood.ink + "20",
+                              background: active
+                                ? pack.mood.accent
+                                : "transparent",
+                              color: active ? "#fff" : pack.mood.inkSoft,
+                            }}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </Field>
                 </div>
               </section>
@@ -2118,15 +2221,13 @@ export function RecipeEditor({
                 className="text-[11px] font-semibold uppercase tracking-[0.18em]"
                 style={{ color: brand.tokens.inkMuted }}
               >
-                Live-Vorschau
+                Schnellansicht
               </span>
               <span
                 className="text-[11px]"
                 style={{ color: brand.tokens.inkMuted }}
               >
-                {previewMode === "thumbnail"
-                  ? "so erscheint sie im Pack"
-                  : "so sieht die Karte geöffnet aus"}
+                Druck-Layout kann leicht abweichen
               </span>
             </div>
 
@@ -2169,11 +2270,11 @@ export function RecipeEditor({
               )
             ) : null}
 
-            {/* PDF-Live-Preview: rendert die Karte server-side eins-zu-eins
-                wie beim PDF-Download. 3-10s pro Render — daher button-
-                triggered statt onChange. Beim ersten Render zeigt die
-                Sektion nur den Aktualisieren-Button; ab dem zweiten ist
-                der vorige Blob noch im iframe und wird beim Klick ersetzt. */}
+            {/* Druck-Vorschau: rendert die Karte server-side eins-zu-eins
+                wie beim PDF-Download. Aktualisiert sich automatisch
+                2 Sekunden nach jeder Aenderung am Recipe (Debounce im
+                useEffect oben). Der manuelle "Jetzt aktualisieren"-Button
+                ist als Notnagel da falls der User nicht warten will. */}
             <div
               className="mt-5 rounded-2xl border p-4"
               style={{
@@ -2186,75 +2287,74 @@ export function RecipeEditor({
                   className="text-[11px] font-semibold uppercase tracking-[0.16em]"
                   style={{ color: brand.tokens.inkMuted }}
                 >
-                  PDF-Vorschau
+                  Druck-Vorschau
                 </span>
                 <span
                   className="text-[11px]"
                   style={{ color: brand.tokens.inkMuted }}
                 >
-                  eins-zu-eins wie der Download
+                  {pdfPreviewLoading
+                    ? "Wird aktualisiert…"
+                    : pdfPreviewBlobUrl
+                      ? "exakt wie der Download"
+                      : "wird gleich gerendert…"}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => void refreshPdfPreview()}
-                disabled={pdfPreviewLoading || !previewRecipe}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2 text-[13px] font-medium transition-colors disabled:opacity-50"
-                style={{
-                  background: pack.mood.ink,
-                  color: pack.mood.background,
-                }}
-              >
-                {pdfPreviewLoading ? (
-                  <>
-                    <span className="inline-block size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    Rendere PDF…
-                  </>
-                ) : pdfPreviewBlobUrl ? (
-                  <>
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 14 14"
-                      fill="none"
-                      aria-hidden
+              {pdfPreviewBlobUrl ? (
+                <div
+                  className="relative overflow-hidden rounded-xl border"
+                  style={{
+                    borderColor: brand.tokens.line,
+                    aspectRatio: "210 / 297",
+                  }}
+                >
+                  <iframe
+                    src={pdfPreviewBlobUrl}
+                    title="Druck-Vorschau der Rezeptkarte"
+                    className="h-full w-full"
+                  />
+                  {pdfPreviewLoading ? (
+                    <div
+                      className="absolute inset-0 flex items-center justify-center backdrop-blur-[1px]"
+                      style={{ background: brand.tokens.surface + "B0" }}
                     >
-                      <path
-                        d="M1.5 7a5.5 5.5 0 1011 0 5.5 5.5 0 00-11 0zM7 4v3l2 2"
-                        stroke="currentColor"
-                        strokeWidth="1.4"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    Vorschau aktualisieren
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 14 14"
-                      fill="none"
-                      aria-hidden
-                    >
-                      <path
-                        d="M3 3h8v8H3z"
-                        stroke="currentColor"
-                        strokeWidth="1.4"
-                      />
-                      <path
-                        d="M5.5 6L7 7.5 9 5.5"
-                        stroke="currentColor"
-                        strokeWidth="1.4"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    PDF rendern
-                  </>
-                )}
-              </button>
+                      <div
+                        className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[12px] font-medium shadow-sm"
+                        style={{
+                          background: pack.mood.ink,
+                          color: pack.mood.background,
+                        }}
+                      >
+                        <span className="inline-block size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        Aktualisiere Druck-Vorschau…
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div
+                  className="flex items-center justify-center rounded-xl border"
+                  style={{
+                    borderColor: brand.tokens.line,
+                    aspectRatio: "210 / 297",
+                    background: brand.tokens.surface,
+                  }}
+                >
+                  <div
+                    className="inline-flex items-center gap-2 text-[12px]"
+                    style={{ color: brand.tokens.inkMuted }}
+                  >
+                    {pdfPreviewLoading ? (
+                      <>
+                        <span className="inline-block size-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        Erste Druck-Vorschau wird gerendert…
+                      </>
+                    ) : (
+                      "Druck-Vorschau wird gleich geladen…"
+                    )}
+                  </div>
+                </div>
+              )}
               {pdfPreviewError ? (
                 <p
                   className="mt-3 text-[12px]"
@@ -2263,29 +2363,34 @@ export function RecipeEditor({
                   {pdfPreviewError}
                 </p>
               ) : null}
-              {pdfPreviewBlobUrl ? (
-                <div
-                  className="mt-3 overflow-hidden rounded-xl border"
-                  style={{
-                    borderColor: brand.tokens.line,
-                    aspectRatio: "210 / 297",
-                  }}
+              <button
+                type="button"
+                onClick={() => void refreshPdfPreview()}
+                disabled={pdfPreviewLoading || !previewRecipe}
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border px-4 py-2 text-[12px] font-medium transition-colors disabled:opacity-50"
+                style={{
+                  borderColor: pack.mood.ink + "30",
+                  color: pack.mood.inkSoft,
+                  background: "transparent",
+                }}
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 14 14"
+                  fill="none"
+                  aria-hidden
                 >
-                  <iframe
-                    src={pdfPreviewBlobUrl}
-                    title="PDF-Vorschau der Rezeptkarte"
-                    className="h-full w-full"
+                  <path
+                    d="M11 5a4.5 4.5 0 10-1.2 3.4M11 2v3h-3"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   />
-                </div>
-              ) : (
-                <p
-                  className="mt-3 text-[12px] leading-snug"
-                  style={{ color: brand.tokens.inkMuted }}
-                >
-                  Klicke auf „PDF rendern", um die fertige Karte als A4-PDF
-                  zu sehen. Der Render dauert 3-10 Sekunden.
-                </p>
-              )}
+                </svg>
+                Jetzt aktualisieren
+              </button>
             </div>
 
             {/* Pflicht-Checklist */}
