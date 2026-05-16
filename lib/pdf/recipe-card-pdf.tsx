@@ -300,7 +300,7 @@ function EditorialPage({
             <Text
               style={{
                 fontFamily: "Fraunces",
-                fontSize: titleFontSize,
+                fontSize: titleFontSize + titleFontSizeOffset(recipe),
                 lineHeight: 1.02,
                 letterSpacing: -0.3,
                 color: t.ink,
@@ -378,7 +378,9 @@ function EditorialPage({
           after the title, with mini progress bars. No other pack gives
           micros this kind of editorial billing — they're always tucked
           into the footer strip. */}
-      <EditorialMicrosBanner recipe={recipe} theme={t} density={density} />
+      {shouldShowMicros(recipe) ? (
+        <EditorialMicrosBanner recipe={recipe} theme={t} density={density} />
+      ) : null}
 
       {/* 4-TILE STATS BAR — Portionen · kcal · Eiweiß · Zeit */}
       <View
@@ -427,7 +429,7 @@ function EditorialPage({
       {/* BIENES STORY — pull-quote with «»-quotes, honey-tinted.
           Density-aware padding: bei compact reduzieren wir den Block
           damit lange Recipes auf eine Seite passen. */}
-      {recipe.description ? (
+      {shouldShowStory(recipe) && recipe.description ? (
         <View
           style={{
             paddingHorizontal: 32,
@@ -818,7 +820,7 @@ function PatisseriePage({
               style={{
                 fontFamily: "Fraunces",
                 fontStyle: "italic",
-                fontSize: titleFontSize,
+                fontSize: titleFontSize + titleFontSizeOffset(recipe),
                 lineHeight: 1.02,
                 letterSpacing: -0.5,
                 color: t.ink,
@@ -870,7 +872,7 @@ function PatisseriePage({
                 differentiates Pack 1 from every other pack: micros aren't
                 a footer banner, they're a sidebar block with the pack
                 accent driving the % bars. Up to 8 entries shown. */}
-            {micros.length > 0 ? (
+            {shouldShowMicros(recipe) && micros.length > 0 ? (
               <View style={{ marginTop: 18 }}>
                 <Text
                   style={{
@@ -2304,7 +2306,7 @@ function SportPage({
             style={{
               fontFamily: "Fraunces",
               fontStyle: "italic",
-              fontSize: d.titleFontSize,
+              fontSize: d.titleFontSize + titleFontSizeOffset(recipe),
               lineHeight: 1.02,
               letterSpacing: -0.3,
               color: t.ink,
@@ -2977,7 +2979,7 @@ function DashboardPage({
           <Text
             style={{
               fontFamily: "Fraunces",
-              fontSize: d.titleFontSize,
+              fontSize: d.titleFontSize + titleFontSizeOffset(recipe),
               lineHeight: 1.04,
               letterSpacing: -0.3,
               color: t.ink,
@@ -3399,7 +3401,7 @@ function VitalPage({
             style={{
               fontFamily: "Fraunces",
               fontStyle: "italic",
-              fontSize: d.titleFontSize,
+              fontSize: d.titleFontSize + titleFontSizeOffset(recipe),
               lineHeight: 1.02,
               letterSpacing: -0.3,
               color: t.ink,
@@ -3586,7 +3588,7 @@ function VitalPage({
           </View>
 
           {/* Mikros als horizontaler Pearl-Strip rechts */}
-          {micros.length > 0 ? (
+          {shouldShowMicros(recipe) && micros.length > 0 ? (
             <View
               style={{
                 flex: 1,
@@ -4344,7 +4346,7 @@ function AmberPage({
           style={{
             fontFamily: "Fraunces",
             fontStyle: "italic",
-            fontSize: d.titleFontSize,
+            fontSize: d.titleFontSize + titleFontSizeOffset(recipe),
             lineHeight: 1.04,
             letterSpacing: -0.4,
             color: t.ink,
@@ -4679,7 +4681,7 @@ function AmberPage({
       </View>
 
       {/* MIKROS als VERTIKALE BAR-LIST */}
-      {micros.length > 0 ? (
+      {shouldShowMicros(recipe) && micros.length > 0 ? (
         <View
           style={{
             paddingTop: 7,
@@ -5605,7 +5607,12 @@ function MicrosStrip({
   padTop?: number;
   padBottom?: number;
 }) {
-  const micros = recipe?.nutrition?.micros;
+  // visibleMicros respektiert recipe.tweaks.hideMicros zentral — bei
+  // hideMicros: true gibt's ein leeres Array zurueck, der early-return
+  // schluckt die ganze Strip. Damit wirkt der User-Toggle "Mikros
+  // ausblenden" automatisch in allen Layouts die diesen Shared-Footer
+  // nutzen (Patisserie/Sport/Dashboard/Vital ueber CardFooter).
+  const micros = recipe ? visibleMicros(recipe) : null;
   if (!micros || micros.length === 0) return null;
   // Top 8 micros — keeps the strip to one wrapping row even on long recipes
   const top = [...micros]
@@ -6025,7 +6032,7 @@ function NewspaperPage({
           <Text
             style={{
               fontFamily: "Fraunces",
-              fontSize: D.headlineFontSize,
+              fontSize: D.headlineFontSize + titleFontSizeOffset(recipe),
               fontWeight: 700,
               fontStyle: "italic",
               color: theme.ink,
@@ -6288,7 +6295,7 @@ function NewspaperPage({
           </View>
         </View>
         {/* MIKROS — dezenter, kompakter Block darunter mit Trennlinie */}
-        {topMicros.length > 0 ? (
+        {shouldShowMicros(recipe) && topMicros.length > 0 ? (
           <View>
             <View
               style={{
@@ -7198,7 +7205,7 @@ function RestaurantPage({
         <Text
           style={{
             fontFamily: "Fraunces",
-            fontSize: D.titleFontSize,
+            fontSize: D.titleFontSize + titleFontSizeOffset(recipe),
             fontStyle: "italic",
             fontWeight: 600,
             color: RESTAURANT_COLORS.ink,
@@ -7510,7 +7517,7 @@ function RestaurantPage({
             Sitzt oberhalb vom Footer und unterhalb vom Content. Reserviert
             durch RESTAURANT_BOTTOM_RESERVE-paddingBottom auf dem Content-
             Wrapper, damit Zutaten/Steps nie hier reinlaufen. ── */}
-      {topMicros.length > 0 ? (
+      {shouldShowMicros(recipe) && topMicros.length > 0 ? (
         <View
           style={{
             position: "absolute",
