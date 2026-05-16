@@ -12,7 +12,8 @@ import { PackPdfDocument } from "./pack-pdf";
 
 export type RenderProgress = (stage: string, percent: number) => void;
 
-// Production-Garantie: jede Single-Recipe-PDF muss genau 1 Seite haben.
+// Production-Garantie: jede Recipe-Card muss genau 1 Seite haben — egal ob
+// als Single-Recipe-PDF exportiert oder als eine von N Karten im Pack-PDF.
 // Falls die Auto-Density-Heuristik mal danebenliegt (extrem lange Steps,
 // monstroese Zutaten-Namen, riesige Story), greift dieser Render-Guard:
 // 3-stufiges Retry-System mit progressiv aggressiveren Tweaks. Cleane
@@ -49,6 +50,75 @@ const FALLBACK_TWEAKS: Array<{
   },
 ];
 
+// Findet die kleinste Tweak-Kombination, mit der ein einzelnes Recipe
+// garantiert auf 1 A4-Seite passt. Rendert dafuer das Recipe als
+// Single-Page-Document via RecipePdfDocument — genau die Page-Komponente
+// (RecipeCardPdfPage), die spaeter auch im Pack-PDF-Pfad verwendet wird,
+// sodass das Ergebnis WYSIWYG ist: passt es als Single, passt es im Pack.
+//
+// Returnt das ge-tweakte Recipe + den finalen Buffer (den der
+// Single-Recipe-Export wiederverwendet, sodass kein Doppel-Render noetig
+// ist). Wirft bei Hard-Fail mit eindeutiger Fehlermeldung.
+async function fitRecipeToOnePage(args: {
+  brand: Brand;
+  pack: Pack;
+  recipe: Recipe;
+  totalRecipes: number;
+  heroDataUri: string | null;
+  qrDataUri: string | null;
+  avatarDataUri: string | null;
+}): Promise<{ recipe: Recipe; buffer: Buffer }> {
+  const renderWithTweaks = async (
+    overrideTweaks: Recipe["tweaks"] | undefined
+  ): Promise<{ buf: Buffer; recipeForRender: Recipe }> => {
+    const recipeForRender: Recipe = overrideTweaks
+      ? {
+          ...args.recipe,
+          tweaks: {
+            ...args.recipe.tweaks,
+            ...overrideTweaks,
+          },
+        }
+      : args.recipe;
+    const buf = await renderToBuffer(
+      RecipePdfDocument({
+        brand: args.brand,
+        pack: args.pack,
+        recipe: recipeForRender,
+        totalRecipes: args.totalRecipes,
+        heroDataUri: args.heroDataUri,
+        qrDataUri: args.qrDataUri,
+        avatarDataUri: args.avatarDataUri,
+      })
+    );
+    return { buf, recipeForRender };
+  };
+
+  let result = await renderWithTweaks(undefined);
+  let pageCount = await getPageCount(result.buf);
+
+  for (const { label, tweaks } of FALLBACK_TWEAKS) {
+    if (pageCount === 1) break;
+    console.warn(
+      `[pdf-fit] ${args.recipe.slug} rendered ${pageCount} Seiten — Retry mit Fallback "${label}"`
+    );
+    result = await renderWithTweaks(tweaks);
+    pageCount = await getPageCount(result.buf);
+  }
+
+  if (pageCount !== 1) {
+    // Auch der finale Fallback hat es nicht geschafft. Hard-Fail mit klarer
+    // Diagnose damit der Editor das Recipe nachjustieren kann (Step-Texte
+    // kuerzen, Zutaten-Namen verkuerzen).
+    throw new Error(
+      `Recipe "${args.recipe.slug}" produziert ${pageCount} Seiten selbst mit maximaler Kompression. ` +
+        `Step-Texte oder Zutaten-Namen sind zu lang. Bitte im Editor kuerzen oder hideStory/hideMicros manuell setzen.`
+    );
+  }
+
+  return { recipe: result.recipeForRender, buffer: result.buf };
+}
+
 // Renders a single-recipe PDF and returns the binary buffer.
 // Production-Guard: bei Mehrseitigkeit wird automatisch mit aggressiveren
 // Tweaks neu gerendert, sodass das finale PDF garantiert 1 Seite ist.
@@ -67,61 +137,18 @@ export async function renderRecipePdf(args: {
     loadImageAsDataUri(args.brand.avatar),
   ]);
 
-  // Inner render-Funktion. Wird mit progressiv aggressiveren Tweaks
-  // wiederholt aufgerufen wenn der Guard mehrere Seiten erkennt.
-  const renderWithTweaks = async (
-    overrideTweaks: Recipe["tweaks"] | undefined
-  ): Promise<Buffer> => {
-    const recipeForRender: Recipe = overrideTweaks
-      ? {
-          ...args.recipe,
-          tweaks: {
-            ...args.recipe.tweaks,
-            ...overrideTweaks,
-          },
-        }
-      : args.recipe;
-    return await renderToBuffer(
-      RecipePdfDocument({
-        brand: args.brand,
-        pack: args.pack,
-        recipe: recipeForRender,
-        totalRecipes: args.totalRecipes,
-        heroDataUri,
-        qrDataUri,
-        avatarDataUri,
-      })
-    );
-  };
-
   args.onProgress?.("rendering", 55);
-  let buf = await renderWithTweaks(undefined);
-  let pageCount = await getPageCount(buf);
-
-  // Retry-Loop: falls Auto-Density das Recipe nicht auf 1 Seite kriegt,
-  // greifen wir auf zunehmend striktere Tweak-Kombinationen zurueck.
-  for (const { label, tweaks } of FALLBACK_TWEAKS) {
-    if (pageCount === 1) break;
-    console.warn(
-      `[renderRecipePdf] ${args.recipe.slug} rendered ${pageCount} Seiten — Retry mit Fallback "${label}"`
-    );
-    args.onProgress?.("rendering-retry", 70);
-    buf = await renderWithTweaks(tweaks);
-    pageCount = await getPageCount(buf);
-  }
-
-  if (pageCount !== 1) {
-    // Auch der finale Fallback hat es nicht geschafft. Hard-Fail mit klarer
-    // Diagnose damit der Editor das Recipe nachjustieren kann (Step-Texte
-    // kuerzen, Zutaten-Namen verkuerzen).
-    throw new Error(
-      `Recipe "${args.recipe.slug}" produziert ${pageCount} Seiten selbst mit maximaler Kompression. ` +
-        `Step-Texte oder Zutaten-Namen sind zu lang. Bitte im Editor kuerzen oder hideStory/hideMicros manuell setzen.`
-    );
-  }
-
+  const fit = await fitRecipeToOnePage({
+    brand: args.brand,
+    pack: args.pack,
+    recipe: args.recipe,
+    totalRecipes: args.totalRecipes,
+    heroDataUri,
+    qrDataUri,
+    avatarDataUri,
+  });
   args.onProgress?.("done", 100);
-  return buf;
+  return fit.buffer;
 }
 
 // Renders a full pack PDF (cover + index + recipes + nutrition).
@@ -175,12 +202,43 @@ export async function renderPackPdf(args: {
       loadImageAsDataUri(args.brand.avatar),
     ]);
 
+  // Pre-Render-Verifikation: jede Recipe-Card einzeln rendern und
+  // notfalls mit Tweaks neu rendern bis sie auf 1 Seite passt. Das
+  // Ergebnis sind Recipes mit ggf. zusaetzlich gesetzten Tweaks
+  // (densityOverride/hideStory/hideMicros), die wir gleich in
+  // PackPdfDocument einspeisen. So ist garantiert dass im finalen
+  // Pack-PDF keine einzelne Karte auf 2 Seiten umbricht — die gleiche
+  // RecipeCardPdfPage-Komponente wird hier zur Pruefung und spaeter
+  // im Pack-Render verwendet, also WYSIWYG.
+  //
+  // Sequenziell, nicht parallel: react-pdf ist CPU-bound, parallel
+  // bringt auf einem Lambda-Worker nichts und erzeugt Memory-Spikes.
+  // Bei 14 Karten ~30-45s extra im Background-Job; akzeptabel weil
+  // der Job-Runner ohnehin asynchron laeuft.
+  args.onProgress?.("verifying-recipes", 35);
+  const fittedRecipes: Recipe[] = [];
+  for (let i = 0; i < args.recipes.length; i++) {
+    const fit = await fitRecipeToOnePage({
+      brand: args.brand,
+      pack: args.pack,
+      recipe: args.recipes[i],
+      totalRecipes: args.recipes.length,
+      heroDataUri: heroDataUris[i] ?? null,
+      qrDataUri: qrDataUris[i] ?? null,
+      avatarDataUri,
+    });
+    fittedRecipes.push(fit.recipe);
+    const verifyPct =
+      35 + Math.round(((i + 1) / args.recipes.length) * 20);
+    args.onProgress?.("verifying-recipes", verifyPct);
+  }
+
   args.onProgress?.("rendering", 55);
   const buf = await renderToBuffer(
     PackPdfDocument({
       brand: args.brand,
       pack: args.pack,
-      recipes: args.recipes,
+      recipes: fittedRecipes,
       coverDataUri,
       heroDataUris,
       qrDataUris,
