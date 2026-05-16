@@ -4,7 +4,12 @@ import { updateCustomPackData, findCustomPackIdBySlug } from "@/lib/custom-packs
 import { loadBrand } from "@/lib/custom-brands-server";
 import { generatePackMeta } from "@/lib/ai/generate-pack-meta";
 import { generatePackForeword } from "@/lib/ai/generate-foreword";
-import { getRecipesForPack } from "@/lib/recipes";
+import {
+  getRecipesForPack,
+  mergeAndRenumber,
+  type MergeableCustom,
+  type Recipe,
+} from "@/lib/recipes";
 import type { Pack } from "@/lib/packs";
 import type { ReelRow } from "@/lib/creator-reels-server";
 
@@ -63,11 +68,65 @@ async function loadPack(opts: Body): Promise<{
   };
 }
 
-async function recipesAsReelInputs(
+// Lädt ALLE für den Pack-PDF-Render sichtbaren Recipes — static aus Code-
+// Brand PLUS custom aus Supabase, minus die vom User versteckten static.
+// Spiegelt exakt die Logik aus lib/pdf/job-runner.ts (Pack-PDF-Render),
+// sodass die KI-Generation immer die selbe Recipe-Liste sieht, die im PDF
+// landet.
+//
+// KRITISCH fuer regenerate-meta: getRecipesForPack() allein returnt NUR
+// Code-Recipes (per Design — sonst Doubling im Web-Renderer). Bei einem
+// komplett custom-erstellten Pack waere die Liste leer und das Foreword
+// wuerde mit "REZEPTE im Pack: (leer)" generiert. Folge: die KI haette
+// keine Anker fuer die story und koennte weder Adds noch Deletes
+// reflektieren. Genau dieser Bug hat dazu gefuehrt, dass User-Reports
+// sagen: "ich loesche ein Rezept, aber das Vorwort erwaehnt es weiter".
+async function loadVisibleRecipesForPack(
   brandSlug: string,
   packSlug: string
+): Promise<Recipe[]> {
+  const staticPromise = getRecipesForPack(packSlug);
+  if (!hasServerSupabase()) return staticPromise;
+
+  const supabase = getServerSupabase();
+  const [staticRecipes, customRowsResult, hiddenRowsResult] = await Promise.all([
+    staticPromise,
+    supabase
+      .from("recipes")
+      .select("data, created_at")
+      .eq("pack_slug", packSlug)
+      .eq("is_custom", true),
+    supabase
+      .from("hidden_recipes")
+      .select("recipe_slug")
+      .eq("brand_slug", brandSlug)
+      .eq("pack_slug", packSlug),
+  ]);
+
+  const hiddenSlugs = new Set(
+    (hiddenRowsResult.data ?? [])
+      .map((r) => r.recipe_slug as string | undefined)
+      .filter((s): s is string => Boolean(s))
+  );
+  const visibleStatic = staticRecipes.filter((r) => !hiddenSlugs.has(r.slug));
+
+  const customRecipes: MergeableCustom[] = [];
+  for (const row of customRowsResult.data ?? []) {
+    const recipe = row.data as Recipe | undefined;
+    if (!recipe) continue;
+    customRecipes.push({
+      ...recipe,
+      createdAt: new Date(row.created_at as string).getTime(),
+    });
+  }
+
+  return mergeAndRenumber(visibleStatic, customRecipes);
+}
+
+async function recipesAsReelInputs(
+  recipes: Recipe[],
+  brandSlug: string
 ): Promise<ReelRow[]> {
-  const recipes = await getRecipesForPack(packSlug);
   return recipes.map((r, idx) => ({
     id: `recipe-${idx}-${r.slug}`,
     brand_slug: brandSlug,
@@ -151,10 +210,22 @@ export async function POST(req: Request) {
     updated: [],
   };
 
+  // Recipes EINMAL laden — wird sowohl von generatePackMeta (als ReelRow-
+  // Adapter) als auch von generatePackForeword (als Titel-Liste) gebraucht.
+  // loadVisibleRecipesForPack mischt static + custom + hidden-Filter, exakt
+  // wie der Pack-PDF-Renderer es macht. Damit sieht die KI dieselbe Liste,
+  // die im finalen PDF landet — Add/Delete/Hide werden 1:1 reflektiert.
+  const needsRecipes =
+    textFieldsToUpdate.length > 0 ||
+    (forewordFieldsToUpdate.length > 0 && !!ctx.pack.foreword);
+  const recipes = needsRecipes
+    ? await loadVisibleRecipesForPack(ctx.brandSlug, ctx.pack.slug)
+    : [];
+
   // ─── Pack-Meta (title/subtitle/tagline/description/category) ─────────────
   if (textFieldsToUpdate.length > 0) {
     try {
-      const reels = await recipesAsReelInputs(ctx.brandSlug, ctx.pack.slug);
+      const reels = await recipesAsReelInputs(recipes, ctx.brandSlug);
       if (reels.length >= 1) {
         const meta = await generatePackMeta(reels, brand);
         for (const f of textFieldsToUpdate) {
@@ -179,7 +250,6 @@ export async function POST(req: Request) {
   // der Pack einen Foreword hat (oder einen bekommen soll).
   if (forewordFieldsToUpdate.length > 0 && ctx.pack.foreword) {
     try {
-      const recipes = await getRecipesForPack(ctx.pack.slug);
       const recipeTitles = recipes.map((r) => r.title);
       const newForeword = await generatePackForeword(ctx.pack, brand, recipeTitles);
       // Merge: nur un-locked Subfields uebernehmen, locked behalten
