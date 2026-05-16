@@ -145,10 +145,12 @@ export async function addCustomRecipe(
     console.error("[recipes-db] addCustomRecipe", error);
     return null;
   }
-  // Pack-Meta-Auto-Sync: neuer Recipe → Pack-Texte koennten veraltete
-  // Rezeptnamen nennen oder die Aussage des Packs nicht mehr stimmen.
-  // Server respektiert pack.editedFields[].
-  triggerPackMetaSync(brandSlug, packSlug);
+  // Pack-Meta-Auto-Sync mit force=true: neuer Recipe -> Vorwort/Meta
+  // MUSS aktualisiert werden, auch wenn der User vorher manuell editiert
+  // hat. Sonst koennte ein "Meine 7 liebsten Rezepte"-Vorwort hartnaeckig
+  // stehen bleiben obwohl jetzt 8 Rezepte im Pack sind, oder umgekehrt
+  // veraltete namentliche Erwaehnungen bei Delete.
+  triggerPackMetaSync(brandSlug, packSlug, { force: true });
   return rowToCustomRecipe(data);
 }
 
@@ -168,7 +170,10 @@ export async function removeCustomRecipe(id: string): Promise<boolean> {
     return false;
   }
   if (row?.brand_slug && row?.pack_slug) {
-    triggerPackMetaSync(row.brand_slug, row.pack_slug);
+    // force=true: ein geloeschtes Rezept darf NIEMALS im Vorwort
+    // namentlich stehen bleiben, auch wenn der User vorher manuell am
+    // Vorwort editiert hat. Sonst "Luegen-Vorwort" im Druck-PDF.
+    triggerPackMetaSync(row.brand_slug, row.pack_slug, { force: true });
   }
   return true;
 }
