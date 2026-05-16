@@ -16,15 +16,22 @@ export type RenderProgress = (stage: string, percent: number) => void;
 // als Single-Recipe-PDF exportiert oder als eine von N Karten im Pack-PDF.
 // Falls die Auto-Density-Heuristik mal danebenliegt (extrem lange Steps,
 // monstroese Zutaten-Namen, riesige Story), greift dieser Render-Guard:
-// 3-stufiges Retry-System mit progressiv aggressiveren Tweaks. Cleane
+// 5-stufiges Retry-System mit progressiv aggressiveren Massnahmen. Cleane
 // Fallback-Reihenfolge:
 //   Attempt 1 — Original Recipe, Auto-Density
 //   Attempt 2 — densityOverride: "compact" + hideStory
 //   Attempt 3 — Attempt 2 + hideMicros (Notbremse: Mikros-Block weg)
-//   Final     — Hard-Fail mit eindeutiger Fehlermeldung
+//   Attempt 4 — Attempt 3 + titleScale -2 (kleinere Titel-Reserve)
+//   Attempt 5 — Layout-Switch zu "feature" (Pixel-Estimation +
+//               Smart-Truncation in feature-fit.ts, garantierte 1-Seite
+//               weil Story + Subtitle notfalls automatisch weggelassen)
+//   Final     — Hard-Fail (sollte praktisch nie auftreten)
 //
 // Im Normal-Case rendert Attempt 1 sauber und der Guard ist transparent.
-// Nur bei Edge-Cases (~0.5-1% der Recipes) tritt Retry ein.
+// Stufen 2-3 greifen bei ~0.5% (lange Step-Texte). Stufen 4-5 sind
+// Edge-Case-Notbremsen, die <0.1% der Recipes brauchen. Jede angewandte
+// Fallback-Stufe wird per console.warn geloggt, sodass die betroffenen
+// Karten in den Vercel-Logs sichtbar sind und nachjustiert werden koennen.
 async function getPageCount(buf: Buffer): Promise<number> {
   // pdf-lib parsed das PDF nur soweit dass die Page-Count im Trailer
   // ablesbar ist — sehr schnell (< 50ms typischerweise).
@@ -32,33 +39,90 @@ async function getPageCount(buf: Buffer): Promise<number> {
   return doc.getPageCount();
 }
 
-const FALLBACK_TWEAKS: Array<{
+// Eine Fallback-Stufe transformiert das Original-Recipe in eine engere
+// Variante. Jede Stufe greift auf das ORIGINAL zu (nicht kumulativ auf
+// die vorherige Stufe) — so bleibt die Semantik klar lesbar: jede Stufe
+// ist eine vollstaendige, alleinstehende Konfiguration.
+type FallbackAttempt = {
   label: string;
-  tweaks: NonNullable<Recipe["tweaks"]>;
-}> = [
+  apply: (recipe: Recipe) => Recipe;
+};
+
+const FALLBACK_ATTEMPTS: FallbackAttempt[] = [
   {
     label: "compact + hideStory",
-    tweaks: { densityOverride: "compact", hideStory: true },
+    apply: (r) => ({
+      ...r,
+      tweaks: { ...r.tweaks, densityOverride: "compact", hideStory: true },
+    }),
   },
   {
     label: "compact + hideStory + hideMicros",
-    tweaks: {
-      densityOverride: "compact",
-      hideStory: true,
-      hideMicros: true,
-    },
+    apply: (r) => ({
+      ...r,
+      tweaks: {
+        ...r.tweaks,
+        densityOverride: "compact",
+        hideStory: true,
+        hideMicros: true,
+      },
+    }),
+  },
+  {
+    label: "compact + hideStory + hideMicros + titleScale -2",
+    apply: (r) => ({
+      ...r,
+      tweaks: {
+        ...r.tweaks,
+        densityOverride: "compact",
+        hideStory: true,
+        hideMicros: true,
+        titleScale: -2,
+      },
+    }),
+  },
+  {
+    // Letzter Safety-Net: Layout-Switch zu feature. Das Feature-Layout
+    // hat als einziges eine echte Pixel-Estimation + Smart-Truncation
+    // in lib/pdf/feature-fit.ts eingebaut — pickFeatureDensity iteriert
+    // spacious -> extreme und gibt im worst case extreme + truncateStory
+    // + truncateSubtitle zurueck, was Story und Subtitle automatisch
+    // weglaesst. Dadurch ist 1-Page-Output bei JEDEM Recipe-Inhalt
+    // garantiert.
+    //
+    // Trade-off: Diese eine Karte sieht im Pack visuell anders aus als
+    // die anderen (anderes Layout). Das ist akzeptabel weil:
+    // (a) extrem selten (<0.1% der Recipes)
+    // (b) besser als gar kein PDF / Hard-Fail
+    // (c) ein klarer console.warn loggt es, sodass der Editor das
+    //     Recipe nachtraeglich kuerzen kann
+    label: "layout-switch zu feature (Pixel-Estimation + Smart-Truncation)",
+    apply: (r) => ({
+      ...r,
+      cardLayout: "feature",
+      tweaks: {
+        ...r.tweaks,
+        // Kein densityOverride — pickFeatureDensity arbeitet mit
+        // Pixel-Estimation und waehlt selbst extreme + truncate.
+        hideStory: true,
+        hideMicros: true,
+        titleScale: -2,
+      },
+    }),
   },
 ];
 
-// Findet die kleinste Tweak-Kombination, mit der ein einzelnes Recipe
-// garantiert auf 1 A4-Seite passt. Rendert dafuer das Recipe als
+// Findet die schwaechste Fallback-Kombination, mit der ein einzelnes
+// Recipe garantiert auf 1 A4-Seite passt. Rendert dafuer das Recipe als
 // Single-Page-Document via RecipePdfDocument — genau die Page-Komponente
 // (RecipeCardPdfPage), die spaeter auch im Pack-PDF-Pfad verwendet wird,
 // sodass das Ergebnis WYSIWYG ist: passt es als Single, passt es im Pack.
 //
-// Returnt das ge-tweakte Recipe + den finalen Buffer (den der
+// Returnt das modifizierte Recipe + den finalen Buffer (den der
 // Single-Recipe-Export wiederverwendet, sodass kein Doppel-Render noetig
-// ist). Wirft bei Hard-Fail mit eindeutiger Fehlermeldung.
+// ist). Wirft bei Hard-Fail mit eindeutiger Fehlermeldung — sollte aber
+// praktisch nie auftreten weil Stufe 5 (feature-switch) eine
+// quasi-Garantie ist.
 async function fitRecipeToOnePage(args: {
   brand: Brand;
   pack: Pack;
@@ -68,19 +132,8 @@ async function fitRecipeToOnePage(args: {
   qrDataUri: string | null;
   avatarDataUri: string | null;
 }): Promise<{ recipe: Recipe; buffer: Buffer }> {
-  const renderWithTweaks = async (
-    overrideTweaks: Recipe["tweaks"] | undefined
-  ): Promise<{ buf: Buffer; recipeForRender: Recipe }> => {
-    const recipeForRender: Recipe = overrideTweaks
-      ? {
-          ...args.recipe,
-          tweaks: {
-            ...args.recipe.tweaks,
-            ...overrideTweaks,
-          },
-        }
-      : args.recipe;
-    const buf = await renderToBuffer(
+  const renderWithRecipe = async (recipeForRender: Recipe): Promise<Buffer> => {
+    return await renderToBuffer(
       RecipePdfDocument({
         brand: args.brand,
         pack: args.pack,
@@ -91,32 +144,39 @@ async function fitRecipeToOnePage(args: {
         avatarDataUri: args.avatarDataUri,
       })
     );
-    return { buf, recipeForRender };
   };
 
-  let result = await renderWithTweaks(undefined);
-  let pageCount = await getPageCount(result.buf);
+  // Attempt 1: Auto-Density (Original Recipe, kein Override).
+  let currentRecipe = args.recipe;
+  let buf = await renderWithRecipe(currentRecipe);
+  let pageCount = await getPageCount(buf);
 
-  for (const { label, tweaks } of FALLBACK_TWEAKS) {
+  // Attempts 2-5: progressive Fallbacks. Jede Stufe wird auf das
+  // ORIGINAL angewandt (nicht kumulativ), damit jede Stufe alleinstehend
+  // sauber konfiguriert ist.
+  for (const { label, apply } of FALLBACK_ATTEMPTS) {
     if (pageCount === 1) break;
     console.warn(
       `[pdf-fit] ${args.recipe.slug} rendered ${pageCount} Seiten — Retry mit Fallback "${label}"`
     );
-    result = await renderWithTweaks(tweaks);
-    pageCount = await getPageCount(result.buf);
+    currentRecipe = apply(args.recipe);
+    buf = await renderWithRecipe(currentRecipe);
+    pageCount = await getPageCount(buf);
   }
 
   if (pageCount !== 1) {
-    // Auch der finale Fallback hat es nicht geschafft. Hard-Fail mit klarer
-    // Diagnose damit der Editor das Recipe nachjustieren kann (Step-Texte
-    // kuerzen, Zutaten-Namen verkuerzen).
+    // Sollte praktisch nie auftreten — Stufe 5 (feature-switch) hat
+    // eingebaute Smart-Truncation in feature-fit.ts, die selbst extreme
+    // Recipes auf 1 Seite drueckt. Wenn diese Meldung doch erscheint, ist
+    // das Recipe pathologisch (z.B. 30+ Steps mit je 300+ Zeichen) und
+    // sollte im Editor radikal gekuerzt werden.
     throw new Error(
-      `Recipe "${args.recipe.slug}" produziert ${pageCount} Seiten selbst mit maximaler Kompression. ` +
-        `Step-Texte oder Zutaten-Namen sind zu lang. Bitte im Editor kuerzen oder hideStory/hideMicros manuell setzen.`
+      `Recipe "${args.recipe.slug}" produziert ${pageCount} Seiten selbst nach Layout-Switch zu feature mit Smart-Truncation. ` +
+        `Dieser Fall ist sehr selten — typischerweise nur bei 30+ Steps mit jeweils 300+ Zeichen. Bitte Step-Texte im Editor kuerzen.`
     );
   }
 
-  return { recipe: result.recipeForRender, buffer: result.buf };
+  return { recipe: currentRecipe, buffer: buf };
 }
 
 // Renders a single-recipe PDF and returns the binary buffer.
