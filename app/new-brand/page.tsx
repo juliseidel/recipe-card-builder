@@ -25,6 +25,22 @@ import { formatFollowersCompact } from "@/lib/format-followers";
 import { SiteHeader } from "@/components/site-header";
 import { BrandHubCard } from "@/components/brand-hub-card";
 
+// Helper: grammatikalisch korrekte Standard-Anrede aus Vorname + Geschlecht.
+// Wird verwendet wenn der User keine eigene Signature gesetzt hat — sowohl
+// im Live-Preview als auch im Save-Pfad. Bei neutralen Brands (Marken-
+// Accounts wie "Bienesfitlife", "Healthy Kitchen Co.") fallen wir auf
+// einen geschlechtsneutralen Sign-off zurueck.
+function derivedSignature(
+  name: string,
+  gender: "male" | "female" | "neutral"
+): string {
+  const cleanName = name.trim();
+  if (!cleanName) return "Dein Creator";
+  if (gender === "male") return `Dein ${cleanName}`;
+  if (gender === "female") return `Deine ${cleanName}`;
+  return `Bis bald, ${cleanName}`;
+}
+
 // Creator-Onboarding-Form fuer das Multi-Tenant-Tool. Schritt 3/3 des
 // Hub-Umbaus: hier kommen neue Creator on-the-fly rein, mit Avatar-Upload,
 // Identity-Feldern und Mood-Picker. Live-Preview rechts spiegelt die
@@ -49,6 +65,14 @@ export default function NewBrandPage() {
   const [bio, setBio] = useState("");
   const [tagline, setTagline] = useState("");
   const [niche, setNiche] = useState("");
+  // Anrede + Geschlecht — werden beim Auto-Fill aus der Gemini-Identity-
+  // Analyse uebernommen. Geschlecht steuert die grammatikalische
+  // Anrede-Form ("Dein Martin" vs "Deine Julia") wenn der User die
+  // signature manuell zurueckaendert. Default 'neutral' bei Marken-Accounts.
+  const [signature, setSignature] = useState("");
+  const [gender, setGender] = useState<"male" | "female" | "neutral">(
+    "neutral"
+  );
   // Follower-Count als formatierter String ("247K"). Beim Auto-Fill aus
   // Apify's raw.followersCount gesetzt — landet beim Save in
   // brand.stats.followers und wird im Workspace-Hero gezeigt.
@@ -113,12 +137,17 @@ export default function NewBrandPage() {
         tagline: string;
         niche: string;
         signature: string;
+        gender?: "male" | "female" | "neutral";
       };
       setName(id.name);
       setFullName(id.fullName);
       setBio(id.bio);
       setTagline(id.tagline);
       setNiche(id.niche);
+      // Gender + Signature aus Gemini-Identity uebernehmen — User kann
+      // beides nachher noch im Formular editieren falls die KI daneben lag.
+      setGender(id.gender ?? "neutral");
+      setSignature(id.signature ?? "");
       // Handle ins Form-Feld zurueckspielen, falls User ihn ohne '@'
       // eingegeben hat — normalizeHandle macht das beim Save auch nochmal,
       // aber im Formular sieht es jetzt schon richtig aus.
@@ -188,7 +217,11 @@ export default function NewBrandPage() {
         bio.trim() ||
         "Kurze Beschreibung des Creators — taucht auf der Hub-Card und im Workspace-Hero auf.",
       tagline: tagline.trim() || "Eigener Workspace im Recipe Card Builder",
-      signature: name.trim() ? `Deine ${name.trim()}` : "Dein Creator",
+      // Signature-Preview: wenn der User (oder Gemini) eine Signature
+      // gesetzt hat, nutze die. Sonst leite aus gender + name ab —
+      // grammatikalisch korrekt fuer "Dein Martin" vs "Deine Julia".
+      signature: signature.trim() || derivedSignature(name.trim(), gender),
+      gender,
       avatar: avatarUrl ?? "",
       stats: {
         followers: followers.trim(),
@@ -200,7 +233,7 @@ export default function NewBrandPage() {
       recipeCount: 0,
       platform,
     }),
-    [name, fullName, handle, bio, tagline, niche, followers, avatarUrl, selectedMood, platform]
+    [name, fullName, handle, bio, tagline, niche, signature, gender, followers, avatarUrl, selectedMood, platform]
   );
 
   const requirements = [
@@ -257,7 +290,9 @@ export default function NewBrandPage() {
       handle: normalizeHandle(handle),
       bio: bio.trim(),
       tagline: tagline.trim() || `${name.trim()}s Workspace`,
-      signature: `Deine ${name.trim()}`,
+      // Save: User-Override > Gemini-Output > Default aus gender+name
+      signature: signature.trim() || derivedSignature(name.trim(), gender),
+      gender,
       avatar: avatarUrl ?? "",
       stats: {
         followers: followers.trim(),
@@ -700,6 +735,56 @@ export default function NewBrandPage() {
                   value={tagline}
                   onChange={(e) => setTagline(e.target.value)}
                   maxLength={80}
+                />
+              </Field>
+
+              <Field
+                label="Geschlecht"
+                hint='Steuert die Anrede am Pack-Ende. Bei Marken-Accounts (keine konkrete Person) wähle „Neutral".'
+              >
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      { id: "female", label: "Weiblich (Deine)" },
+                      { id: "male", label: "Männlich (Dein)" },
+                      { id: "neutral", label: "Neutral / Marke" },
+                    ] as const
+                  ).map((opt) => {
+                    const active = gender === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setGender(opt.id)}
+                        className="rounded-full border px-4 py-1.5 text-[13px] font-medium transition-colors"
+                        style={{
+                          borderColor: active
+                            ? selectedMood.accent
+                            : "rgba(43, 31, 25, 0.2)",
+                          background: active
+                            ? selectedMood.accent
+                            : "transparent",
+                          color: active ? "#fff" : "rgba(43, 31, 25, 0.7)",
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Field>
+
+              <Field
+                label="Anrede / Sign-off"
+                hint='Wie soll sich der Creator am Pack-Ende verabschieden? Standard wird aus Geschlecht abgeleitet ("Dein Martin" / "Deine Julia"). Eigene Anrede möglich: „Cheers, Lukas", „Eure Sophie", „Bis bald, Mia".'
+              >
+                <input
+                  className="editor-input"
+                  type="text"
+                  placeholder={derivedSignature(name || "Creator", gender)}
+                  value={signature}
+                  onChange={(e) => setSignature(e.target.value)}
+                  maxLength={30}
                 />
               </Field>
             </section>

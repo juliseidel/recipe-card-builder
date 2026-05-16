@@ -112,6 +112,11 @@ export type Brand = {
   bio: string;
   tagline: string;
   signature: string;
+  /** Geschlecht des Creators. Steuert die Anrede-Form ("Dein Martin" vs
+   *  "Deine Julia") wenn die signature dem Standard-Pattern folgt. Wird
+   *  beim Brand-Onboarding via Gemini abgeleitet (analyze-creator-identity).
+   *  Optional fuer Backward-Compat mit Bestands-Brands ohne gender-Feld. */
+  gender?: "male" | "female" | "neutral";
   avatar: string;
   stats: BrandStats;
   tokens: BrandTokens;
