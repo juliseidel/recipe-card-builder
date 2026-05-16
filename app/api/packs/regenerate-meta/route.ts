@@ -1,28 +1,17 @@
 import { NextResponse } from "next/server";
+import { regeneratePackMeta } from "@/lib/ai/regenerate-pack-meta";
+import { findCustomPackIdBySlug } from "@/lib/custom-packs-server";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
-import { updateCustomPackData, findCustomPackIdBySlug } from "@/lib/custom-packs-server";
-import { loadBrand } from "@/lib/custom-brands-server";
-import { generatePackMeta } from "@/lib/ai/generate-pack-meta";
-import { generatePackForeword } from "@/lib/ai/generate-foreword";
-import { loadVisibleRecipesForPack, type Recipe } from "@/lib/recipes";
-import type { Pack } from "@/lib/packs";
-import type { ReelRow } from "@/lib/creator-reels-server";
 
 // Auto-Sync-Endpoint: wird nach jeder Recipe-Mutation (Add/Delete/Edit/
-// Hide) gerufen. Re-generiert die Pack-Texte basierend auf den AKTUELLEN
-// Recipes im Pack. RESPEKTIERT pack.editedFields[] — jedes Feld das der
-// User manuell editiert hat, wird hier NICHT mehr ueberschrieben.
+// Hide) gerufen. Die eigentliche Re-Generation-Logik lebt im shared
+// Helper lib/ai/regenerate-pack-meta.ts — diese Route ist nur ein
+// dünner HTTP-Wrapper. Damit kann der gleiche Helper auch vom
+// PDF-Job-Runner synchron aufgerufen werden (Block-on-Sync vor Render).
 //
 // Body (eine der zwei Varianten):
-//   { brandSlug, packSlug }   — typisch fuer Auto-Sync-Hooks
-//   { packId }                 — typisch fuer manuellen Refresh
-//
-// Felder die hier regeneriert werden (wenn nicht in editedFields):
-//   - title, subtitle, tagline, description, category (via generatePackMeta)
-//   - foreword.greeting/story/signoff/outro (via generatePackForeword)
-//
-// NICHT regeneriert: coverImage, forewordImage, mood, displayFont, cardLayout.
-// Diese bleiben vom Cover-Reroll-Button oder Manual-Edit kontrolliert.
+//   { brandSlug, packSlug, force? }   — typisch für Auto-Sync-Hooks
+//   { packId, force? }                — typisch für manuellen Refresh
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
@@ -31,94 +20,28 @@ type Body = {
   brandSlug?: string;
   packSlug?: string;
   packId?: string;
-  /** Wenn true: ignoriert editedFields und regeneriert alles. Default false. */
   force?: boolean;
 };
 
-async function loadPack(opts: Body): Promise<{
-  pack: Pack;
-  packId: string;
-  brandSlug: string;
-} | null> {
-  if (!hasServerSupabase()) return null;
-  const supabase = getServerSupabase();
-
-  let packId = opts.packId ?? null;
-  if (!packId && opts.brandSlug && opts.packSlug) {
-    packId = await findCustomPackIdBySlug(opts.brandSlug, opts.packSlug);
+async function resolveBrandPackSlugs(
+  body: Body
+): Promise<{ brandSlug: string; packSlug: string } | null> {
+  if (body.brandSlug && body.packSlug) {
+    return { brandSlug: body.brandSlug, packSlug: body.packSlug };
   }
-  if (!packId) return null;
-
+  if (!body.packId || !hasServerSupabase()) return null;
+  const supabase = getServerSupabase();
   const { data, error } = await supabase
     .from("packs")
-    .select("id, brand_slug, data")
-    .eq("id", packId)
+    .select("brand_slug, pack_slug")
+    .eq("id", body.packId)
     .maybeSingle();
   if (error || !data) return null;
-
   return {
-    packId: data.id as string,
     brandSlug: data.brand_slug as string,
-    pack: data.data as Pack,
+    packSlug: data.pack_slug as string,
   };
 }
-
-// loadVisibleRecipesForPack ist jetzt zentral in lib/recipes.ts — nicht
-// mehr inline hier, damit /api/packs/[id]/regenerate-field denselben
-// Helper nutzen kann.
-
-async function recipesAsReelInputs(
-  recipes: Recipe[],
-  brandSlug: string
-): Promise<ReelRow[]> {
-  return recipes.map((r, idx) => ({
-    id: `recipe-${idx}-${r.slug}`,
-    brand_slug: brandSlug,
-    ig_id: r.slug,
-    post_url: r.sourceUrl ?? null,
-    type: "Video",
-    caption: r.description ?? r.title,
-    display_url: r.hero ?? null,
-    video_url: null,
-    posted_at: null,
-    like_count: null,
-    view_count: null,
-    comment_count: null,
-    hashtags: null,
-    is_recipe: true,
-    recipe_confidence: 1,
-    recipe_title: r.title,
-    meal_type: null,
-    cuisine: null,
-    main_ingredient: null,
-    dietary: null,
-    estimated_time_minutes: r.prepTime ?? null,
-    occasion: null,
-    season: null,
-    skill_level: null,
-    vessel: null,
-    classified_at: null,
-    scraped_at: null,
-    raw: null,
-    cover_storage_url: null,
-    platform: "instagram" as const,
-  })) as unknown as ReelRow[];
-}
-
-const TEXT_FIELDS: (keyof Pack)[] = [
-  "title",
-  "subtitle",
-  "tagline",
-  "description",
-  "category",
-];
-
-const FOREWORD_FIELDS = [
-  "foreword.greeting",
-  "foreword.story",
-  "foreword.signoff",
-  "foreword.outro",
-] as const;
 
 export async function POST(req: Request) {
   let body: Body;
@@ -128,115 +51,33 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
   }
 
-  const ctx = await loadPack(body);
-  if (!ctx) {
+  const slugs = await resolveBrandPackSlugs(body);
+  if (!slugs) {
     return NextResponse.json(
       { error: "Pack nicht gefunden (oder kein Custom-Pack)." },
       { status: 404 }
     );
   }
 
-  const brand = await loadBrand(ctx.brandSlug);
-  if (!brand) {
-    return NextResponse.json({ error: "Brand nicht gefunden." }, { status: 404 });
+  const packId = await findCustomPackIdBySlug(slugs.brandSlug, slugs.packSlug);
+  if (!packId) {
+    return NextResponse.json(
+      { error: "Pack nicht gefunden." },
+      { status: 404 }
+    );
   }
 
-  const lockedFields = new Set(body.force ? [] : (ctx.pack.editedFields ?? []));
+  const result = await regeneratePackMeta(slugs.brandSlug, slugs.packSlug, {
+    force: body.force,
+  });
 
-  // Welche Text-Felder muss regeneriert werden? Wenn ALLE locked sind,
-  // sparen wir den Gemini-Call.
-  const textFieldsToUpdate = TEXT_FIELDS.filter((f) => !lockedFields.has(f));
-  const forewordFieldsToUpdate = FOREWORD_FIELDS.filter((f) => !lockedFields.has(f));
-
-  const patch: Partial<Pack> = {};
-  const summary: { skipped: string[]; updated: string[] } = {
-    skipped: [...lockedFields],
-    updated: [],
-  };
-
-  // Recipes EINMAL laden — wird sowohl von generatePackMeta (als ReelRow-
-  // Adapter) als auch von generatePackForeword (als Titel-Liste) gebraucht.
-  // loadVisibleRecipesForPack mischt static + custom + hidden-Filter, exakt
-  // wie der Pack-PDF-Renderer es macht. Damit sieht die KI dieselbe Liste,
-  // die im finalen PDF landet — Add/Delete/Hide werden 1:1 reflektiert.
-  const needsRecipes =
-    textFieldsToUpdate.length > 0 ||
-    (forewordFieldsToUpdate.length > 0 && !!ctx.pack.foreword);
-  const recipes = needsRecipes
-    ? await loadVisibleRecipesForPack(ctx.brandSlug, ctx.pack.slug)
-    : [];
-
-  // ─── Pack-Meta (title/subtitle/tagline/description/category) ─────────────
-  if (textFieldsToUpdate.length > 0) {
-    try {
-      const reels = await recipesAsReelInputs(recipes, ctx.brandSlug);
-      if (reels.length >= 1) {
-        const meta = await generatePackMeta(reels, brand);
-        for (const f of textFieldsToUpdate) {
-          if (f === "title") patch.title = meta.title;
-          else if (f === "subtitle") patch.subtitle = meta.subtitle;
-          else if (f === "tagline") patch.tagline = meta.tagline;
-          else if (f === "description") patch.description = meta.description;
-          else if (f === "category") patch.category = meta.category;
-          summary.updated.push(f);
-        }
-      }
-    } catch (err) {
-      console.warn(
-        "[packs/regenerate-meta] generatePackMeta failed (non-fatal):",
-        err instanceof Error ? err.message : err
-      );
-    }
-  }
-
-  // ─── Foreword-Block ──────────────────────────────────────────────────────
-  // Nur regenerieren wenn mindestens EIN Foreword-Subfield un-locked ist UND
-  // der Pack einen Foreword hat (oder einen bekommen soll).
-  if (forewordFieldsToUpdate.length > 0 && ctx.pack.foreword) {
-    try {
-      const recipeTitles = recipes.map((r) => r.title);
-      const newForeword = await generatePackForeword(ctx.pack, brand, recipeTitles);
-      // Merge: nur un-locked Subfields uebernehmen, locked behalten
-      const merged: NonNullable<Pack["foreword"]> = {
-        greeting: lockedFields.has("foreword.greeting")
-          ? ctx.pack.foreword.greeting
-          : newForeword.greeting,
-        story: lockedFields.has("foreword.story")
-          ? ctx.pack.foreword.story
-          : newForeword.story,
-        signoff: lockedFields.has("foreword.signoff")
-          ? ctx.pack.foreword.signoff
-          : newForeword.signoff,
-        ...(newForeword.outro || ctx.pack.foreword.outro
-          ? {
-              outro: lockedFields.has("foreword.outro")
-                ? ctx.pack.foreword.outro
-                : newForeword.outro,
-            }
-          : {}),
-      };
-      patch.foreword = merged;
-      for (const f of forewordFieldsToUpdate) summary.updated.push(f);
-    } catch (err) {
-      console.warn(
-        "[packs/regenerate-meta] generatePackForeword failed (non-fatal):",
-        err instanceof Error ? err.message : err
-      );
-    }
-  }
-
-  if (Object.keys(patch).length === 0) {
-    return NextResponse.json({
-      ok: true,
-      message: "Nichts zu regenerieren — alle Felder sind manuell-editiert oder Generation fehlgeschlagen.",
-      summary,
-    });
-  }
-
-  const updated = await updateCustomPackData(ctx.packId, patch);
   return NextResponse.json({
-    ok: true,
-    pack: updated,
-    summary,
+    ok: result.ok,
+    summary: {
+      skipped: result.skipped,
+      updated: result.updated,
+      changed: result.changed,
+    },
+    pack: result.pack,
   });
 }
