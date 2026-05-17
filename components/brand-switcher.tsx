@@ -213,6 +213,30 @@ export function BrandSwitcher() {
           />
 
           <Link
+            href={`/${current.slug}/settings`}
+            onClick={() => setOpen(false)}
+            role="menuitem"
+            className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-[12px] font-medium text-ink-muted transition-colors hover:bg-canvas-alt hover:text-ink"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              fill="none"
+              aria-hidden
+            >
+              <path
+                d="M7 9.2A2.2 2.2 0 1 0 7 4.8a2.2 2.2 0 0 0 0 4.4zM11.6 7c0 .35-.03.69-.1 1.02l1.34 1.05-1.3 2.25-1.55-.62a4.7 4.7 0 0 1-1.77 1.02L8 13.5H5.4l-.22-1.78a4.7 4.7 0 0 1-1.77-1.02l-1.55.62-1.3-2.25 1.34-1.05A4.7 4.7 0 0 1 1.8 7c0-.35.03-.69.1-1.02L.56 4.93l1.3-2.25 1.55.62a4.7 4.7 0 0 1 1.77-1.02L5.4.5H8l.22 1.78a4.7 4.7 0 0 1 1.77 1.02l1.55-.62 1.3 2.25-1.34 1.05c.06.33.1.67.1 1.02z"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Workspace-Einstellungen
+          </Link>
+
+          <Link
             href="/"
             onClick={() => setOpen(false)}
             role="menuitem"

@@ -109,7 +109,7 @@ export async function brandExists(slug: string): Promise<boolean> {
 // einer angelegt mit dem Code-Brand-Object als Basis + Patch. Damit
 // funktioniert Persistenz von AI-Computed-Feldern (voiceProfile, etc.)
 // auch fuer Code-Brands wie Biene, ohne ihre Identity-Felder zu duplizieren.
-async function upsertBrandData(
+export async function upsertBrandData(
   slug: string,
   patch: Partial<Brand>
 ): Promise<void> {
