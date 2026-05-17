@@ -8,6 +8,7 @@ import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 import { loadBrand } from "@/lib/custom-brands-server";
 import { getPack } from "@/lib/packs";
 import { getCustomPackServer } from "@/lib/custom-packs-server";
+import { findCachedHeroForSource } from "@/lib/hero-cache";
 import type { Recipe } from "@/lib/recipes";
 
 // Server route that fills in Gemini-derived micros AND a Flux 2 Pro hero
@@ -282,6 +283,46 @@ export async function POST(req: Request) {
     }
   }
 
+  // ─── HERO-CACHE: SYNC vor Flux ───────────────────────────────────────
+  // Bevor wir die teure Flux-Pipeline starten (Apify + ffmpeg + Vision +
+  // Flux + Storage = ~$0.05 + 30-90s), schauen wir nach: gibt's schon ein
+  // generiertes Brand-Hero fuer dieselbe sourceUrl im selben Brand? Wenn
+  // ja, recyceln wir das. Spart Apify-Call + Flux-Cost komplett.
+  //
+  // Wird NICHT gemacht bei:
+  //   - forceFlux / forceHero (User-Re-Roll: User will explizit ein neues
+  //     Bild, Cache umgehen)
+  //   - keine sourceUrl (handgeschriebene Rezepte ohne Original-Reel haben
+  //     keinen Cache-Match)
+  let usedCache = false;
+  const canUseCache =
+    needsHero &&
+    !body.forceHero &&
+    !body.forceFlux &&
+    Boolean(recipe.sourceUrl);
+
+  if (canUseCache && recipe.sourceUrl) {
+    try {
+      const cached = await findCachedHeroForSource(brandSlug, recipe.sourceUrl);
+      if (cached) {
+        await mergeRecipeData(row.id, () => ({ hero: cached.heroUrl }));
+        const { revalidatePath } = await import("next/cache");
+        revalidatePath(`/${brandSlug}/${packSlug}`);
+        revalidatePath(`/${brandSlug}/${packSlug}/${recipe.slug}`);
+        usedCache = true;
+        console.log(
+          `[enrich] hero-cache HIT für ${body.recipeId} ← ${cached.sourceRecipeId} (${recipe.sourceUrl})`
+        );
+      }
+    } catch (err) {
+      // Cache-Failure ist non-fatal — wir fallen einfach auf Flux zurueck.
+      console.warn(
+        "[enrich] hero-cache-lookup failed, falling back to Flux",
+        err
+      );
+    }
+  }
+
   // ─── HERO + STORY: ASYNC nach der Response ──────────────────────────
   // Hero-Strategie (Ingo Phase 3): Wenn das Rezept aus Instagram kommt
   // (sourceUrl gesetzt) und der User NICHT explizit forceHero=true klickt,
@@ -296,7 +337,10 @@ export async function POST(req: Request) {
   // Flux bleibt der lange Pol (15-90 s); Reel-Cover ist schnell (~2 s).
   // Beide laufen in after() nach der Response. Das Detail-Polling holt
   // den Hero ab, sobald er in der DB steht.
-  if (needsHero) {
+  //
+  // SKIP wenn Cache-Hit (usedCache=true) — sonst wuerden wir das gerade
+  // gecachte Bild gleich wieder mit einem frisch generierten ueberschreiben.
+  if (needsHero && !usedCache) {
     after(async () => {
       try {
         const result = await generateHeroForRecipe({
@@ -350,6 +394,7 @@ export async function POST(req: Request) {
       macros: needsMacros,
       micros: needsMicros,
       hero: needsHero,
+      heroSource: usedCache ? "cache" : needsHero ? "flux" : "none",
       story: needsStory,
     },
     { status: 202 }
