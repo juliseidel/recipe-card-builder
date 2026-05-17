@@ -143,6 +143,30 @@ export default async function BrandPage({ params }: BrandPageProps) {
         liveRecipeCount={totalRecipes}
       />
 
+      {/* Reel-Library-Toolbar: direkt unter dem Hero, IMMER im First-
+          Viewport sichtbar. "REEL-LIBRARY · @handle" links, Refresh-Button
+          + Letzter-Sync-Anzeige rechts. Border-bottom grenzt klar von
+          Suggestions ab. Keine z-index-Konflikte (im Document-Flow). */}
+      {hasReelLibrary ? (
+        <div
+          className="border-b"
+          style={{
+            background: brand.tokens.background,
+            borderColor: brand.tokens.line,
+          }}
+        >
+          <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-6 py-3 lg:px-10">
+            <span
+              className="text-[11px] font-semibold uppercase tracking-[0.18em]"
+              style={{ color: brand.tokens.inkMuted }}
+            >
+              Reel-Library · {brand.handle}
+            </span>
+            <RefreshReelsButton brand={brand} />
+          </div>
+        </div>
+      ) : null}
+
       {/* Pack-Vorschlaege ZWISCHEN Brand-Hero und Active-Packs — klare
           narrative Reihenfolge: wer ist das (Hero) → was du anlegen
           koenntest (KI-CTA) → was du schon hast (Active Packs). Section
@@ -177,14 +201,6 @@ export default async function BrandPage({ params }: BrandPageProps) {
                 Klick auf ein Pack, um Karten zu reviewen, zu bearbeiten oder als PDF zu exportieren.
               </p>
             </div>
-
-            {/* Refresh-Button rechts neben dem Section-Header. Liegt im
-                normalen Document-Flow, kollidiert nicht mehr mit dem
-                fixed SiteHeader rechts oben. Semantisch passend: neue
-                Reels -> neue Pack-Vorschlaege -> Active-Packs-Pool. */}
-            {hasReelLibrary ? (
-              <RefreshReelsButton brand={brand} />
-            ) : null}
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
