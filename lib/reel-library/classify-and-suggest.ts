@@ -9,6 +9,7 @@ import {
   getSuggestionsForBrand,
   updateScrapeStatus,
   type NewSuggestion,
+  type ReelRow,
 } from "@/lib/creator-reels-server";
 import { loadBrand } from "@/lib/custom-brands-server";
 import { classifyReels, CLASSIFICATION_FAILED } from "@/lib/ai/classify-reels";
@@ -174,4 +175,88 @@ export async function runClassificationAndSuggestions(opts: {
       err instanceof Error ? err.message : err
     );
   }
+}
+
+// Suggestion-Only-Regen ohne Apify-Scrape. Wird vom Cron aufgerufen, wenn
+// der Brand zwar einen frischen Reel-Scrape hat (skip-lock greift), aber
+// die Pack-Vorschlaege >7 Tage alt sind oder ein Monatswechsel war —
+// damit "Top Reels Mai" nicht im Juni stehen bleibt.
+//
+// Im Unterschied zu runClassificationAndSuggestions:
+//   - Kein Klassifikations-Step (Reels sind schon klassifiziert)
+//   - Keine scrapeId / kein Scrape-Status-Update
+//   - Nutzt direkt die existierende Recipe-Reel-Library
+//
+// Ablauf:
+//   1. Recipe-Reels laden
+//   2. Bei < 5 Rezepten: skip
+//   3. suggestPacks neu rufen (mit aktuellem Datum im Prompt)
+//   4. Alte pending clear, neue insert
+//   5. Cover fuer neue Vorschlaege async generieren
+export async function regenerateSuggestionsForBrand(
+  brandSlug: string
+): Promise<{ generated: number; skipped: boolean; reason?: string }> {
+  const recipeCount = await countRecipeReelsForBrand(brandSlug);
+  if (recipeCount < 5) {
+    return { generated: 0, skipped: true, reason: "fewer-than-5-recipes" };
+  }
+  const brand = await loadBrand(brandSlug);
+  const recipeReels: ReelRow[] = await getRecipeReelsForBrand(brandSlug);
+
+  let suggestionCount = 0;
+  try {
+    const suggestions = await suggestPacks({
+      brandName: brand?.name ?? brandSlug,
+      recipeReels,
+      brand,
+    });
+    if (suggestions.length === 0) {
+      return { generated: 0, skipped: true, reason: "no-suggestions-from-ai" };
+    }
+    await clearPendingSuggestions(brandSlug);
+    const rows: NewSuggestion[] = suggestions.map((s) => ({
+      brandSlug,
+      title: s.title,
+      subtitle: s.subtitle,
+      tagline: s.tagline,
+      description: s.description,
+      category: s.category,
+      reelIds: s.reelIds,
+      reasoning: s.reasoning,
+      score: s.score,
+    }));
+    suggestionCount = await insertSuggestions(rows);
+    console.log(
+      `[regenerate-suggestions] brand=${brandSlug} generated=${suggestionCount}`
+    );
+  } catch (err) {
+    console.error(
+      "[regenerate-suggestions] suggestPacks failed:",
+      err instanceof Error ? err.message : err
+    );
+    return { generated: 0, skipped: true, reason: "suggest-packs-failed" };
+  }
+
+  // Cover async im Hintergrund — gleicher Pattern wie im Onboarding.
+  try {
+    const pending = await getSuggestionsForBrand(brandSlug, "pending");
+    const missingCover = pending.filter((s) => !s.cover_url);
+    if (missingCover.length > 0) {
+      await generateSuggestionCovers({
+        brandSlug,
+        suggestions: missingCover.map((s) => ({
+          id: s.id,
+          title: s.title,
+          tagline: s.tagline,
+        })),
+      });
+    }
+  } catch (err) {
+    console.error(
+      "[regenerate-suggestions] cover-gen failed (non-fatal):",
+      err instanceof Error ? err.message : err
+    );
+  }
+
+  return { generated: suggestionCount, skipped: false };
 }

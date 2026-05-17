@@ -660,6 +660,27 @@ export async function getSuggestionsForBrand(
   return (data as SuggestionRow[]) ?? [];
 }
 
+// Juengster created_at-Zeitstempel der pending Suggestions eines Brands.
+// Wird vom Cron benutzt, um Stale-Suggestions zu erkennen — wenn die
+// Vorschlaege > 7 Tage alt sind ODER Monatswechsel war, regenerieren wir
+// sie auch ohne neuen Scrape (sonst bleiben monats-spezifische Packs wie
+// "Top Reels Mai" im Juni stehen).
+export async function getLatestPendingSuggestionAt(
+  brandSlug: string
+): Promise<string | null> {
+  if (!hasServerSupabase()) return null;
+  const supabase = getServerSupabase();
+  const { data } = await supabase
+    .from("pack_suggestions")
+    .select("created_at")
+    .eq("brand_slug", brandSlug)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data?.created_at as string | null) ?? null;
+}
+
 export async function getSuggestionById(
   id: string
 ): Promise<SuggestionRow | null> {

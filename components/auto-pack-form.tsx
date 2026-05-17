@@ -72,6 +72,8 @@ type ReelTagAggregates = {
 };
 
 const TIMEFRAME_PRESETS = [
+  { id: "1d", label: "Gestern", days: 1 },
+  { id: "1w", label: "Letzte Woche", days: 7 },
   { id: "2w", label: "Letzte 2 Wochen", days: 14 },
   { id: "1m", label: "Letzter Monat", days: 30 },
   { id: "3m", label: "Letzte 3 Monate", days: 90 },

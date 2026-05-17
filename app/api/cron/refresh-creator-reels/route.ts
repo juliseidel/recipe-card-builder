@@ -1,13 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 import { startReelBackfill } from "@/lib/integrations/apify";
 import { startTikTokBackfill } from "@/lib/integrations/apify-tiktok";
 import {
   createScrape,
   getLatestScrapeForBrand,
+  getLatestPendingSuggestionAt,
   updateScrapeRunId,
   updateScrapeStatus,
 } from "@/lib/creator-reels-server";
+import { regenerateSuggestionsForBrand } from "@/lib/reel-library/classify-and-suggest";
 import { brands as codeBrands, getCodeBrandsWithHandle, type Brand } from "@/lib/brands";
 import type { SocialPlatform } from "@/lib/integrations/platform";
 
@@ -36,6 +38,31 @@ export const maxDuration = 60;
 // Wenn der letzte Scrape eines Brands juenger als dieses Fenster ist,
 // ueberspringen wir. 2h Fenster = 30 Min Puffer auf den 4h-Cron-Takt.
 const SKIP_IF_FRESHER_THAN_MIN = 120;
+
+// Suggestion-Stale-Threshold: wenn die juengste pending-Suggestion aelter
+// als das Fenster ist, regenerieren wir die Vorschlaege auch ohne neuen
+// Scrape. Gemini sieht das aktuelle Datum im Prompt und passt monats-
+// spezifische Packs an ("Top Reels Juni" statt Mai stehen lassen).
+const SUGGESTIONS_STALE_AFTER_DAYS = 7;
+
+// Helper: ist die Suggestion-Liste stale? Stale = aelter als X Tage ODER
+// in einem anderen Kalendermonat als heute.
+function isSuggestionsStale(latestCreatedAt: string | null): boolean {
+  if (!latestCreatedAt) return true; // noch nie generiert
+  const latest = new Date(latestCreatedAt);
+  const now = new Date();
+  const ageMs = now.getTime() - latest.getTime();
+  const ageDays = ageMs / (1000 * 60 * 60 * 24);
+  if (ageDays > SUGGESTIONS_STALE_AFTER_DAYS) return true;
+  // Monatswechsel = Jahr ODER Monat unterschiedlich
+  if (
+    latest.getUTCFullYear() !== now.getUTCFullYear() ||
+    latest.getUTCMonth() !== now.getUTCMonth()
+  ) {
+    return true;
+  }
+  return false;
+}
 
 export async function GET(req: Request) {
   const cronSecret = process.env.CRON_SECRET;
@@ -92,10 +119,18 @@ export async function GET(req: Request) {
 
   const results: Array<{
     brandSlug: string;
-    status: "started" | "skipped" | "skipped-fresh" | "skipped-running" | "failed";
+    status:
+      | "started"
+      | "skipped"
+      | "skipped-fresh"
+      | "skipped-running"
+      | "failed";
     runId?: string;
     error?: string;
     skipReason?: string;
+    /** True wenn wir trotz Scrape-Skip die Suggestions im Background
+     *  regenerieren (stale-detection). */
+    suggestionsRegenScheduled?: boolean;
   }> = [];
 
   for (const brand of allBrands) {
@@ -126,14 +161,37 @@ export async function GET(req: Request) {
 
     // Skip-Lock 2: war der letzte Refresh frisch? Verhindert Doppel-Run
     // mit manuell getriggertem Refresh.
+    // ABER: Suggestions koennen trotzdem stale sein (z.B. "Top Reels Mai"
+    // im Juni). Wir prüfen das separat und regenerieren ggf. NUR die
+    // Suggestions ohne neuen Apify-Scrape — guenstig, kein Apify-Cost.
     if (latest && latest.status === "done" && latest.finished_at) {
       const ageMin =
         (Date.now() - new Date(latest.finished_at).getTime()) / 60_000;
       if (ageMin < SKIP_IF_FRESHER_THAN_MIN) {
+        const latestSuggestionAt = await getLatestPendingSuggestionAt(
+          brand.slug
+        );
+        const stale = isSuggestionsStale(latestSuggestionAt);
+        if (stale) {
+          // Background-Regen via after() — Response geht sofort raus,
+          // Gemini macht den Suggestion-Regen-Call (~10-20s) im Lambda-
+          // Tail. Cover-Gen ist fire-and-forget innerhalb der Funktion.
+          after(async () => {
+            try {
+              await regenerateSuggestionsForBrand(brand.slug);
+            } catch (err) {
+              console.error(
+                `[cron] suggestion-regen failed for ${brand.slug}:`,
+                err
+              );
+            }
+          });
+        }
         results.push({
           brandSlug: brand.slug,
           status: "skipped-fresh",
           skipReason: `last-refresh-${Math.round(ageMin)}min-ago`,
+          suggestionsRegenScheduled: stale,
         });
         continue;
       }
