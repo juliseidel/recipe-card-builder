@@ -665,18 +665,23 @@ function OutroPage({
           </Text>
           <BeeIcon brandSlug={brand.slug} size={38} />
         </View>
-        <Text
-          style={{
-            fontSize: 11,
-            color: t.inkSoft,
-            marginTop: 16,
-            textAlign: "center",
-            lineHeight: 1.55,
-            maxWidth: 380,
-          }}
-        >
-          {outroText}
-        </Text>
+        {/* Outro-Text in fester View-Width statt maxWidth direkt am Text.
+            react-pdf wrappt sonst CHARACTER-level statt word-level (User-
+            Report: "SPAGHETTI PROTEIN E\nIS", "fü\nr", "pa\nckt" mitten
+            im Wort gebrochen). View-Container loest das, Text rendert
+            mit normalem word-wrap. */}
+        <View style={{ width: 420, marginTop: 16 }}>
+          <Text
+            style={{
+              fontSize: 11,
+              color: t.inkSoft,
+              textAlign: "center",
+              lineHeight: 1.55,
+            }}
+          >
+            {outroText}
+          </Text>
+        </View>
         <Text
           style={{
             fontSize: 9,
