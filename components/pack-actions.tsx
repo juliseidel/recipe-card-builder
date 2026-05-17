@@ -3,8 +3,13 @@ import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
 import { PdfExportButton } from "./pdf-export-button";
 import { PackDeleteButton } from "./pack-delete-button";
-import { PackCoverRerollButton } from "./pack-cover-reroll-button";
-import { PackForewordRerollButton } from "./pack-foreword-reroll-button";
+
+// Cover-Reroll + Foreword-Reroll Buttons sind bewusst aus der Pack-
+// Uebersicht entfernt (User-Feedback 2026-05-17: zu viele Action-Buttons,
+// unuebersichtlich). Beide Funktionen sind im Pack-Editor verfuegbar —
+// dort als Re-Roll-Button neben jedem Feld einzeln (greeting/story/
+// signoff/outro separat re-rollbar plus Cover/Foreword-Bild separat).
+// Cleaner Single-Entry-Point: "Pack bearbeiten" → alles drin.
 
 type PackActionsProps = {
   brand: Brand;
@@ -50,26 +55,6 @@ export function PackActions({ brand, pack, customPackId }: PackActionsProps) {
             >
               Pack bearbeiten
             </Link>
-          ) : null}
-          {customPackId ? (
-            <PackForewordRerollButton
-              packId={customPackId}
-              tint={{
-                bg: pack.mood.background,
-                ink: pack.mood.ink,
-                accent: pack.mood.accent,
-              }}
-            />
-          ) : null}
-          {customPackId ? (
-            <PackCoverRerollButton
-              packId={customPackId}
-              tint={{
-                bg: pack.mood.background,
-                ink: pack.mood.ink,
-                accent: pack.mood.accent,
-              }}
-            />
           ) : null}
           {customPackId ? (
             <PackDeleteButton
