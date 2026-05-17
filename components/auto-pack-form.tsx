@@ -442,6 +442,20 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
     return () => clearTimeout(t);
   }, [loadReels]);
 
+  // Cross-Component-Refresh via Window-Event: wenn auf der Brand-Seite
+  // (oder hier per Quick-Scrape) ein Refresh getriggert wurde, lädt der
+  // Auto-Tab seine Reel-Preview + Tag-Aggregates neu — ohne Page-Reload.
+  // Sonst bleibt die UI auf alten Reels haengen und der User denkt
+  // "nichts hat sich geaendert".
+  useEffect(() => {
+    const handler = () => {
+      void loadReels();
+      void loadTags();
+    };
+    window.addEventListener("reels-refresh-needed", handler);
+    return () => window.removeEventListener("reels-refresh-needed", handler);
+  }, [loadReels, loadTags]);
+
   // Multi-Select-Toggle-Helper. Funktioniert fuer jede Dimension.
   function toggleIn(
     setter: React.Dispatch<React.SetStateAction<string[]>>,
@@ -508,6 +522,9 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
       );
       // Reels-Preview + Tags re-laden mit dem aktuellen Filter
       await Promise.all([loadReels(), loadTags()]);
+      // Globales Event: andere Komponenten (Brand-Seite Refresh-Button,
+      // Suggestions-Section) ziehen frische Daten ohne Page-Reload.
+      window.dispatchEvent(new CustomEvent("reels-refresh-needed"));
     } catch (err) {
       setScrapeError(
         err instanceof Error ? err.message : "Scrape fehlgeschlagen."

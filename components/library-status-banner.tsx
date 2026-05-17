@@ -124,10 +124,22 @@ export function LibraryStatusBanner({
     void fetchStatus();
     interval = setInterval(fetchStatus, POLL_INTERVAL_MS);
 
+    // Sofort-Poll wenn ein anderes Element einen Refresh getriggert hat
+    // (z.B. RefreshReelsButton). Sonst wartet der Banner bis zu 4s auf
+    // den naechsten Interval-Tick — wirkt traege. Mit Event sieht der
+    // Banner den neuen Scrape in <500ms. Zusaetzlich: hidden=false setzen
+    // damit ein gerade weggefadeter Banner wieder erscheint.
+    const refreshHandler = () => {
+      setHidden(false);
+      void fetchStatus();
+    };
+    window.addEventListener("reels-refresh-needed", refreshHandler);
+
     return () => {
       cancelled = true;
       if (interval) clearInterval(interval);
       if (fadeTimer) clearTimeout(fadeTimer);
+      window.removeEventListener("reels-refresh-needed", refreshHandler);
     };
   }, [brand.slug, onDone]);
 

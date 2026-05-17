@@ -406,7 +406,28 @@ export async function queryReelsForBrand(opts: {
     .eq("brand_slug", opts.brandSlug);
   if (opts.onlyRecipes !== false) q = q.eq("is_recipe", true);
   if (opts.fromDate) q = q.gte("posted_at", opts.fromDate);
-  if (opts.toDate) q = q.lte("posted_at", opts.toDate);
+  if (opts.toDate) {
+    // posted_at ist ein vollstaendiger Timestamp (mit Uhrzeit). User gibt
+    // im Datepicker nur YYYY-MM-DD an und meint "bis Ende des Tages",
+    // nicht "bis Mitternacht morgens". Ohne diesen Fix wuerden alle Reels
+    // des Bis-Tages stumm rausgefiltert.
+    //
+    // Wir nehmen toDate, addieren einen Tag, und nutzen lt (exclusive).
+    // Beispiel: toDate=2026-05-17 -> q.lt('posted_at', '2026-05-18T00:00:00Z')
+    // Damit landen alle Posts von 00:00 bis 23:59:59 des 17. inklusive.
+    try {
+      const d = new Date(`${opts.toDate}T00:00:00Z`);
+      if (!Number.isNaN(d.getTime())) {
+        d.setUTCDate(d.getUTCDate() + 1);
+        q = q.lt("posted_at", d.toISOString());
+      } else {
+        // Falls toDate kein parsebares Datum ist, Fallback auf lte
+        q = q.lte("posted_at", opts.toDate);
+      }
+    } catch {
+      q = q.lte("posted_at", opts.toDate);
+    }
+  }
   if (opts.mealTypes && opts.mealTypes.length > 0) {
     q = q.in("meal_type", opts.mealTypes);
   }
