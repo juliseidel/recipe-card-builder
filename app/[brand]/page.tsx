@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { brands, isCodeBrand } from "@/lib/brands";
+import { brands } from "@/lib/brands";
 import { loadBrand } from "@/lib/custom-brands-server";
 import { getPacksForBrand, mergeAndRenumberPacks } from "@/lib/packs";
 import {
@@ -123,9 +123,12 @@ export default async function BrandPage({ params }: BrandPageProps) {
       style={{ background: brand.tokens.background }}
     >
       <SiteHeader />
-      {/* Library-Banner + Pack-Vorschlaege fuer DB-Brands. Code-Brand Biene
-          hat keine gescrapte Reel-Library — die Pilot-Packs sind im Code. */}
-      {!isCodeBrand(brand.slug) ? <BrandLibraryHeader brand={brand} /> : null}
+      {/* Library-Header: Refresh-Toolbar + Status-Banner + Pack-Vorschlaege.
+          Funktioniert fuer alle Brands mit Social-Handle (Code- und DB-
+          Brands gleichermassen). Komponente entscheidet intern, was sie
+          rendert — Toolbar nur wenn handle gesetzt, Banner nur wenn
+          Scrape laeuft, Suggestions nur wenn welche pending sind. */}
+      <BrandLibraryHeader brand={brand} />
       <BrandHero
         brand={brand}
         livePackCount={packs.length}

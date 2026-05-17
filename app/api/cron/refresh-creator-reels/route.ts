@@ -4,16 +4,25 @@ import { startReelBackfill } from "@/lib/integrations/apify";
 import { startTikTokBackfill } from "@/lib/integrations/apify-tiktok";
 import {
   createScrape,
+  getLatestScrapeForBrand,
   updateScrapeRunId,
   updateScrapeStatus,
 } from "@/lib/creator-reels-server";
-import type { Brand } from "@/lib/brands";
+import { brands as codeBrands, getCodeBrandsWithHandle, type Brand } from "@/lib/brands";
 import type { SocialPlatform } from "@/lib/integrations/platform";
 
-// Daily-Refresh-Cron. Vercel feuert das alle 24h (siehe vercel.json),
-// dann scrapen wir fuer jeden DB-Brand die neuesten ~50 Posts der letzten
-// 30 Tage. Existing Apify-Webhook-Pipeline uebernimmt Dedup + Klassifikation
-// + Suggestions-Regen — der Refresh nutzt sie 1:1 wieder.
+// Auto-Refresh-Cron. Vercel feuert das alle 4h (siehe vercel.json), wir
+// scrapen pro Brand die letzten ~50 Posts der letzten 14 Tage. Dedup auf
+// ig_id verhindert Duplikate; nur neue Reels landen in der Library.
+// Apify-Webhook-Pipeline uebernimmt Klassifikation + Suggestions-Regen
+// + Cover-Caching automatisch.
+//
+// Was sich vom alten Daily-Cron unterscheidet:
+//   - Frequenz 24h → 4h (vercel.json)
+//   - Auch Code-Brands (z.B. Biene) werden mitgescrapt — vorher nur DB-Brands
+//   - Skip-Lock: Brands, deren letzte Aktualisierung < 2h alt ist, werden
+//     uebersprungen. Verhindert Overlap mit manuellen Refreshes und spart
+//     Apify-Credits bei sehr aktivem Cron.
 //
 // Authentifizierung: Vercel setzt automatisch den Header
 // `authorization: Bearer <CRON_SECRET>`, wenn `CRON_SECRET` env-var
@@ -24,8 +33,11 @@ import type { SocialPlatform } from "@/lib/integrations/platform";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+// Wenn der letzte Scrape eines Brands juenger als dieses Fenster ist,
+// ueberspringen wir. 2h Fenster = 30 Min Puffer auf den 4h-Cron-Takt.
+const SKIP_IF_FRESHER_THAN_MIN = 120;
+
 export async function GET(req: Request) {
-  // Auth-Check: nur Vercel-Cron darf das aufrufen.
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = req.headers.get("authorization");
@@ -48,7 +60,9 @@ export async function GET(req: Request) {
   }
 
   const supabase = getServerSupabase();
-  const { data: rows, error } = await supabase
+
+  // ─── DB-Brands laden ──────────────────────────────────────────────────
+  const { data: dbRows, error } = await supabase
     .from("brands")
     .select("slug, data");
   if (error) {
@@ -57,10 +71,20 @@ export async function GET(req: Request) {
       { status: 500 }
     );
   }
+  const dbBrands: Brand[] = (dbRows ?? [])
+    .map((row) => row.data as Brand)
+    .filter((b) => Boolean(b?.slug));
+
+  // ─── Code-Brands mit Handle ergaenzen ────────────────────────────────
+  // Code-Brand Biene wurde vom alten Cron komplett ignoriert (select from
+  // brands liefert nur DB-Rows). Wir fuegen alle Code-Brands mit gueltigem
+  // Handle hinzu, deduplizieren falls Slug-Konflikt mit einem DB-Brand
+  // (Code gewinnt).
+  const codeBrandSlugs = new Set(codeBrands.map((b) => b.slug));
+  const dedupedDbBrands = dbBrands.filter((b) => !codeBrandSlugs.has(b.slug));
+  const allBrands: Brand[] = [...getCodeBrandsWithHandle(), ...dedupedDbBrands];
 
   const origin = new URL(req.url).origin;
-  // Identisches Secret-Handling wie in /api/brands/backfill — Apify muss
-  // den Secret beim Callback mitschicken, sonst gibt der Webhook 403.
   const webhookSecret = process.env.APIFY_WEBHOOK_SECRET;
   const webhookUrl = webhookSecret
     ? `${origin}/api/apify-webhook?secret=${encodeURIComponent(webhookSecret)}`
@@ -68,21 +92,53 @@ export async function GET(req: Request) {
 
   const results: Array<{
     brandSlug: string;
-    status: "started" | "skipped" | "failed";
+    status: "started" | "skipped" | "skipped-fresh" | "skipped-running" | "failed";
     runId?: string;
     error?: string;
+    skipReason?: string;
   }> = [];
 
-  for (const row of rows ?? []) {
-    const brand = row.data as Brand;
+  for (const brand of allBrands) {
     const handle = brand.handle?.replace(/^@+/, "").trim();
     if (!handle || handle === "creator") {
-      results.push({ brandSlug: brand.slug, status: "skipped" });
+      results.push({
+        brandSlug: brand.slug,
+        status: "skipped",
+        skipReason: "no-handle",
+      });
       continue;
     }
 
-    // Plattform aus brand.platform — Default 'instagram' fuer Brands die
-    // vor der platform-extension Migration angelegt wurden.
+    // Skip-Lock 1: laeuft schon ein Scrape? Webhook erledigt Pipeline,
+    // doppelt-anstossen waere Verschwendung.
+    const latest = await getLatestScrapeForBrand(brand.slug);
+    if (
+      latest &&
+      (latest.status === "running" || latest.status === "classifying")
+    ) {
+      results.push({
+        brandSlug: brand.slug,
+        status: "skipped-running",
+        skipReason: `existing-scrape-${latest.status}`,
+      });
+      continue;
+    }
+
+    // Skip-Lock 2: war der letzte Refresh frisch? Verhindert Doppel-Run
+    // mit manuell getriggertem Refresh.
+    if (latest && latest.status === "done" && latest.finished_at) {
+      const ageMin =
+        (Date.now() - new Date(latest.finished_at).getTime()) / 60_000;
+      if (ageMin < SKIP_IF_FRESHER_THAN_MIN) {
+        results.push({
+          brandSlug: brand.slug,
+          status: "skipped-fresh",
+          skipReason: `last-refresh-${Math.round(ageMin)}min-ago`,
+        });
+        continue;
+      }
+    }
+
     const platform: SocialPlatform = brand.platform ?? "instagram";
     const scrapeId = await createScrape(brand.slug, platform);
     if (!scrapeId) {
@@ -95,19 +151,22 @@ export async function GET(req: Request) {
     }
 
     try {
+      // Delta-Backfill: 50 Posts, letzte 14 Tage. Beim 4h-Cron-Takt
+      // reicht das fuer alle Creator (auch >5 Posts/Tag), Dedup macht
+      // Rest.
       const { runId } =
         platform === "tiktok"
           ? await startTikTokBackfill({
               username: handle,
               webhookUrl,
               resultsLimit: 50,
-              onlyPostsNewerThanDays: 30,
+              onlyPostsNewerThanDays: 14,
             })
           : await startReelBackfill({
               username: handle,
               webhookUrl,
               resultsLimit: 50,
-              onlyPostsNewerThanDays: 30,
+              onlyPostsNewerThanDays: 14,
             });
       await updateScrapeRunId(scrapeId, runId);
       results.push({ brandSlug: brand.slug, status: "started", runId });
@@ -120,7 +179,9 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     ranAt: new Date().toISOString(),
-    brandCount: rows?.length ?? 0,
+    brandCount: allBrands.length,
+    codeBrandCount: getCodeBrandsWithHandle().length,
+    dbBrandCount: dedupedDbBrands.length,
     results,
   });
 }

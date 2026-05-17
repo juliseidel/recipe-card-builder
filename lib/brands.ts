@@ -185,3 +185,15 @@ export function getBrand(slug: string): Brand | undefined {
 export function isCodeBrand(slug: string): boolean {
   return brands.some((b) => b.slug === slug);
 }
+
+// Alle Code-Brands mit gueltigem Social-Handle. Wird vom Daily-Refresh-
+// Cron und vom Reel-Refresh-Endpoint genutzt: auch Biene & Co. muessen
+// regelmaessig neue Reels nachziehen, obwohl ihr Profil im Code liegt
+// und nicht in der brands-Tabelle. Filter: handle muss gesetzt sein,
+// "@creator" / leer wird ausgeschlossen.
+export function getCodeBrandsWithHandle(): Brand[] {
+  return brands.filter((b) => {
+    const handle = b.handle?.replace(/^@+/, "").trim();
+    return Boolean(handle) && handle !== "creator";
+  });
+}
