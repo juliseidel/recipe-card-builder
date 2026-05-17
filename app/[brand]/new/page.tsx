@@ -3,7 +3,7 @@
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { isCodeBrand, type Brand } from "@/lib/brands";
+import type { Brand } from "@/lib/brands";
 import { getBrandClient } from "@/lib/custom-brands";
 import { getPacksForBrand, type Pack } from "@/lib/packs";
 import { addCustomPack, slugifyPack } from "@/lib/custom-packs";
@@ -43,9 +43,14 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
   const staticPacks = useMemo(() => getPacksForBrand(brandSlug), [brandSlug]);
 
   // Mode-Tab: Individuell (Form fuer Custom-Pack) oder Auto-Generate
-  // (KI-Pack aus Reel-Library mit Filter-Selektoren). Auto-Tab nur fuer
-  // DB-Brands sinnvoll — Code-Brand Biene hat keine gescrapte Library.
-  const isCode = isCodeBrand(brandSlug);
+  // (KI-Pack aus Reel-Library mit Filter-Selektoren). Auto-Tab fuer ALLE
+  // Brands mit Social-Handle verfuegbar — Code-Brand Biene inklusive,
+  // seit der Refresh-Pipeline (User kann via Reel-Library aktualisieren
+  // jederzeit einen Backfill fuer Biene anstossen).
+  const hasHandle = useMemo(() => {
+    const h = brand?.handle?.replace(/^@+/, "").trim();
+    return Boolean(h) && h !== "creator";
+  }, [brand]);
   const [mode, setMode] = useState<"individual" | "auto">("individual");
 
   const [title, setTitle] = useState("");
@@ -295,9 +300,10 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
 
       <main className="flex-1">
         {/* Tab-Switcher zwischen Individuell und Auto-Generate. Auto-Tab
-            nur fuer DB-Brands sinnvoll — Code-Brand Biene hat keine
-            gescrapte Reel-Library. */}
-        {!isCode ? (
+            fuer alle Brands mit Handle — wenn die Library leer ist, zeigt
+            AutoPackForm einen Quick-Scrape-Button (Reel-Library kann via
+            Refresh-Button auf der Brand-Seite jederzeit gefuellt werden). */}
+        {hasHandle ? (
           <div
             className="border-b"
             style={{
@@ -384,7 +390,7 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
           </div>
         ) : null}
 
-        {mode === "auto" && !isCode ? (
+        {mode === "auto" && hasHandle ? (
           <div className="mx-auto max-w-[1100px] px-6 py-10 lg:px-10 lg:py-14">
             <AutoPackForm brand={brand} />
           </div>

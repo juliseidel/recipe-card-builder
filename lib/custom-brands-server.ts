@@ -88,11 +88,20 @@ export async function loadBrand(slug: string): Promise<Brand | undefined> {
 }
 
 // Alle Brands fuer den Workspace-Hub. Code-Brands first (Biene oben als
-// Anker), dann Custom-Brands in Erstellungs-Reihenfolge. Hub-Page zeigt
-// das Ergebnis 1:1 im Grid.
+// Anker), dann Custom-Brands in Erstellungs-Reihenfolge. Dedup gegen
+// Code-Brand-Slugs — wenn ein DB-Brand denselben Slug wie ein Code-Brand
+// hat (z.B. ein versehentlich angelegter "biene"-DB-Eintrag), gewinnt der
+// Code-Brand und der DB-Eintrag wird hier ausgeblendet. Sonst doppelte
+// Workspace-Cards im Hub.
+//
+// Der DB-Eintrag wird NICHT geloescht — er kann optional AI-Felder
+// (voiceProfile, etc.) tragen, die `loadBrand(slug)` in den Code-Brand
+// mergt. Hier filtern wir nur fuer die Hub-Anzeige.
 export async function loadAllBrands(): Promise<Brand[]> {
   const custom = await getCustomBrandsServer();
-  return [...codeBrands, ...custom];
+  const codeSlugs = new Set(codeBrands.map((b) => b.slug));
+  const dedupedCustom = custom.filter((c) => !codeSlugs.has(c.slug));
+  return [...codeBrands, ...dedupedCustom];
 }
 
 // Helper fuer die Routing-Logik: existiert ein Slug ueberhaupt? Wird im

@@ -79,7 +79,22 @@ const TIMEFRAME_PRESETS = [
   { id: "3m", label: "Letzte 3 Monate", days: 90 },
   { id: "1y", label: "Letztes Jahr", days: 365 },
   { id: "all", label: "Alle Zeit", days: 0 },
+  // Pseudo-Preset: bei timeframe=custom werden customFromDate + customToDate
+  // verwendet, days ist nur Default-Fallback fuer Quick-Scrape (das macht
+  // dann maximal 90 Tage Apify-Window).
+  { id: "custom", label: "Eigener Zeitraum", days: 90 },
 ] as const;
+
+// Liefert ein ISO-Datum (YYYY-MM-DD) fuer "heute − N Tage". Wird als
+// Default fuer den Custom-Datepicker genutzt.
+function defaultIsoDaysAgo(days: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 // ─── Label-Maps (KI gibt englische enums, User sieht Deutsch) ────────────
 
@@ -220,6 +235,12 @@ function labelFor(map: Record<string, string>, value: string): string {
 export function AutoPackForm({ brand }: { brand: Brand }) {
   const router = useRouter();
   const [timeframe, setTimeframe] = useState<(typeof TIMEFRAME_PRESETS)[number]["id"]>("1m");
+  // Custom-Zeitraum: aktiv wenn timeframe === "custom". Defaults sind
+  // letzte 30 Tage, aber User kann beide unabhaengig anpassen.
+  const [customFromDate, setCustomFromDate] = useState<string>(() =>
+    defaultIsoDaysAgo(30)
+  );
+  const [customToDate, setCustomToDate] = useState<string>(() => todayIso());
   const [limit, setLimit] = useState(12);
   const [sortBy, setSortBy] = useState<"engagement" | "recent">("engagement");
 
@@ -340,9 +361,14 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
   // useEffect nur bei echten Aenderungen re-laed't.
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
-    const tf = TIMEFRAME_PRESETS.find((t) => t.id === timeframe);
-    if (tf && tf.days > 0) {
-      params.set("from", isoDaysAgo(tf.days));
+    if (timeframe === "custom") {
+      if (customFromDate) params.set("from", customFromDate);
+      if (customToDate) params.set("to", customToDate);
+    } else {
+      const tf = TIMEFRAME_PRESETS.find((t) => t.id === timeframe);
+      if (tf && tf.days > 0) {
+        params.set("from", isoDaysAgo(tf.days));
+      }
     }
     if (mealTypes.length > 0) params.set("mealTypes", mealTypes.join(","));
     if (cuisines.length > 0) params.set("cuisines", cuisines.join(","));
@@ -362,6 +388,8 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
     return params.toString();
   }, [
     timeframe,
+    customFromDate,
+    customToDate,
     mealTypes,
     cuisines,
     mainIngredients,
@@ -496,9 +524,15 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
     const maxTimeMinutes = timeBucket
       ? TIME_BUCKET_TO_MAX[timeBucket]
       : undefined;
+    const isCustom = timeframe === "custom";
     return {
       brandSlug: brand.slug,
-      fromDate: tf && tf.days > 0 ? isoDaysAgo(tf.days) : undefined,
+      fromDate: isCustom
+        ? customFromDate || undefined
+        : tf && tf.days > 0
+          ? isoDaysAgo(tf.days)
+          : undefined,
+      toDate: isCustom ? customToDate || undefined : undefined,
       mealTypes: mealTypes.length > 0 ? mealTypes : undefined,
       cuisines: cuisines.length > 0 ? cuisines : undefined,
       mainIngredients:
@@ -515,6 +549,8 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
   }, [
     brand.slug,
     timeframe,
+    customFromDate,
+    customToDate,
     mealTypes,
     cuisines,
     mainIngredients,
@@ -771,6 +807,68 @@ export function AutoPackForm({ brand }: { brand: Brand }) {
             );
           })}
         </div>
+        {/* Custom-Zeitraum-Datepicker: erscheint nur wenn "Eigener
+            Zeitraum" ausgewaehlt. Native <input type="date"> — funktioniert
+            in allen Browsern + Mobile out-of-the-box, kein extra Lib. Bis-
+            Datum kann nicht vor Von-Datum liegen (min-attribut). */}
+        {timeframe === "custom" ? (
+          <div
+            className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-end sm:gap-5"
+            style={{
+              borderColor: brand.tokens.line,
+              background: brand.tokens.background,
+            }}
+          >
+            <label className="flex flex-col gap-1.5">
+              <span
+                className="text-[10.5px] font-semibold uppercase tracking-[0.16em]"
+                style={{ color: brand.tokens.inkMuted }}
+              >
+                Von
+              </span>
+              <input
+                type="date"
+                value={customFromDate}
+                max={customToDate || todayIso()}
+                onChange={(e) => setCustomFromDate(e.target.value)}
+                className="rounded-lg border-2 px-3 py-2 text-[13px] font-medium outline-none transition-colors"
+                style={{
+                  borderColor: brand.tokens.line,
+                  background: brand.tokens.surface,
+                  color: brand.tokens.ink,
+                }}
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span
+                className="text-[10.5px] font-semibold uppercase tracking-[0.16em]"
+                style={{ color: brand.tokens.inkMuted }}
+              >
+                Bis
+              </span>
+              <input
+                type="date"
+                value={customToDate}
+                min={customFromDate}
+                max={todayIso()}
+                onChange={(e) => setCustomToDate(e.target.value)}
+                className="rounded-lg border-2 px-3 py-2 text-[13px] font-medium outline-none transition-colors"
+                style={{
+                  borderColor: brand.tokens.line,
+                  background: brand.tokens.surface,
+                  color: brand.tokens.ink,
+                }}
+              />
+            </label>
+            <p
+              className="flex-1 text-[11.5px] leading-snug"
+              style={{ color: brand.tokens.inkMuted }}
+            >
+              Eigener Zeitraum — Filter auf Reels deren Posting-Datum in
+              diesem Fenster liegt. Maximal 2 Jahre zurueck (Library-Limit).
+            </p>
+          </div>
+        ) : null}
       </section>
 
       {/* Section 2 — Filter-Bar mit gruppierten Chip-Sektionen.
