@@ -8,6 +8,7 @@ import {
 import { generateWithCritique } from "./text-generation-pipeline";
 import { restoreGermanUmlauts } from "@/lib/restore-umlauts";
 import { correctGermanUmlautsBatch } from "./correct-german-umlauts";
+import { normalizeRecipeTitleForProse } from "@/lib/normalize-recipe-title";
 
 // Pack-Vorwort-Generator (v2, Mai 2026): jetzt brand-agnostisch ueber
 // Voice-Profil + Multi-Candidate + Self-Critique + Banned-Check.
@@ -79,6 +80,12 @@ DEUTSCHE SCHREIBWEISE (KRITISCH wenn Sprache=de):
 - Verwende immer korrekte Umlaute: ä, ö, ü, ß
 - NIEMALS "ae/oe/ue/ss" wo Umlaute hingehoeren
 - Bei langem Vokal: ß statt ss ("süß", "heiß", "groß", "weiß")
+
+REZEPT-NAMEN IM FLIESSTEXT:
+- Schreibe Rezept-Namen IMMER in Title-Case ("Spaghetti Protein Eis", "Homemade Döner") — NIEMALS in ALL-CAPS, auch wenn sie in der Recipe-Liste oben so vorkommen
+- Im Fliesstext eines Vorworts wirkt ALL-CAPS schreiend und unleserlich
+- Beispiel falsch: "Das SPAGHETTI PROTEIN EIS ist ein Knaller"
+- Beispiel richtig: "Das Spaghetti Protein Eis ist ein Knaller"
 
 PACK-VORWORT-STRUKTUR:
 - greeting: 4-7 Woerter, direkte Anrede
@@ -167,9 +174,17 @@ export async function generatePackForeword(
   const brandWithVoice = (await ensureBrandVoiceProfile(brand)) ?? brand;
   const brandBanned = brandWithVoice.voiceProfile?.bannedPhrases ?? [];
 
+  // ALL-CAPS-Recipe-Titel ("SPAGHETTI PROTEIN EIS") werden fuer die
+  // Prose-Erwaehnung im Vorwort in Title-Case ueberfuehrt ("Spaghetti
+  // Protein Eis"). User-Feedback: ALL-CAPS-Erwaehnungen im Fliesstext
+  // wirken schreiend + triggern Char-Level-Wraps in react-pdf. Recipe-
+  // Cards selbst behalten ihre Original-Schreibweise — das hier ist
+  // nur fuer Gemini's Story/Outro-Generation.
+  const normalizedTitles = recipeTitles.map(normalizeRecipeTitleForProse);
+
   const result = await generateWithCritique<PackForewordContent>({
     schema: RESPONSE_SCHEMA,
-    generationPrompt: buildUserPrompt(pack, brandWithVoice, recipeTitles),
+    generationPrompt: buildUserPrompt(pack, brandWithVoice, normalizedTitles),
     generationSystemInstruction: buildSystemInstruction(brandWithVoice),
     candidateCount: 3,
     generationTemperature: 0.7,
