@@ -9,11 +9,13 @@ import type { Brand } from "@/lib/brands";
 //   1. Beim Mount: GET /api/brands/[slug]/library-status — zeigt
 //      "Letzter Sync vor X" oder "Noch nie aktualisiert"
 //   2. User klickt "Aktualisieren" → POST /api/brands/[slug]/refresh-reels
-//   3. Bei Success: setRefreshing=true, Parent (BrandLibraryHeader)
-//      rendert dann den LibraryStatusBanner als progress-anzeige. Sobald
-//      der Banner status='done' triggert, refreshen wir hier den
-//      Last-Sync-Text via onRefreshComplete-Callback.
-//   4. Bei Fehler (429 throttled / 409 running / 422 no-handle): Error-
+//   3. Bei Success: window-Event "reels-refresh-needed" wird gefeuert.
+//      LibraryStatusBanner pollt eh, taucht damit nach max 4s auf. Pack-
+//      Suggestions-Section reloaded sich sofort.
+//   4. Beim Banner-onDone-Transition feuert ein weiteres Window-Event,
+//      hier landet's im handler unten und der Last-Sync-Text wird neu
+//      geladen ohne Page-Reload.
+//   5. Bei Fehler (429 throttled / 409 running / 422 no-handle): Error-
 //      Toast ohne Banner-Trigger.
 //
 // Wir nutzen die ASYNC-Pipeline (refresh-reels Endpoint), NICHT quick-
@@ -73,8 +75,16 @@ export function RefreshReelsButton({
       }
     };
     void fetchStatus();
+
+    // Window-Event-Listener: wenn LibraryStatusBanner status='done'
+    // detected ODER ein User-Refresh gestartet wurde, Last-Sync-Anzeige
+    // sofort updaten ohne auf den nächsten Mount zu warten.
+    const handler = () => void fetchStatus();
+    window.addEventListener("reels-refresh-needed", handler);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("reels-refresh-needed", handler);
     };
   }, [brand.slug, refreshToken]);
 
@@ -93,12 +103,18 @@ export function RefreshReelsButton({
         // User den Fortschritt sieht. Trotzdem onRefreshStarted callen.
         if (res.status === 409) {
           onRefreshStarted?.();
+          window.dispatchEvent(new CustomEvent("reels-refresh-needed"));
           setError(null);
           return;
         }
         throw new Error(json.error ?? "Aktualisierung fehlgeschlagen.");
       }
       onRefreshStarted?.();
+      // Globales Refresh-Event: PackSuggestionsSection und alle anderen
+      // Komponenten, die ihren Stand zeigen, ziehen sofort neue Daten.
+      // Banner pollt eh selber, aber der erste Tick kommt ggf. erst in
+      // 4s — das Event laesst Suggestions-Reload sofort starten.
+      window.dispatchEvent(new CustomEvent("reels-refresh-needed"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler.");
     } finally {

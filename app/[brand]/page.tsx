@@ -11,7 +11,9 @@ import { SiteHeader } from "@/components/site-header";
 import { BrandHero } from "@/components/brand-hero";
 import { PackCard } from "@/components/pack-card";
 import { NewPackCard } from "@/components/new-pack-card";
-import { BrandLibraryHeader } from "@/components/brand-library-header";
+import { LibraryStatusBanner } from "@/components/library-status-banner";
+import { PackSuggestionsSection } from "@/components/pack-suggestions-section";
+import { RefreshReelsButton } from "@/components/refresh-reels-button";
 
 // Pre-render the Code-Brands at build time (currently only Biene). Custom
 // brands aus der Supabase `brands`-Tabelle werden on-demand gerendert —
@@ -117,23 +119,36 @@ export default async function BrandPage({ params }: BrandPageProps) {
   const totalRecipes = packs.reduce((sum, p) => sum + p.recipeCount, 0);
   const nextPackNumber = packs.length + 1;
 
+  // Brand mit Social-Handle? Nur dann zeigen wir die Reel-Library-Pipeline-
+  // Komponenten (Refresh-Button, Suggestions, Status-Banner). Code-Brands
+  // wie Biene haben einen Handle und werden mitberücksichtigt.
+  const handle = brand.handle?.replace(/^@+/, "").trim();
+  const hasReelLibrary = Boolean(handle) && handle !== "creator";
+
   return (
     <div
       className="flex min-h-screen flex-col"
       style={{ background: brand.tokens.background }}
     >
       <SiteHeader />
-      {/* Library-Header: Refresh-Toolbar + Status-Banner + Pack-Vorschlaege.
-          Funktioniert fuer alle Brands mit Social-Handle (Code- und DB-
-          Brands gleichermassen). Komponente entscheidet intern, was sie
-          rendert — Toolbar nur wenn handle gesetzt, Banner nur wenn
-          Scrape laeuft, Suggestions nur wenn welche pending sind. */}
-      <BrandLibraryHeader brand={brand} />
+      {/* Banner oben: transient, nur sichtbar wenn ein Scrape laeuft oder
+          gerade fertig wurde. Fadet nach 8s automatisch weg. Triggert
+          window-Event 'reels-refresh-needed' beim Done-Transition, das
+          alle Komponenten die Daten von der Reel-Library lesen sofort
+          aktualisiert. */}
+      {hasReelLibrary ? <LibraryStatusBanner brand={brand} /> : null}
       <BrandHero
         brand={brand}
         livePackCount={packs.length}
         liveRecipeCount={totalRecipes}
       />
+
+      {/* Pack-Vorschlaege ZWISCHEN Brand-Hero und Active-Packs — klare
+          narrative Reihenfolge: wer ist das (Hero) → was du anlegen
+          koenntest (KI-CTA) → was du schon hast (Active Packs). Section
+          rendert null wenn keine pending Suggestions da sind, kein leerer
+          Header. */}
+      {hasReelLibrary ? <PackSuggestionsSection brand={brand} /> : null}
 
       <main className="flex-1">
         <section className="mx-auto max-w-[1400px] px-6 pt-10 pb-24 lg:px-10 lg:pt-12 lg:pb-32">
@@ -163,6 +178,13 @@ export default async function BrandPage({ params }: BrandPageProps) {
               </p>
             </div>
 
+            {/* Refresh-Button rechts neben dem Section-Header. Liegt im
+                normalen Document-Flow, kollidiert nicht mehr mit dem
+                fixed SiteHeader rechts oben. Semantisch passend: neue
+                Reels -> neue Pack-Vorschlaege -> Active-Packs-Pool. */}
+            {hasReelLibrary ? (
+              <RefreshReelsButton brand={brand} />
+            ) : null}
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

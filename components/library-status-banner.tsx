@@ -92,12 +92,16 @@ export function LibraryStatusBanner({
         }
 
         setStatus((prev) => {
-          // Bei status='done' Transition: callback + Fade-Timer setzen
+          // Bei status='done' Transition: callback + Fade-Timer setzen,
+          // plus globales Window-Event fuer alle Komponenten, die ihre
+          // Server-Daten refreshen muessen (Refresh-Button-Last-Sync,
+          // Pack-Suggestions-Section).
           if (
             json.status === "done" &&
             (!prev || prev.status !== "done")
           ) {
             onDone?.(json);
+            window.dispatchEvent(new CustomEvent("reels-refresh-needed"));
             if (fadeTimer) clearTimeout(fadeTimer);
             fadeTimer = setTimeout(() => setHidden(true), POST_DONE_FADE_MS);
           }

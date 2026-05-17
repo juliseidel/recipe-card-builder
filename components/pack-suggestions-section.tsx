@@ -70,6 +70,16 @@ export function PackSuggestionsSection({
     void loadSuggestions();
   }, [loadSuggestions, refreshToken]);
 
+  // Cross-component-Refresh via Window-Event. Sender: RefreshReelsButton
+  // (User-getriggerter Refresh) und LibraryStatusBanner (status='done'
+  // Transition vom Cron-Lauf). Damit aktualisieren sich neue Suggestions
+  // sofort, ohne dass die Komponenten via Props gekoppelt sein muessen.
+  useEffect(() => {
+    const handler = () => void loadSuggestions();
+    window.addEventListener("reels-refresh-needed", handler);
+    return () => window.removeEventListener("reels-refresh-needed", handler);
+  }, [loadSuggestions]);
+
   // Auto-Poll solange mindestens ein Cover noch fehlt — KI-Cover-Generation
   // laeuft im Hintergrund fuer ~30-60s nach dem ersten Onboarding. Wir
   // pollen alle 8s und stoppen sobald alle Suggestions ein Cover haben
