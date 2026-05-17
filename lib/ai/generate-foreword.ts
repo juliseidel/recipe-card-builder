@@ -7,6 +7,7 @@ import {
 } from "./analyze-voice-profile";
 import { generateWithCritique } from "./text-generation-pipeline";
 import { restoreGermanUmlauts } from "@/lib/restore-umlauts";
+import { correctGermanUmlautsBatch } from "./correct-german-umlauts";
 
 // Pack-Vorwort-Generator (v2, Mai 2026): jetzt brand-agnostisch ueber
 // Voice-Profil + Multi-Candidate + Self-Critique + Banned-Check.
@@ -222,10 +223,37 @@ export async function generatePackForeword(
   }
 
   const winner = result.winner;
-  return {
+
+  // Stage 1: schnelle Wortlisten-Korrektur (instant, kein API-Call).
+  // Faengt die ~100 haeufigsten deutschen Woerter ab und ist defense
+  // gegen Gemini-Outage in Stage 2.
+  const preCorrected = {
     greeting: cleanField(winner.greeting, 60),
     story: cleanField(winner.story, 420),
     signoff: cleanField(winner.signoff, 100),
-    outro: winner.outro ? cleanField(winner.outro, 320) : undefined,
+    outro: winner.outro ? cleanField(winner.outro, 320) : "",
+  };
+
+  // Stage 2: semantische Umlaut-Korrektur via Gemini-Mini-Call.
+  // Faengt alle Woerter ab die nicht in der Whitelist sind — auch ganz
+  // neue oder seltene Begriffe. Skipt falls keine verdaechtigen Patterns
+  // mehr drin sind (also Gemini Output war von vornherein sauber +
+  // Stage 1 hat alles abgedeckt). Cost ~1s + ~$0.0001 pro Foreword.
+  let corrected: typeof preCorrected;
+  try {
+    corrected = await correctGermanUmlautsBatch(preCorrected);
+  } catch (err) {
+    console.warn(
+      "[generate-foreword] Umlaut-Korrektur fehlgeschlagen, nutze Stage-1-Ergebnis:",
+      err instanceof Error ? err.message : err
+    );
+    corrected = preCorrected;
+  }
+
+  return {
+    greeting: corrected.greeting,
+    story: corrected.story,
+    signoff: corrected.signoff,
+    outro: corrected.outro ? corrected.outro : undefined,
   };
 }
