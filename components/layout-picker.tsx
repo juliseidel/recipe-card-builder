@@ -852,6 +852,84 @@ export function LayoutThumbnail({
           />
         </>
       )}
+      {layout === "newspaper" && (
+        <>
+          {/* Broadsheet: Masthead-Doppellinie, Hero + Headline, 3-Spalten-Body,
+              Spreadsheet-Footer mit Macro-Zellen. Skaliert von 70×52. */}
+          {/* Masthead Doppellinie */}
+          <rect x="2" y="2.5" width="44" height="0.5" fill={stroke} />
+          <rect x="2" y="3.5" width="44" height="0.25" fill={stroke} opacity="0.5" />
+          {/* Italic-Title-Hint */}
+          <rect x="2" y="5.2" width="20" height="1.4" rx="0.3" fill={fill} />
+          {/* Hero links */}
+          <rect x="2" y="8" width="20" height="9.5" fill={fill} opacity="0.55" />
+          {/* Body rechts (Lead-Paragraph) */}
+          <rect x="24" y="8" width="15" height="1.6" rx="0.3" fill={fill} />
+          <rect x="24" y="10.5" width="14" height="0.7" rx="0.2" fill={stroke} opacity="0.35" />
+          <rect x="24" y="12" width="12" height="0.7" rx="0.2" fill={stroke} opacity="0.35" />
+          <rect x="24" y="13.5" width="14" height="0.7" rx="0.2" fill={stroke} opacity="0.35" />
+          <rect x="24" y="15" width="11" height="0.7" rx="0.2" fill={stroke} opacity="0.35" />
+          {/* 3-Spalten-Body Hint */}
+          <rect x="2" y="20" width="13" height="0.5" fill={stroke} opacity="0.4" />
+          <rect x="2" y="21.5" width="10" height="0.5" fill={stroke} opacity="0.4" />
+          <rect x="2" y="23" width="12" height="0.5" fill={stroke} opacity="0.4" />
+          <rect x="17" y="20" width="13" height="0.5" fill={stroke} opacity="0.4" />
+          <rect x="17" y="21.5" width="10" height="0.5" fill={stroke} opacity="0.4" />
+          <rect x="17" y="23" width="12" height="0.5" fill={stroke} opacity="0.4" />
+          <rect x="32" y="20" width="13" height="0.5" fill={stroke} opacity="0.4" />
+          <rect x="32" y="21.5" width="10" height="0.5" fill={stroke} opacity="0.4" />
+          <rect x="32" y="23" width="12" height="0.5" fill={stroke} opacity="0.4" />
+          {/* Spreadsheet-Footer Doppellinie */}
+          <rect x="2" y="28" width="44" height="0.5" fill={stroke} />
+          <rect x="2" y="29" width="44" height="0.25" fill={stroke} opacity="0.5" />
+          {/* Macro-Zellen unten */}
+          <rect x="2" y="31" width="2" height="1.6" fill={fill} />
+          <rect x="5" y="31" width="2" height="1.6" fill={fill} />
+          <rect x="8" y="31" width="2" height="1.6" fill={fill} />
+          <rect x="11" y="31" width="2" height="1.6" fill={fill} />
+          <rect x="28" y="31" width="2" height="1.6" fill={fill} opacity="0.7" />
+          <rect x="31" y="31" width="2" height="1.6" fill={fill} opacity="0.7" />
+          <rect x="34" y="31" width="2" height="1.6" fill={fill} opacity="0.7" />
+        </>
+      )}
+      {layout === "restaurant" && (
+        <>
+          {/* Fine-Dining Speisekarte: Cream-BG, Gold-Akzent, zentriertes
+              quadratisches Hero mit Gold-Border, Dot-Leader-Zutaten,
+              Roman-Numeral-Steps. Skaliert von 70×52. */}
+          {/* Cream Background override */}
+          <rect x="0" y="0" width="48" height="36" rx="4" fill="#fcf9f3" />
+          {/* Top-Ornament: Gold-Linien + Brand-Hint */}
+          <line x1="4" y1="4" x2="14" y2="4" stroke="#b08842" strokeWidth="0.3" />
+          <rect x="16" y="3.2" width="16" height="1.5" rx="0.25" fill="#2c2418" opacity="0.85" />
+          <line x1="34" y1="4" x2="44" y2="4" stroke="#b08842" strokeWidth="0.3" />
+          {/* Hero quadratisch mit Gold-Border zentriert */}
+          <rect x="18" y="7" width="12" height="12" fill="none" stroke="#b08842" strokeWidth="0.4" />
+          <rect x="18.7" y="7.7" width="10.6" height="10.6" fill={fill} opacity="0.6" />
+          {/* Title-Hint italic */}
+          <rect x="13" y="20.5" width="22" height="1.4" rx="0.25" fill="#2c2418" opacity="0.85" />
+          {/* Ornamental Rule mit ◇ */}
+          <line x1="18" y1="23.2" x2="22" y2="23.2" stroke="#b08842" strokeWidth="0.3" />
+          <text x="22.8" y="23.9" fontSize="1.5" fill="#b08842">◇</text>
+          <line x1="26" y1="23.2" x2="30" y2="23.2" stroke="#b08842" strokeWidth="0.3" />
+          {/* Dot-Leader Zutaten */}
+          <rect x="3" y="26" width="8" height="0.7" rx="0.15" fill="#2c2418" opacity="0.8" />
+          <text x="12" y="26.6" fontSize="1.1" fill="#b08842" opacity="0.55" letterSpacing="0.3">···········</text>
+          <rect x="26" y="26" width="5" height="0.7" rx="0.15" fill="#2c2418" opacity="0.9" />
+          <rect x="3" y="28" width="7" height="0.7" rx="0.15" fill="#2c2418" opacity="0.8" />
+          <text x="11" y="28.6" fontSize="1.1" fill="#b08842" opacity="0.55" letterSpacing="0.3">·············</text>
+          <rect x="28" y="28" width="5" height="0.7" rx="0.15" fill="#2c2418" opacity="0.9" />
+          {/* Roman-Numeral Steps */}
+          <text x="3" y="31.4" fontSize="1.8" fill="#b08842" fontWeight="700" fontStyle="italic">I.</text>
+          <rect x="6.5" y="30.7" width="22" height="0.7" rx="0.15" fill="#2c2418" opacity="0.7" />
+          <text x="3" y="33.4" fontSize="1.8" fill="#b08842" fontWeight="700" fontStyle="italic">II.</text>
+          <rect x="6.5" y="32.7" width="19" height="0.7" rx="0.15" fill="#2c2418" opacity="0.7" />
+          {/* Wine-Notes Hint rechts unten */}
+          <text x="33" y="31.4" fontSize="1.3" fill="#b08842" fontWeight="700">◇</text>
+          <rect x="35" y="30.8" width="10" height="0.7" rx="0.15" fill="#b08842" opacity="0.85" />
+          <rect x="33" y="32.7" width="12" height="0.6" rx="0.15" fill="#2c2418" opacity="0.55" />
+        </>
+      )}
       {layout === "feature" && (
         <>
           {/* Cinematic Split — Content links ~42 %, Hero rechts ~58 % full-bleed */}
