@@ -109,6 +109,13 @@ export type Pack = {
    *  'coverImage', 'forewordImage', 'foreword.greeting', 'foreword.story',
    *  'foreword.signoff', 'foreword.outro'. */
   editedFields?: string[];
+  /** Pack-Type-Discriminator. "recipe" (Default) = klassischer Rezept-Pack
+   *  mit Recipe-Karten; "fitness" = Trainings-Pack mit FitnessCard-Karten
+   *  (siehe lib/fitness/types.ts). Steuert welche Loader-/Renderer-Pipeline
+   *  laeuft. Per-Pack-Override des Brand-Defaults (brand.defaultPackType).
+   *  Optional fuer Backward-Compat — Bestands-Packs ohne Feld werden als
+   *  "recipe" interpretiert. */
+  packType?: "recipe" | "fitness";
 };
 
 export const packs: Pack[] = [

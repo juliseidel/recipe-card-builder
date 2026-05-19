@@ -139,6 +139,13 @@ export type Brand = {
    *  Text-Generierungs-Pipelines als Steuersignal genutzt. Code-Brands
    *  ohne Profil fallen auf bio/tagline-basierte Defaults zurueck. */
   voiceProfile?: BrandVoiceProfile;
+  /** Welcher Pack-Type ist Default fuer diesen Brand. "recipe" (Default)
+   *  = Rezepte-Workspace; "fitness" = Trainings-Workspace. Steuert welche
+   *  Pipeline bei Karten-Anlage laeuft (Hero-Generation, Klassifikator,
+   *  PDF-Layouts). Per-Pack ueberschreibbar via Pack.packType.
+   *  Optional fuer Backward-Compat — Bestands-Brands ohne Feld werden als
+   *  "recipe" interpretiert. */
+  defaultPackType?: "recipe" | "fitness";
 };
 
 export const brands: Brand[] = [
