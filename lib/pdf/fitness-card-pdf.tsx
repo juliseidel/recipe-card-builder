@@ -492,21 +492,54 @@ const styles = StyleSheet.create({
     padding: 2,
   },
 
-  // ─── Empty Hero State ───────────────────────────────────────────────
+  // ─── Empty Hero State (eleganter, nicht nur Mega-Number) ───────────
   heroEmpty: {
     width: "100%",
     height: "100%",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: COLORS.surface,
+    position: "relative",
   },
-  heroEmptyMega: {
+  // Subtile Outline-Number im Hintergrund — viel zurueckhaltender als
+  // vorher (alpha statt solid divider). Kein dominantes Statement,
+  // sondern strukturelles Element.
+  heroEmptyOutline: {
     fontFamily: "Inter",
     fontWeight: 700,
-    fontSize: 240,
+    fontSize: 320,
     lineHeight: 0.85,
-    color: COLORS.dividerStrong,
-    letterSpacing: -10,
+    color: COLORS.bgSoft,
+    letterSpacing: -14,
+    position: "absolute",
+  },
+  // Center-Plate mit klarem Inhalt — Brand-Mark + Hero-Status
+  heroEmptyCenter: {
+    position: "relative",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 12,
+  },
+  heroEmptyBrand: {
+    fontFamily: "Inter",
+    fontWeight: 700,
+    fontSize: 11,
+    letterSpacing: 3,
+    textTransform: "uppercase",
+    color: COLORS.inkMuted,
+  },
+  heroEmptyDivider: {
+    width: 40,
+    height: 1,
+    backgroundColor: COLORS.dividerStrong,
+  },
+  heroEmptyLabel: {
+    fontFamily: "Inter",
+    fontWeight: 500,
+    fontSize: 9,
+    letterSpacing: 2,
+    textTransform: "uppercase",
+    color: COLORS.inkSubtle,
   },
 });
 
@@ -536,9 +569,16 @@ export function FitnessCardPdfPage(props: FitnessCardPdfProps) {
             </>
           ) : (
             <View style={styles.heroEmpty}>
-              <Text style={styles.heroEmptyMega}>
+              <Text style={styles.heroEmptyOutline}>
                 {(card.number ?? 1).toString().padStart(2, "0")}
               </Text>
+              <View style={styles.heroEmptyCenter}>
+                <Text style={styles.heroEmptyBrand}>
+                  {brand.handle ?? brand.name}
+                </Text>
+                <View style={styles.heroEmptyDivider} />
+                <Text style={styles.heroEmptyLabel}>Hero folgt</Text>
+              </View>
             </View>
           )}
           <View style={styles.raceStrip}>
@@ -582,7 +622,14 @@ export function FitnessCardPdfPage(props: FitnessCardPdfProps) {
           </>
         ) : (
           <View style={styles.heroEmpty}>
-            <Text style={styles.heroEmptyMega}>{stationNumStr}</Text>
+            <Text style={styles.heroEmptyOutline}>{stationNumStr}</Text>
+            <View style={styles.heroEmptyCenter}>
+              <Text style={styles.heroEmptyBrand}>
+                {brand.handle ?? brand.name}
+              </Text>
+              <View style={styles.heroEmptyDivider} />
+              <Text style={styles.heroEmptyLabel}>Hero folgt</Text>
+            </View>
           </View>
         )}
 

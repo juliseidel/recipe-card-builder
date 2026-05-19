@@ -224,16 +224,39 @@ function FitnessCardWebRender({
             />
           </>
         ) : (
+          // Eleganter Empty-State (Block 6 Polish): Mega-Outline-Number im
+          // Hintergrund + Brand-Mark + Divider + Hero-Status zentriert.
+          // Vorher: nur Mega-Number alleine = wirkte billig.
           <div className="absolute inset-0 flex items-center justify-center">
             <span
-              className="select-none font-bold leading-none tracking-tighter"
+              className="pointer-events-none absolute select-none font-bold leading-none tracking-tighter"
               style={{
-                fontSize: "clamp(180px, 30vw, 360px)",
-                color: COLORS.dividerStrong,
+                fontSize: "clamp(220px, 38vw, 440px)",
+                color: COLORS.bgSoft,
+                letterSpacing: "-0.05em",
               }}
+              aria-hidden
             >
               {stationNumStr}
             </span>
+            <div className="relative flex flex-col items-center gap-4">
+              <span
+                className="text-[12px] font-bold uppercase tracking-[0.3em]"
+                style={{ color: COLORS.inkMuted }}
+              >
+                {brand.handle ?? brand.name}
+              </span>
+              <span
+                className="block"
+                style={{ width: 56, height: 1, background: COLORS.dividerStrong }}
+              />
+              <span
+                className="text-[10px] font-medium uppercase tracking-[0.25em]"
+                style={{ color: COLORS.inkSubtle }}
+              >
+                Hero folgt
+              </span>
+            </div>
           </div>
         )}
 
