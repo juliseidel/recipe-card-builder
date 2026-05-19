@@ -1,4 +1,5 @@
 import { generatePackCover } from "@/lib/ai/generate-pack-cover";
+import { generateFitnessPackCover } from "@/lib/ai/generate-fitness-pack-cover";
 import {
   getServerSupabase,
   hasServerSupabase,
@@ -45,6 +46,15 @@ export async function generateSuggestionCovers(opts: {
   // sie aus dem Supabase-brands-Record.
   const bgHex = await getBrandBackground(opts.brandSlug);
 
+  // Pack-Type-Diskriminator: bei brand.defaultPackType='fitness' rufen
+  // wir generateFitnessPackCover (Equipment/Coaching-Setting mit Sub-
+  // Niche-Heuristik aus title/category/tagline) statt generatePackCover
+  // (Food-Stillleben). Vorher: ALLE Suggestions bekamen Food-Bowls,
+  // auch fuer "Food Noise: Mental-Reset" — semantisch komplett daneben.
+  const brandForType =
+    getBrand(opts.brandSlug) ?? (await loadBrand(opts.brandSlug));
+  const useFitnessCover = brandForType?.defaultPackType === "fitness";
+
   const supabase = getServerSupabase();
   await ensureBucket(supabase);
 
@@ -57,11 +67,18 @@ export async function generateSuggestionCovers(opts: {
     const results = await Promise.allSettled(
       chunk.map(async (s) => {
         try {
-          const { buffer } = await generatePackCover({
-            title: s.title,
-            tagline: s.tagline,
-            bgHex,
-          });
+          const { buffer } = useFitnessCover
+            ? await generateFitnessPackCover({
+                title: s.title,
+                tagline: s.tagline,
+                category: "", // wird im Sub-Niche-Picker aus title/tagline geparsed
+                bgHex,
+              })
+            : await generatePackCover({
+                title: s.title,
+                tagline: s.tagline,
+                bgHex,
+              });
           const filePath = `${s.id}.jpg`;
           const upload = await supabase.storage
             .from(COVER_BUCKET)

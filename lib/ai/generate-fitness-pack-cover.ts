@@ -64,6 +64,38 @@ function pickFitnessSetting(
 ): FitnessSettingPrompt {
   const combined = `${title} ${category} ${tagline}`.toLowerCase();
 
+  // Mindset/Coaching/Edukations-Packs zuerst checken — die haben oft
+  // Worte die mit Hardcore-Workout nichts zu tun haben und brauchen
+  // ein anderes Bild als Hantel-Stillleben. Beispiele: Tim's "Food
+  // Noise", Christian's "Mindset Erfolg", "Mythen & Fakten", "Methoden-
+  // Guide", "Mental-Reset", "Habits", "Routinen".
+  if (
+    combined.includes("mindset") ||
+    combined.includes("mental") ||
+    combined.includes("motivation") ||
+    combined.includes("food noise") ||
+    combined.includes("mythen") ||
+    combined.includes("fakten") ||
+    combined.includes("wissen") ||
+    combined.includes("guide") ||
+    combined.includes("methoden") ||
+    combined.includes("habits") ||
+    combined.includes("routine") ||
+    combined.includes("reflexion") ||
+    combined.includes("erfolg") ||
+    combined.includes("hater") ||
+    combined.includes("kritik") ||
+    combined.includes("content creator") ||
+    combined.includes("business")
+  ) {
+    return {
+      setting:
+        "Calm coaching desk: open notebook with handwritten weekly plan, ceramic mug of coffee, pair of running shoes off to the side, soft morning sunlight through window. Editorial flat lay, no equipment dominance — the mood is contemplative + intentional.",
+      equipmentFocus:
+        "Reflective coaching mood, notebook + coffee + ambient warmth, editorial magazine aesthetic",
+    };
+  }
+
   if (
     combined.includes("hyrox") ||
     combined.includes("functional") ||
