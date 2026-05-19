@@ -18,16 +18,20 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: Partial<CreateJobInput> & { recipeSlug?: string };
+  let body: Partial<CreateJobInput> & {
+    recipeSlug?: string;
+    cardSlug?: string;
+  };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  if (!body || (body.type !== "recipe" && body.type !== "pack")) {
+  const validTypes = new Set(["recipe", "pack", "fitness-card"]);
+  if (!body || !body.type || !validTypes.has(body.type)) {
     return NextResponse.json(
-      { error: "type must be 'recipe' or 'pack'" },
+      { error: "type must be 'recipe', 'pack' or 'fitness-card'" },
       { status: 400 }
     );
   }
@@ -40,6 +44,12 @@ export async function POST(req: Request) {
   if (body.type === "recipe" && !body.recipeSlug) {
     return NextResponse.json(
       { error: "recipeSlug is required when type='recipe'" },
+      { status: 400 }
+    );
+  }
+  if (body.type === "fitness-card" && !body.cardSlug) {
+    return NextResponse.json(
+      { error: "cardSlug is required when type='fitness-card'" },
       { status: 400 }
     );
   }
@@ -61,20 +71,27 @@ export async function POST(req: Request) {
 
   let job;
   try {
-    job = await createJob(
-      body.type === "recipe"
-        ? {
-            type: "recipe",
-            brandSlug: body.brandSlug,
-            packSlug: body.packSlug,
-            recipeSlug: body.recipeSlug!,
-          }
-        : {
-            type: "pack",
-            brandSlug: body.brandSlug,
-            packSlug: body.packSlug,
-          }
-    );
+    if (body.type === "recipe") {
+      job = await createJob({
+        type: "recipe",
+        brandSlug: body.brandSlug,
+        packSlug: body.packSlug,
+        recipeSlug: body.recipeSlug!,
+      });
+    } else if (body.type === "fitness-card") {
+      job = await createJob({
+        type: "fitness-card",
+        brandSlug: body.brandSlug,
+        packSlug: body.packSlug,
+        cardSlug: body.cardSlug!,
+      });
+    } else {
+      job = await createJob({
+        type: "pack",
+        brandSlug: body.brandSlug,
+        packSlug: body.packSlug,
+      });
+    }
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Could not create job" },

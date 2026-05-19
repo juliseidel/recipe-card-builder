@@ -11,9 +11,13 @@ import {
 } from "@/lib/recipes";
 import { getServerSupabase } from "@/lib/supabase-server";
 import { renderPackPdf, renderRecipePdf } from "./render";
+import { renderFitnessCardPdf } from "./render-fitness";
+import { getFitnessCardServer } from "@/lib/fitness/custom-cards-server";
 import { regeneratePackMeta } from "@/lib/ai/regenerate-pack-meta";
 
-export type PdfJobType = "recipe" | "pack";
+// Erweitert um Fitness-Types (Schritt 5/10, 2026-05-19). Fitness-Pack
+// (Cover + alle Cards) folgt in Schritt 10 mit dem Pilot.
+export type PdfJobType = "recipe" | "pack" | "fitness-card" | "fitness-pack";
 
 export type CreateJobInput =
   | {
@@ -26,6 +30,14 @@ export type CreateJobInput =
       type: "pack";
       brandSlug: string;
       packSlug: string;
+    }
+  | {
+      type: "fitness-card";
+      brandSlug: string;
+      packSlug: string;
+      /** Slug der Fitness-Card. Reused recipe_slug-Spalte in pdf_jobs
+       *  (gleiches Format, andere Tabelle dahinter). */
+      cardSlug: string;
     };
 
 export type PdfJob = {
@@ -51,11 +63,20 @@ const BUCKET = "recipe-pdfs";
 // Creates a job row and returns its ID. Does not start rendering.
 export async function createJob(input: CreateJobInput): Promise<PdfJob> {
   const supabase = getServerSupabase();
+  // recipe_slug-Spalte wird fuer fitness-card mit cardSlug befuellt — gleiche
+  // Spalte, andere Quell-Tabelle (fitness_cards statt recipes). Spart Schema-
+  // Aenderung; processJob branched anhand type.
+  const slugForRecipeColumn =
+    input.type === "recipe"
+      ? input.recipeSlug
+      : input.type === "fitness-card"
+        ? input.cardSlug
+        : null;
   const insert = {
     type: input.type,
     brand_slug: input.brandSlug,
     pack_slug: input.packSlug,
-    recipe_slug: input.type === "recipe" ? input.recipeSlug : null,
+    recipe_slug: slugForRecipeColumn,
     status: "queued" as const,
     progress: 0,
   };
@@ -136,7 +157,29 @@ export async function processJob(jobId: string): Promise<void> {
     let storagePath: string;
     let downloadName: string;
 
-    if (job.type === "recipe") {
+    // ── Fitness-Card-Branch (Schritt 5/10) ─────────────────────────
+    if (job.type === "fitness-card") {
+      const cardSlug = job.recipe_slug ?? "";
+      const card = await getFitnessCardServer(
+        job.brand_slug,
+        job.pack_slug,
+        cardSlug
+      );
+      if (!card) {
+        await markFailed(supabase, jobId, "Fitness card not found");
+        return;
+      }
+      // Pack muss packType='fitness' haben — sicherheitshalber.
+      buffer = await renderFitnessCardPdf({
+        brand,
+        pack,
+        card,
+        totalCards: 1, // Single-Card-Export, hideCardIndex blendet die Anzeige eh aus
+        onProgress,
+      });
+      storagePath = `${pack.slug}__${card.slug}.pdf`;
+      downloadName = `${safeFilename(card.title)}.pdf`;
+    } else if (job.type === "recipe") {
       const recipe = await loadRecipe(
         supabase,
         job.pack_slug,
