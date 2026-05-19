@@ -267,11 +267,89 @@ export const KRISTINA_STYLE: BrandImageStyle = {
   },
 };
 
+// ─── Alina · @alina.walbrun (DB-Brand-Slug: "alina") ─────────────────────────
+// Calibrated against 5 IG-Screenshots from the user (2026-05-19):
+//   1. Zuckerfreie Schokolade (Hero mit ihr, weißer Counter, weiße Schränke,
+//      braune Silikon-Tafelform, gefriergetrocknete Himbeeren)
+//   2. Profil-Grid (15 Reels): alle in weißem Setting — weiße Küche, weiße
+//      Wand, weißes Bett, weißer Bademantel — Weiß ist konsequente Brand-Farbe
+//   3. Schoko-Mousse mit Himbeeren (Glasschale auf hellem Grund, weich
+//      neutrales Licht, sehr cleaner Look)
+//   4. Schokoladen-Silikonform mit Himbeeren (hellgrauer Mesh-Hintergrund,
+//      cleane Ästhetik)
+//   5. Blueberry-Müsli-Auflauf (Glasform in der Hand, weiße Küchenschränke,
+//      weißer Counter, neutrales helles Licht)
+//
+// Brand-Positionierung: "Angehende Ärztin / Doctor's Wellness / Longevity".
+// Sie nutzt Marker wie "A doctor's favorite" — die Brand verkauft Premium-
+// Wellness-Aesthetic statt cottage-homemade.
+//
+// Brand-DNA-Kernunterschied zu Biene/Julia/Kristina (alle home-cosy):
+//   - Biene = pale-grey concrete + cutting-board (cottage-home)
+//   - Julia = bone-grey concrete + scattered ingredients (smartphone-snap)
+//   - Kristina = warm oak + basil-pot (family-healthy-home)
+//   - Alina = white matte counter + NO PROPS (doctor's modern minimal)
+//
+// INVERSE Lesson zu Biene v9.x: bei Biene war "no studio-clean" wichtig
+// (Bienes echter Look ist homemade). Bei Alina ist Studio-clean GENAU der
+// Ziel-Look. Cleanness IST das Signature, also Negatives flippen: aggressiv
+// "no wood, no rustic, no scattered herbs, no background props" — sonst
+// rendert Flux seine Default-Kräuter-Bias und bricht den Doctor's-Look.
+export const ALINA_STYLE: BrandImageStyle = {
+  brandSlug: "alina",
+  // Neutral bis leicht kühl — NICHT honey-toned wie Kristina, NICHT warm-
+  // amber wie Biene. Tageslicht, weich, modern-clinical-clean.
+  lightingOptions: [
+    "bright neutral daylight from a kitchen window with soft directional shadows",
+    "clean cool daylight from above, modern minimal kitchen mood",
+    "soft bright daylight from the left, slight clinical-clean feel",
+    "neutral bright daylight from a sunny window with crisp clean shadows",
+    "soft diffused daylight, modern doctor's-kitchen aesthetic",
+  ],
+  // Weißer matter Counter ist Alinas Signatur-Surface. Variationen damit
+  // Gemini Range hat ohne in beige/grau abzudriften.
+  sceneOptions: [
+    "a clean matte-white kitchen counter",
+    "a smooth white quartz countertop",
+    "a clean white modern kitchen surface near a window",
+    "a matte white counter with subtle minimal texture",
+    "a clean white kitchen counter with white cabinets softly blurred in the upper background",
+  ],
+  styleSuffix: "",
+  // Aggressiv-flip zu Biene/Julia/Kristina: hier ist clean-studio GUT,
+  // home-cosy/rustic/farmhouse SCHLECHT. Schlank gehalten (5 Items wie
+  // Biene v9.4), nicht in 11+ NEVER-Klauseln zerfallen lassen.
+  negativeAddition:
+    "no wood counter or table, no concrete or stone counter, no scattered herbs or ingredients around the dish, no background plants or props, no rustic farmhouse styling",
+  // Bei Alina explicit Studio-clean ZULASSEN — sonst dreht Flux es weg.
+  // "Modern minimal doctor's-kitchen" ist die Aesthetic.
+  cameraAesthetic:
+    "clean modern minimal food photograph, doctor's-kitchen aesthetic, premium wellness feel, no over-styling, no rustic styling",
+  // Alinas Signature ist die ABWESENHEIT von Background-Props. Die Cleanness
+  // des weißen Counters IST das visuelle Statement. Explicit positive
+  // Beschreibung "stands alone, empty space around it" — Flux bekommt
+  // einen klaren Anker statt nur Negatives.
+  heroElementGuidance:
+    "The dish stands alone on the clean white counter with absolute minimal styling and empty negative space around it — no background props, no scattered ingredients, no plants, no cutting boards, no decorative elements. The cleanness of the white surface and the dish alone IS the visual statement.",
+  // Per-shape Winkel: top-down 75° für flat dishes, 30° three-quarter für
+  // layered (Cheesecake, Mousse-Glass), 45° eye-level für tall, 30° für
+  // liquid. Composition mit explicit "empty space around the dish" damit
+  // Flux nicht den Frame mit Props füllt.
+  defaultAngles: {
+    flat: "from a high overhead angle (about 75°, slightly tilted not strict 90°), the dish centered on the clean white counter with generous empty negative space around it",
+    mixed: "from a high overhead angle (about 75°, slightly tilted not strict 90°), clean white counter visible, no surrounding props, generous empty space around the dish",
+    layered: "from a 30° three-quarter angle so the layers of the dish are visible, clean white counter with white cabinets softly blurred in the upper background, no other props",
+    tall: "from a 45° eye-level angle that shows the dish's full height, clean white background, no other props in frame",
+    liquid: "from a 30° three-quarter angle so the liquid surface shines, clean white surface, no surrounding props",
+  },
+};
+
 // ─── Lookup by brand slug ────────────────────────────────────────────────────
 const STYLES: Record<string, BrandImageStyle> = {
   biene: BIENE_STYLE,
   julia: JULIA_STYLE,
   kristina: KRISTINA_STYLE,
+  alina: ALINA_STYLE,
 };
 
 // Sagt: haben wir fuer diesen Slug einen hand-kalibrierten Code-Style?
