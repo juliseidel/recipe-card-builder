@@ -30,8 +30,16 @@ const RESPONSE_SCHEMA = {
           },
           amount: {
             type: "string",
+            // maxLength: harte Obergrenze gegen den Gemini-Bug wo das Modell
+            // statt einer Zahl-Einheit-Kombi einen ganzen Erklaerungs-
+            // Absatz inkl. abgehackten ```json-Fence in dieses Feld packt
+            // (gesehen am 2026-05-19 bei laetitia/cheesecake-traume/
+            // blueberry-cheesecake: amount enthielt 600+ chars Fliesstext
+            // statt "1,8 µg"). 20 chars sind genug fuer realistische Werte
+            // ("1200 mg", "45,5 µg", "1,2 g") aber zu wenig fuer Romane.
+            maxLength: 20,
             description:
-              "Geschätzte Menge pro Portion mit Einheit, z. B. '45 mg', '120 µg', '1,8 g'",
+              "NUR Zahl + Einheit (z. B. '45 mg', '120 µg', '1,8 g'). Maximal 20 Zeichen. KEINE Erklaerungen, keine Saetze, kein JSON-Markup — nur der reine Zahlenwert.",
           },
           pctDaily: {
             type: "number",
@@ -121,7 +129,11 @@ export async function generateMicros(recipe: Recipe): Promise<Micronutrient[]> {
     retries: 3,
   });
 
-  // Defensive: clamp pctDaily, normalize amount strings, dedupe by name, sort
+  // Defensive: clamp pctDaily, normalize amount strings, dedupe by name, sort.
+  // amount-Filter ist defensive Sicherung GEGEN den Gemini-Bug wo das Modell
+  // statt einer Zahl-Einheit-Kombi einen ganzen Erklaerungs-Absatz in das
+  // Feld packt — falls maxLength: 20 vom Schema doch mal ueberschritten
+  // wird, schmeissen wir den Eintrag raus statt ihn ins PDF zu rendern.
   const seen = new Set<string>();
   const cleaned = (result.micros ?? [])
     .filter((m) => m.name && m.amount)
@@ -133,6 +145,7 @@ export async function generateMicros(recipe: Recipe): Promise<Micronutrient[]> {
         Math.min(999, Math.round(Number(m.pctDaily) || 0))
       ),
     }))
+    .filter((m) => isValidAmount(m.amount))
     .filter((m) => {
       const key = m.name.toLowerCase();
       if (seen.has(key)) return false;
@@ -146,6 +159,22 @@ export async function generateMicros(recipe: Recipe): Promise<Micronutrient[]> {
     .slice(0, 12);
 
   return cleaned;
+}
+
+// Defensive guard: ein gueltiger amount-Wert ist eine kurze Zahl-Einheit-
+// Kombination ("1,8 µg", "120 mg", "3 g"), kein Fliesstext-Absatz. Triggert
+// auch bei abgehackten ```json-Markdown-Fences die Gemini bei structured-JSON-
+// Bugs in das Feld einschleust (Real-Case 2026-05-19). Ohne diesen Filter
+// rendern wir 600-Zeichen-Absaetze in die Mikros-Pills der Recipe-Card.
+function isValidAmount(amount: string): boolean {
+  if (!amount) return false;
+  if (amount.length > 25) return false;
+  // Code-Fences, JSON-Brackets oder Satzpunktuation sind klares Garbage-
+  // Indizes — eine echte Mengenangabe enthaelt keines davon.
+  if (/```|[{}]|[.!?]\s|json/i.test(amount)) return false;
+  // Muss mindestens eine Ziffer enthalten (sonst kein Zahlenwert).
+  if (!/\d/.test(amount)) return false;
+  return true;
 }
 
 // Gemini's structured-JSON output occasionally garbles non-ASCII characters
