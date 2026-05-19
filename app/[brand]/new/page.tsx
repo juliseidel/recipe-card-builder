@@ -8,6 +8,7 @@ import { getBrandClient } from "@/lib/custom-brands";
 import { getPacksForBrand, type Pack } from "@/lib/packs";
 import { addCustomPack, slugifyPack } from "@/lib/custom-packs";
 import { moodPresets, displayFontOptions } from "@/lib/pack-presets";
+import type { PackType } from "@/lib/fitness/types";
 import { SiteHeader } from "@/components/site-header";
 import { PackCover } from "@/components/pack-cover";
 import { AutoPackForm } from "@/components/auto-pack-form";
@@ -33,7 +34,12 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
   useEffect(() => {
     let active = true;
     void getBrandClient(brandSlug).then((b) => {
-      if (active) setBrand(b ?? null);
+      if (active) {
+        setBrand(b ?? null);
+        // Pack-Type-Default aus dem Brand uebernehmen (falls gesetzt).
+        // User kann es im Toggle pro Pack ueberschreiben.
+        if (b?.defaultPackType) setPackType(b.defaultPackType);
+      }
     });
     return () => {
       active = false;
@@ -41,6 +47,11 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
   }, [brandSlug]);
   const router = useRouter();
   const staticPacks = useMemo(() => getPacksForBrand(brandSlug), [brandSlug]);
+
+  // Pack-Type-Toggle. Default 'recipe', wird aus brand.defaultPackType
+  // ueberschrieben wenn der Brand einen Default hat. User kann hier
+  // pro Pack umschalten.
+  const [packType, setPackType] = useState<PackType>("recipe");
 
   // Mode-Tab: Individuell (Form fuer Custom-Pack) oder Auto-Generate
   // (KI-Pack aus Reel-Library mit Filter-Selektoren). Auto-Tab fuer ALLE
@@ -216,6 +227,9 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
         displayFont,
         // Default fallback — recipes pick their own layout on creation.
         cardLayout: "editorial",
+        // Pack-Type-Diskriminator. Steuert ob Recipe- oder Fitness-
+        // Pipeline laeuft (Loader, Grid, Hero-Pipeline, PDF-Layout).
+        packType,
       },
     });
 
@@ -301,9 +315,11 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
       <main className="flex-1">
         {/* Tab-Switcher zwischen Individuell und Auto-Generate. Auto-Tab
             fuer alle Brands mit Handle — wenn die Library leer ist, zeigt
-            AutoPackForm einen Quick-Scrape-Button (Reel-Library kann via
-            Refresh-Button auf der Brand-Seite jederzeit gefuellt werden). */}
-        {hasHandle ? (
+            AutoPackForm einen Quick-Scrape-Button. Bei packType='fitness'
+            ausgeblendet: Reel-Library-Filter sind aktuell nur fuer Rezept-
+            Reels (mealType/cuisine/etc.) — Fitness-Auto-Pack kommt in
+            einem spaeteren Schritt mit eigenem Filter-UI. */}
+        {hasHandle && packType === "recipe" ? (
           <div
             className="border-b"
             style={{
@@ -398,6 +414,49 @@ export default function NewPackPage({ params }: PackEditorPageProps) {
           <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-10 px-6 py-10 lg:grid-cols-[1.05fr_1fr] lg:gap-14 lg:px-10 lg:py-14">
           {/* ─── FORM (left) ─── */}
           <div className="flex flex-col gap-8">
+            {/* Section 0 — Pack-Typ-Toggle. Allererste Entscheidung:
+                ist das ein Rezept-Pack oder Fitness-Pack? Default kommt
+                aus brand.defaultPackType (falls gesetzt). Steuert spaeter
+                welche Loader-/Renderer-/Hero-Pipeline laeuft. */}
+            <section className="editor-section editor-card flex flex-col gap-5">
+              <SectionHeader
+                num="00"
+                title="Pack-Typ"
+                hint="Erstellst du ein Rezept-Pack oder ein Trainings-/Fitness-Pack?"
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <PackTypeToggle
+                  active={packType === "recipe"}
+                  label="Rezept-Pack"
+                  hint="Karten mit Zutaten, Schritten, Nährwerten — wie Bienes Cookbooks."
+                  accent={selectedMood.accent}
+                  onClick={() => setPackType("recipe")}
+                />
+                <PackTypeToggle
+                  active={packType === "fitness"}
+                  label="Fitness-Pack"
+                  hint="Trainingskarten: Übungen, Sätze × Wdh, Technik-Cues."
+                  accent={selectedMood.accent}
+                  onClick={() => setPackType("fitness")}
+                />
+              </div>
+              {packType === "fitness" ? (
+                <div
+                  className="rounded-xl border px-4 py-3 text-[12px] leading-relaxed"
+                  style={{
+                    borderColor: selectedMood.accent + "40",
+                    background: selectedMood.accent + "10",
+                    color: "var(--color-ink)",
+                  }}
+                >
+                  <strong>Hinweis:</strong> Die Fitness-Pipeline läuft —
+                  Karten lassen sich anlegen, das Layout ist aber noch in der
+                  Design-Phase. Hochwertige Sub-Niche-Layouts (Hyrox, Bodybuilding,
+                  Pilates, Female-Strength) folgen in einem eigenen Block.
+                </div>
+              ) : null}
+            </section>
+
             {/* Section 1 — Identity */}
             <section className="editor-section editor-card flex flex-col gap-5">
               <SectionHeader
@@ -1020,6 +1079,55 @@ function Field({
       </span>
       {children}
     </label>
+  );
+}
+
+// Toggle-Button fuer Pack-Type-Picker (Rezept vs Fitness). Selbe Optik
+// wie die anderen 2-Spalten-Auswahl-Cards im Form.
+function PackTypeToggle({
+  active,
+  label,
+  hint,
+  accent,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  hint: string;
+  accent: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex flex-col items-start gap-2 rounded-2xl border-2 p-4 text-left transition-all"
+      style={{
+        borderColor: active ? accent : "var(--color-line)",
+        background: active ? accent + "10" : "white",
+      }}
+    >
+      <span
+        className="text-[14px] font-semibold"
+        style={{ color: active ? accent : "var(--color-ink)" }}
+      >
+        {label}
+      </span>
+      <p
+        className="text-[12px] leading-snug"
+        style={{ color: "var(--color-ink-muted)" }}
+      >
+        {hint}
+      </p>
+      {active ? (
+        <span
+          className="font-mono text-[10.5px] uppercase tracking-[0.14em]"
+          style={{ color: accent }}
+        >
+          ✓ Ausgewählt
+        </span>
+      ) : null}
+    </button>
   );
 }
 
