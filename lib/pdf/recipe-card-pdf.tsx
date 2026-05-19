@@ -1393,23 +1393,47 @@ function MinimalPage({
           : recipe.servings === 1
             ? "Portion"
             : "Portionen";
-  // Bei vielen Steps (>=6) override auf compact-density UND zusaetzlich
-  // enger (kleinerer stepMarginBottom + stepFontSize). Sonst ueberlaufen
-  // lange Step-Texte den Body-Slot und ueberlappen sich. Loaded Süßkartoffel
-  // (6 Schritte mit teils 3-4 Zeilen Text) war genau dieser Worst-Case.
+  // Komplexitaets-basierte Auto-Fit-Logik (2026-05-19, Bug-Report Laetitia):
+  // Multi-Section-Recipes mit vielen Zutaten + Steps haben den Body ueber
+  // den Mikros-Strip rendern lassen — sichtbare Ueberlappung "150g Skyr"
+  // ueber "Bereite in der Zwischenzeit..." bei Butterkeks Wildberry
+  // Cheesecake (5 Sektionen × ~14 Zutaten + 8 Steps).
+  //
+  // Score = ingredients + sections × 2 + steps × 1.5
+  // - normal   (< 22): Hero bleibt 360pt, normale Density (Cookbook-Cover-Look)
+  // - complex  (22-29): Hero auf 300pt, compact-Density mit engerem Padding
+  // - ultra    (>= 30): Hero auf 240pt, extra-compact + kleinere Fonts +
+  //                     reduzierter Mikros-Strip — Body bekommt 120pt mehr
+  //                     Platz fuer die uebervolle Section-Liste.
   const baseDensity = getDensity(recipe);
   const stepCount = recipe.steps?.length ?? 0;
-  const density = stepCount >= 6 ? "compact" : baseDensity;
+  const grouped = groupIngredients(recipe.ingredients);
+  const sectionCount = grouped.length;
+  const ingredientCount = recipe.ingredients.length;
+  const complexityScore =
+    ingredientCount + sectionCount * 2 + stepCount * 1.5;
+  const isUltraComplex = complexityScore >= 30;
+  const isComplex = complexityScore >= 22;
+  const density =
+    isComplex || stepCount >= 6 ? "compact" : baseDensity;
   const dBase = MINIMAL_DENSITY[density];
-  const d =
-    stepCount >= 6
+  const d = isUltraComplex
+    ? {
+        ...dBase,
+        stepMarginBottom: Math.max(2, dBase.stepMarginBottom - 3),
+        stepFontSize: dBase.stepFontSize - 1.5,
+        ingRowPadV: Math.max(1.5, dBase.ingRowPadV - 1),
+        ingFontSize: dBase.ingFontSize - 1,
+        bodyPadTop: Math.max(8, dBase.bodyPadTop - 6),
+        bodyPadBottom: Math.max(8, dBase.bodyPadBottom - 6),
+      }
+    : isComplex || stepCount >= 6
       ? {
           ...dBase,
           stepMarginBottom: Math.max(3, dBase.stepMarginBottom - 2),
           stepFontSize: dBase.stepFontSize - 0.5,
         }
       : dBase;
-  const grouped = groupIngredients(recipe.ingredients);
 
   // Hero-Title-Skala: Bold Inter-Tight, weiss auf Hero-Bild. Schmale
   // Zeichen-Zaehler-Steps damit auch zusammengesetzte Substantive
@@ -1426,17 +1450,21 @@ function MinimalPage({
             ? 32
             : 26;
 
-  // Hero ist 380 pt hoch — full-bleed, mit dunklem Gradient unten damit
-  // die Title-Overlay sicher lesbar bleibt egal wie hell das Hero-Bild
-  // gerade ist. Der Gradient ist als zwei gestapelte Views simuliert
-  // weil @react-pdf keinen CSS-Gradient unterstuetzt.
-  const HERO_HEIGHT = 360;
+  // Hero-Hoehe dynamisch nach Komplexitaet — bei ultra-komplexen Recipes
+  // (Multi-Section + viele Steps) geben wir 120pt mehr an den Body ab,
+  // damit der nicht ueberlaeuft. Normal-Recipes behalten den vollen
+  // Cookbook-Cover-Hero (360pt = obere Haelfte der A4-Seite).
+  const HERO_HEIGHT = isUltraComplex ? 240 : isComplex ? 300 : 360;
 
-  // Mikros-Limit density-aware — bei langen Snacks (selten in Pack 3,
-  // aber moeglich bei Custom-Packs mit minimal Layout) bekommt der
-  // Mikros-Strip weniger Pills.
-  const microsLimit =
-    density === "compact" ? 5 : density === "balanced" ? 7 : 9;
+  // Mikros-Limit komplexitaets-aware — ultra-komplexe Recipes bekommen
+  // weniger Mikros-Pills, damit der Strip nicht in den Body laeuft.
+  const microsLimit = isUltraComplex
+    ? 4
+    : density === "compact"
+      ? 5
+      : density === "balanced"
+        ? 7
+        : 9;
   const micros = (recipe.nutrition?.micros ?? []).slice(0, microsLimit);
 
   return (
