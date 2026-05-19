@@ -25,7 +25,32 @@ export type ScrapeRow = {
   platform: SocialPlatform;
 };
 
+/** Discriminator: was fuer ein Content ist das Reel.
+ *  - recipe: ausgeschriebenes Rezept (Zutaten + Zubereitung)
+ *  - exercise: einzelne Uebungs-Demo (eine Bewegung, Form-Cues)
+ *  - workout: kompletter Workout-Block (mehrere Uebungen, Reihenfolge)
+ *  - mindset: motivationaler/inhaltlicher Text (Pull-Quote-Material)
+ *  - tutorial: How-To ohne Rezept oder Workout (z.B. "wie packe ich Mealprep")
+ *  - transformation: Vorher/Nachher, Progress-Update
+ *  - vlog: Lifestyle, Day-in-Life, Reise, persoenlicher Vlog
+ *  - other: Werbung, Promo, Foto-Dump, nicht klassifizierbar
+ *
+ *  Wird zusaetzlich zu isRecipe gesetzt (Backward-Compat). Bei content_type
+ *  = 'recipe' wird isRecipe automatisch = true; sonst false. */
+export type ContentType =
+  | "recipe"
+  | "exercise"
+  | "workout"
+  | "mindset"
+  | "tutorial"
+  | "transformation"
+  | "vlog"
+  | "other";
+
 export type ReelClassification = {
+  /** Wichtigster Diskriminator. Steuert ob Recipe- oder Fitness-Felder
+   *  gefuellt werden. */
+  contentType: ContentType | null;
   isRecipe: boolean;
   recipeConfidence: number;
   recipeTitle: string | null;
@@ -40,6 +65,16 @@ export type ReelClassification = {
   season: string | null;
   skillLevel: string | null;
   vessel: string | null;
+  /** Phase 2c (2026-05-19): Fitness-Klassifikation. Nur gefuellt wenn
+   *  contentType IN ('exercise', 'workout'). Bei recipe/mindset/vlog/etc.
+   *  alle null. Vocabulary siehe lib/fitness/types.ts. */
+  workoutType: string | null;
+  bodyParts: string[];
+  equipment: string[];
+  trainingSetting: string | null;
+  trainingGoal: string | null;
+  fitnessLevel: string | null;
+  durationMinutes: number | null;
 };
 
 export type ReelRow = {
@@ -68,6 +103,16 @@ export type ReelRow = {
   season: string | null;
   skill_level: string | null;
   vessel: string | null;
+  /** Phase 2c (2026-05-19): Fitness-Klassifikation. Default null/leer-Array
+   *  bei pre-Phase-2c-Reels. */
+  content_type: string | null;
+  workout_type: string | null;
+  body_parts: string[];
+  equipment: string[];
+  training_setting: string | null;
+  training_goal: string | null;
+  fitness_level: string | null;
+  duration_minutes: number | null;
   classified_at: string | null;
   scraped_at: string;
   /** Quelle des Reels — gleicher Wert wie creator_scrapes.platform beim
@@ -612,6 +657,15 @@ export async function updateReelClassification(
       season: c.season,
       skill_level: c.skillLevel,
       vessel: c.vessel,
+      // Phase 2c (2026-05-19): Fitness-Klassifikation
+      content_type: c.contentType,
+      workout_type: c.workoutType,
+      body_parts: c.bodyParts,
+      equipment: c.equipment,
+      training_setting: c.trainingSetting,
+      training_goal: c.trainingGoal,
+      fitness_level: c.fitnessLevel,
+      duration_minutes: c.durationMinutes,
       classified_at: new Date().toISOString(),
     })
     .eq("id", id);

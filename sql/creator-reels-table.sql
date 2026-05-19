@@ -97,6 +97,43 @@ alter table public.creator_reels
   add column if not exists skill_level text,
   add column if not exists vessel text;
 
+-- ─── Phase 2c (2026-05-19): contentType + Fitness-Klassifikation ───────────
+-- Erweitert is_recipe um content_type-Diskriminator + 8 Fitness-Felder
+-- (workout_type, body_parts, equipment, training_setting, training_goal,
+-- fitness_level, duration_minutes). Backward-compatible: alle nullable,
+-- bestehende Recipe-Reels bleiben unangetastet (content_type = NULL).
+-- is_recipe bleibt parallel bestehen — alte Filter funktionieren weiter.
+
+alter table public.creator_reels
+  add column if not exists content_type text,
+  add column if not exists workout_type text,
+  add column if not exists body_parts text[] not null default '{}',
+  add column if not exists equipment text[] not null default '{}',
+  add column if not exists training_setting text,
+  add column if not exists training_goal text,
+  add column if not exists fitness_level text,
+  add column if not exists duration_minutes int;
+
+create index if not exists creator_reels_brand_content_type_idx
+  on public.creator_reels (brand_slug, content_type)
+  where content_type is not null;
+
+create index if not exists creator_reels_brand_workout_type_idx
+  on public.creator_reels (brand_slug, workout_type)
+  where workout_type is not null;
+
+create index if not exists creator_reels_brand_training_goal_idx
+  on public.creator_reels (brand_slug, training_goal)
+  where training_goal is not null;
+
+create index if not exists creator_reels_brand_fitness_level_idx
+  on public.creator_reels (brand_slug, fitness_level)
+  where fitness_level is not null;
+
+create index if not exists creator_reels_brand_content_workout_idx
+  on public.creator_reels (brand_slug, content_type, workout_type)
+  where content_type in ('exercise', 'workout');
+
 -- ─── creator_scrapes ────────────────────────────────────────────────────────
 -- Job-Tracker fuer asynchrone Apify-Runs. Ein Backfill dauert 3-10 Min und
 -- passt nicht in eine Vercel-Lambda. Wir starten den Apify-Run mit Webhook-

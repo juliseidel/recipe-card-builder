@@ -1,10 +1,18 @@
 import { callGemini, GeminiError } from "./gemini";
 import type { ReelRow, ReelClassification } from "@/lib/creator-reels-server";
 
-// Reel-Klassifikator (Phase 2). Gemini Flash bekommt pro Batch 10 Reel-
-// Captions und entscheidet:
-//   1. Ist das ein Rezept? (vs Talking-Head, Werbung, Reise, Workout-Video)
-//   2. Falls ja: meal_type, cuisine, main_ingredient, dietary, time-estimate
+// Reel-Klassifikator (Phase 2c, 2026-05-19). Gemini Flash bekommt pro Batch
+// 10 Reel-Captions und entscheidet:
+//   1. contentType: recipe | exercise | workout | mindset | tutorial |
+//      transformation | vlog | other
+//   2. Falls contentType='recipe': mealType, cuisine, mainIngredient,
+//      dietary, time, occasion, season, skillLevel, vessel
+//   3. Falls contentType IN ('exercise','workout'): workoutType, bodyParts,
+//      equipment, trainingSetting, trainingGoal, fitnessLevel, duration
+//
+// is_recipe (alter Bool) wird automatisch aus contentType abgeleitet:
+// is_recipe = (contentType === 'recipe'). So bleiben alle alten Filter
+// (getRecipeReelsForBrand, Auto-Pack-UI, etc.) backward-compatible.
 //
 // Wir nutzen Batch-Calls statt einzelner Calls weil:
 //   - Latenz: 50 Reels einzeln = 50 * 3s = 150s; in Batches von 10 = 5 * 4s = 20s
@@ -14,10 +22,9 @@ import type { ReelRow, ReelClassification } from "@/lib/creator-reels-server";
 //   - Quota: Gemini Flash hat Rate-Limits pro Minute, weniger Calls = mehr
 //     parallele Brands.
 //
-// Bei Fehlern (Gemini fail, JSON ungueltig) fallback wir auf
-// is_recipe=false fuer alle Reels im Batch — Phase 3 ignoriert sie dann.
-// Defensiv: einzelne Reels koennen ueber den deterministic Hashtag-Check
-// trotzdem gerettet werden.
+// Bei Fehlern (Gemini fail, JSON ungueltig) markieren wir den Batch als
+// CLASSIFICATION_FAILED — Caller schreibt nichts in die DB, naechster
+// Resume probiert es erneut. Verhindert Daten-Zerstoerung bei Gemini-Fail.
 
 const BATCH_SIZE = 10;
 
@@ -39,19 +46,30 @@ const RESPONSE_SCHEMA = {
             description:
               "Index aus dem Eingabe-Array (0-basiert). MUSS mit der Reihenfolge der Eingabe matchen.",
           },
-          isRecipe: {
-            type: "boolean",
+          contentType: {
+            type: "string",
+            enum: [
+              "recipe",
+              "exercise",
+              "workout",
+              "mindset",
+              "tutorial",
+              "transformation",
+              "vlog",
+              "other",
+            ],
             description:
-              "true wenn der Post ein ausgeschriebenes Rezept enthaelt (Zutaten + Zubereitung erkennbar). false bei Talking-Heads, Workout-Videos, Reise-Content, Werbung ohne Rezept, Foto-Dumps.",
+              "Was fuer ein Content ist das Reel? recipe=Rezept mit Zutaten+Zubereitung; exercise=einzelne Uebungs-Demo (eine Bewegung mit Form-Cues); workout=kompletter Workout-Block mit mehreren Uebungen+Reihenfolge; mindset=motivationaler Text/Pull-Quote-Material; tutorial=How-To ohne Rezept/Workout (Mealprep-Tipps, Kueche organisieren); transformation=Vorher/Nachher/Progress; vlog=Lifestyle/Day-in-Life/Reise; other=Werbung/Foto-Dump/nicht klassifizierbar. EXAKT EIN Wert.",
           },
           recipeConfidence: {
             type: "number",
-            description: "0..1 — wie sicher ist die Klassifikation als Rezept.",
+            description:
+              "0..1 — wie sicher ist die Klassifikation als Rezept. Bei contentType!='recipe': 0.",
           },
           recipeTitle: {
             type: "string",
             description:
-              'Falls Rezept: ein knapper, lesbarer Titel (z.B. "Protein-Pancakes mit Beeren"). Falls kein Rezept: leerer String.',
+              'Falls contentType="recipe": knapper Titel ("Protein-Pancakes mit Beeren"). Falls contentType="exercise": Uebungs-Name ("Wall Ball", "Sled Push"). Falls contentType="workout": Workout-Name ("Push-Day 1", "Full-Body HIIT"). Sonst leerer String.',
           },
           mealType: {
             type: "string",
@@ -64,53 +82,124 @@ const RESPONSE_SCHEMA = {
               "drink",
               "unknown",
             ],
-            description: "Mahlzeit-Kategorie. unknown wenn kein Rezept.",
+            description: "Nur bei contentType='recipe' gesetzt. unknown sonst.",
           },
           cuisine: {
             type: "string",
             description:
-              'Free-form ("italian", "asian", "german", "healthy", "baking", "mediterranean", ...). Leerer String wenn unklar oder kein Rezept.',
+              "Controlled Vocabulary. Nur bei contentType='recipe'. Sonst leer.",
           },
           mainIngredient: {
             type: "string",
             description:
-              'Wichtigste Zutat ("chicken", "oats", "pasta", "eggs", "potato", "chocolate"). Leerer String wenn kein Rezept.',
+              "Controlled Vocabulary. Nur bei contentType='recipe'. Sonst leer.",
           },
           dietary: {
             type: "array",
             items: { type: "string" },
             description:
-              'Eigenschaften: "highprotein", "lowcarb", "vegan", "vegetarian", "glutenfree", "lactosefree", "lowcal". Leeres Array moeglich.',
+              "Nur bei contentType='recipe'. Sonst leeres Array.",
           },
           estimatedTimeMinutes: {
             type: "integer",
             description:
-              "Geschaetzte Zubereitungszeit in Minuten (5..240). 0 wenn unklar oder kein Rezept.",
+              "Zubereitungszeit (Recipe) in Minuten. 0 wenn nicht-recipe.",
           },
           occasion: {
             type: "string",
-            description:
-              'Wann wuerde man dieses Rezept machen? Nur EIN Hauptanlass aus: "mealprep", "quick-weeknight", "cozy", "gameday", "brunch", "family-dinner", "date-night", "summer-bbq", "festive", "sunday-baking", "post-workout", "lazy-morning". Leerer String wenn unklar oder kein Rezept.',
+            description: "Recipe-Anlass. Nur bei contentType='recipe'.",
           },
           season: {
             type: "string",
-            description:
-              'Saison-Kontext, einer aus: "spring", "summer", "autumn", "winter", "year-round". "year-round" = passt jederzeit. Leerer String wenn kein Rezept.',
+            description: "Recipe-Saison. Nur bei contentType='recipe'.",
           },
           skillLevel: {
             type: "string",
             description:
-              'Schwierigkeit, einer aus: "beginner", "intermediate", "advanced". beginner = wenige Zutaten + simple Schritte, intermediate = mehrere Komponenten, advanced = Backen/Teig/Technik. Leer wenn unklar.',
+              "Recipe-Schwierigkeit. Nur bei contentType='recipe'. (Fuer Fitness-Skill siehe fitnessLevel.)",
           },
           vessel: {
             type: "string",
+            description: "Recipe-Gefaess/Methode. Nur bei contentType='recipe'.",
+          },
+          // ─── Fitness-Felder (Phase 2c) — nur bei contentType IN
+          //     ('exercise','workout') sinnvoll gesetzt; sonst leer/0/[]
+          workoutType: {
+            type: "string",
+            enum: [
+              "strength",
+              "cardio",
+              "hiit",
+              "functional",
+              "mobility",
+              "pilates",
+              "yoga",
+              "posing",
+              "rehab",
+              "calisthenics",
+              "",
+            ],
             description:
-              'Hauptgefaess/Methode, einer aus: "bowl", "pan", "sheet", "airfryer", "mug", "mixer", "oven", "pot", "no-cook", "grill", "blender". bowl = Bowl/Schuessel-Gericht, sheet = Backblech, no-cook = ohne Hitze. Leer wenn unklar.',
+              "Trainings-Typ. Nur bei contentType IN (exercise, workout). strength=Krafttraining/Hypertrophie; cardio=Ausdauer-Steady-State; hiit=High-Intensity-Intervals; functional=Hyrox/CrossFit/Hybrid; mobility=Beweglichkeit/Stretching; pilates=Pilates/Barre; yoga=Yoga; posing=Bodybuilding-Posing; rehab=Reha/Verletzung; calisthenics=Bodyweight/Street. Leer wenn unklar oder nicht-Fitness.",
+          },
+          bodyParts: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Trainierte Muskelgruppen als Array. Werte: chest, back, shoulders, arms, legs, glutes, core, full-body, cardio-conditioning. Mehrere moeglich. Leer wenn nicht-Fitness.",
+          },
+          equipment: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Equipment als Array. Werte: none, dumbbell, barbell, kettlebell, machine, cable, bands, bodyweight, sled, ski-erg, rower, wall-ball, sandbag, outdoor, studio, mixed. Leer wenn nicht-Fitness.",
+          },
+          trainingSetting: {
+            type: "string",
+            enum: [
+              "home",
+              "commercial-gym",
+              "studio",
+              "functional-gym",
+              "outdoor",
+              "stage",
+              "",
+            ],
+            description:
+              "Wo trainiert. home=zuhause; commercial-gym=Fitnessstudio (FitX/McFit); studio=Pilates-/Yoga-Studio; functional-gym=CrossFit-Box/Hyrox; outdoor=Park/Strasse/Trail; stage=Bodybuilding-Buehne. Leer wenn unklar.",
+          },
+          trainingGoal: {
+            type: "string",
+            enum: [
+              "hypertrophy",
+              "fat-loss",
+              "strength",
+              "endurance",
+              "mobility",
+              "aesthetic",
+              "performance",
+              "posture",
+              "longevity",
+              "",
+            ],
+            description:
+              "Trainings-Ziel. hypertrophy=Muskelaufbau; fat-loss=Abnehmen; strength=Maximalkraft; endurance=Ausdauer; mobility=Beweglichkeit; aesthetic=Optik/Bikini-Fitness; performance=Wettkampf (Hyrox, BB-Comp); posture=Haltung; longevity=Gesundheit/Anti-Aging. Leer wenn unklar.",
+          },
+          fitnessLevel: {
+            type: "string",
+            enum: ["beginner", "intermediate", "advanced", "pro", ""],
+            description:
+              "Schwierigkeit der Uebung/Workout. Leer wenn unklar oder nicht-Fitness.",
+          },
+          durationMinutes: {
+            type: "integer",
+            description:
+              "Workout-Dauer in Minuten (NICHT Recipe-Zubereitungszeit). 0 wenn unklar oder nicht-Workout.",
           },
         },
         required: [
           "index",
-          "isRecipe",
+          "contentType",
           "recipeConfidence",
           "recipeTitle",
           "mealType",
@@ -118,8 +207,8 @@ const RESPONSE_SCHEMA = {
           "mainIngredient",
           "dietary",
           "estimatedTimeMinutes",
-          // occasion/season/skillLevel/vessel sind optional — Gemini darf
-          // sie weglassen wenn unklar. defaultMiss() bei Komplett-Fail.
+          // Fitness- und erweiterte Recipe-Felder sind optional — Gemini darf
+          // sie weglassen wenn unklar oder Kategorie nicht passt.
         ],
       },
     },
@@ -127,21 +216,52 @@ const RESPONSE_SCHEMA = {
   required: ["classifications"],
 };
 
-const SYSTEM_INSTRUCTION = `Du bist ein Klassifikator fuer Food-Creator-Instagram-Posts.
+const SYSTEM_INSTRUCTION = `Du bist ein Klassifikator fuer Creator-Instagram-/TikTok-Posts.
+Die Creator sind entweder Food-Creator (Rezepte) oder Fitness-Coaches
+(Trainingsplaene, Uebungs-Demos) — beide Welten gehoeren ins Schema.
 
-Aufgabe: Pro Post entscheide, ob es ein RICHTIGES REZEPT ist (Zutaten + Zubereitung in der Caption erkennbar) und extrahiere Meta-Felder fuer die Pack-Generierung.
+Aufgabe: Pro Post entscheide den contentType (recipe / exercise / workout /
+mindset / tutorial / transformation / vlog / other) und extrahiere die
+passenden Meta-Felder.
 
-KRITISCH — was ist KEIN Rezept:
-- Talking-Head-Videos ohne Rezept-Text in der Caption
-- Workout-Videos, Reise-Vlogs, Lifestyle-Posts
-- "Buch erschienen", Produkt-Werbung, Sponsoring-Posts ohne Rezept-Inhalt
-- Foto-Dumps ("recap of my week")
-- Schritte-Anleitungen ohne Zutaten (z.B. "How to organize your kitchen")
+CONTENT-TYPE-ENTSCHEIDUNG (kritisch):
 
-Was IST ein Rezept:
-- Caption enthaelt Zutaten-Liste (auch implizit: "200g Quark, 2 Eier, ...")
-- Caption beschreibt Zubereitung (auch knapp: "Alles vermengen, 12 Min backen")
-- Reel oder Image-Post wo die Zubereitung gezeigt wird UND in der Caption nachvollziehbar steht
+- recipe: Caption enthaelt Zutaten + Zubereitung erkennbar. Z.B. "200g
+  Quark, 2 Eier, alles vermengen, 12 Min backen". Auch implizite Mengen
+  zaehlen. Reels die Kochen/Backen zeigen UND Rezept in Caption haben.
+
+- exercise: Caption oder Video zeigt EINE einzelne Uebung mit Form-Cues
+  ("So machst du Squats richtig", "Wall Ball Technik"). Sets/Reps optional,
+  aber der Fokus liegt auf EINER Bewegung mit Ausfuehrungs-Erklaerung.
+
+- workout: Caption beschreibt einen KOMPLETTEN Workout-Block aus mehreren
+  Uebungen ("Push-Day 1: 5 Uebungen, hier ist mein Split"). Reihenfolge +
+  Saetze/Wdh fuer mehrere Uebungen erkennbar.
+
+- mindset: Reiner Motivations-/Inhalts-Text ohne Rezept oder Workout.
+  Z.B. "3 Sachen die mir geholfen haben", Pull-Quote-Material, Reflexion.
+
+- tutorial: How-To ohne Rezept und ohne Workout. Z.B. "Wie organisiere
+  ich Mealprep-Boxen", "Wie packe ich Gym-Bag", "5 Supplement-Tipps".
+
+- transformation: Vorher/Nachher, Progress-Update, "-20kg in 6 Monaten".
+
+- vlog: Lifestyle, Day-in-Life, Reise, persoenlicher Vlog ohne klares
+  Lern-Element.
+
+- other: Werbung, Produkt-Promo ohne Bildungs-Inhalt, Foto-Dump,
+  nicht klassifizierbar.
+
+REZEPT-spezifische Felder (nur bei contentType='recipe' fuellen):
+
+mealType-Regeln:
+- breakfast: Pancakes, Overnight Oats, Bowls, Eier-Gerichte fuer den Morgen
+- lunch: meist herzhafte Mittagsgerichte
+- dinner: Abendessen (Pasta, Bowls, Aufstrich, Fleisch-Gerichte)
+- snack: kleine herzhafte oder suesse Snacks unter 200 kcal
+- dessert: Kuchen, Kekse, Eis, Cheesecakes, Pudding
+- drink: Smoothies, Shakes, Drinks
+- unknown: nicht eindeutig oder kein Rezept
 
 mealType-Regeln:
 - breakfast: Pancakes, Overnight Oats, Bowls, Eier-Gerichte fuer den Morgen
@@ -203,6 +323,63 @@ vessel (Hauptgefaess waehrend der Hauptzubereitung):
 - grill: Grill
 - blender: Smoothies, Shakes
 
+FITNESS-spezifische Felder (nur bei contentType IN ('exercise','workout') fuellen):
+
+workoutType:
+- strength: Krafttraining/Hypertrophie (Hantel-/Maschinen-Training)
+- cardio: Ausdauer-Steady-State (Laufen, Rudern, Bike)
+- hiit: High-Intensity-Intervals (kurze hochintensive Bursts mit Pausen)
+- functional: Hyrox, CrossFit-Style, Hybrid-Endurance (Sled/Wall-Ball/SkiErg)
+- mobility: Stretching, Beweglichkeit, Foam-Rolling
+- pilates: Pilates/Barre (Mat-Work, Reformer)
+- yoga: Yoga (Vinyasa, Hatha, Ashtanga)
+- posing: Bodybuilding-Posing-Practice
+- rehab: Reha/Verletzungs-Prevention, Physio-Uebungen
+- calisthenics: Bodyweight/Street-Workout (Pull-Ups, Push-Ups, Dips)
+
+bodyParts (mehrere moeglich):
+- chest, back, shoulders, arms, legs, glutes, core, full-body,
+  cardio-conditioning. cardio-conditioning = explizit Conditioning ohne
+  Muskel-Schwerpunkt (Burpees, Mountain Climbers, Jump Rope).
+
+equipment (mehrere moeglich):
+- none/bodyweight: ohne Equipment
+- dumbbell/barbell/kettlebell: klassische Krafttraining-Gewichte
+- machine/cable: Studio-Maschinen
+- bands: Resistance-Bands
+- sled/ski-erg/rower/wall-ball/sandbag: Hyrox-spezifisches Equipment
+- outdoor: Park/Strasse/Trail (Laufen, Outdoor-Workouts)
+- studio: Mat/Block/Roller (Pilates/Yoga)
+- mixed: Workout mit mehreren Equipment-Typen
+
+trainingSetting (genau einer):
+- home: zuhause (Wohnzimmer, Garage)
+- commercial-gym: klassisches Fitnessstudio (FitX, McFit, Gold's Gym)
+- studio: Pilates-/Yoga-Studio (hell, ruhig, edle Optik)
+- functional-gym: CrossFit-Box, Hyrox-Setup (rustikal, viel Equipment)
+- outdoor: Park, Strasse, Trail
+- stage: Bodybuilding-Buehne (Posing, Wettkampf)
+
+trainingGoal (genau einer, bester Hauptanlass):
+- hypertrophy: Muskelaufbau (BB-Splits, Volumen-Training)
+- fat-loss: Abnehmen (Kalorien-Defizit, Cardio, leichtes Strength)
+- strength: Maximalkraft (1RM-Fokus, Powerlifting)
+- endurance: Ausdauer (Lauf-Programme, Bike, Rudern)
+- mobility: Beweglichkeit, Reha-Aspekt
+- aesthetic: Optik (Bikini-Fitness, Glute-/Booty-Fokus, Stage-Look)
+- performance: Wettkampf-orientiert (Hyrox-Race-Prep, BB-Comp)
+- posture: Haltung, Rumpf-Stabilitaet
+- longevity: Gesundheit, Anti-Aging (sanftes Pilates, Mobility)
+
+fitnessLevel:
+- beginner: Einsteiger-Uebung (Basic-Squat, Bodyweight)
+- intermediate: solide Technik vorausgesetzt (Deadlift, Pull-Ups)
+- advanced: fortgeschrittene Technik (Olympic-Lifts, Muscle-Up, Plyo)
+- pro: Wettkampf-Niveau (IFBB-Pro-Training, Hyrox-Pro)
+
+durationMinutes: nur fuer Workouts (komplette Sessions). Bei einzelnen
+Uebungs-Demos: 0.
+
 Antworte AUSSCHLIESSLICH im JSON-Schema. Reihenfolge im classifications-Array MUSS mit der Eingabe matchen (Index 0..n).`;
 
 function summariseReel(reel: ReelRow, index: number): string {
@@ -225,7 +402,7 @@ function summariseReel(reel: ReelRow, index: number): string {
 type BatchOut = {
   classifications: Array<{
     index: number;
-    isRecipe: boolean;
+    contentType: string;
     recipeConfidence: number;
     recipeTitle: string;
     mealType: string;
@@ -237,8 +414,26 @@ type BatchOut = {
     season: string;
     skillLevel: string;
     vessel: string;
+    workoutType?: string;
+    bodyParts?: string[];
+    equipment?: string[];
+    trainingSetting?: string;
+    trainingGoal?: string;
+    fitnessLevel?: string;
+    durationMinutes?: number;
   }>;
 };
+
+const VALID_CONTENT_TYPES = new Set([
+  "recipe",
+  "exercise",
+  "workout",
+  "mindset",
+  "tutorial",
+  "transformation",
+  "vlog",
+  "other",
+]);
 
 // Klassifiziert einen einzelnen Batch (max BATCH_SIZE Reels). Returnt
 // ein Map von Reel-ID auf ReelClassification.
@@ -263,24 +458,61 @@ async function classifyBatch(
   for (const c of result.classifications) {
     const reel = reels[c.index];
     if (!reel) continue;
+    // contentType normalisieren: nur erlaubte Werte durchlassen.
+    const contentType = VALID_CONTENT_TYPES.has(c.contentType)
+      ? (c.contentType as ReelClassification["contentType"])
+      : null;
+    // is_recipe ableiten — bleibt der einzige Bool fuer Backward-Compat
+    // mit getRecipeReelsForBrand, isRecipe-Filter, etc.
+    const isRecipe = contentType === "recipe";
+    const isFitness =
+      contentType === "exercise" || contentType === "workout";
+
     map.set(reel.id, {
-      isRecipe: c.isRecipe,
+      contentType,
+      isRecipe,
       recipeConfidence: Math.max(0, Math.min(1, c.recipeConfidence)),
       recipeTitle: c.recipeTitle?.trim() || null,
+      // Recipe-Felder nur bei contentType='recipe' uebernehmen, sonst null.
       mealType:
-        c.mealType && c.mealType !== "unknown" ? c.mealType : null,
-      cuisine: c.cuisine?.trim() || null,
-      mainIngredient: c.mainIngredient?.trim() || null,
-      dietary: Array.isArray(c.dietary) ? c.dietary.filter(Boolean) : [],
+        isRecipe && c.mealType && c.mealType !== "unknown"
+          ? c.mealType
+          : null,
+      cuisine: isRecipe ? c.cuisine?.trim() || null : null,
+      mainIngredient: isRecipe ? c.mainIngredient?.trim() || null : null,
+      dietary:
+        isRecipe && Array.isArray(c.dietary)
+          ? c.dietary.filter(Boolean)
+          : [],
       estimatedTimeMinutes:
+        isRecipe &&
         typeof c.estimatedTimeMinutes === "number" &&
         c.estimatedTimeMinutes > 0
           ? c.estimatedTimeMinutes
           : null,
-      occasion: c.occasion?.trim() || null,
-      season: c.season?.trim() || null,
-      skillLevel: c.skillLevel?.trim() || null,
-      vessel: c.vessel?.trim() || null,
+      occasion: isRecipe ? c.occasion?.trim() || null : null,
+      season: isRecipe ? c.season?.trim() || null : null,
+      skillLevel: isRecipe ? c.skillLevel?.trim() || null : null,
+      vessel: isRecipe ? c.vessel?.trim() || null : null,
+      // Fitness-Felder nur bei contentType IN ('exercise','workout').
+      workoutType: isFitness ? c.workoutType?.trim() || null : null,
+      bodyParts:
+        isFitness && Array.isArray(c.bodyParts)
+          ? c.bodyParts.filter(Boolean)
+          : [],
+      equipment:
+        isFitness && Array.isArray(c.equipment)
+          ? c.equipment.filter(Boolean)
+          : [],
+      trainingSetting: isFitness ? c.trainingSetting?.trim() || null : null,
+      trainingGoal: isFitness ? c.trainingGoal?.trim() || null : null,
+      fitnessLevel: isFitness ? c.fitnessLevel?.trim() || null : null,
+      durationMinutes:
+        isFitness &&
+        typeof c.durationMinutes === "number" &&
+        c.durationMinutes > 0
+          ? c.durationMinutes
+          : null,
     });
   }
   return map;
