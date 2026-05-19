@@ -344,12 +344,93 @@ export const ALINA_STYLE: BrandImageStyle = {
   },
 };
 
+// ─── Laetitia · @laetitiaszabo (DB-Brand-Slug: "laetitia") ───────────────────
+// Calibrated against 5 IG-Screenshots from the user (2026-05-19):
+//   1. Profil-Grid: Mix aus Food (Donauwelle, Happy Hippo Bowl, Strawberry
+//      Cheesecake, Milchschnitten, Kuchen-Bowls) + Lifestyle (Pferd,
+//      Sunrise-Run, Pilates, Cape-Town, Marbella). Hero-relevant ist die
+//      Food-Side — alle Food-Shots auf Marmor mit Adern.
+//   2. Kinderriegel Kuchen Close-up: heller Marmor mit feinen Adern,
+//      Glasform, Cream-Textur mit Highlights, Hand mit beigen Naegeln
+//   3. Milchschnitten Bowl: gleiche Marmor-Surface, Glas-Aufbewahrungs-
+//      form mit sichtbaren Schichten, Erdbeeren als Akzent
+//   4. High Protein Greek Pasta Salad: Glasschuessel, Marmor-Hintergrund,
+//      buntes Recipe mit Tomaten/Gurken
+//   5. Raspberry Schicht Kuchenbowl: Glasform top-down, Marmor sichtbar,
+//      Beeren-Schicht als Hero-Element
+//
+// Brand-Positionierung: "Luxe High-Protein Meal-Prep". MORE Nutrition
+// Partnership, Wettkampf-Vorpac, Female-Strength-Lifestyle aber Food-
+// Content ist sehr Hero-Recipe-style mit Premium-Meal-Prep-Aesthetic.
+//
+// Brand-DNA-Kernunterschied zu allen anderen:
+//   - Biene = pale-grey concrete + cutting-board (cottage)
+//   - Julia = bone-grey concrete + scattered (smartphone-snap)
+//   - Kristina = warm oak + basil-pot (family-healthy)
+//   - Alina = white matte + zero props (doctor's-clean)
+//   - Laetitia = light marble with veining + glass-container-aesthetic
+//     (luxe meal-prep close-up)
+//
+// Lesson: Vessel-Hardcode bewusst raus — das war Julias v1-Bug. Glas-
+// Container ist Laetitias Reel-Pattern, aber vessel kommt aus dem Recipe
+// via Stage-2 (sonst kämpft Style gegen Reel-Reality). Wir lassen das
+// Marmor + Highlights + Close-up-Atmosphaere als Signature ohne den
+// Vessel-Wechsel zu erzwingen.
+export const LAETITIA_STYLE: BrandImageStyle = {
+  brandSlug: "laetitia",
+  // Weich + neutral + cream-Highlights. Ihr Reel-Look hat charakteristisch
+  // Highlights auf den cremigen Texturen (Mousse, Quark, Sauce-Glanz).
+  // Kein warm-honey wie Kristina, kein clinical wie Alina — eher modern-
+  // editorial mit Cream-Sheen.
+  lightingOptions: [
+    "soft natural daylight on light marble, gentle highlights on cream textures",
+    "neutral bright daylight from a window, slight warm tone on the marble veining",
+    "soft directional daylight catching cream and protein textures",
+    "diffused daylight from above with cream-rich highlights",
+    "modern editorial daylight on marble, premium meal-prep feel",
+  ],
+  // Marmor mit Adern in 5 Variationen — alle hellgrau-weiß, verschiedene
+  // Vein-Intensitäten damit Gemini Range hat.
+  sceneOptions: [
+    "a light grey marble kitchen counter with subtle natural veining",
+    "a white-grey carrara-style marble countertop with delicate veins",
+    "a polished light marble surface with fine grey veining",
+    "a clean light marble counter near a window, soft natural sheen",
+    "a premium light marble work surface, modern fitness-kitchen feel",
+  ],
+  styleSuffix: "",
+  // Klares Anti-Pattern zu Biene/Julia/Kristina: KEIN Holz, KEIN Beton,
+  // KEINE rustic-Props. Schlank gehalten (5 Items wie Biene v9.4).
+  negativeAddition:
+    "no wood counter or table, no plain concrete or stone, no scattered herbs or ingredients around the dish, no background plants or props, no rustic farmhouse styling",
+  // Editorial close-up Premium-Feel ohne "studio look" — sie ist
+  // smartphone-shot, aber gut-lit und dramatisch.
+  cameraAesthetic:
+    "premium modern food photograph, high-protein meal-prep aesthetic, editorial close-up feel, smartphone-shot but well-lit, no over-styled studio look",
+  // Signature ist Marmor + Close-up-Atmosphaere + Cream-Highlights. KEIN
+  // Vessel-Hardcode (Julia v1-Lesson). Positiv beschrieben damit Flux
+  // einen klaren Anker hat statt nur Negatives.
+  heroElementGuidance:
+    "The dish is presented in close-up on the light marble counter, the camera relatively tight on the dish so the marble veining and any cream/protein textures fill the frame atmospherically. No background props, no plants, no cutting boards, no scattered ingredients — the marble surface and the dish itself ARE the visual statement.",
+  // Per-shape Winkel: Laetitia hat einen Mix aus 30° three-quarter
+  // (Cheesecake, Schicht-Bowls) und 75°-Topdown (Pasta-Salat). Layered
+  // Shapes mit close-up Frame damit die Schichten dramatisch wirken.
+  defaultAngles: {
+    flat: "from a high overhead angle (about 75°, slightly tilted not strict 90°), the dish filling most of the frame on the light marble surface with veining subtly visible",
+    mixed: "from a 30-45° three-quarter angle so cream and protein textures catch the light, light marble counter visible with subtle veining",
+    layered: "from a close 30° three-quarter angle so visible layers in the dish are central and dramatic, marble counter softly visible below the dish",
+    tall: "from a 45° eye-level angle that shows the dish's full height, light marble background",
+    liquid: "from a close 30° three-quarter angle so the cream or sauce surface catches highlights, marble surface visible",
+  },
+};
+
 // ─── Lookup by brand slug ────────────────────────────────────────────────────
 const STYLES: Record<string, BrandImageStyle> = {
   biene: BIENE_STYLE,
   julia: JULIA_STYLE,
   kristina: KRISTINA_STYLE,
   alina: ALINA_STYLE,
+  laetitia: LAETITIA_STYLE,
 };
 
 // Sagt: haben wir fuer diesen Slug einen hand-kalibrierten Code-Style?
