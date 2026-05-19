@@ -9,6 +9,10 @@ import {
   pickMoodById,
   triggerEnrichForBuiltPack,
 } from "@/lib/reel-library/pack-builder";
+import {
+  buildFitnessPackFromReels,
+  triggerEnrichForBuiltFitnessPack,
+} from "@/lib/reel-library/fitness-pack-builder";
 import { brandMoodPresets } from "@/lib/brand-presets";
 import { loadBrand } from "@/lib/custom-brands-server";
 import { generatePackMeta } from "@/lib/ai/generate-pack-meta";
@@ -171,35 +175,107 @@ export async function POST(req: Request, { params }: RouteParams) {
   const baseSlug = slugifyPack(suggestion.title) || "pack";
   const slug = `${baseSlug}-${Date.now().toString(36).slice(-4)}`;
 
+  // Brand laden — Entscheidet ob wir Recipe- oder Fitness-Builder rufen
+  // (brand.defaultPackType). Plus brauchen wir den brand fuer die Voice-
+  // Pipeline-Regeneration unten.
+  const brand = await loadBrand(suggestion.brand_slug);
+  const packType = brand?.defaultPackType ?? "recipe";
+
   // Texte aus der Suggestion werden mit der neuen Brand-Voice-Pipeline
   // regeneriert, falls moeglich. Suggestions, die vor der Pipeline-V2
   // generiert wurden, klingen sonst nach generischer KI — und der User
   // wuerde den schlechten Text uebernehmen ohne es zu merken. Re-Generate
   // ist non-blocking: bei Fehler oder fehlenden Reels fallen wir auf den
   // gespeicherten Suggestion-Text zurueck.
+  //
+  // NOTE: generatePackMeta ist aktuell auf Recipe-Reels optimiert — fuer
+  // Fitness-Brands skippen wir den Re-Gen und vertrauen der Original-
+  // Suggestion (die kam aus suggest-fitness-packs.ts mit eigenem Prompt).
   let finalTitle = suggestion.title;
   let finalSubtitle = suggestion.subtitle;
   let finalTagline = suggestion.tagline;
   let finalDescription = suggestion.description;
   let finalCategory = suggestion.category;
-  try {
-    const brand = await loadBrand(suggestion.brand_slug);
-    const reels = await getReelsByIds(suggestion.reel_ids);
-    if (brand && reels.length >= 3) {
-      const meta = await generatePackMeta(reels, brand);
-      finalTitle = meta.title || finalTitle;
-      finalSubtitle = meta.subtitle || finalSubtitle;
-      finalTagline = meta.tagline || finalTagline;
-      finalDescription = meta.description || finalDescription;
-      finalCategory = meta.category || finalCategory;
+  if (packType === "recipe") {
+    try {
+      const reels = await getReelsByIds(suggestion.reel_ids);
+      if (brand && reels.length >= 3) {
+        const meta = await generatePackMeta(reels, brand);
+        finalTitle = meta.title || finalTitle;
+        finalSubtitle = meta.subtitle || finalSubtitle;
+        finalTagline = meta.tagline || finalTagline;
+        finalDescription = meta.description || finalDescription;
+        finalCategory = meta.category || finalCategory;
+      }
+    } catch (err) {
+      console.warn(
+        "[pack-suggestions/accept] re-generate meta failed (fallback to stored suggestion text):",
+        err instanceof Error ? err.message : err
+      );
     }
-  } catch (err) {
-    console.warn(
-      "[pack-suggestions/accept] re-generate meta failed (fallback to stored suggestion text):",
-      err instanceof Error ? err.message : err
-    );
   }
 
+  // ── Branch: Fitness-Pack vs Recipe-Pack ────────────────────────────
+  if (packType === "fitness") {
+    const result = await buildFitnessPackFromReels({
+      brandSlug: suggestion.brand_slug,
+      reelIds: suggestion.reel_ids,
+      pack: {
+        slug,
+        title: finalTitle,
+        subtitle: finalSubtitle,
+        tagline: finalTagline,
+        description: finalDescription,
+        category: finalCategory,
+        mood: packMood,
+        displayFont,
+        cardLayout: overrideLayout ?? cardLayout,
+      },
+      origin,
+      presetCoverImage: suggestion.cover_url ?? undefined,
+    });
+
+    if (!result) {
+      return NextResponse.json(
+        {
+          error:
+            "Fitness-Pack konnte nicht erstellt werden — zu wenige Reels parsbar oder DB-Fehler.",
+        },
+        { status: 500 }
+      );
+    }
+
+    await updateSuggestionStatus(id, "accepted", result.packId);
+
+    after(async () => {
+      try {
+        await triggerEnrichForBuiltFitnessPack(
+          origin,
+          suggestion.brand_slug,
+          result.packSlug,
+          result.insertedCardSlugs,
+          result.packId
+        );
+      } catch (err) {
+        console.error(
+          "[pack-suggestions/accept] fitness-enrich trigger failed",
+          err
+        );
+      }
+    });
+
+    return NextResponse.json({
+      status: "accepted",
+      packType: "fitness",
+      packId: result.packId,
+      packSlug: result.packSlug,
+      cardCount: result.cardCount,
+      parseFailures: result.parseFailures,
+      brandSlug: suggestion.brand_slug,
+    });
+  }
+
+  // Recipe-Pack (Default)
   const result = await buildPackFromReels({
     brandSlug: suggestion.brand_slug,
     reelIds: suggestion.reel_ids,
@@ -253,6 +329,7 @@ export async function POST(req: Request, { params }: RouteParams) {
 
   return NextResponse.json({
     status: "accepted",
+    packType: "recipe",
     packId: result.packId,
     packSlug: result.packSlug,
     recipeCount: result.recipeCount,

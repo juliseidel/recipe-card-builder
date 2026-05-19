@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { generatePackCover } from "@/lib/ai/generate-pack-cover";
+import { generateFitnessPackCover } from "@/lib/ai/generate-fitness-pack-cover";
 import { generatePackForeword } from "@/lib/ai/generate-foreword";
 import { generateForewordImage } from "@/lib/ai/generate-foreword-image";
 import {
@@ -12,6 +13,7 @@ import { loadBrand } from "@/lib/custom-brands-server";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 import type { Pack } from "@/lib/packs";
 import type { Recipe } from "@/lib/recipes";
+import { resolvePackType } from "@/lib/fitness/types";
 
 // Async pack-enrichment — generates everything a freshly-created custom
 // pack needs to look like one of the curated Bienen-Packs:
@@ -101,26 +103,36 @@ export async function POST(req: Request) {
     );
   }
 
+  // Pack-Type-Diskriminator. Bei Fitness-Pack laufen nur Cover-Gen (mit
+  // Equipment-Prompt), kein Foreword-Text + kein Foreword-Bild —
+  // Foreword-Pipeline ist recipe-spezifisch (Pack-PDF rendert die
+  // Vorwort-Page nur fuer Recipe-Packs).
+  const packType = resolvePackType(pack, brand);
+
   // Per-task skip checks — re-running enrich (e.g. user edits a field)
   // mustn't burn a fresh Flux/Gemini call for results we already have.
   // Cover counts as "done" when its URL points at our own bucket;
   // foreword counts as "done" when both fields are populated.
   //
   // force-Parameter-Override: wenn forceCover/forceForeword* gesetzt,
-  // ignorieren wir den hasX-Check und regenerieren trotzdem. Genutzt vom
-  // Pack-Cover-Reroll-Button im UI.
+  // ignorieren wir den hasX-Check und regenerieren trotzdem.
   const hasCover =
     !body.forceCover &&
     (pack.coverImage ?? "").includes(
       `/storage/v1/object/public/${COVER_BUCKET}/`
     );
-  const hasForewordText = !body.forceForewordText && !!pack.foreword;
-  const hasForewordImage = !body.forceForewordImage && !!pack.forewordImage;
+  // Bei Fitness-Packs: Foreword wird komplett geskipped — markieren als
+  // "done" damit Skip-Check + Promise.allSettled das richtig tun.
+  const hasForewordText =
+    packType === "fitness" || (!body.forceForewordText && !!pack.foreword);
+  const hasForewordImage =
+    packType === "fitness" || (!body.forceForewordImage && !!pack.forewordImage);
 
   if (hasCover && hasForewordText && hasForewordImage) {
     return NextResponse.json({
       status: "already-enriched",
       packId: row.id,
+      packType,
     });
   }
 
@@ -198,11 +210,20 @@ export async function POST(req: Request) {
     // Three independent enrichment tasks. We use Promise.allSettled so a
     // failure in one (Gemini overloaded, Flux timeout) doesn't drop the
     // others. Each settled value is processed individually below.
+    //
+    // Cover-Generator branched nach packType:
+    //   - recipe: generatePackCover (Food-Stillleben)
+    //   - fitness: generateFitnessPackCover (Equipment-Stillleben mit
+    //     Sub-Niche-Heuristik aus Pack-Category, kein Foreword)
+    const coverPromise = hasCover
+      ? Promise.resolve(null)
+      : packType === "fitness"
+        ? generateFitnessPackCover({ pack }).then((r) => r.buffer)
+        : generatePackCover({ pack }).then((r) => r.buffer);
+
     const [coverSettled, forewordTextSettled, forewordImageSettled] =
       await Promise.allSettled([
-        hasCover
-          ? Promise.resolve(null)
-          : generatePackCover({ pack }).then((r) => r.buffer),
+        coverPromise,
         hasForewordText
           ? Promise.resolve(null)
           : generatePackForeword(pack, brand, recipeTitlesForForeword),
