@@ -203,10 +203,75 @@ export const JULIA_STYLE: BrandImageStyle = {
   },
 };
 
+// ─── Kristina · @kristinas.healthylife (DB-Brand-Slug: "kristina") ───────────
+// Calibrated against 5 IG-Screenshots from the user (2026-05-19):
+//   1. Gnocchi One-Pot mit Hackfleisch (top-down, helles Eichenholz,
+//      Basilikum-Pflanze in weißem Riffel-Topf rechts, grau-beige Keramik)
+//   2. Kirsch-Tiramisu (30° three-quarter, gleiches Holz, Basilikum im
+//      Hintergrund, Holzlöffel + Leinen-Serviette als Props)
+//   3. Profil-Grid (mix Studio-Talking-Head + Food-Shots, alle Food-Shots
+//      mit charakteristischem Holzboden + Pflanze)
+//   4. One-Pot Nudelpfanne in echter Küche (helle moderne Familien-
+//      Küche, viel Tageslicht, Holzarbeitsplatte)
+//   5. Asia Kohlrouladen (30° three-quarter, dunkler grauer Keramik-
+//      Teller, Frühlingszwiebeln, Basilikum oben im Frame)
+//
+// Brand-DNA-Kernunterschied zu Biene/Julia:
+//   - Biene = pale-grey concrete + cutting-board-mit-ingredient-bowl
+//   - Julia = bone-grey concrete + scattered loose ingredients
+//   - Kristina = warm light-oak wood + basil-plant-in-white-pot
+//
+// Lessons aus Biene v9.x: weniger NEVER/NOT-Klauseln, sonst rendert Flux
+// clean-magazine statt homemade-Reel. Schlanke Negatives, klares Signature-
+// Element, simple positive Beschreibungen.
+export const KRISTINA_STYLE: BrandImageStyle = {
+  brandSlug: "kristina",
+  lightingOptions: [
+    "soft natural daylight on a warm oak counter, gentle directional shadows",
+    "warm afternoon daylight from a kitchen window, slightly honey-toned",
+    "bright neutral daylight from above with soft shadows on the wood grain",
+    "warm side daylight catching the oak grain, healthy-home-cook feel",
+    "diffused daylight from the left, warm cosy modern-kitchen mood",
+  ],
+  sceneOptions: [
+    "a warm light-oak wooden counter with visible plank seams and natural grain",
+    "a wide-plank honey-oak kitchen table, warm and lived-in",
+    "a natural light-oak wood surface in a modern healthy home kitchen",
+    "a soft light-oak counter near a sunny kitchen window",
+    "a warm honey-toned oak table top, family-kitchen feel",
+  ],
+  styleSuffix: "",
+  // Schlank wie Biene v9.4 — nur die echten Anti-Patterns negieren:
+  // keine Stein/Beton/Marmor-Counter (Biene/Julia-Territorium), kein
+  // dunkel-vintage Farmhouse-Tisch, kein clean Studio-Look.
+  negativeAddition:
+    "no concrete or stone counter, no marble surface, no dark vintage farmhouse table, no studio-clean magazine look",
+  cameraAesthetic:
+    "natural healthy-home-kitchen food photograph, homemade-feeling, no studio look",
+  // Kristinas Signature: Basilikum-Pflanze im weißen Riffel-Übertopf im
+  // soft-blurred Background. Konsistent in fast all ihren Reels (4 von 5
+  // Reference-Screenshots haben sie sichtbar). Wichtig: SOFT background,
+  // never on the dish or in the foreground.
+  heroElementGuidance:
+    "A complete English phrase: 'a small fresh basil plant in a white ribbed ceramic pot sits softly in the upper background of the scene, slightly out of focus'. The basil plant is a separate prop in the soft background, never on or in the dish itself.",
+  // Per-shape Winkel an Kristinas Reel-Repertoire angepasst: one-pot bowls
+  // und Pfannen top-down (häufigster Shot), layered desserts (Tiramisu,
+  // Mealprep-Auflauf) 30° three-quarter, tall single items 45°, Suppen/
+  // Liquids 30° für Glanz.
+  defaultAngles: {
+    flat: "from a high overhead angle looking down (about 75°, slightly tilted not strict 90°), with the dish as the main subject in the foreground on the warm oak counter, and the basil-plant prop placed separately on the counter in the soft upper background of the scene",
+    mixed: "from a high overhead angle (about 75°, slightly tilted not strict 90°), warm oak counter visible, basil plant softly in the upper background",
+    layered: "from a 30° three-quarter angle so the layers of the dish are visible, basil plant softly visible in the upper background",
+    tall: "from a 45° eye-level angle that shows the dish's full height, basil plant softly in the background",
+    liquid: "from a 30° three-quarter angle so the liquid surface shines, basil plant softly in the background",
+  },
+};
+
 // ─── Lookup by brand slug ────────────────────────────────────────────────────
 const STYLES: Record<string, BrandImageStyle> = {
   biene: BIENE_STYLE,
   julia: JULIA_STYLE,
+  kristina: KRISTINA_STYLE,
 };
 
 // Sagt: haben wir fuer diesen Slug einen hand-kalibrierten Code-Style?
