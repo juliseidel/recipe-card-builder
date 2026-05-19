@@ -33,6 +33,15 @@ const HERO_BUCKET = "recipe-heroes";
 const STORAGE_LONG_EDGE = 2400; // wir behalten den Original-Aspekt — kein 1:1-Crop
 const STORAGE_JPEG_QUALITY = 95;
 
+// Cinematic-Look-Parameter — heben Reel-Frame-Aufnahme auf Magazin-Niveau.
+// Werte sind subtil gehalten: Ziel ist "Foto sieht professionell aus", nicht
+// "Foto ist offensichtlich gefiltert". Bei zu aggressivem Boost werden
+// Hauttoene unnatuerlich.
+const CINEMATIC_SATURATION = 1.08;   // +8% Saettigung (Farben kraftvoller)
+const CINEMATIC_BRIGHTNESS = 0.97;   // -3% Brightness (mehr Tiefe in Shadows)
+const CINEMATIC_SHARPEN_SIGMA = 0.7; // etwas mehr als Recipe-Pipeline (0.5)
+const VIGNETTE_INTENSITY = 0.35;     // 0..1 — Staerke des dunklen Edges-Rings
+
 export type GenerateFitnessHeroOpts = {
   card: FitnessCard;
   /** UUID der DB-Row — gleichzeitig Teil des Storage-Pfads. */
@@ -169,21 +178,40 @@ async function uploadFitnessJpeg(
   // aber semantische Trennung im Storage.
   const filePath = `fitness/${cardId}.jpg`;
 
-  // Wir behalten den Original-Aspekt (kein Crop auf 1:1) — Fitness-Reels
-  // sind oft Portrait (9:16) oder Square, und Action-Shots brauchen den
-  // vollen vertikalen Raum. Sharp resized auf STORAGE_LONG_EDGE long-edge,
-  // andere Seite proportional. Plus modesty Sharpening + JPEG q=95.
-  const processed = await sharp(buf)
+  // Cinematic-Pipeline:
+  //   1) Resize auf STORAGE_LONG_EDGE long-edge (proportional, kein Crop)
+  //   2) modulate — Saettigung leicht hoch, Brightness leicht runter (mehr
+  //      Tiefe in Shadows, kraftvolle Farben — typischer Magazin-Look)
+  //   3) sharpen — etwas aggressiver als Recipe-Pipeline weil Reel-Source
+  //      oft weicher ist als Studio-Photos
+  //   4) Vignette composite (SVG-radial-gradient, dark edges) — subtiler
+  //      cinematic frame ohne dass es nach "Photoshop-Vignette" aussieht
+  //   5) JPEG q=95 mit mozjpeg + progressive
+  const base = await sharp(buf)
     .resize(STORAGE_LONG_EDGE, STORAGE_LONG_EDGE, {
       kernel: sharp.kernel.lanczos3,
-      fit: "inside", // proportional, keine Verzerrung
-      withoutEnlargement: false, // upscale ok wenn source kleiner
+      fit: "inside",
+      withoutEnlargement: false,
     })
-    .sharpen({ sigma: 0.5, m1: 0.6, m2: 0.4 })
+    .modulate({
+      saturation: CINEMATIC_SATURATION,
+      brightness: CINEMATIC_BRIGHTNESS,
+    })
+    .sharpen({ sigma: CINEMATIC_SHARPEN_SIGMA, m1: 0.7, m2: 0.4 })
+    .toBuffer({ resolveWithObject: true });
+
+  const { width: outWidth, height: outHeight } = base.info;
+  const vignette = buildVignetteSvg(outWidth, outHeight, VIGNETTE_INTENSITY);
+
+  const processed = await sharp(base.data)
+    .composite([{ input: vignette, blend: "multiply" }])
     .jpeg({
       quality: STORAGE_JPEG_QUALITY,
       mozjpeg: true,
       progressive: true,
+      // chromaSubsampling 4:4:4 statt default 4:2:0 — feinere Farb-Details
+      // besonders an Hautton-Kanten, lohnt sich bei q=95.
+      chromaSubsampling: "4:4:4",
     })
     .toBuffer();
 
@@ -215,4 +243,41 @@ async function ensureHeroBucket(supabase: SupabaseClient): Promise<void> {
   if (error && !/already exists/i.test(error.message)) {
     console.warn("[fitness-hero] bucket create warning:", error.message);
   }
+}
+
+// Generiert ein SVG-Buffer mit radial-Gradient (transparent in der Mitte,
+// dunkel an den Edges). Sharp composited das mit multiply-blend auf das
+// Hero-Bild → subtile cinematic Vignette. SVG statt PNG damit es exakt zur
+// Bildgroesse passt ohne Resize-Artefakte.
+//
+// intensity 0..1:
+//   0 = keine Vignette (alpha 0 ueberall, Multiply = unveraendert)
+//   1 = harte Vignette (alpha 1 an den Edges, Multiply = schwarz)
+// 0.35 = sehr subtil, etwa "professional editorial photo finish"
+function buildVignetteSvg(
+  width: number,
+  height: number,
+  intensity: number
+): Buffer {
+  const cx = width / 2;
+  const cy = height / 2;
+  // Radius bis zur Ecke (Pythagoras)
+  const rOuter = Math.hypot(cx, cy);
+  // Inner-Stop bei ~50% Radius — bis dort transparent, dann linear zur Ecke
+  // hin dunkler werdend
+  const rInner = rOuter * 0.5;
+  // Edge-Alpha aus intensity (0..1) — 0.35 → alpha ~0.35 an den Ecken
+  const alpha = Math.max(0, Math.min(1, intensity));
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+      <defs>
+        <radialGradient id="vignette" cx="${cx}" cy="${cy}" r="${rOuter}" fx="${cx}" fy="${cy}" gradientUnits="userSpaceOnUse">
+          <stop offset="${(rInner / rOuter).toFixed(4)}" stop-color="rgb(255,255,255)" stop-opacity="1" />
+          <stop offset="1" stop-color="rgb(0,0,0)" stop-opacity="${alpha.toFixed(3)}" />
+        </radialGradient>
+      </defs>
+      <rect width="${width}" height="${height}" fill="url(#vignette)" />
+    </svg>
+  `;
+  return Buffer.from(svg);
 }

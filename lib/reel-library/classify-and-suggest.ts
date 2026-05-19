@@ -3,6 +3,8 @@ import {
   updateReelClassification,
   getRecipeReelsForBrand,
   countRecipeReelsForBrand,
+  getFitnessReelsForBrand,
+  countFitnessReelsForBrand,
   countReelsForBrand,
   insertSuggestions,
   clearPendingSuggestions,
@@ -14,6 +16,7 @@ import {
 import { loadBrand } from "@/lib/custom-brands-server";
 import { classifyReels, CLASSIFICATION_FAILED } from "@/lib/ai/classify-reels";
 import { suggestPacks } from "@/lib/ai/suggest-packs";
+import { suggestFitnessPacks } from "@/lib/ai/suggest-fitness-packs";
 import { generateSuggestionCovers } from "./generate-suggestion-covers";
 
 // Orchestrierung der Phase-2 + Phase-3 Pipeline. Wird vom Apify-Webhook
@@ -87,15 +90,64 @@ export async function runClassificationAndSuggestions(opts: {
 
   const totalReels = await countReelsForBrand(brandSlug);
   const recipeCount = await countRecipeReelsForBrand(brandSlug);
+  const fitnessCount = await countFitnessReelsForBrand(brandSlug);
   console.log(
-    `[classify-and-suggest] brand=${brandSlug} totalReels=${totalReels} recipeCount=${recipeCount}`
+    `[classify-and-suggest] brand=${brandSlug} totalReels=${totalReels} recipeCount=${recipeCount} fitnessCount=${fitnessCount}`
   );
 
   // ─── Schritt 2: Pack-Vorschlaege ────────────────────────────────────
-  // Bei <5 Rezepten ueberspringen (nichts sinnvolles zu clustern).
+  // Entscheidung welcher Suggester laueft:
+  //   1. brand.defaultPackType ist primary signal (vom Onboarding-Picker
+  //      oder Auto-Detection gesetzt)
+  //   2. Falls nicht gesetzt: nimm den Suggester wo wir MEHR klassifizierte
+  //      Reels haben (Mehrheit gewinnt)
+  //   3. Falls beides <5: skip
+  // Hybrid-Creators (Christian Wolf, Aylin) bekommen primaer den Default-
+  // Suggester, koennen aber das andere Pack-Format manuell ueber den
+  // Pack-Type-Toggle anlegen.
+  const brand = await loadBrand(brandSlug);
+  const explicitPackType = brand?.defaultPackType;
+  const effectivePackType: "recipe" | "fitness" =
+    explicitPackType ??
+    (fitnessCount > recipeCount ? "fitness" : "recipe");
+
   let suggestionCount = 0;
-  if (recipeCount >= 5) {
-    const brand = await loadBrand(brandSlug);
+  if (effectivePackType === "fitness" && fitnessCount >= 5) {
+    // Fitness-Pipeline
+    const fitnessReels = await getFitnessReelsForBrand(brandSlug);
+    try {
+      const suggestions = await suggestFitnessPacks({
+        brandName: brand?.name ?? brandSlug,
+        fitnessReels,
+        brand,
+      });
+      if (suggestions.length > 0) {
+        await clearPendingSuggestions(brandSlug);
+        const rows: NewSuggestion[] = suggestions.map((s) => ({
+          brandSlug,
+          title: s.title,
+          subtitle: s.subtitle,
+          tagline: s.tagline,
+          description: s.description,
+          category: s.category,
+          reelIds: s.reelIds,
+          reasoning: s.reasoning,
+          score: s.score,
+        }));
+        suggestionCount = await insertSuggestions(rows);
+        console.log(
+          `[classify-and-suggest] brand=${brandSlug} fitness-suggestions=${suggestionCount}`
+        );
+      }
+    } catch (err) {
+      console.error(
+        "[classify-and-suggest] suggestFitnessPacks failed (non-fatal):",
+        err instanceof Error ? err.message : err
+      );
+    }
+  } else if (recipeCount >= 5) {
+    // Recipe-Pipeline (Default fuer alle Bestands-Brands ohne Pack-Type
+    // oder explicit recipe-Brands)
     const recipeReels = await getRecipeReelsForBrand(brandSlug);
     try {
       const suggestions = await suggestPacks({
@@ -121,7 +173,7 @@ export async function runClassificationAndSuggestions(opts: {
         }));
         suggestionCount = await insertSuggestions(rows);
         console.log(
-          `[classify-and-suggest] brand=${brandSlug} suggestions=${suggestionCount}`
+          `[classify-and-suggest] brand=${brandSlug} recipe-suggestions=${suggestionCount}`
         );
       }
     } catch (err) {

@@ -406,6 +406,50 @@ export async function getRecipeReelsForBrand(
   return (data as ReelRow[]) ?? [];
 }
 
+// Bulk-Read aller klassifizierten Fitness-Reels (exercise + workout)
+// eines Brands. Spiegel zu getRecipeReelsForBrand fuer die Fitness-
+// Pack-Suggestions-Pipeline (lib/ai/suggest-fitness-packs.ts).
+//
+// content_type IN ('exercise', 'workout') ist die zentrale Bedingung —
+// mindset/transformation/vlog werden hier ausgeschlossen weil sie nicht
+// fuer Trainings-Packs taugen (eigene Card-Typen).
+export async function getFitnessReelsForBrand(
+  brandSlug: string
+): Promise<ReelRow[]> {
+  if (!hasServerSupabase()) return [];
+  const supabase = getServerSupabase();
+  const { data, error } = await supabase
+    .from("creator_reels")
+    .select("*")
+    .eq("brand_slug", brandSlug)
+    .in("content_type", ["exercise", "workout"])
+    .order("posted_at", { ascending: false, nullsFirst: false });
+  if (error) {
+    console.error("[creator-reels] getFitnessReelsForBrand failed", error);
+    return [];
+  }
+  return (data as ReelRow[]) ?? [];
+}
+
+// Count-Variante fuer Skip-Lock im Orchestrator (analog zu
+// countRecipeReelsForBrand).
+export async function countFitnessReelsForBrand(
+  brandSlug: string
+): Promise<number> {
+  if (!hasServerSupabase()) return 0;
+  const supabase = getServerSupabase();
+  const { count, error } = await supabase
+    .from("creator_reels")
+    .select("*", { count: "exact", head: true })
+    .eq("brand_slug", brandSlug)
+    .in("content_type", ["exercise", "workout"]);
+  if (error) {
+    console.error("[creator-reels] countFitnessReelsForBrand failed", error);
+    return 0;
+  }
+  return count ?? 0;
+}
+
 // Holt mehrere Reels anhand ihrer DB-UUIDs. Wird beim Annehmen eines
 // Pack-Vorschlags genutzt: aus den reel_ids des Vorschlags die echten
 // Reels laden um daraus Recipe-Rows zu bauen.
