@@ -22,7 +22,10 @@ import { generateSuggestionCovers } from "@/lib/reel-library/generate-suggestion
 // oder:    GET (Cron-style)
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// 5 min wie Webhook — 518 Reels in 50er-Batches mit 5 parallelen Gemini-
+// Calls dauert ~5-8 Min total. Mit 60s Limit bricht der Loop nach 2-3
+// Batches ab.
+export const maxDuration = 300;
 
 async function handle(req: Request) {
   // Optionaler Bearer-Token-Check.

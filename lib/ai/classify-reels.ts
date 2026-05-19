@@ -137,7 +137,6 @@ const RESPONSE_SCHEMA = {
               "posing",
               "rehab",
               "calisthenics",
-              "",
             ],
             description:
               "Trainings-Typ. Nur bei contentType IN (exercise, workout). strength=Krafttraining/Hypertrophie; cardio=Ausdauer-Steady-State; hiit=High-Intensity-Intervals; functional=Hyrox/CrossFit/Hybrid; mobility=Beweglichkeit/Stretching; pilates=Pilates/Barre; yoga=Yoga; posing=Bodybuilding-Posing; rehab=Reha/Verletzung; calisthenics=Bodyweight/Street. Leer wenn unklar oder nicht-Fitness.",
@@ -163,7 +162,6 @@ const RESPONSE_SCHEMA = {
               "functional-gym",
               "outdoor",
               "stage",
-              "",
             ],
             description:
               "Wo trainiert. home=zuhause; commercial-gym=Fitnessstudio (FitX/McFit); studio=Pilates-/Yoga-Studio; functional-gym=CrossFit-Box/Hyrox; outdoor=Park/Strasse/Trail; stage=Bodybuilding-Buehne. Leer wenn unklar.",
@@ -180,14 +178,13 @@ const RESPONSE_SCHEMA = {
               "performance",
               "posture",
               "longevity",
-              "",
             ],
             description:
               "Trainings-Ziel. hypertrophy=Muskelaufbau; fat-loss=Abnehmen; strength=Maximalkraft; endurance=Ausdauer; mobility=Beweglichkeit; aesthetic=Optik/Bikini-Fitness; performance=Wettkampf (Hyrox, BB-Comp); posture=Haltung; longevity=Gesundheit/Anti-Aging. Leer wenn unklar.",
           },
           fitnessLevel: {
             type: "string",
-            enum: ["beginner", "intermediate", "advanced", "pro", ""],
+            enum: ["beginner", "intermediate", "advanced", "pro"],
             description:
               "Schwierigkeit der Uebung/Workout. Leer wenn unklar oder nicht-Fitness.",
           },
@@ -448,7 +445,11 @@ async function classifyBatch(
     schema: RESPONSE_SCHEMA,
     systemInstruction: SYSTEM_INSTRUCTION,
     temperature: 0.2,
-    maxOutputTokens: 16384,
+    // Bei neuem 8-Dim-Schema haben Responses pro Reel ~25 Felder statt
+    // ~12 — 32k Tokens damit auch grosse Batches sauber durchgehen.
+    maxOutputTokens: 32768,
+    // Thinking aus — Klassifikator ist Pattern-Recognition, kein
+    // mehrstufiges Reasoning. Spart Latenz.
     thinkingBudget: 0,
     retries: 1,
     model: "flash",

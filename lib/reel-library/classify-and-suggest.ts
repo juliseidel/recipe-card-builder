@@ -49,10 +49,18 @@ export async function runClassificationAndSuggestions(opts: {
   // Pro Loop ~10s (5 Batches a 10 Reels * 2s), total ~100s.
   let classifiedTotal = 0;
   let consecutiveFailures = 0;
+  let loopIteration = 0;
   while (true) {
+    loopIteration += 1;
     const batch = await getUnclassifiedReels(brandSlug, 50);
+    console.log(
+      `[classify-and-suggest] brand=${brandSlug} iteration=${loopIteration} fetched_unclassified=${batch.length}`
+    );
     if (batch.length === 0) break;
     const results = await classifyReels(batch);
+    console.log(
+      `[classify-and-suggest] brand=${brandSlug} iteration=${loopIteration} classifyReels_returned=${results.size}`
+    );
     // Per-Reel-Persist parallel. CLASSIFICATION_FAILED → SKIP, classified_at
     // bleibt NULL, naechster Resume probiert es nochmal. Verhindert
     // Datenzerstoerung bei Gemini-Failure (Bug-2026-05-13).
