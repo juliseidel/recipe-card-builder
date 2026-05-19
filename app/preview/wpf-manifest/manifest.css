@@ -1,0 +1,434 @@
+/* WPF-Manifest — Christian Wolf Premium-Editorial-Design
+   Scope: nur unter .wpf-root. Berührt keine andere App-Stelle. */
+
+.wpf-root {
+  /* Christian-Palette — DNA aus seinem Brand-Profil, plus präzise
+     Editorial-Töne (Off-White-Manuskript, Espresso-Tinte). */
+  --wpf-paper: #f3ece0;          /* Hauptpapier — warm-cream, leicht vergilbt */
+  --wpf-paper-deep: #ebe2d0;     /* Sekundär — für Abstufungen */
+  --wpf-paper-mute: #d9cdb1;     /* Trennlinien — gedämpft */
+  --wpf-ink: #1a120b;            /* Espresso-Tinte */
+  --wpf-ink-soft: #4a382a;       /* Sekundärtext */
+  --wpf-ink-mute: #8a7558;       /* Captions/Eyebrow */
+  --wpf-honey: #c79336;          /* Gedämpftes Honig-Gold (statt schreiendes Gelb) */
+  --wpf-rust: #8a3a1a;           /* Tiefes Terracotta — Akzent für Zahlen */
+  --wpf-blood: #5c1818;          /* Tiefes Bordeaux — für seltene Statements */
+  --wpf-night: #14100b;          /* Cover-Hintergrund, satt-dunkel */
+
+  /* Typo-Skala — Modular Scale 1.250 (Major Third), für magazinhafte
+     Hierarchie. */
+  --wpf-step-0: 1rem;
+  --wpf-step-1: 1.25rem;
+  --wpf-step-2: 1.5625rem;
+  --wpf-step-3: 1.953rem;
+  --wpf-step-4: 2.441rem;
+  --wpf-step-5: 3.052rem;
+  --wpf-step-6: 3.815rem;
+  --wpf-step-7: 4.768rem;
+  --wpf-step-8: 5.96rem;
+  --wpf-step-9: 7.451rem;
+  --wpf-step-10: 9.313rem;
+
+  /* Print-Page Dimensionen — A4 Hochkant @ 96dpi */
+  --wpf-page-w: 794px;   /* A4 = 210mm */
+  --wpf-page-h: 1123px;  /* A4 = 297mm */
+  --wpf-cover-w: 794px;
+  --wpf-cover-h: 992px;  /* 4:5 ratio fürs Cover */
+
+  background: var(--wpf-paper);
+  color: var(--wpf-ink);
+  font-family: var(--font-body-tight), system-ui, sans-serif;
+  font-feature-settings: "ss01", "ss02", "kern", "liga", "calt", "tnum";
+  min-height: 100vh;
+  padding: 64px 24px 96px;
+}
+
+.wpf-root * {
+  box-sizing: border-box;
+}
+
+/* ━━━ TYPO PRIMITIVES ━━━ */
+
+.wpf-editorial {
+  font-family: var(--font-editorial), "Iowan Old Style", Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 0.94;
+}
+
+.wpf-editorial-italic {
+  font-family: var(--font-editorial), "Iowan Old Style", Georgia, serif;
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: -0.015em;
+}
+
+.wpf-fraunces {
+  font-family: var(--font-fraunces-accent), "Iowan Old Style", Georgia, serif;
+  font-feature-settings: "ss01", "ss02", "ss03";
+}
+
+.wpf-body {
+  font-family: var(--font-body-tight), system-ui, sans-serif;
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: -0.005em;
+}
+
+.wpf-stamp {
+  font-family: var(--font-stamp), ui-monospace, monospace;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-feature-settings: "tnum", "zero";
+}
+
+.wpf-tabular {
+  font-feature-settings: "tnum", "lnum";
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* ━━━ PAGE WRAPPER ━━━ */
+
+.wpf-page {
+  width: var(--wpf-page-w);
+  height: var(--wpf-page-h);
+  margin: 0 auto 48px;
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 1px 0 rgba(26, 18, 11, 0.05),
+    0 24px 60px -24px rgba(26, 18, 11, 0.25),
+    0 60px 120px -40px rgba(26, 18, 11, 0.18);
+  page-break-after: always;
+}
+
+.wpf-page-cream {
+  background: var(--wpf-paper);
+}
+
+.wpf-page-night {
+  background: var(--wpf-night);
+  color: var(--wpf-paper);
+}
+
+.wpf-cover {
+  width: var(--wpf-cover-w);
+  height: var(--wpf-cover-h);
+  margin: 0 auto 48px;
+  position: relative;
+  overflow: hidden;
+  background: var(--wpf-night);
+  color: var(--wpf-paper);
+  box-shadow:
+    0 1px 0 rgba(26, 18, 11, 0.05),
+    0 24px 80px -24px rgba(26, 18, 11, 0.45),
+    0 80px 140px -40px rgba(26, 18, 11, 0.28);
+}
+
+/* ━━━ DETAIL-LINES & ORNAMENTE ━━━ */
+
+.wpf-rule {
+  height: 1px;
+  background: var(--wpf-ink);
+  border: 0;
+  margin: 0;
+}
+
+.wpf-rule-soft {
+  height: 1px;
+  background: var(--wpf-paper-mute);
+  border: 0;
+  margin: 0;
+}
+
+.wpf-rule-thin-paper {
+  height: 1px;
+  background: rgba(243, 236, 224, 0.25);
+  border: 0;
+}
+
+/* Brand-Glyphe — kleines Sigel das wir auf jedem Page-Footer haben */
+.wpf-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-stamp), ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.wpf-mark-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--wpf-honey);
+}
+
+/* ━━━ COVER-SPECIFIC ━━━ */
+
+.wpf-cover-bg-image {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  filter: grayscale(0.4) contrast(1.05) brightness(0.55) saturate(0.85);
+  background-size: cover;
+  background-position: center 30%;
+}
+
+.wpf-cover-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(
+      ellipse at 60% 25%,
+      transparent 0%,
+      rgba(20, 16, 11, 0.35) 55%,
+      rgba(20, 16, 11, 0.92) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(20, 16, 11, 0.25) 0%,
+      rgba(20, 16, 11, 0.05) 38%,
+      rgba(20, 16, 11, 0.6) 72%,
+      rgba(20, 16, 11, 0.95) 100%
+    );
+}
+
+.wpf-cover-content {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 56px 72px;
+}
+
+.wpf-cover-mega {
+  font-family: var(--font-editorial), serif;
+  font-size: 280px;
+  line-height: 0.78;
+  letter-spacing: -0.045em;
+  color: var(--wpf-paper);
+  margin: 0;
+}
+
+.wpf-cover-mega-i {
+  font-family: var(--font-editorial), serif;
+  font-style: italic;
+  font-size: 280px;
+  line-height: 0.78;
+  letter-spacing: -0.045em;
+  color: var(--wpf-honey);
+}
+
+/* ━━━ SPREAD — Double Page Layouts ━━━ */
+
+.wpf-spread {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  width: calc(var(--wpf-page-w) * 2);
+  margin: 0 auto 64px;
+  height: var(--wpf-page-h);
+  box-shadow:
+    0 1px 0 rgba(26, 18, 11, 0.05),
+    0 24px 80px -24px rgba(26, 18, 11, 0.3);
+}
+
+.wpf-spread-half {
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+}
+
+/* ━━━ EDITORIAL NOTE / TITELSEITE ━━━ */
+
+.wpf-note-page {
+  padding: 96px 88px 72px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+}
+
+/* ━━━ AKT-OPENER ━━━ */
+
+.wpf-akt-opener {
+  padding: 96px 80px 72px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.wpf-akt-number {
+  font-family: var(--font-editorial), serif;
+  font-style: italic;
+  font-size: 360px;
+  line-height: 0.8;
+  letter-spacing: -0.05em;
+  color: var(--wpf-paper-mute);
+  position: absolute;
+  right: -40px;
+  top: -60px;
+  z-index: 0;
+  user-select: none;
+}
+
+/* ━━━ HEBEL-PAGES ━━━ */
+
+.wpf-hebel-page {
+  padding: 0;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  height: 100%;
+}
+
+.wpf-hebel-hero {
+  position: relative;
+  overflow: hidden;
+  background: var(--wpf-paper-deep);
+}
+
+.wpf-hebel-hero-img {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  filter: contrast(1.02) saturate(0.92);
+}
+
+/* ━━━ NUMBER-CALLOUT ━━━ */
+
+.wpf-callout-num {
+  font-family: var(--font-editorial), serif;
+  font-style: italic;
+  letter-spacing: -0.04em;
+  line-height: 0.85;
+  color: var(--wpf-rust);
+}
+
+/* ━━━ REEL-PROOF-STRIP ━━━ */
+
+.wpf-reel-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.wpf-reel-thumb {
+  aspect-ratio: 4 / 5;
+  background-size: cover;
+  background-position: center;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+  filter: grayscale(0.15) contrast(1.04);
+}
+
+.wpf-reel-thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 60%,
+    rgba(20, 16, 11, 0.7) 100%
+  );
+}
+
+/* ━━━ HEBEL-STACK (Sattmach-Anleitung) ━━━ */
+
+.wpf-stack-row {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 32px;
+  align-items: start;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--wpf-paper-mute);
+}
+
+.wpf-stack-row:last-child {
+  border-bottom: 0;
+}
+
+.wpf-stack-num {
+  font-family: var(--font-editorial), serif;
+  font-style: italic;
+  font-size: 56px;
+  line-height: 0.8;
+  color: var(--wpf-rust);
+  letter-spacing: -0.04em;
+}
+
+/* ━━━ TYPOGRAPHY-WIDOWS-PROTECT ━━━ */
+
+.wpf-no-orphan {
+  text-wrap: balance;
+}
+
+/* ━━━ DROP-CAP für Editorial-Body ━━━ */
+
+.wpf-drop-cap::first-letter {
+  font-family: var(--font-editorial), serif;
+  font-size: 6.5em;
+  float: left;
+  line-height: 0.82;
+  padding: 8px 12px 0 0;
+  font-style: italic;
+  color: var(--wpf-rust);
+  letter-spacing: -0.04em;
+}
+
+/* ━━━ NOTE & TOC HELPERS ━━━ */
+
+.wpf-toc-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  gap: 20px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--wpf-paper-mute);
+  align-items: baseline;
+}
+
+.wpf-toc-num {
+  font-family: var(--font-editorial), serif;
+  font-style: italic;
+  font-size: 22px;
+  color: var(--wpf-rust);
+}
+
+/* ━━━ DEBUG / SCREEN-ONLY GUIDES ━━━ */
+
+.wpf-screen-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--wpf-night);
+  color: var(--wpf-paper);
+  padding: 14px 24px;
+  margin: -64px -24px 64px;
+  font-family: var(--font-stamp), monospace;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(243, 236, 224, 0.15);
+}
+
+.wpf-screen-bar-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--wpf-honey);
+  display: inline-block;
+  margin-right: 8px;
+  vertical-align: middle;
+}
