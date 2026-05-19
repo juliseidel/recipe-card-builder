@@ -79,6 +79,9 @@ create policy "fitness_cards public delete"
 create or replace function public.fitness_cards_set_updated_at()
 returns trigger
 language plpgsql
+-- search_path explizit setzen (Supabase-Linter 0011) — sonst koennte ein
+-- Caller-spezifischer Search-Path die now()-Resolution beeinflussen.
+set search_path = ''
 as $$
 begin
   new.updated_at = now();

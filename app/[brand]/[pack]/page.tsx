@@ -15,10 +15,13 @@ import {
   getHiddenRecipeCountsForBrand,
 } from "@/lib/custom-packs-server";
 import { getRecipesForPack } from "@/lib/recipes";
+import { resolvePackType } from "@/lib/fitness/types";
+import { getFitnessCardCountsForBrand } from "@/lib/fitness/custom-cards-server";
 import { SiteHeader } from "@/components/site-header";
 import { PackCover } from "@/components/pack-cover";
 import { PackActions } from "@/components/pack-actions";
 import { RecipeGrid } from "@/components/recipe-grid";
+import { FitnessCardGrid } from "@/components/fitness-card-grid";
 import { NutritionOverview } from "@/components/nutrition-overview";
 
 // Static generation per curated pack. Custom packs aren't pre-rendered (they
@@ -50,22 +53,29 @@ export async function generateMetadata({ params }: PackPageProps) {
   }
 
   // Live count for SEO description: curated baseline + custom adds − hidden.
-  // Same formula the page body uses below — kept in sync so the meta tag
-  // never disagrees with what the visitor sees.
-  const [customCounts, hiddenCounts] = await Promise.all([
-    getCustomRecipeCountsForBrand(brandSlug),
-    getHiddenRecipeCountsForBrand(brandSlug),
-  ]);
-  const liveRecipeCount = Math.max(
-    0,
-    pack.recipeCount +
-      (customCounts[packSlug] ?? 0) -
-      (hiddenCounts[packSlug] ?? 0)
-  );
+  // Bei Fitness-Packs gibt's keine kuratierten Karten — Live-Count = nur DB.
+  const packType = resolvePackType(pack, brand);
+  let liveCount = 0;
+  if (packType === "fitness") {
+    const fitnessCounts = await getFitnessCardCountsForBrand(brandSlug);
+    liveCount = fitnessCounts[packSlug] ?? 0;
+  } else {
+    const [customCounts, hiddenCounts] = await Promise.all([
+      getCustomRecipeCountsForBrand(brandSlug),
+      getHiddenRecipeCountsForBrand(brandSlug),
+    ]);
+    liveCount = Math.max(
+      0,
+      pack.recipeCount +
+        (customCounts[packSlug] ?? 0) -
+        (hiddenCounts[packSlug] ?? 0)
+    );
+  }
 
+  const label = packType === "fitness" ? "Trainingskarten" : "Rezeptkarten";
   return {
     title: `${pack.title} · ${brand.name} · Recipe Card Builder`,
-    description: `${pack.description} ${liveRecipeCount} Rezeptkarten — druckfertig.`,
+    description: `${pack.description} ${liveCount} ${label} — druckfertig.`,
   };
 }
 
@@ -96,7 +106,14 @@ export default async function PackPage({ params }: PackPageProps) {
   );
   const pack = merged.find((p) => p.slug === packSlug) ?? rawPack;
 
-  const recipes = await getRecipesForPack(pack.slug);
+  // Pack-Type-Discriminator: 'recipe' (Default) oder 'fitness'. Steuert
+  // welcher Loader laeuft + welcher Grid gerendert wird.
+  const packType = resolvePackType(pack, brand);
+
+  // Recipe-Pipeline-Daten nur laden wenn Recipe-Pack. Bei Fitness-Pack
+  // sparen wir uns den DB-Roundtrip + die Curated-Recipes komplett.
+  const recipes =
+    packType === "recipe" ? await getRecipesForPack(pack.slug) : [];
 
   // Safety-Net: bei Pack-Detail-Visit wird ein Client-Component-Trigger
   // gemountet, der nach dem Render einen POST an /api/packs/auto-trigger-
@@ -104,27 +121,30 @@ export default async function PackPage({ params }: PackPageProps) {
   // Internal-Token noetig) und prueft via detectAndTriggerEnrichGaps ob
   // Recipes ohne Hero/Mikros oder Pack-Cover-Lueck existieren. Wenn ja:
   // triggert /packs/enrich + /recipes/enrich nach. Skipped fuer kuratierte
-  // Bienen-Packs (kein customRow).
-  const enrichTriggerCustomPackId = customRow?.id ?? null;
+  // Bienen-Packs (kein customRow). Bei Fitness-Packs noch nicht aktiv —
+  // eigener Fitness-Enrichment-Endpoint kommt in einem spaeteren Schritt.
+  const enrichTriggerCustomPackId =
+    packType === "recipe" ? customRow?.id ?? null : null;
 
-  // Live recipe count for the cover hero + the "Alle Rezeptkarten" badge:
-  //   curated cards visible
-  // + custom cards the user dropped into THIS pack
-  // − curated cards the user hid from THIS pack
-  // Same formula the workspace pack-card uses, scoped to one pack. We use
-  // pack.recipeCount as the curated baseline (instead of recipes.length)
-  // so a custom pack — which has no curated rows — starts from 0 and the
-  // count then equals exactly the number of custom cards added.
-  const [customCountsForBrand, hiddenCountsForBrand] = await Promise.all([
-    getCustomRecipeCountsForBrand(brandSlug),
-    getHiddenRecipeCountsForBrand(brandSlug),
-  ]);
-  const liveRecipeCount = Math.max(
-    0,
-    pack.recipeCount +
-      (customCountsForBrand[pack.slug] ?? 0) -
-      (hiddenCountsForBrand[pack.slug] ?? 0)
-  );
+  // Live count fuer Cover-Hero + Header. Bei Recipe-Pack: kuratiert +
+  // custom − hidden. Bei Fitness-Pack: nur DB-Count (keine kuratierten
+  // Fitness-Karten existieren, alles liegt in fitness_cards-Tabelle).
+  let liveRecipeCount = 0;
+  if (packType === "fitness") {
+    const fitnessCounts = await getFitnessCardCountsForBrand(brandSlug);
+    liveRecipeCount = fitnessCounts[pack.slug] ?? 0;
+  } else {
+    const [customCountsForBrand, hiddenCountsForBrand] = await Promise.all([
+      getCustomRecipeCountsForBrand(brandSlug),
+      getHiddenRecipeCountsForBrand(brandSlug),
+    ]);
+    liveRecipeCount = Math.max(
+      0,
+      pack.recipeCount +
+        (customCountsForBrand[pack.slug] ?? 0) -
+        (hiddenCountsForBrand[pack.slug] ?? 0)
+    );
+  }
 
   return (
     <div
@@ -155,7 +175,7 @@ export default async function PackPage({ params }: PackPageProps) {
               className="font-display text-[28px] leading-none tracking-[-0.01em]"
               style={{ color: brand.tokens.ink }}
             >
-              Alle Rezeptkarten
+              {packType === "fitness" ? "Alle Trainingskarten" : "Alle Rezeptkarten"}
             </h2>
             <span
               className="text-[13px]"
@@ -165,10 +185,16 @@ export default async function PackPage({ params }: PackPageProps) {
             </span>
           </div>
 
-          <RecipeGrid brand={brand} pack={pack} staticRecipes={recipes} />
+          {packType === "fitness" ? (
+            <FitnessCardGrid brand={brand} pack={pack} />
+          ) : (
+            <RecipeGrid brand={brand} pack={pack} staticRecipes={recipes} />
+          )}
         </section>
 
-        <NutritionOverview brand={brand} pack={pack} recipes={recipes} />
+        {packType === "recipe" ? (
+          <NutritionOverview brand={brand} pack={pack} recipes={recipes} />
+        ) : null}
       </main>
 
       <footer
