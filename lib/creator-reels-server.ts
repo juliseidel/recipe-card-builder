@@ -406,13 +406,17 @@ export async function getRecipeReelsForBrand(
   return (data as ReelRow[]) ?? [];
 }
 
-// Bulk-Read aller klassifizierten Fitness-Reels (exercise + workout)
-// eines Brands. Spiegel zu getRecipeReelsForBrand fuer die Fitness-
-// Pack-Suggestions-Pipeline (lib/ai/suggest-fitness-packs.ts).
+// Bulk-Read aller klassifizierten Fitness-Reels eines Brands. Spiegel zu
+// getRecipeReelsForBrand fuer die Fitness-Pack-Suggestions-Pipeline
+// (lib/ai/suggest-fitness-packs.ts).
 //
-// content_type IN ('exercise', 'workout') ist die zentrale Bedingung —
-// mindset/transformation/vlog werden hier ausgeschlossen weil sie nicht
-// fuer Trainings-Packs taugen (eigene Card-Typen).
+// EXTENDED (Phase 2c+): Inkludiert exercise + workout + mindset + tutorial.
+// Hintergrund: viele Fitness-Coaches sind nicht klassische Workout-Demo-
+// Creator (Christian Wolf, Tim Rabitz etc.), sondern Edukatoren — sie
+// REDEN ueber Training/Ernaehrung statt es zu zeigen. Mindset + Tutorial-
+// Reels sind ihre Hero-Inhalte und sollten in Trainings-Packs einfliessen
+// (z.B. "Protein-Fasten Erklaert", "Die 10 wichtigsten Mindset-Hacks").
+// transformation/vlog/other bleiben ausgeschlossen (kein Coaching-Wert).
 export async function getFitnessReelsForBrand(
   brandSlug: string
 ): Promise<ReelRow[]> {
@@ -422,7 +426,7 @@ export async function getFitnessReelsForBrand(
     .from("creator_reels")
     .select("*")
     .eq("brand_slug", brandSlug)
-    .in("content_type", ["exercise", "workout"])
+    .in("content_type", ["exercise", "workout", "mindset", "tutorial"])
     .order("posted_at", { ascending: false, nullsFirst: false });
   if (error) {
     console.error("[creator-reels] getFitnessReelsForBrand failed", error);
@@ -432,7 +436,7 @@ export async function getFitnessReelsForBrand(
 }
 
 // Count-Variante fuer Skip-Lock im Orchestrator (analog zu
-// countRecipeReelsForBrand).
+// countRecipeReelsForBrand). Gleicher erweiterter Filter.
 export async function countFitnessReelsForBrand(
   brandSlug: string
 ): Promise<number> {
@@ -442,7 +446,7 @@ export async function countFitnessReelsForBrand(
     .from("creator_reels")
     .select("*", { count: "exact", head: true })
     .eq("brand_slug", brandSlug)
-    .in("content_type", ["exercise", "workout"]);
+    .in("content_type", ["exercise", "workout", "mindset", "tutorial"]);
   if (error) {
     console.error("[creator-reels] countFitnessReelsForBrand failed", error);
     return 0;

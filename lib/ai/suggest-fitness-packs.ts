@@ -109,9 +109,17 @@ ${voiceBlock}
 
 ${fewShotBlock}
 
-AUFGABE: Aus einer Liste klassifizierter Trainings-Reels (Uebungen, Workouts, Mindset) schlaegst du 10-20 Trainings-Pack-Konzepte vor, die das Team mit einem Klick anlegen kann. Alle Texte (Title, Subtitle, Tagline, Description) klingen wie ${brandName} selbst — Coaching-Sprache, nicht generische KI.
+AUFGABE: Aus einer Liste klassifizierter Trainings- und Coaching-Reels (Uebungen, Workouts, Mindset, Tutorials) schlaegst du 10-20 Pack-Konzepte vor, die das Team mit einem Klick anlegen kann. Alle Texte (Title, Subtitle, Tagline, Description) klingen wie ${brandName} selbst — Coaching-Sprache, nicht generische KI.
+
+WICHTIG: Es gibt ZWEI Arten von Fitness-Coaches im Input:
+- DEMONSTRATIONS-COACHES: Reels zeigen Workouts/Uebungen direkt (content_type=exercise/workout). Bei diesen baust du klassische Trainings-Programme.
+- EDUKATIONS-COACHES (z.B. Christian Wolf, Tim Rabitz): Reels sind primaer Mindset/Tutorial-Content — der Coach REDET ueber Methoden, statt sie zu zeigen. Bei diesen baust du WISSENS-PACKS / METHODEN-GUIDES / MINDSET-COLLECTIONS.
+
+Schau dir die TYPE-Verteilung an (im Input markiert als "type=exercise/workout/mindset/tutorial") und entscheide pro Suggestion welche Art Pack sinnvoll ist.
 
 STRATEGIE-MIX (moeglichst diverse Auswahl):
+
+A. WENN viele exercise/workout-Reels vorhanden:
 
 1. PROGRAMME / WOCHENPLAENE: zeitlich strukturierte Mehrwochenplaene
    - "6-Wochen-Hypertrophie-Bootcamp" (wenn primaer Krafttraining)
@@ -120,10 +128,10 @@ STRATEGIE-MIX (moeglichst diverse Auswahl):
    - "Glutes Power 4 Wochen" (wenn primaer Glutes/Female-Strength)
 
 2. SPLIT- ODER STRUKTUR-BASIERT: nach Trainings-System
-   - "Push-Pull-Legs-Split" (3-Day-Split, klassisch Hypertrophie)
+   - "Push-Pull-Legs-Split"
    - "Upper-Lower-Split"
    - "Full-Body 3x Woche"
-   - "Hyrox 8-Stationen-Mastery" (alle Stationen einzeln)
+   - "Hyrox 8-Stationen-Mastery"
 
 3. BODY-PART-FOKUS: wenn 5+ Reels zur selben Muskelgruppe
    - "Chest Day Drills"
@@ -131,18 +139,39 @@ STRATEGIE-MIX (moeglichst diverse Auswahl):
    - "Back & Pulls"
 
 4. EQUIPMENT-BASIERT: wenn klares Equipment-Pattern
-   - "Hantel-Only Programm" (alle dumbbell-Reels)
-   - "Bodyweight Anywhere" (alle none/bodyweight)
-   - "Sled & Sandbag Conditioning" (Hyrox-spezifisches Equipment)
+   - "Hantel-Only Programm"
+   - "Bodyweight Anywhere"
+   - "Sled & Sandbag Conditioning"
 
 5. SKILL-LEVEL: wenn Reels klar fuer Beginner oder Pro
-   - "Beginner Start — 14 Tage Einstieg" (intermediate→beginner-friendly)
-   - "Rx+ Race-Pace" (advanced/pro)
+   - "Beginner Start — 14 Tage Einstieg"
+   - "Rx+ Race-Pace"
 
-6. GOAL-BASIERT: wenn klares Trainings-Ziel
-   - "Mobility & Recovery"
-   - "Strength & Power"
-   - "Endurance Builder"
+6. GOAL-BASIERT: Mobility/Recovery, Strength/Power, Endurance Builder
+
+B. WENN viele mindset/tutorial-Reels vorhanden (Edukations-Coaches):
+
+7. METHODEN-GUIDES: aus mindset-Reels, die eine Methodik des Creators erklaeren
+   - "Protein-Fasten Erklaert: Die 12 wichtigsten Lessons" (Christian Wolf)
+   - "Mein Mindset fuer nachhaltiges Abnehmen"
+   - "Die wahren Grundlagen von Hypertrophie"
+
+8. MYTHEN & FAKTEN: aus tutorial-Reels die Missverstaendnisse aufklaeren
+   - "10 Abnehm-Mythen, die du loswerden musst"
+   - "Was die Fitness-Industrie dir verschweigt"
+   - "Die haeufigsten Trainings-Fehler"
+
+9. KONZEPT-SAMMLUNGEN: aus mindset-Reels die ein Coaching-Konzept transportieren
+   - "Habits, die mein Leben veraendert haben"
+   - "Mental-Reset fuer Plateau-Phasen"
+   - "Tagesroutinen erfolgreicher Athleten"
+
+10. EXPLAINER-PACKS: aus tutorial-Reels die "How-To" lehren
+    - "Mealprep wie ein Pro — Komplett-Guide"
+    - "Supplement-Stack fuer jedes Ziel"
+    - "Erholung optimieren: Schlaf, Stress, Regeneration"
+
+Bei MISCHCREATORN (sowohl Demo als auch Edukation): mische beides. Z.B. ein Strength-Programm + ein Mindset-Pack + ein Mythen-Pack.
 
 PRAEFERENZEN:
 - Bevorzuge Reels mit hoher Engagement (likes/views)
