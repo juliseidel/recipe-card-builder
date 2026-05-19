@@ -8,7 +8,13 @@ import {
   getRecipeRowIdFromDb,
   getRecipesForPack,
 } from "@/lib/recipes";
+import { resolvePackType } from "@/lib/fitness/types";
+import {
+  getFitnessCardServer,
+  getFitnessCardsForPackServer,
+} from "@/lib/fitness/custom-cards-server";
 import { RecipeDetailLayout } from "@/components/recipe-detail-layout";
+import { FitnessCardDetailLayout } from "@/components/fitness-card-detail-layout";
 import { CustomRecipeView } from "@/components/custom-recipe-view";
 import { StaticRecipeDeleteButton } from "@/components/static-recipe-delete-button";
 
@@ -50,6 +56,39 @@ export default async function RecipePage({ params }: RecipePageProps) {
 
   if (!brand || !pack) {
     notFound();
+  }
+
+  // ── Fitness-Pack-Branch: lade FitnessCard statt Recipe ─────────────
+  const packType = resolvePackType(pack, brand);
+  if (packType === "fitness") {
+    const card = await getFitnessCardServer(brandSlug, packSlug, recipeSlug);
+    if (!card) notFound();
+    const allCards = await getFitnessCardsForPackServer(brandSlug, packSlug);
+    const idx = allCards.findIndex((c) => c.slug === card.slug);
+    const previous =
+      idx > 0
+        ? {
+            href: `/${brand.slug}/${pack.slug}/${allCards[idx - 1].slug}`,
+            title: allCards[idx - 1].title,
+          }
+        : null;
+    const next =
+      idx < allCards.length - 1
+        ? {
+            href: `/${brand.slug}/${pack.slug}/${allCards[idx + 1].slug}`,
+            title: allCards[idx + 1].title,
+          }
+        : null;
+    return (
+      <FitnessCardDetailLayout
+        brand={brand}
+        pack={pack}
+        card={card}
+        totalCards={allCards.length}
+        previous={previous}
+        next={next}
+      />
+    );
   }
 
   const staticRecipes = await getRecipesForPack(pack.slug);
