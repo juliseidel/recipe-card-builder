@@ -424,6 +424,90 @@ export const LAETITIA_STYLE: BrandImageStyle = {
   },
 };
 
+// ─── IQ's Kitchen · @iqskitchen (DB-Brand-Slug: "iqskitchen") ────────────────
+// Calibrated against 4 IG-Screenshots from the user (2026-05-19):
+//   1. Schoko-Mousse/Brownie-Teig in hellgrauer Keramikschale auf dunklem
+//      grauen Leinen-Geschirrtuch, dunkler Hintergrund-Counter, warmes
+//      Indoor-Licht mit weichen Highlights
+//   2. Profil-Grid: Talking-Head + Food-Shots, Mix aus Edukation
+//      (Magnesium/Eisen-Talks) + Recipes (One-Pot, Mealprep) + MORE-
+//      Werbung. Maskuline Coaching-Brand mit substanzieller Food-Side.
+//   3. High-Protein Eis in Glas-Becher auf DUNKLEM Stone-Counter,
+//      MORE-Produkte als Backdrop, warm-indoor Lighting
+//   4. Schnelle One-Pot Pasta mit Spinat in Edelstahl-Pfanne, DUNKLER
+//      Granit-Counter, Induktionsherd sichtbar, moody Indoor-Light
+//   5. High-Protein Blueberry Cake in Glas-Auflaufform auf DUNKLEM
+//      Leinen-Underlay, dramatisches side-lit Editorial-Foto mit golden
+//      Highlights auf der Crust, scriptige Typo "High-Protein Blueberry
+//      Cake" — sein bestes Brand-Foto, definiert den Look
+//
+// Brand-Positionierung: "Masculine Coaching Kitchen / Premium Dark
+// Editorial Food". IFBB-Pro-Look, MORE Nutrition Partnership, hybride
+// Edukations-Content + Recipe-Posts. User klassifiziert als Rezept-
+// Brand weil Food-Side substanziell ist (One-Pots, Cakes, Mealprep,
+// Mousse).
+//
+// Brand-DNA-Kernunterschied zu allen anderen — er ist fast das Gegenteil
+// von Alina (white minimal):
+//   - Biene = pale-grey concrete + cutting-board (cottage)
+//   - Julia = bone-grey concrete + scattered (smartphone-snap)
+//   - Kristina = warm oak + basil-pot (family-healthy)
+//   - Alina = white matte + zero props (doctor's-clean)
+//   - Laetitia = light marble + glass-container (luxe meal-prep)
+//   - IQ's Kitchen = dark granite + side-lit drama (masculine editorial)
+//
+// Wichtig: das ist der erste Brand-Style mit DARK base. Lighting muss
+// dramatisch, side-lit, mit golden Crust-Highlights — sonst wirkt
+// dark-grey wie undeflited statt editorial. Aggressive positive
+// Lighting-Hints damit Flux nicht in dark-flat fällt.
+export const IQSKITCHEN_STYLE: BrandImageStyle = {
+  brandSlug: "iqskitchen",
+  // Dramatic, side-lit, moody warm. KEY-Lighting muss Highlights auf
+  // gebackenen Crusts und glänzenden Saucen erzeugen — das macht den
+  // editorial Look. Indoor warm, nicht harsh daylight.
+  lightingOptions: [
+    "dramatic warm side-lighting from the left with golden highlights on the dish, dark moody background",
+    "moody indoor warm light from a single window, strong side-shadows, golden edges on the food",
+    "warm directional light catching crusts and sauces with golden sheen, dark surroundings",
+    "editorial dark mood lighting with a single warm light source, food glowing against dark counter",
+    "low-key warm indoor light, dramatic chiaroscuro on the dish, dark moody atmosphere",
+  ],
+  // Dunkle Stone-Surfaces. 5 Variationen damit Gemini Range hat ohne
+  // in pure black abzudriften (Flux rendert pure black flach).
+  sceneOptions: [
+    "a dark charcoal granite kitchen counter with subtle natural texture",
+    "a black-grey stone countertop with fine speckled texture",
+    "a dark slate kitchen surface, modern coaching-kitchen feel",
+    "a deep grey stone counter under moody warm light",
+    "a dark textured counter with a dark grey linen underlay near the dish",
+  ],
+  styleSuffix: "",
+  // Klares Anti-Pattern zu allen anderen 5 Rezept-Brands: KEIN heller
+  // Counter, KEIN Marmor, KEIN Holz, KEIN Weiß. Schlank gehalten.
+  negativeAddition:
+    "no white or light counter, no marble, no wood counter or table, no bright airy kitchen, no scattered herbs or background plants, no flat even lighting",
+  // Editorial Premium-Look ohne studio-cleanness — sein Stil ist
+  // smartphone-shot aber gut-lit. Aggressive moody Indikatoren damit
+  // Flux nicht in seinen Default bright-clean Bias fällt.
+  cameraAesthetic:
+    "moody editorial food photograph, dark masculine coaching-kitchen aesthetic, premium high-protein feel, dramatic close-up with strong side-light, smartphone-shot but well-lit, no studio bright look",
+  // Signature ist Dunkelheit + dramatic Lighting + Golden Highlights.
+  // Positiv beschrieben damit Flux einen klaren Atmosphere-Anker hat
+  // (sonst rendert dark-grey als underexposed-flat statt editorial).
+  heroElementGuidance:
+    "The dish is presented dramatically against the dark counter, lit from one side so golden highlights play on crusts, sauces, or creamy surfaces — the contrast between the warm-lit food and the dark surroundings IS the visual statement. No background props, no plants, no scattered ingredients — the moody atmosphere and the food's own glow carry the frame.",
+  // Per-shape Winkel: 30° three-quarter dominant (Blueberry Cake-Style,
+  // sein bester Hero-Shot). Layered Shapes besonders dramatisch in 30°.
+  // Top-down 75° für flat dishes (One-Pot, Mousse-Bowl).
+  defaultAngles: {
+    flat: "from a high overhead angle (about 75°, slightly tilted not strict 90°), centered on the dark stone counter with strong side-light creating moody shadows around the dish",
+    mixed: "from a 30-45° three-quarter angle with dramatic warm side-lighting, the dark counter visible, golden highlights on the dish",
+    layered: "from a close 30° three-quarter angle so the layers and crusts are dramatically lit from the side, dark counter softly visible below, editorial moody atmosphere",
+    tall: "from a 45° eye-level angle that shows the dish's full height against the dark moody background, side-lit for editorial drama",
+    liquid: "from a close 30° three-quarter angle so the warm side-light glints on the liquid surface, dark counter and moody atmosphere",
+  },
+};
+
 // ─── Lookup by brand slug ────────────────────────────────────────────────────
 const STYLES: Record<string, BrandImageStyle> = {
   biene: BIENE_STYLE,
@@ -431,6 +515,7 @@ const STYLES: Record<string, BrandImageStyle> = {
   kristina: KRISTINA_STYLE,
   alina: ALINA_STYLE,
   laetitia: LAETITIA_STYLE,
+  iqskitchen: IQSKITCHEN_STYLE,
 };
 
 // Sagt: haben wir fuer diesen Slug einen hand-kalibrierten Code-Style?
