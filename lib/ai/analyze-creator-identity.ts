@@ -29,6 +29,11 @@ export type CreatorIdentity = {
    *  ('Dein Martin' vs 'Deine Julia') wenn die signature dem Standard-
    *  Pattern folgt. 'neutral' fuer Marken-Accounts (z.B. 'Bienesfitlife'). */
   gender: "male" | "female" | "neutral";
+  /** Empfehlung fuer den Workspace-Pack-Type basierend auf Bio + Captions.
+   *  'recipe' fuer Rezept-/Food-Creator, 'fitness' fuer Trainings-Coaches.
+   *  Wird als Default-Auswahl im Onboarding-Picker gesetzt — User kann
+   *  trotzdem ueberschreiben. */
+  suggestedPackType: "recipe" | "fitness";
 };
 
 const RESPONSE_SCHEMA = {
@@ -70,8 +75,14 @@ const RESPONSE_SCHEMA = {
       description:
         "Sign-off im Workspace-Footer / am Ende des Pack-PDFs. Soll zum Voice-Profil des Creators passen — NICHT zwingend 'Dein/Deine [Name]'. Erlaubte Varianten: 'Dein Martin' (klassisch maennlich), 'Deine Julia' (klassisch weiblich), 'Bis bald, Lukas', 'Cheers, Sarah', 'Eure Sophie' (informeller Plural), 'Hab dich lieb, deine Mia' (sehr warm), oder einfach nur der Name wenn der Creator lakonisch schreibt. Max 30 Zeichen. Bei Unsicherheit: 'Dein [Name]' (gender=male) oder 'Deine [Name]' (gender=female) oder einfach 'Bis bald, [Name]' (gender=neutral).",
     },
+    suggestedPackType: {
+      type: "string",
+      enum: ["recipe", "fitness"],
+      description:
+        "Pack-Type-Vorschlag basierend auf Bio + Captions. 'recipe' = der Creator postet primaer Rezepte/Kochinhalte (z.B. Bienesfitlife, Kristinas Healthy Life, Aylinaphrodite). 'fitness' = Trainings-/Bewegungs-Inhalte sind primaer (z.B. Marvin Krajewski Bodybuilder, Simon Gronau Hyrox-Athlet, Alina Walbrun Pilates-Coach, Tim Rabitz Abnehm-Coach). Bei Hybrid-Creators (z.B. Christian Wolf hat sowohl Rezepte als auch Ernaehrungs-Edukation): waehle das STAERKERE Format — wenn mehr Trainings-/Methoden-Content als reine Rezepte, dann 'fitness'.",
+    },
   },
-  required: ["name", "fullName", "bio", "tagline", "niche", "gender", "signature"],
+  required: ["name", "fullName", "bio", "tagline", "niche", "gender", "signature", "suggestedPackType"],
 };
 
 const SYSTEM_INSTRUCTION = `Du analysierst Social-Media-Profile (Instagram oder TikTok) von Food-/Fitness-/Recipe-Creators und leitest daraus die Identität ihres Workspaces in unserem internen Recipe-Card-Builder-Tool ab.
@@ -105,6 +116,16 @@ Niche-Bullet-Format:
 • 'Fitness · Food · MORE Nutrition · 819K Instagram'
 • 'Vegan · Backen · 230K Instagram'
 • Hauptbereich zuerst, Reichweite zuletzt
+
+Pack-Type-Empfehlung:
+• 'recipe' wenn der Creator primaer Rezepte/Kochinhalte postet (Zutaten, Schritte, Foto vom fertigen Gericht)
+• 'fitness' wenn primaer Trainings-Inhalte (Uebungs-Demos, Workouts, Sportler-Lifestyle, Coaching, Hyrox, Bodybuilding, Pilates, Yoga, CrossFit, Krafttraining, Abnehm-Methodik)
+• Bei Hybrid (sowohl Rezepte als auch Training): waehle das STAERKER ausgepraegte Format der Captions. Beispiele:
+  - "−20 kg ohne Verzicht, einfache Abnehm-Rezepte" → recipe (Fokus = Rezepte)
+  - "12-Wochen-Coaching, Protein-Fasten-Methode" → fitness (Fokus = Methode, weniger Rezepte)
+  - "Hyrox-Pro, Race-Prep-Tipps" → fitness (klar Training)
+  - "Bodybuilding IFBB Pro, 1:1-Coaching" → fitness (kein Food-Content)
+  - "Mom Glow-Up Tips + What-I-Eat" → recipe (Food-Content dominiert)
 
 Antworte AUSSCHLIESSLICH im JSON-Schema, ohne Erklärung.`;
 
@@ -195,6 +216,13 @@ export async function analyzeCreatorIdentity(
       : gender === "female"
         ? `Deine ${cleanName}`
         : `Bis bald, ${cleanName}`;
+  // Pack-Type-Fallback: Default 'recipe' (Backward-Compat — bestehende
+  // App ist Recipe-only entstanden). Bei ungueltigem Wert konservativ
+  // ebenfalls 'recipe'.
+  const validPackTypes = new Set(["recipe", "fitness"]);
+  const suggestedPackType = (validPackTypes.has(result.suggestedPackType)
+    ? result.suggestedPackType
+    : "recipe") as "recipe" | "fitness";
   return {
     name: cleanName,
     fullName: sanitize(result.fullName, 60) || sanitize(result.name, 60) || "Creator",
@@ -203,6 +231,7 @@ export async function analyzeCreatorIdentity(
     niche: sanitize(result.niche, 80) || "Food · Recipes",
     gender,
     signature: sanitize(result.signature, 30) || fallbackSignature,
+    suggestedPackType,
   };
 }
 

@@ -22,6 +22,7 @@ import {
   DEFAULT_BRAND_STATS,
 } from "@/lib/brand-presets";
 import { formatFollowersCompact } from "@/lib/format-followers";
+import type { PackType } from "@/lib/fitness/types";
 import { SiteHeader } from "@/components/site-header";
 import { BrandHubCard } from "@/components/brand-hub-card";
 
@@ -78,6 +79,12 @@ export default function NewBrandPage() {
   // brand.stats.followers und wird im Workspace-Hero gezeigt.
   const [followers, setFollowers] = useState("");
   const [moodId, setMoodId] = useState(DEFAULT_BRAND_MOOD_ID);
+  // Pack-Type-Default fuer diesen Brand. 'recipe' fuer Rezept-Creator
+  // (Biene, Kristina, Aylin, Romina), 'fitness' fuer Trainings-Coaches
+  // (Marvin, Johny, Simon, Alina, Jessica, Laetitia, Tim, Johannes, Jan).
+  // Beim Pack-Anlegen wird der Wert als Vorauswahl genutzt, kann aber
+  // pro Pack ueberschrieben werden.
+  const [packType, setPackType] = useState<PackType>("recipe");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -138,6 +145,7 @@ export default function NewBrandPage() {
         niche: string;
         signature: string;
         gender?: "male" | "female" | "neutral";
+        suggestedPackType?: PackType;
       };
       setName(id.name);
       setFullName(id.fullName);
@@ -148,6 +156,13 @@ export default function NewBrandPage() {
       // beides nachher noch im Formular editieren falls die KI daneben lag.
       setGender(id.gender ?? "neutral");
       setSignature(id.signature ?? "");
+      // Pack-Type-Vorschlag uebernehmen — User kann im Workspace-Typ-
+      // Picker (Section 03) trotzdem manuell ueberschreiben. Bei Marvin,
+      // Simon, Alina etc. setzt das automatisch 'fitness'; bei Biene,
+      // Kristina, Aylin, Romina 'recipe'.
+      if (id.suggestedPackType) {
+        setPackType(id.suggestedPackType);
+      }
       // Handle ins Form-Feld zurueckspielen, falls User ihn ohne '@'
       // eingegeben hat — normalizeHandle macht das beim Save auch nochmal,
       // aber im Formular sieht es jetzt schon richtig aus.
@@ -311,6 +326,9 @@ export default function NewBrandPage() {
       // spaeteren Pack-Text-Pipelines gelesen. Optional — fehlt es, fallen
       // die Pipelines auf Bio-basierte Defaults zurueck.
       ...(detectedVoice ? { voiceProfile: detectedVoice } : {}),
+      // Pack-Type-Default fuer alle spaeteren Pack-Anlegen-Aktionen
+      // dieses Brands. User kann pro Pack ueberschreiben.
+      defaultPackType: packType,
       // imageStyle wird bewusst NICHT gesetzt — Brand-DNA wird per
       // Code-Brand in lib/ai/brand-image-style.ts hand-kalibriert.
     };
@@ -864,10 +882,105 @@ export default function NewBrandPage() {
               </div>
             </section>
 
-            {/* Section 3 — Mood */}
+            {/* Section 3 — Pack-Typ-Default */}
             <section className="editor-section editor-card flex flex-col gap-5">
               <SectionHeader
                 num="03"
+                title="Workspace-Typ"
+                hint="Macht dieser Creator hauptsächlich Rezepte oder Fitness/Training? Steuert die Vorauswahl bei neuen Packs — pro Pack ist trotzdem ein Override möglich."
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPackType("recipe")}
+                  className="flex flex-col items-start gap-2 rounded-2xl border-2 p-4 text-left transition-all"
+                  style={{
+                    borderColor:
+                      packType === "recipe"
+                        ? selectedMood.accent
+                        : "rgba(43,31,25,0.12)",
+                    background:
+                      packType === "recipe"
+                        ? selectedMood.accent + "12"
+                        : "white",
+                  }}
+                >
+                  <span
+                    className="text-[14px] font-semibold"
+                    style={{
+                      color:
+                        packType === "recipe"
+                          ? selectedMood.accent
+                          : selectedMood.ink,
+                    }}
+                  >
+                    Rezept-Workspace
+                  </span>
+                  <p
+                    className="text-[12px] leading-snug"
+                    style={{ color: selectedMood.inkMuted }}
+                  >
+                    Bienes-Stil: Rezeptkarten mit Zutaten, Schritten,
+                    Nährwerten. Klassische Cookbook-Pipeline.
+                  </p>
+                  {packType === "recipe" ? (
+                    <span
+                      className="font-mono text-[10.5px] uppercase tracking-[0.14em]"
+                      style={{ color: selectedMood.accent }}
+                    >
+                      ✓ Ausgewählt
+                    </span>
+                  ) : null}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPackType("fitness")}
+                  className="flex flex-col items-start gap-2 rounded-2xl border-2 p-4 text-left transition-all"
+                  style={{
+                    borderColor:
+                      packType === "fitness"
+                        ? selectedMood.accent
+                        : "rgba(43,31,25,0.12)",
+                    background:
+                      packType === "fitness"
+                        ? selectedMood.accent + "12"
+                        : "white",
+                  }}
+                >
+                  <span
+                    className="text-[14px] font-semibold"
+                    style={{
+                      color:
+                        packType === "fitness"
+                          ? selectedMood.accent
+                          : selectedMood.ink,
+                    }}
+                  >
+                    Fitness-Workspace
+                  </span>
+                  <p
+                    className="text-[12px] leading-snug"
+                    style={{ color: selectedMood.inkMuted }}
+                  >
+                    Trainingskarten: Übungen, Sätze × Wdh, Technik-Cues,
+                    Wochenpläne. Coaching-Pipeline.
+                  </p>
+                  {packType === "fitness" ? (
+                    <span
+                      className="font-mono text-[10.5px] uppercase tracking-[0.14em]"
+                      style={{ color: selectedMood.accent }}
+                    >
+                      ✓ Ausgewählt
+                    </span>
+                  ) : null}
+                </button>
+              </div>
+            </section>
+
+            {/* Section 4 — Mood */}
+            <section className="editor-section editor-card flex flex-col gap-5">
+              <SectionHeader
+                num="04"
                 title="Mood"
                 hint="Farbpalette des Workspaces — Background, Akzent und derived Tokens."
               />
