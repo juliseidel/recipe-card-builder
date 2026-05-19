@@ -492,7 +492,12 @@ export async function startReelBackfill(opts: {
     // wichtigen `timestamp` + `videoUrl`-Felder. "details" wuerde nur
     // Profil-Metadaten + ~30 latestPosts liefern.
     resultsType: "posts",
-    resultsLimit: opts.resultsLimit ?? 200,
+    // 500 als neuer Default (vorher 200) — gibt 1.5-2 Jahre Archive
+    // pro Creator statt nur ~6-9 Monaten. Mehr Material für KI-Pack-
+    // Suggestions, +50 Cent Apify-Kosten pro Brand. Bei grossen
+    // Creators (Christian 518, Marvin/Johny ähnlich) holt das deren
+    // gesamten Wettkampf-/Methoden-Zyklus rein.
+    resultsLimit: opts.resultsLimit ?? 500,
     // onlyPostsNewerThan ist als String-Filter erlaubt ("2 years", "30 days"),
     // limitiert serverseitig den Apify-Run.
     onlyPostsNewerThan: `${opts.onlyPostsNewerThanDays ?? 365} days`,
