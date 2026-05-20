@@ -213,43 +213,47 @@ export async function processJob(jobId: string): Promise<void> {
       storagePath = `${pack.slug}__${recipe.slug}.pdf`;
       downloadName = `${safeFilename(recipe.title)}.pdf`;
     } else {
-      // BLOCK-ON-SYNC: vor dem Pack-Render synchron sicherstellen, dass
-      // pack.foreword die AKTUELLE Recipe-Liste reflektiert. Verhindert die
-      // Race-Condition wo der User direkt nach Recipe-Mutation Pack-PDF
-      // downloadet — der fire-and-forget triggerPackMetaSync wäre dann oft
-      // noch nicht fertig (Gemini ~5-15s) und das PDF würde mit stale
-      // foreword rendern (Lügen-Vorwort: gelöschte Rezepte stehen noch drin).
+      // FOREWORD-BACKFILL (nur wenn komplett fehlend):
       //
-      // forewordOnly=true (vorher force=true): wir synchronisieren NUR das
-      // Foreword, NICHT den Title. Der Title ist ein stabiles Identitaets-
-      // Feld — vorher lief hier force=true, was bei JEDEM Download den Titel
-      // via Gemini neu (und durch LLM-Varianz jedes Mal anders) generierte.
-      // Real-Bug 2026-05-19: "Cheesecake-Traeume" → "Meine liebsten
-      // Cheesecakes" → "...High Protein Cheesecakes" bei drei aufeinander-
-      // folgenden Downloads desselben Packs.
+      // FRUEHER lief hier bei JEDEM Pack-Download ein regeneratePackMeta —
+      // erst mit force=true (regenerierte auch den Title), dann mit
+      // forewordOnly=true (regenerierte das Foreword). Beides verursachte
+      // dasselbe User-Problem: Deckblatt-Title UND Vorwort-Text wechselten
+      // bei jedem einzelnen Download durch, weil Gemini jedes Mal eine
+      // leicht andere Formulierung liefert — und das ueberschrieb sogar
+      // manuelle Edits aus dem Pack-Editor (User-Report 2026-05-19:
+      // "egal was ich bei Pack bearbeiten einstelle, wird immer was Neues
+      // generiert").
       //
-      // Wenn die Re-Generation failt (Gemini-Outage, Network), rendern
-      // wir trotzdem weiter mit den alten Texten. Nicht-fatal.
-      await supabase
-        .from("pdf_jobs")
-        .update({ stage: "syncing-foreword", progress: 12 })
-        .eq("id", jobId);
-      try {
-        const sync = await regeneratePackMeta(
-          job.brand_slug,
-          job.pack_slug,
-          { forewordOnly: true }
-        );
-        if (sync.changed && sync.pack) {
-          // Pack-Reference auf den frischen Stand setzen, damit der
-          // anschließende Render das frische Foreword verwendet.
-          Object.assign(pack, sync.pack);
+      // FIX: beim Download wird NICHTS mehr automatisch neu generiert. Das
+      // Pack wird exakt so gerendert wie es in der DB steht — Title,
+      // Foreword, Cover, alle manuellen Edits bleiben stabil. Das Foreword
+      // wird nur dann nachgezogen wenn es KOMPLETT FEHLT (frischer Pack,
+      // enrich noch nicht durch) — sonst waere die Vorwort-Seite leer.
+      //
+      // Aktuell-Halten bei geaenderter Recipe-Liste uebernimmt der separate
+      // Auto-Sync nach Recipe-Mutation (lib/pack-meta-sync.ts → /api/packs/
+      // regenerate-meta), nicht mehr der Download-Pfad.
+      if (!pack.foreword) {
+        await supabase
+          .from("pdf_jobs")
+          .update({ stage: "syncing-foreword", progress: 12 })
+          .eq("id", jobId);
+        try {
+          const sync = await regeneratePackMeta(
+            job.brand_slug,
+            job.pack_slug,
+            { forewordOnly: true }
+          );
+          if (sync.changed && sync.pack) {
+            Object.assign(pack, sync.pack);
+          }
+        } catch (err) {
+          console.warn(
+            "[pdf-jobs] foreword backfill failed (non-fatal):",
+            err instanceof Error ? err.message : err
+          );
         }
-      } catch (err) {
-        console.warn(
-          "[pdf-jobs] pre-render foreword sync failed (non-fatal):",
-          err instanceof Error ? err.message : err
-        );
       }
 
       // Pack PDF includes curated recipes + any custom cards saved into this
