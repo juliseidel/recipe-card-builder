@@ -38,6 +38,18 @@ const FOREWORD_FIELDS = [
 export type RegenerateOptions = {
   /** Wenn true: ignoriert pack.editedFields[] und regeneriert alles. */
   force?: boolean;
+  /** Wenn true: regeneriert NUR das Foreword, laesst Title/Subtitle/
+   *  Tagline/Description/Category komplett in Ruhe.
+   *
+   *  Use-Case: PDF-Pre-Render-Sync (job-runner). Das Foreword referenziert
+   *  die konkrete Recipe-Liste ("diese 15 Rezepte...") und MUSS bei einem
+   *  Download frisch sein, damit geloeschte Rezepte nicht im Vorwort
+   *  stehen. Der Title hingegen ist ein stabiles Identitaets-Feld — er
+   *  darf NICHT bei jedem Download neu (und durch Gemini-Varianz jedes Mal
+   *  anders) generiert werden. Vorher lief hier force=true und der Title
+   *  driftete bei jedem PDF-Download ("Cheesecake-Traeume" →
+   *  "Meine liebsten Cheesecakes" → "...High Protein Cheesecakes"). */
+  forewordOnly?: boolean;
 };
 
 export type RegenerateResult = {
@@ -132,7 +144,12 @@ export async function regeneratePackMeta(
 
   const lockedFields = new Set(opts.force ? [] : (pack.editedFields ?? []));
 
-  const textFieldsToUpdate = TEXT_FIELDS.filter((f) => !lockedFields.has(f));
+  // forewordOnly: Title/Subtitle/Tagline/Description/Category komplett
+  // ueberspringen — nur das Foreword wird frisch gezogen. Verhindert den
+  // Title-Drift bei jedem PDF-Download.
+  const textFieldsToUpdate = opts.forewordOnly
+    ? []
+    : TEXT_FIELDS.filter((f) => !lockedFields.has(f));
   const forewordFieldsToUpdate = FOREWORD_FIELDS.filter(
     (f) => !lockedFields.has(f)
   );

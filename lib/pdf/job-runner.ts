@@ -214,16 +214,19 @@ export async function processJob(jobId: string): Promise<void> {
       downloadName = `${safeFilename(recipe.title)}.pdf`;
     } else {
       // BLOCK-ON-SYNC: vor dem Pack-Render synchron sicherstellen, dass
-      // pack.foreword + title/subtitle/tagline/description die AKTUELLE
-      // Recipe-Liste reflektieren. Verhindert die Race-Condition wo der
-      // User direkt nach Recipe-Mutation Pack-PDF downloadet — der
-      // fire-and-forget triggerPackMetaSync wäre dann oft noch nicht
-      // fertig (Gemini ~5-15s) und das PDF würde mit stale foreword
-      // rendern (Lügen-Vorwort: gelöschte Rezepte stehen noch drin).
+      // pack.foreword die AKTUELLE Recipe-Liste reflektiert. Verhindert die
+      // Race-Condition wo der User direkt nach Recipe-Mutation Pack-PDF
+      // downloadet — der fire-and-forget triggerPackMetaSync wäre dann oft
+      // noch nicht fertig (Gemini ~5-15s) und das PDF würde mit stale
+      // foreword rendern (Lügen-Vorwort: gelöschte Rezepte stehen noch drin).
       //
-      // force=true ignoriert pack.editedFields[] — bei einem PDF-Download
-      // wollen wir IMMER aktuelle Texte, auch wenn der User vorher manuell
-      // am Vorwort editiert hat. Sonst landen Inkonsistenzen im Druck.
+      // forewordOnly=true (vorher force=true): wir synchronisieren NUR das
+      // Foreword, NICHT den Title. Der Title ist ein stabiles Identitaets-
+      // Feld — vorher lief hier force=true, was bei JEDEM Download den Titel
+      // via Gemini neu (und durch LLM-Varianz jedes Mal anders) generierte.
+      // Real-Bug 2026-05-19: "Cheesecake-Traeume" → "Meine liebsten
+      // Cheesecakes" → "...High Protein Cheesecakes" bei drei aufeinander-
+      // folgenden Downloads desselben Packs.
       //
       // Wenn die Re-Generation failt (Gemini-Outage, Network), rendern
       // wir trotzdem weiter mit den alten Texten. Nicht-fatal.
@@ -235,12 +238,11 @@ export async function processJob(jobId: string): Promise<void> {
         const sync = await regeneratePackMeta(
           job.brand_slug,
           job.pack_slug,
-          { force: true }
+          { forewordOnly: true }
         );
         if (sync.changed && sync.pack) {
           // Pack-Reference auf den frischen Stand setzen, damit der
-          // anschließende Render und die Filename-Generation den neuen
-          // title verwendet.
+          // anschließende Render das frische Foreword verwendet.
           Object.assign(pack, sync.pack);
         }
       } catch (err) {
