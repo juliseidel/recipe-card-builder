@@ -135,9 +135,16 @@ export function WebStoryBlock({
 }
 
 export function RecipeCardFull(props: RecipeCardFullProps) {
-  // Per-recipe layout override wins over pack.cardLayout. Lets users pick
-  // a layout per card in the editor independent of the pack default.
-  const layout = props.recipe.cardLayout ?? props.pack.cardLayout;
+  // pack.cardLayout ist die Single Source of Truth fuer das Layout (geaendert
+  // 2026-05-19). FRUEHER galt `recipe.cardLayout ?? pack.cardLayout` — das
+  // sollte ein per-Card-Override erlauben, aber dafuer gibt es gar kein UI;
+  // recipe.cardLayout wird beim Pack-Erstellen nur als redundante Kopie von
+  // pack.cardLayout gesetzt. Folge: aenderte der User das Pack-Layout im
+  // Editor, gewann die alte Recipe-Kopie und der Wechsel verpuffte (PDF+Web).
+  // Jetzt gewinnt IMMER das Pack-Layout — ein globaler Schalter, wie erwartet.
+  // recipe.cardLayout bleibt nur als Fallback fuer den (theoretischen) Fall
+  // dass ein Pack mal kein Layout gesetzt hat.
+  const layout = props.pack.cardLayout ?? props.recipe.cardLayout ?? "editorial";
   switch (layout) {
     case "editorial":
       return <EditorialLayout {...props} />;

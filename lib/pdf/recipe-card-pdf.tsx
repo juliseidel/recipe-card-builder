@@ -72,9 +72,13 @@ export type RecipeCardPdfProps = {
 };
 
 export function RecipeCardPdfPage(props: RecipeCardPdfProps) {
-  // Per-recipe layout override wins over pack.cardLayout — same rule as
-  // the web renderer in components/recipe-card-full.tsx.
-  const layout = props.recipe.cardLayout ?? props.pack.cardLayout;
+  // pack.cardLayout ist die Single Source of Truth — same rule as the web
+  // renderer in components/recipe-card-full.tsx (geaendert 2026-05-19).
+  // recipe.cardLayout war nur eine redundante Kopie (kein per-Card-UI), die
+  // den Pack-Layout-Wechsel blockierte. Jetzt gewinnt das Pack-Layout immer;
+  // recipe.cardLayout bleibt nur Fallback falls ein Pack kein Layout hat.
+  const layout =
+    props.pack.cardLayout ?? props.recipe.cardLayout ?? "editorial";
   return LAYOUTS[layout](props);
 }
 
