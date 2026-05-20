@@ -252,40 +252,10 @@ function BannerRowSkeleton({ pack, delay }: { pack: Pack; delay: number }) {
   );
 }
 
-// Lokaler Loading-Indicator wahrend KI-Bild generiert wird. Nur fuer Biene —
-// andere Brands bekommen einfach keinen Indicator (Skeleton + Caption reichen),
-// damit die Biene nicht auf Julias oder anderen Karten landet.
-function BeeIcon({ color, brandSlug }: { color: string; brandSlug: string }) {
-  if (brandSlug !== "biene") return null;
-  return (
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden
-      style={{ opacity: 0.8 }}
-    >
-      <ellipse cx="12" cy="14" rx="5.5" ry="6" fill={color} opacity="0.18" />
-      <path
-        d="M12 8c-3 0-5.5 2.5-5.5 6s2.5 6 5.5 6 5.5-2.5 5.5-6S15 8 12 8Z"
-        stroke={color}
-        strokeWidth="1.4"
-      />
-      <path
-        d="M8 11h8M8 14h8M8 17h8"
-        stroke={color}
-        strokeWidth="1.2"
-        strokeLinecap="round"
-      />
-      <path
-        d="M9 6c0-1.5 1.3-2.5 3-2.5s3 1 3 2.5"
-        stroke={color}
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-      <circle cx="9" cy="5" r="1.4" fill={color} opacity="0.4" />
-      <circle cx="15" cy="5" r="1.4" fill={color} opacity="0.4" />
-    </svg>
-  );
+// User-Feedback 2026-05-19: Bienen-Icon ueberall entfernt (wirkte "billig").
+// Auch dieser Loading-Indicator rendert jetzt nichts mehr — der Skeleton +
+// die Caption reichen als Lade-Anzeige fuer alle Brands inkl. Biene.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function BeeIcon(_props: { color: string; brandSlug: string }) {
+  return null;
 }

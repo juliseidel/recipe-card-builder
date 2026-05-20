@@ -7,81 +7,19 @@ type Props = {
   size?: number;
   className?: string;
   style?: React.CSSProperties;
-  /** Brand-Slug — Icon erscheint NUR fuer Biene, weil's ihr Personal-
-   *  Wappen ist ("Deine Biene 🐝"). Alle anderen Creator (Julia etc.) bekommen
-   *  kein Bee-Icon — die Signature steht dann allein, mit ihrer eigenen
-   *  Brand-Identitaet. Pflicht-Prop, damit niemand das versehentlich vergisst
-   *  und die Biene auf einer fremden Karte landet. */
+  /** Brand-Slug — historisch hat das Icon nur fuer Biene gerendert. Seit
+   *  2026-05-19 (User-Feedback "wirkt billig") rendert die Komponente fuer
+   *  ALLE Brands nichts mehr. Prop bleibt fuer Call-Site-Kompatibilitaet. */
   brandSlug: string;
 };
 
-export function BeeIcon({ size = 16, className, style, brandSlug }: Props) {
-  if (brandSlug !== "biene") return null;
-  return (
-    <svg
-      viewBox="0 0 64 64"
-      width={size}
-      height={size}
-      className={className}
-      style={style}
-      aria-hidden
-      role="img"
-    >
-      <path
-        d="M27 24 Q24 16 22 12"
-        stroke="#2b1f19"
-        strokeWidth={2}
-        fill="none"
-        strokeLinecap="round"
-      />
-      <path
-        d="M37 24 Q40 16 42 12"
-        stroke="#2b1f19"
-        strokeWidth={2}
-        fill="none"
-        strokeLinecap="round"
-      />
-      <circle cx={22} cy={12} r={2} fill="#2b1f19" />
-      <circle cx={42} cy={12} r={2} fill="#2b1f19" />
-      <ellipse
-        cx={20}
-        cy={24}
-        rx={10}
-        ry={7}
-        fill="#cfe8ff"
-        stroke="#9bbedb"
-        strokeWidth={0.7}
-      />
-      <ellipse
-        cx={44}
-        cy={24}
-        rx={10}
-        ry={7}
-        fill="#cfe8ff"
-        stroke="#9bbedb"
-        strokeWidth={0.7}
-      />
-      <ellipse
-        cx={32}
-        cy={40}
-        rx={18}
-        ry={17}
-        fill="#F4C44A"
-        stroke="#2b1f19"
-        strokeWidth={1.5}
-      />
-      <path
-        d="M15 35 Q32 37 49 35 L49 40 Q32 42 15 40 Z"
-        fill="#2b1f19"
-      />
-      <path
-        d="M15 47 Q32 49 49 47 L49 52 Q32 54 15 52 Z"
-        fill="#2b1f19"
-      />
-      <circle cx={26} cy={32} r={2.4} fill="#2b1f19" />
-      <circle cx={38} cy={32} r={2.4} fill="#2b1f19" />
-      <circle cx={26.5} cy={31.3} r={0.8} fill="#fff" />
-      <circle cx={38.5} cy={31.3} r={0.8} fill="#fff" />
-    </svg>
-  );
+// User-Feedback 2026-05-19: Das Bienen-Icon wurde bei Biene KOMPLETT
+// entfernt (Web-Layouts, Footer, Signatur, Anfang + Ende) — es wirkte
+// "billig". Die Komponente bleibt als no-op bestehen, damit die ~6
+// Call-Sites in recipe-card-full.tsx nicht einzeln angefasst werden
+// muessen. Sie rendert jetzt fuer ALLE Brands nichts mehr. Falls je ein
+// Brand-Wappen zurueck soll: hier wieder bedingt rendern.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function BeeIcon(_props: Props) {
+  return null;
 }
