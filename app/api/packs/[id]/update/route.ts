@@ -1,5 +1,8 @@
 import { NextResponse, after } from "next/server";
-import { updateCustomPackData } from "@/lib/custom-packs-server";
+import {
+  updateCustomPackData,
+  clearRecipeLayoutOverridesForPack,
+} from "@/lib/custom-packs-server";
 import { revalidatePath } from "next/cache";
 import type { Pack, PackMood, CardLayout } from "@/lib/packs";
 
@@ -148,6 +151,33 @@ export async function POST(req: Request, { params }: RouteParams) {
       { error: "Pack konnte nicht aktualisiert werden — vermutlich kein Custom-Pack." },
       { status: 404 }
     );
+  }
+
+  // Wenn das Pack-Layout geaendert wurde: alle per-recipe cardLayout-
+  // Overrides clearen, damit der Wechsel global greift. Sonst gewinnt das
+  // beim Pack-Erstellen aufs Recipe kopierte alte Layout (Render-Regel
+  // recipe.cardLayout ?? pack.cardLayout) und der Wechsel wirkt weder im
+  // PDF noch in der Web-Ansicht (Bug 2026-05-19). SYNCHRON vor der Response
+  // — damit ein direkt anschliessender PDF-Download das neue Layout sieht
+  // (kein after()-Race). Nutzt brand/pack-Slug; bei kuratierten Code-Packs
+  // ohne DB-Recipes ist es ein No-Op.
+  if (cleanPatch.cardLayout && body.brandSlug && body.packSlug) {
+    try {
+      const cleared = await clearRecipeLayoutOverridesForPack(
+        body.brandSlug,
+        body.packSlug
+      );
+      if (cleared > 0) {
+        console.log(
+          `[packs/update] cleared ${cleared} recipe layout-overrides for ${body.brandSlug}/${body.packSlug} after pack-layout change → ${cleanPatch.cardLayout}`
+        );
+      }
+    } catch (err) {
+      console.warn(
+        "[packs/update] clearRecipeLayoutOverrides failed (non-fatal)",
+        err
+      );
+    }
   }
 
   // Cache-Revalidation fire-and-forget — Pack-Detail-Page + Brand-Grid

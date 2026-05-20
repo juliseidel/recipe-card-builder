@@ -178,6 +178,56 @@ export async function updateCustomPackData(
   return merged;
 }
 
+/** Entfernt den per-recipe `cardLayout`-Override aus ALLEN Recipes eines
+ *  Packs (custom + geseedete kuratierte). Wird aufgerufen wenn der User im
+ *  Pack-Editor das Pack-Layout aendert.
+ *
+ *  Hintergrund: Beim Pack-Erstellen wird das gewaehlte Layout auf jedes
+ *  Recipe kopiert (recipe.cardLayout). Die Render-Regel ist
+ *  `recipe.cardLayout ?? pack.cardLayout` — der Recipe-Override GEWINNT also.
+ *  Folge: aendert der User spaeter das Pack-Layout, behalten die Recipes ihr
+ *  altes hartcodiertes Layout und der Wechsel wirkt nicht (Bug 2026-05-19:
+ *  "neues Layout ausgewaehlt, PDF trotzdem im alten Layout").
+ *
+ *  Durch das Loeschen des Keys faellt das Rendering sauber auf pack.cardLayout
+ *  zurueck → ein einziger globaler Layout-Schalter, wie der User es erwartet.
+ *  Returnt die Anzahl der angepassten Recipes. */
+export async function clearRecipeLayoutOverridesForPack(
+  brandSlug: string,
+  packSlug: string
+): Promise<number> {
+  if (!hasServerSupabase()) return 0;
+  const supabase: SupabaseClient = getServerSupabase();
+  const { data, error } = await supabase
+    .from("recipes")
+    .select("id, data")
+    .eq("brand_slug", brandSlug)
+    .eq("pack_slug", packSlug);
+  if (error) {
+    console.warn("[packs-server] clearRecipeLayoutOverrides read", error);
+    return 0;
+  }
+  let cleared = 0;
+  for (const row of data ?? []) {
+    const d = row.data as Record<string, unknown>;
+    if (d.cardLayout == null) continue; // schon ohne Override → skip
+    delete d.cardLayout;
+    const { error: writeErr } = await supabase
+      .from("recipes")
+      .update({ data: d })
+      .eq("id", row.id);
+    if (writeErr) {
+      console.warn(
+        "[packs-server] clearRecipeLayoutOverrides write",
+        writeErr
+      );
+      continue;
+    }
+    cleared += 1;
+  }
+  return cleared;
+}
+
 /** Findet die Pack-Row anhand brandSlug + packSlug (statt pack.id) — nuetzlich
  *  fuer Auto-Sync-Hooks die nach Recipe-Mutation die zugehoerige Pack-ID
  *  brauchen. Returnt null fuer kuratierte (Code-)Packs ohne DB-Eintrag. */
