@@ -97,13 +97,18 @@ export async function generateGeminiImage(
     });
   }
 
+  // KRITISCH: responseModalities MUSS gesetzt sein, sonst returnt Gemini
+  // nur Text-Response (kein Image). aspectRatio gehoert in imageConfig,
+  // NICHT in responseFormat (das war meine erste falsche Annahme aus der
+  // ai.google.dev/gemini-api/docs/image-generation-Doku — die zeigt ein
+  // unklares Beispiel, das offizielle Notebook in
+  // GoogleCloudPlatform/generative-ai nutzt response_modalities + image_config).
   const body = {
     contents: [{ parts }],
     generationConfig: {
-      responseFormat: {
-        image: {
-          aspectRatio: opts.aspectRatio ?? "1:1",
-        },
+      responseModalities: ["IMAGE"],
+      imageConfig: {
+        aspectRatio: opts.aspectRatio ?? "1:1",
       },
     },
   };
