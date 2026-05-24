@@ -82,11 +82,16 @@ export async function generateGeminiImage(
 
   // Parts: zuerst Text, dann Reference-Images. Reihenfolge ist
   // konventionell; Gemini liest beide Modalitaeten zusammen.
+  //
+  // KRITISCH: camelCase Feldnamen (inlineData/mimeType), NICHT snake_case.
+  // Erste Implementierung nutzte inline_data/mime_type — Gemini-REST-API
+  // akzeptiert das nicht und returnt 400 mit kryptischer message, die im
+  // unserem catch dann als 500 nach aussen lecked.
   const parts: Array<Record<string, unknown>> = [{ text: opts.prompt }];
   for (const ref of opts.references ?? []) {
     parts.push({
-      inline_data: {
-        mime_type: ref.mimeType,
+      inlineData: {
+        mimeType: ref.mimeType,
         data: ref.buffer.toString("base64"),
       },
     });
@@ -141,21 +146,37 @@ export async function generateGeminiImage(
 
       const data = await res.json();
       const candidate = data?.candidates?.[0];
-      const imagePart = (candidate?.content?.parts ?? []).find(
-        (p: { inline_data?: { data?: string; mime_type?: string } }) =>
-          p?.inline_data?.data
+      // Response-Parts kommen ebenfalls in camelCase (inlineData/mimeType)
+      // zurueck — aber wir akzeptieren beide Schreibweisen defensiv, falls
+      // Google sich mal entscheidet beide zu unterstuetzen oder zu wechseln.
+      type ImagePart = {
+        inlineData?: { data?: string; mimeType?: string };
+        inline_data?: { data?: string; mime_type?: string };
+      };
+      const partList: ImagePart[] = candidate?.content?.parts ?? [];
+      const imagePart = partList.find(
+        (p) => p?.inlineData?.data || p?.inline_data?.data
       );
-      const inline = imagePart?.inline_data;
-      if (!inline?.data) {
+      const inline =
+        imagePart?.inlineData ?? imagePart?.inline_data ?? null;
+      const dataB64 =
+        (inline && "data" in inline ? inline.data : undefined) ?? null;
+      const mime =
+        (inline && "mimeType" in inline
+          ? inline.mimeType
+          : inline && "mime_type" in inline
+            ? inline.mime_type
+            : undefined) ?? "image/png";
+      if (!dataB64) {
         throw new GeminiImageError(
-          "Gemini returned no image in response",
+          `Gemini returned no image in response. Raw: ${JSON.stringify(data).slice(0, 500)}`,
           200,
           data
         );
       }
       return {
-        buffer: Buffer.from(inline.data, "base64"),
-        mimeType: inline.mime_type ?? "image/png",
+        buffer: Buffer.from(dataB64, "base64"),
+        mimeType: mime,
       };
     } catch (err) {
       lastErr = err;

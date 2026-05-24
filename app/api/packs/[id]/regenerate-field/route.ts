@@ -230,6 +230,10 @@ export async function POST(req: Request, { params }: RouteParams) {
       });
       return NextResponse.json({ ok: true, pack: updated, field, value: coverImage });
     } catch (err) {
+      // Stacktrace + Message ins Server-Log damit Vercel-Runtime-Logs
+      // den eigentlichen Fehler zeigen — vorher kam nur generisches 500
+      // beim User an, kein Debug-Hinweis im Log.
+      console.error("[regenerate-field] cover generation failed:", err);
       return NextResponse.json(
         { error: `Cover-Re-Generate fehlgeschlagen: ${(err as Error).message}` },
         { status: 500 }
