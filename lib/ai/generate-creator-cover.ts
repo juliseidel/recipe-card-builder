@@ -120,21 +120,23 @@ function buildCoverPrompt(input: CreatorCoverInput): string {
 
   return [
     `An editorial cookbook cover photograph in the style of Bon Appétit or Phaidon.`,
-    `The person from the first reference image (${brand.name}, ${brand.handle}) is shown ${sceneHint}.`,
-    `Use the person's face, hair, and general appearance from the reference — recognisable as ${brand.name}.`,
     ``,
-    `Pack theme: "${pack.title}" — ${pack.tagline}.`,
-    `Visual hint: this pack contains recipes like ${recipeContext}.`,
+    `Subject: the person from the FIRST reference image (${brand.name}, ${brand.handle}). Use her face, hair, body type, and general appearance from that reference so she is clearly recognisable as ${brand.name}. She is shown ${sceneHint}.`,
     ``,
-    `IMPORTANT — text composition: render the following text DIRECTLY INSIDE the image, integrated as elegant cookbook cover typography:`,
-    `  - Large title: "${pack.title}"`,
-    pack.subtitle ? `  - Smaller italic subtitle below: "${pack.subtitle}"` : "",
-    `  - Bottom corner small text: "${brand.handle}"`,
-    `Use a warm, off-white text color with subtle shadow for readability. Title in elegant serif typography. Place text in a calm area of the composition (typically bottom-left third) so the person and dish stay visually prominent.`,
+    `Visual world: the ADDITIONAL reference images (if any) are real recipes from this pack — use them as a style anchor for plating, food colours, lighting mood, and overall atmosphere. The dish visible in the cover should feel like it belongs to the same visual universe as those references (NOT a literal copy of any single one).`,
     ``,
-    `Lighting: soft natural daylight from a side window, intimate magazine feel, slight film grain.`,
-    `Composition: 3:4 portrait, person edge-positioned, scene atmosphere lived-in (not staged), warm cream/honey colour palette unless the pack theme suggests otherwise.`,
-    `NO additional text beyond what's specified. NO logos, watermarks, brand names other than the handle. Real food only — no plastic-looking renders.`,
+    `Pack theme: "${pack.title}" — ${pack.tagline}. Recipes include: ${recipeContext}.`,
+    ``,
+    `IMPORTANT — text composition: render the following German text DIRECTLY INSIDE the image, integrated as elegant cookbook cover typography. The text must be sharply rendered, legible, German spelling preserved (Umlauts ä/ö/ü/ß intact):`,
+    `  - Large title (top or bottom third): ${pack.title}`,
+    pack.subtitle ? `  - Smaller italic subtitle just below the title: ${pack.subtitle}` : "",
+    `  - Small handle in the lower corner: ${brand.handle}`,
+    `Text color: warm off-white with subtle shadow for readability. Title in an elegant serif typography. Place text in a visually calm area (typically lower-left third or bottom band) so the person and dish stay prominent.`,
+    ``,
+    `Lighting: soft natural daylight from a side window, intimate magazine feel, slight natural film grain.`,
+    `Composition: 3:4 portrait orientation, person edge-positioned (not centre-frame), scene atmosphere lived-in (not stage-styled), warm cream/honey colour palette unless the pack theme suggests otherwise.`,
+    ``,
+    `Hard rules: NO additional text beyond what's specified above. NO logos, watermarks, or brand names other than the handle. Real food only — no plastic-looking renders, no oversaturated colours, no AI-art look.`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -152,17 +154,41 @@ async function loadCreatorAvatar(
   return loadImageAsReference(brand.avatar);
 }
 
+// Lädt Recipe-Hero-Bilder als zusätzliche Reference-Inputs für Gemini.
+// User-Wunsch (2026-05-24): "die Bilder der einzelnen Rezepte mitgegeben
+// werden, und dann muss da ein passendes Bild erstellt werden". Mit
+// Recipe-Heroes versteht Gemini die VISUELLE Welt des Packs (Farben,
+// Plating-Stil, Food-Atmosphäre) und nicht nur die Title-Worte. Max 3
+// Heroes — mehr ist sowohl prompt-noise als auch Latenz/Cost.
+async function loadRecipeHeroes(
+  recipes: Recipe[] | undefined
+): Promise<GeminiImageReference[]> {
+  if (!recipes?.length) return [];
+  const heroUrls = recipes
+    .map((r) => r.hero)
+    .filter((u): u is string => Boolean(u?.trim()))
+    .slice(0, 3);
+  const refs = await Promise.all(heroUrls.map((u) => loadImageAsReference(u)));
+  return refs.filter((r): r is GeminiImageReference => r !== null);
+}
+
 export async function generateCreatorCover(
   input: CreatorCoverInput
 ): Promise<CreatorCoverResult> {
-  const avatarRef = await loadCreatorAvatar(input.brand);
+  // Parallel laden: Avatar (Person-Anker) + bis zu 3 Recipe-Heroes
+  // (visueller Pack-Anker). Beide sind optional — fehlende References
+  // führen NICHT zum Fail, Gemini generiert dann eben "generischer".
+  const [avatarRef, recipeRefs] = await Promise.all([
+    loadCreatorAvatar(input.brand),
+    loadRecipeHeroes(input.recipes),
+  ]);
 
-  // Fallback bei fehlendem Avatar: Generation laeuft ohne Person-Reference,
-  // Gemini erfindet eine generische Figur. Weniger personal, aber besser
-  // als gar kein Cover. Caller (enrich-Route) sollte das nicht als Fail
-  // werten.
+  // References-Order ist wichtig: Avatar zuerst → Gemini liest das als
+  // primären Subject-Anker (die Person), Recipe-Heroes als sekundäre
+  // Style/Mood-Anker (das visuelle Universum des Packs).
   const references: GeminiImageReference[] = [];
   if (avatarRef) references.push(avatarRef);
+  references.push(...recipeRefs);
 
   const prompt = buildCoverPrompt(input);
 

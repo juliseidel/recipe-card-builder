@@ -73,22 +73,27 @@ export function PackPdfDocument({
         titleFont={titleFont}
       />
 
-      {/* FOREWORD-PAGE BEWUSST RAUS (Mai 2026, Iteration v3 von Cover).
-          Begruendung: das Creator-Cover (Gemini-Bild mit Person + Text drin)
-          uebernimmt die Intro-Funktion vollstaendig — ein zweiter Bild+Text-
-          Block direkt danach wirkte redundant und "Template-haft" (User-
-          Feedback: Bild Seite 1 + Text Seite 2 = "macht keinen Sinn").
-          DB-Felder pack.foreword + pack.forewordImage bleiben unangetastet
-          (Backward-Compat, kein DB-Migration). foreword-page.tsx + alle 7
-          VARIANTS bleiben im Code als dormant — koennen wieder eingehaengt
-          werden indem dieser Block re-aktiviert wird. */}
+      {/* PAGE 2 — FOREWORD (User-Korrektur 2026-05-24: Vorwort gehoert
+          REIN, nicht das was der User vorher als 'Vorwort' kritisiert
+          hatte. Das war die alte CoverPage mit Text-Overlay. ForewordPage
+          ist das richtige Vorwort mit greeting/story/signoff und sollte
+          wieder gerendert werden wenn pack.foreword vorhanden ist). */}
+      {showForeword && forewordContent ? (
+        <ForewordPage
+          brand={brand}
+          pack={pack}
+          content={forewordContent}
+          imageDataUri={forewordImageDataUri ?? null}
+          avatarDataUri={avatarDataUri ?? null}
+        />
+      ) : null}
 
-      {/* INDEX (immer direkt nach Cover, kein Foreword-Shift mehr) */}
+      {/* INDEX (page 2 ohne Foreword, page 3 mit Foreword) */}
       <IndexPage
         brand={brand}
         pack={pack}
         recipes={recipes}
-        showForeword={false}
+        showForeword={showForeword}
       />
 
       {/* PAGES 3..N+2 — RECIPES */}
