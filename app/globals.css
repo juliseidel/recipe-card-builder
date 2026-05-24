@@ -1,26 +1,102 @@
 @import "tailwindcss";
 
+/* ─────────────────────────────────────────────────────────────
+ * Recipe Card Builder · Design Tokens
+ *
+ * One paper world (Bienenfee cream), one ink scale, one wine accent.
+ * Builder chrome lives alongside the recipe paper so the editor feels
+ * like working *on* the printed page, not next to it.
+ * ───────────────────────────────────────────────────────────── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Paper world — Bienenfee cream */
+  --color-paper: #faf6ee;
+  --color-paper-deep: #f3ebd9;
+  --color-paper-veil: #fbf7ed;
+  --color-cream-50: #fdfaf2;
+
+  /* Ink scale (warm cocoa, never pure black) */
+  --color-ink: #1a120b;
+  --color-ink-2: #2b1f15;
+  --color-ink-3: #4d3d2f;
+  --color-ink-4: #a8998a;
+  --color-hairline: #d9cdb4;
+
+  /* Signature accent — Bienenfee burgundy */
+  --color-wine-600: #7c2d12;
+  --color-wine-700: #4f180f;
+  --color-honey: #e0a82c;
+
+  /* Builder chrome (lives alongside the paper) */
+  --color-builder-bg: #f6f3ec;
+  --color-builder-line: #d9cdb4;
+  --color-builder-line-soft: #ece4d3;
+  --color-builder-muted: #8a7b6b;
+  --color-builder-ink: #1a120b;
+  --color-builder-accent: #7c2d12;
+
+  /* Legacy aliases the Default Next theme expected */
+  --background: var(--color-paper);
+  --foreground: var(--color-ink);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-background: var(--color-paper);
+  --color-foreground: var(--color-ink);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-fraunces);
+  --font-mono: var(--font-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-inter), "Helvetica Neue", Arial, sans-serif;
 }
+
+/* ─────────────────────────────────────────────────────────────
+ * Utility classes referenced from card layouts + chrome
+ * ───────────────────────────────────────────────────────────── */
+
+.font-display {
+  font-family: var(--font-fraunces);
+}
+
+.font-feature-num {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+
+/* A4 hochformat — 595.28 × 841.89 pt at 96dpi ≈ 794 × 1123 px */
+.print-page {
+  width: 794px;
+  height: 1123px;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Subtle paper grain via layered radial gradients (no image dependency) */
+.paper-grain {
+  background-image:
+    radial-gradient(circle at 22% 30%, rgba(140, 110, 80, 0.028), transparent 55%),
+    radial-gradient(circle at 78% 72%, rgba(140, 110, 80, 0.022), transparent 50%),
+    radial-gradient(circle at 50% 100%, rgba(140, 110, 80, 0.014), transparent 45%);
+  background-attachment: local;
+}
+
+.paper-grain-soft {
+  background-image:
+    radial-gradient(circle at 38% 25%, rgba(180, 140, 100, 0.018), transparent 65%),
+    radial-gradient(circle at 70% 78%, rgba(180, 140, 100, 0.012), transparent 55%);
+}
+
+/* Drop-shadow for the preview "sheet on desk" feel */
+.print-shadow {
+  box-shadow:
+    0 1px 0 rgba(26, 18, 11, 0.04),
+    0 28px 64px rgba(26, 18, 11, 0.12),
+    0 80px 160px rgba(26, 18, 11, 0.08);
+  background: var(--color-paper);
+}
+
+/* Recipe Card Builder is intentional warm/paper — no dark mode flip. */
