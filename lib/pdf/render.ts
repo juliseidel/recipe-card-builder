@@ -243,24 +243,32 @@ export async function renderPackPdf(args: {
       : null;
 
   args.onProgress?.("loading-recipe-images", 20);
-  // Hero images, QR codes, foreword image (optional), and brand avatar
-  // (always loaded — Patisserie uses it inside its recipe-page footer
-  // so the avatar is needed even when this pack has no foreword). All
-  // fan out via Promise.all so total wall-clock stays close to the
-  // slowest single asset.
-  const [heroDataUris, qrDataUris, forewordImageDataUri, avatarDataUri] =
-    await Promise.all([
-      Promise.all(
-        args.recipes.map((r) =>
-          loadImageAsDataUri(r.hero ?? args.pack.coverImage)
-        )
-      ),
-      Promise.all(args.recipes.map((r) => generateQrDataUri(r.sourceUrl))),
-      forewordImagePath
-        ? loadImageAsDataUri(forewordImagePath)
-        : Promise.resolve(null),
-      loadImageAsDataUri(args.brand.avatar),
-    ]);
+  // Hero images, QR codes, foreword image (optional), outro image
+  // (optional, new), and brand avatar (always loaded — Patisserie uses
+  // it inside its recipe-page footer so the avatar is needed even when
+  // this pack has no foreword). All fan out via Promise.all so total
+  // wall-clock stays close to the slowest single asset.
+  const [
+    heroDataUris,
+    qrDataUris,
+    forewordImageDataUri,
+    outroImageDataUri,
+    avatarDataUri,
+  ] = await Promise.all([
+    Promise.all(
+      args.recipes.map((r) =>
+        loadImageAsDataUri(r.hero ?? args.pack.coverImage)
+      )
+    ),
+    Promise.all(args.recipes.map((r) => generateQrDataUri(r.sourceUrl))),
+    forewordImagePath
+      ? loadImageAsDataUri(forewordImagePath)
+      : Promise.resolve(null),
+    args.pack.outroImage
+      ? loadImageAsDataUri(args.pack.outroImage)
+      : Promise.resolve(null),
+    loadImageAsDataUri(args.brand.avatar),
+  ]);
 
   // Pre-Render-Verifikation: jede Recipe-Card einzeln rendern und
   // notfalls mit Tweaks neu rendern bis sie auf 1 Seite passt. Das
@@ -305,6 +313,7 @@ export async function renderPackPdf(args: {
       forewordContent,
       forewordImageDataUri,
       avatarDataUri,
+      outroImageDataUri,
     })
   );
   args.onProgress?.("done", 100);

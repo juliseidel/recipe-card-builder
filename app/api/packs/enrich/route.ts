@@ -4,6 +4,7 @@ import { generatePackCover } from "@/lib/ai/generate-pack-cover";
 import { generateFitnessPackCover } from "@/lib/ai/generate-fitness-pack-cover";
 import { generatePackForeword } from "@/lib/ai/generate-foreword";
 import { generateForewordImage } from "@/lib/ai/generate-foreword-image";
+import { generateOutroImage } from "@/lib/ai/generate-outro-image";
 import {
   generateForewordCollage,
   fetchHeroBuffers,
@@ -34,6 +35,7 @@ export const maxDuration = 120;
 
 const COVER_BUCKET = "pack-covers";
 const FOREWORD_BUCKET = "pack-forewords";
+const OUTRO_BUCKET = "pack-outros";
 
 type Body = {
   packId: string;
@@ -46,6 +48,8 @@ type Body = {
   forceForewordImage?: boolean;
   /** Erzwingt Re-Generation des Vorwort-Textes (Greeting + Story + Signoff). */
   forceForewordText?: boolean;
+  /** Erzwingt Re-Generation des Outro-Bildes. Analog forceCover. */
+  forceOutroImage?: boolean;
 };
 
 export async function POST(req: Request) {
@@ -127,8 +131,13 @@ export async function POST(req: Request) {
     packType === "fitness" || (!body.forceForewordText && !!pack.foreword);
   const hasForewordImage =
     packType === "fitness" || (!body.forceForewordImage && !!pack.forewordImage);
+  // Outro-Image: analog Cover. Bei Fitness aktuell auch generiert — die
+  // Outro-Page rendert für jeden Pack-Type, und ein full-bleed-Outro
+  // funktioniert auch ohne Foreword.
+  const hasOutroImage =
+    !body.forceOutroImage && !!pack.outroImage;
 
-  if (hasCover && hasForewordText && hasForewordImage) {
+  if (hasCover && hasForewordText && hasForewordImage && hasOutroImage) {
     return NextResponse.json({
       status: "already-enriched",
       packId: row.id,
@@ -221,14 +230,23 @@ export async function POST(req: Request) {
         ? generateFitnessPackCover({ pack }).then((r) => r.buffer)
         : generatePackCover({ pack }).then((r) => r.buffer);
 
-    const [coverSettled, forewordTextSettled, forewordImageSettled] =
-      await Promise.allSettled([
-        coverPromise,
-        hasForewordText
-          ? Promise.resolve(null)
-          : generatePackForeword(pack, brand, recipeTitlesForForeword),
-        buildForewordImage(),
-      ]);
+    const outroImagePromise = hasOutroImage
+      ? Promise.resolve(null)
+      : generateOutroImage(pack);
+
+    const [
+      coverSettled,
+      forewordTextSettled,
+      forewordImageSettled,
+      outroImageSettled,
+    ] = await Promise.allSettled([
+      coverPromise,
+      hasForewordText
+        ? Promise.resolve(null)
+        : generatePackForeword(pack, brand, recipeTitlesForForeword),
+      buildForewordImage(),
+      outroImagePromise,
+    ]);
 
     // ─── Upload Pack-Cover ─────────────────────────────────────────────────
     let newCoverImage: string | null = null;
@@ -322,10 +340,56 @@ export async function POST(req: Request) {
       );
     }
 
+    // ─── Upload Outro-Image ───────────────────────────────────────────────
+    // Spiegel zu Cover-Upload, eigener Bucket. Cache-Bust-Suffix wie bei
+    // Foreword-Image (damit Browser + Vercel die neue URL holen wenn der
+    // alte Filename ueberschrieben wurde).
+    let newOutroImage: string | null = null;
+    if (
+      outroImageSettled.status === "fulfilled" &&
+      outroImageSettled.value
+    ) {
+      try {
+        await ensureBucket(supabase, OUTRO_BUCKET);
+        const filePath = `${row.id}.jpg`;
+        const upload = await supabase.storage
+          .from(OUTRO_BUCKET)
+          .upload(filePath, outroImageSettled.value, {
+            contentType: "image/jpeg",
+            upsert: true,
+            cacheControl: "31536000",
+          });
+        if (upload.error) {
+          console.error(
+            "[packs/enrich] outro image upload failed:",
+            upload.error.message
+          );
+        } else {
+          const { data } = supabase.storage
+            .from(OUTRO_BUCKET)
+            .getPublicUrl(filePath);
+          newOutroImage = `${data.publicUrl}?t=${Date.now()}`;
+        }
+      } catch (err) {
+        console.error("[packs/enrich] outro image upload threw:", err);
+      }
+    } else if (outroImageSettled.status === "rejected") {
+      console.error(
+        "[packs/enrich] outro image generation failed:",
+        outroImageSettled.reason
+      );
+    }
+
     // ─── Read-modify-write: alle Felder in einem Schreibvorgang merge ─────
     // Wenn nichts neu generiert wurde (alle Tasks failed oder schon
     // vorhanden), sparen wir den Round-Trip in die DB.
-    if (!newCoverImage && !newForeword && !newForewordImage) return;
+    if (
+      !newCoverImage &&
+      !newForeword &&
+      !newForewordImage &&
+      !newOutroImage
+    )
+      return;
 
     const { data: latest } = await supabase
       .from("packs")
@@ -337,6 +401,7 @@ export async function POST(req: Request) {
     if (newCoverImage) merged.coverImage = newCoverImage;
     if (newForeword) merged.foreword = newForeword;
     if (newForewordImage) merged.forewordImage = newForewordImage;
+    if (newOutroImage) merged.outroImage = newOutroImage;
 
     await supabase.from("packs").update({ data: merged }).eq("id", row.id);
   });
