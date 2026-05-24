@@ -1,15 +1,17 @@
 import { NextResponse, after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { generatePackCover } from "@/lib/ai/generate-pack-cover";
+import { generateCreatorCover } from "@/lib/ai/generate-creator-cover";
 import { generateFitnessPackCover } from "@/lib/ai/generate-fitness-pack-cover";
-import { generatePackForeword } from "@/lib/ai/generate-foreword";
-import { generateForewordImage } from "@/lib/ai/generate-foreword-image";
 import { generateOutroImage } from "@/lib/ai/generate-outro-image";
-import {
-  generateForewordCollage,
-  fetchHeroBuffers,
-  isBrandStyleHero,
-} from "@/lib/ai/generate-foreword-collage";
+
+// Foreword-Generation ist im Pack-PDF aktuell deaktiviert (Mai 2026 v3 —
+// Creator-Cover uebernimmt die Intro-Funktion). Foreword-Imports
+// (generatePackForeword, generateForewordImage, Collage) liegen dormant
+// im Code; bei Wiederbelebung der Foreword-Page einfach reaktivieren.
+//
+// generatePackCover (alter Single-Dish-Pfad) wird hier nicht mehr
+// importiert — bleibt aber im Repo, weil Suggestion-Cover-Generator
+// (lib/reel-library/) und regenerate-field-Endpoint ihn noch nutzen.
 import { loadBrand } from "@/lib/custom-brands-server";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 import type { Pack } from "@/lib/packs";
@@ -34,8 +36,10 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 
 const COVER_BUCKET = "pack-covers";
-const FOREWORD_BUCKET = "pack-forewords";
 const OUTRO_BUCKET = "pack-outros";
+// FOREWORD_BUCKET ist deaktiviert (Mai 2026 v3) — Foreword-Image
+// generation laeuft nicht mehr durch enrich. Bestehende Files im Bucket
+// bleiben unangetastet (kein Cleanup).
 
 type Body = {
   packId: string;
@@ -120,24 +124,27 @@ export async function POST(req: Request) {
   //
   // force-Parameter-Override: wenn forceCover/forceForeword* gesetzt,
   // ignorieren wir den hasX-Check und regenerieren trotzdem.
+  // Cover-Skip-Check: "schon enriched" wenn coverImage im pack-covers-
+  // Bucket liegt UND es bereits ein creator-Cover ist. Wenn es noch ein
+  // altes Legacy-/Lifestyle-Cover ist, regenerieren wir auch ohne force-
+  // Flag — sonst bleiben Bestands-Packs auf dem alten Stil haengen.
   const hasCover =
     !body.forceCover &&
+    pack.coverStyle === "creator" &&
     (pack.coverImage ?? "").includes(
       `/storage/v1/object/public/${COVER_BUCKET}/`
     );
-  // Bei Fitness-Packs: Foreword wird komplett geskipped — markieren als
-  // "done" damit Skip-Check + Promise.allSettled das richtig tun.
-  const hasForewordText =
-    packType === "fitness" || (!body.forceForewordText && !!pack.foreword);
-  const hasForewordImage =
-    packType === "fitness" || (!body.forceForewordImage && !!pack.forewordImage);
+  // Foreword komplett deaktiviert (siehe Begruendung im Imports-Block).
+  // Skip-Check ist immer true → keine Generation, keine Cost.
+  const hasForewordText = true;
+  const hasForewordImage = true;
   // Outro-Image: analog Cover. Bei Fitness aktuell auch generiert — die
   // Outro-Page rendert für jeden Pack-Type, und ein full-bleed-Outro
   // funktioniert auch ohne Foreword.
   const hasOutroImage =
     !body.forceOutroImage && !!pack.outroImage;
 
-  if (hasCover && hasForewordText && hasForewordImage && hasOutroImage) {
+  if (hasCover && hasOutroImage) {
     return NextResponse.json({
       status: "already-enriched",
       packId: row.id,
@@ -145,106 +152,41 @@ export async function POST(req: Request) {
     });
   }
 
-  // Foreword-Image-Strategie: wenn der Pack genug Brand-DNA-Heroes hat
-  // (>=3 echte Flux-Bilder), nehmen wir die als 2x2 Collage. Sonst
-  // Fallback auf Flux-Stillleben (generateForewordImage). Vorteil
-  // Collage: User-Request "Bild zeigt alle Rezepte aus dem Pack".
-  //
-  // Returns { buffer, isCollage } — der Caller benutzt isCollage als
-  // Filename-Marker (`{id}-collage.jpg` vs `{id}.jpg`), damit das
-  // Safety-Net spaeter erkennen kann ob noch Flux-Stillleben da ist
-  // (dann re-generate, sobald die Brand-Heroes alle da sind).
-  // Local-Capture damit TS row.brand_slug-Narrowing in der inner-function
-  // halten kann (Closure-Boundary-Edge-Case mit Optional-Chain).
+  // Recipes laden — generateCreatorCover braucht 1-3 Recipe-Titel als
+  // thematischen Anchor (verankert das Cover-Bild visuell mit dem Pack).
   const packRowBrandSlug = row.brand_slug as string;
-  async function buildForewordImage(): Promise<
-    { buffer: Buffer; isCollage: boolean } | null
-  > {
-    if (hasForewordImage) return null;
-    // Recipe-Heroes laden aus DB
-    const { data: recipeRows } = await supabase
-      .from("recipes")
-      .select("data")
-      .eq("brand_slug", packRowBrandSlug)
-      .eq("pack_slug", pack.slug);
-    const heroUrls: string[] = [];
-    for (const r of recipeRows ?? []) {
-      const recipe = r.data as Recipe;
-      if (recipe.hero && isBrandStyleHero(recipe.hero)) {
-        heroUrls.push(recipe.hero);
-      }
-    }
-    if (heroUrls.length >= 3) {
-      console.log(
-        `[packs/enrich] foreword-image: building collage from ${heroUrls.length} brand-heroes for ${pack.slug}`
-      );
-      try {
-        const buffers = await fetchHeroBuffers(heroUrls.slice(0, 4));
-        if (buffers.length >= 3) {
-          const buffer = await generateForewordCollage(buffers, pack.mood);
-          return { buffer, isCollage: true };
-        }
-      } catch (err) {
-        console.warn(
-          "[packs/enrich] collage failed, fallback to Flux still-life:",
-          err
-        );
-      }
-    } else {
-      console.log(
-        `[packs/enrich] foreword-image: only ${heroUrls.length} brand-heroes — using Flux still-life for ${pack.slug}`
-      );
-    }
-    const buffer = await generateForewordImage(pack);
-    return { buffer, isCollage: false };
-  }
-
-  // Recipe-Titel fuer generatePackForeword laden — gibt der KI konkrete
-  // Rezept-Namen die sie in der Story namentlich erwaehnen kann. Macht
-  // die Vorworte um Welten besser ("vom Curry Dattel Dip ueber den High
-  // Protein Schuettel Salat" statt "verschiedene Rezepte").
-  let recipeTitlesForForeword: string[] = [];
-  if (!hasForewordText) {
-    const { data: rRows } = await supabase
-      .from("recipes")
-      .select("data")
-      .eq("brand_slug", packRowBrandSlug)
-      .eq("pack_slug", pack.slug);
-    recipeTitlesForForeword = (rRows ?? [])
-      .map((r) => (r.data as Recipe).title?.trim() ?? "")
-      .filter(Boolean);
-  }
+  const { data: rRows } = await supabase
+    .from("recipes")
+    .select("data")
+    .eq("brand_slug", packRowBrandSlug)
+    .eq("pack_slug", pack.slug);
+  const packRecipes: Recipe[] = (rRows ?? [])
+    .map((r) => r.data as Recipe)
+    .filter((r) => r.title?.trim());
 
   after(async () => {
-    // Three independent enrichment tasks. We use Promise.allSettled so a
-    // failure in one (Gemini overloaded, Flux timeout) doesn't drop the
-    // others. Each settled value is processed individually below.
+    // Zwei unabhaengige Tasks (Cover + Outro). Foreword ist seit Mai 2026 v3
+    // komplett raus (siehe Imports-Block).
     //
-    // Cover-Generator branched nach packType:
-    //   - recipe: generatePackCover (Food-Stillleben)
-    //   - fitness: generateFitnessPackCover (Equipment-Stillleben mit
-    //     Sub-Niche-Heuristik aus Pack-Category, kein Foreword)
+    // Cover branched nach packType:
+    //   - recipe: generateCreatorCover (Gemini 2.5 Flash Image, Person +
+    //     Title direkt im Bild)
+    //   - fitness: generateFitnessPackCover (Equipment-Stillleben, alter
+    //     Hybrid-Pfad mit react-pdf Text-Overlay)
     const coverPromise = hasCover
       ? Promise.resolve(null)
       : packType === "fitness"
         ? generateFitnessPackCover({ pack }).then((r) => r.buffer)
-        : generatePackCover({ pack }).then((r) => r.buffer);
+        : generateCreatorCover({ pack, brand, recipes: packRecipes }).then(
+            (r) => r.buffer
+          );
 
     const outroImagePromise = hasOutroImage
       ? Promise.resolve(null)
       : generateOutroImage(pack);
 
-    const [
-      coverSettled,
-      forewordTextSettled,
-      forewordImageSettled,
-      outroImageSettled,
-    ] = await Promise.allSettled([
+    const [coverSettled, outroImageSettled] = await Promise.allSettled([
       coverPromise,
-      hasForewordText
-        ? Promise.resolve(null)
-        : generatePackForeword(pack, brand, recipeTitlesForForeword),
-      buildForewordImage(),
       outroImagePromise,
     ]);
 
@@ -270,7 +212,9 @@ export async function POST(req: Request) {
           const { data } = supabase.storage
             .from(COVER_BUCKET)
             .getPublicUrl(filePath);
-          newCoverImage = data.publicUrl;
+          // Cache-Bust-Suffix — beim Force-Reroll bleibt sonst die alte
+          // CDN-Variante haengen.
+          newCoverImage = `${data.publicUrl}?t=${Date.now()}`;
         }
       } catch (err) {
         console.error("[packs/enrich] cover upload threw:", err);
@@ -282,68 +226,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // ─── Foreword-Text — kein Upload, geht direkt in pack.data ────────────
-    const newForeword =
-      forewordTextSettled.status === "fulfilled"
-        ? forewordTextSettled.value
-        : null;
-    if (forewordTextSettled.status === "rejected") {
-      console.error(
-        "[packs/enrich] foreword text generation failed:",
-        forewordTextSettled.reason
-      );
-    }
-
-    // ─── Upload Foreword-Bild (Collage ODER Flux-Stillleben) ─────────────
-    // Filename-Marker: `{id}-collage.jpg` bei Collage, `{id}.jpg` bei Flux.
-    // detectAndTriggerEnrichGaps liest diesen Marker und triggert re-gen
-    // wenn der Pack jetzt 3+ Brand-Heroes hat aber das Foreword noch ein
-    // Flux-Stillleben ist (User-Wunsch: Pack-Bild zeigt alle Rezepte).
-    let newForewordImage: string | null = null;
-    if (
-      forewordImageSettled.status === "fulfilled" &&
-      forewordImageSettled.value
-    ) {
-      try {
-        await ensureBucket(supabase, FOREWORD_BUCKET);
-        const { buffer, isCollage } = forewordImageSettled.value;
-        const filePath = isCollage
-          ? `${row.id}-collage.jpg`
-          : `${row.id}.jpg`;
-        const upload = await supabase.storage
-          .from(FOREWORD_BUCKET)
-          .upload(filePath, buffer, {
-            contentType: "image/jpeg",
-            upsert: true,
-            cacheControl: "31536000",
-          });
-        if (upload.error) {
-          console.error(
-            "[packs/enrich] foreword image upload failed:",
-            upload.error.message
-          );
-        } else {
-          const { data } = supabase.storage
-            .from(FOREWORD_BUCKET)
-            .getPublicUrl(filePath);
-          // Cache-Bust-Suffix damit Browser + Vercel die neue URL auch
-          // dann holen wenn der alte Filename gelesen wurde.
-          newForewordImage = `${data.publicUrl}?t=${Date.now()}`;
-        }
-      } catch (err) {
-        console.error("[packs/enrich] foreword image upload threw:", err);
-      }
-    } else if (forewordImageSettled.status === "rejected") {
-      console.error(
-        "[packs/enrich] foreword image generation failed:",
-        forewordImageSettled.reason
-      );
-    }
-
     // ─── Upload Outro-Image ───────────────────────────────────────────────
-    // Spiegel zu Cover-Upload, eigener Bucket. Cache-Bust-Suffix wie bei
-    // Foreword-Image (damit Browser + Vercel die neue URL holen wenn der
-    // alte Filename ueberschrieben wurde).
     let newOutroImage: string | null = null;
     if (
       outroImageSettled.status === "fulfilled" &&
@@ -380,16 +263,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // ─── Read-modify-write: alle Felder in einem Schreibvorgang merge ─────
-    // Wenn nichts neu generiert wurde (alle Tasks failed oder schon
-    // vorhanden), sparen wir den Round-Trip in die DB.
-    if (
-      !newCoverImage &&
-      !newForeword &&
-      !newForewordImage &&
-      !newOutroImage
-    )
-      return;
+    // ─── Read-modify-write ─────────────────────────────────────────────────
+    if (!newCoverImage && !newOutroImage) return;
 
     const { data: latest } = await supabase
       .from("packs")
@@ -398,9 +273,13 @@ export async function POST(req: Request) {
       .maybeSingle();
     const current = (latest?.data as Pack | undefined) ?? pack;
     const merged: Pack = { ...current };
-    if (newCoverImage) merged.coverImage = newCoverImage;
-    if (newForeword) merged.foreword = newForeword;
-    if (newForewordImage) merged.forewordImage = newForewordImage;
+    if (newCoverImage) {
+      merged.coverImage = newCoverImage;
+      // Cover-Style-Marker steuert die CoverPage:
+      //   - "creator" → pure Image-Page (Text ist im Bild von Gemini)
+      //   - "lifestyle" → Hybrid (Bild + react-pdf Overlay) fuer Fitness
+      merged.coverStyle = packType === "recipe" ? "creator" : "lifestyle";
+    }
     if (newOutroImage) merged.outroImage = newOutroImage;
 
     await supabase.from("packs").update({ data: merged }).eq("id", row.id);

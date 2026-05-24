@@ -73,25 +73,22 @@ export function PackPdfDocument({
         titleFont={titleFont}
       />
 
-      {/* PAGE 2 — FOREWORD (only when both text and still-life are
-          available; otherwise this page is omitted and the index slides
-          back into position 2 like in the original layout). */}
-      {showForeword && forewordContent ? (
-        <ForewordPage
-          brand={brand}
-          pack={pack}
-          content={forewordContent}
-          imageDataUri={forewordImageDataUri ?? null}
-          avatarDataUri={avatarDataUri ?? null}
-        />
-      ) : null}
+      {/* FOREWORD-PAGE BEWUSST RAUS (Mai 2026, Iteration v3 von Cover).
+          Begruendung: das Creator-Cover (Gemini-Bild mit Person + Text drin)
+          uebernimmt die Intro-Funktion vollstaendig — ein zweiter Bild+Text-
+          Block direkt danach wirkte redundant und "Template-haft" (User-
+          Feedback: Bild Seite 1 + Text Seite 2 = "macht keinen Sinn").
+          DB-Felder pack.foreword + pack.forewordImage bleiben unangetastet
+          (Backward-Compat, kein DB-Migration). foreword-page.tsx + alle 7
+          VARIANTS bleiben im Code als dormant — koennen wieder eingehaengt
+          werden indem dieser Block re-aktiviert wird. */}
 
-      {/* INDEX (page 2 without foreword, page 3 with foreword) */}
+      {/* INDEX (immer direkt nach Cover, kein Foreword-Shift mehr) */}
       <IndexPage
         brand={brand}
         pack={pack}
         recipes={recipes}
-        showForeword={showForeword}
+        showForeword={false}
       />
 
       {/* PAGES 3..N+2 — RECIPES */}
@@ -142,6 +139,39 @@ function CoverPage({
   const TEXT_LIGHT = "#fdfaf2";
   const hasCover = !!coverDataUri;
 
+  // ─── Pure Image Page (Creator-Cover v3) ──────────────────────────────────
+  // Wenn das aktuelle coverImage vom generateCreatorCover-Pfad kommt
+  // (pack.coverStyle === "creator"), enthaelt das Bild bereits Title +
+  // Subtitle + Handle als von Gemini gerenderten Text. Wir rendern dann
+  // KEIN react-pdf Text-Overlay — sonst doppelt + visuell konkurrierend.
+  // Full-bleed Image, sonst nichts.
+  if (hasCover && pack.coverStyle === "creator") {
+    return (
+      <Page
+        size="A4"
+        style={{ backgroundColor: t.ink, fontFamily: "Inter" }}
+      >
+        <Image
+          src={coverDataUri!}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: "center",
+          }}
+        />
+      </Page>
+    );
+  }
+
+  // ─── Hybrid-Variante (Lifestyle-Image + react-pdf Text-Overlay) ──────────
+  // Fallback fuer Bestands-Packs (coverStyle undefined oder "lifestyle"/
+  // "legacy"). Bild wird leicht abgedunkelt, Text als react-pdf View dr-
+  // ueber gerendert. So bleibt der Print-Output lesbar wenn das alte
+  // 1:1 Bild oder das v2-Lifestyle-Bild im DB liegt.
   return (
     <Page
       size="A4"

@@ -106,6 +106,16 @@ export type Pack = {
    *  via Flux 2 Pro generiert (`lib/ai/generate-outro-image.ts`).
    *  Wenn leer: OutroPage rendert ohne Bild (alter Look). */
   outroImage?: string;
+  /** Welche Cover-Pipeline das aktuelle `coverImage` produziert hat.
+   *  Steuert wie die CoverPage rendert:
+   *    - "creator" → pure Image-Page (Title + Author sind im Bild von
+   *      Gemini direkt rendert, kein react-pdf Text-Overlay)
+   *    - undefined/"lifestyle"/"legacy" → react-pdf Text-Overlay
+   *      (Bild ohne Text, wir legen Title drueber). Bestands-Packs +
+   *      kuratierte Bienen-Pack-Static-Cover.
+   *  Wird von generateCreatorCover gesetzt; bei alter Pipeline bleibt
+   *  das Feld undefined. */
+  coverStyle?: "creator" | "lifestyle" | "legacy";
   /** Liste der Pack-Felder, die der User manuell editiert hat. Wird vom
    *  Auto-Sync (`/api/packs/[id]/regenerate-meta`) gelesen: jedes Feld
    *  in dieser Liste wird beim automatischen Re-Generate (z.B. nach
