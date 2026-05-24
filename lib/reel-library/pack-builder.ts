@@ -328,12 +328,26 @@ export async function detectAndTriggerEnrichGaps(
     cover.includes("/pack-covers/") ||
     cover.includes("/pack-suggestion-covers/") ||
     cover.includes("/uploads/");
+  // Cover-Style-Upgrade (Mai 2026 v3): Recipe-Packs sollen das Creator-
+  // Cover (Gemini Nano Banana mit Person+Text im Bild) bekommen. Bestands-
+  // Packs haben coverStyle === undefined → wir triggern enrich mit
+  // forceCover, damit das alte Lifestyle/Single-Dish-Cover migriert wird.
+  // Fitness-Packs bleiben auf alter Pipeline (coverStyle = "lifestyle"
+  // wird ihr Stable-State, sie kommen nie ins "creator"-Bucket).
+  const isCreatorCover = pack.coverStyle === "creator";
+  const isFitnessPack = pack.packType === "fitness";
+  const needsCoverUpgrade =
+    !isFitnessPack && hasCover && !isCreatorCover;
   const hasForeword = Boolean(pack.foreword);
   const hasForewordImage = Boolean(pack.forewordImage);
   // Foreword-Image-Upgrade-Trigger: wenn das Pack genug Brand-Heroes hat
   // aber das aktuelle Foreword-Image noch ein Flux-Stillleben ist (nicht
   // `-collage.jpg`), wollen wir das spaeter zu einer Collage upgraden.
   // Wir entscheiden das aber erst NACH dem Recipe-Hero-Check unten.
+  // ANMERKUNG v3: ForewordPage ist seit v3 aus PackPdfDocument raus —
+  // ein Foreword-Upgrade hat aktuell keinen PDF-Effekt mehr, kostet aber
+  // auch nichts (enrich macht nichts mit Foreword). Block bleibt fuer
+  // den Tag wo Foreword reaktiviert wird.
   const forewordIsCollage =
     hasForewordImage && pack.forewordImage!.includes("-collage.jpg");
 
@@ -373,7 +387,11 @@ export async function detectAndTriggerEnrichGaps(
     !forewordIsCollage && brandHeroCount >= 3 && hasForewordImage;
 
   const needsPackEnrich =
-    !hasCover || !hasForeword || !hasForewordImage || needsForewordUpgrade;
+    !hasCover ||
+    !hasForeword ||
+    !hasForewordImage ||
+    needsForewordUpgrade ||
+    needsCoverUpgrade;
 
   if (!needsPackEnrich && recipeIdsToEnrich.length === 0) {
     return { triggeredPackEnrich: false, triggeredRecipeIds: [] };
@@ -404,6 +422,9 @@ export async function detectAndTriggerEnrichGaps(
           // forceForewordImage wenn Upgrade von Flux-Stillleben zu Collage
           // gewuenscht ist (3+ Brand-Heroes verfuegbar)
           ...(needsForewordUpgrade ? { forceForewordImage: true } : {}),
+          // forceCover wenn Migration zum Creator-Cover-Style noetig ist
+          // (Bestands-Pack mit altem Lifestyle/Single-Dish-Cover).
+          ...(needsCoverUpgrade ? { forceCover: true } : {}),
         }),
       }).catch((err) =>
         console.warn("[pack-builder] gap pack-enrich failed", err)
