@@ -89,7 +89,7 @@ const RESPONSE_SCHEMA = {
       type: "array",
       items: { type: "string" },
       description:
-        "1-3 zusammenhaengende Absaetze des Vorwort-Bodys. Jeder Absatz 2-4 Saetze, 120-300 Zeichen. Erster Absatz: warum dieses Pack jetzt da ist (persoenlich, anker-haft, KEINE Werbe-Floskeln). Optional Folge-Absaetze: konkrete Inhalte des Packs (mindestens 2 Rezepte beim Namen), kleine persoenliche Notiz, Hinweis zu Anlass/Saison. KEINE Hashtags, Emojis, Em-Dashes. KEINE Werbe-Sprache ('perfekt fuer jeden', 'koestlich', 'absolut', 'kulinarische Reise'). Bei einfachen Packs reicht 1 Absatz, bei storyreichen/saisonalen 2-3.",
+        "1-2 zusammenhaengende Absaetze des Vorwort-Bodys. ZUSAMMEN MAXIMAL 380 ZEICHEN — das Vorwort muss auf EINE Seite passen. Bei 1 Absatz: 2-4 Saetze, 200-380 Zeichen. Bei 2 Absaetzen: jeder ca. 150-180 Zeichen. Erster Absatz: warum dieses Pack jetzt da ist (persoenlich, anker-haft). Zweiter (optional): konkrete Inhalte des Packs (mindestens EIN Rezept beim Namen). KEINE Hashtags, Emojis, Em-Dashes. KEINE Werbe-Sprache ('perfekt fuer jeden', 'koestlich', 'absolut', 'kulinarische Reise', 'entdecke', 'tauche ein'). Mehr als 2 Absaetze oder Gesamtlaenge >380 Zeichen ist VERBOTEN — die Seite ueberlaeuft sonst.",
     },
     pullquote: {
       type: "string",
@@ -151,10 +151,11 @@ GENERATIONS-REGELN:
 - KEINE Hashtags, KEINE Emojis, KEINE Anfuehrungszeichen, KEINE Em-Dashes (—)
 - KEINE Aufzaehlungen mit Bindestrichen oder Bullets — der Vorwort-Text ist Fliesstext
 
-VARIABLE TIEFE — die Anzahl der Absaetze richtet sich nach dem Pack:
-- Einfaches schnelles Pack (z.B. "Blitz-Snacks"): 1 Absatz reicht, kurz und prazise
-- Standard-Pack mit klarem Thema: 2 Absaetze (Anker + Inhalte/Anlass)
-- Pack mit starkem Saison-/Anlass-/Geschichte-Charakter: 3 Absaetze (Anker + Story + Pack-Konkret)
+SEITEN-LIMIT — KRITISCH: das Vorwort hat genau EINE Seite Platz. greeting + paragraphs + signoff zusammen duerfen nicht ueber 500 Zeichen Body-Text liegen, sonst laeuft die Seite ueber:
+- Einfaches schnelles Pack (z.B. "Blitz-Snacks"): 1 kurzer Absatz (~150-220 Zeichen)
+- Standard-Pack mit klarem Thema: 1 vollerer Absatz (~250-380 Zeichen)
+- Pack mit Saison-/Anlass-Charakter: 2 kurze Absaetze (zusammen max 380 Zeichen)
+NIEMALS 3 Absaetze, NIEMALS Gesamtlaenge > 380 Zeichen.
 
 PULLQUOTE — nur wenn wirklich passend. Gib einen leeren String zurueck wenn es keinen pointierten Satz gibt, der als Pull-Quote sinnvoll ist. Lieber kein Pullquote als ein erzwungener.
 
@@ -375,13 +376,27 @@ export async function generatePackForeword(
     );
   }
 
-  // Stage 1: schnelle Wortlisten-Korrektur (instant, kein API-Call)
+  // Stage 1: schnelle Wortlisten-Korrektur (instant, kein API-Call).
+  // Hartes Limit: max 2 Paragraphs + zusammen max 400 Zeichen, sonst kippt
+  // das Vorwort auf 2 Seiten. cleanField mit cap pro Paragraph hilft, der
+  // Joined-Cap unten ist die Safety-Net gegen "1x280 + 1x280" = 560.
+  const rawParagraphs = winner.paragraphs
+    .map((p) => cleanParagraph(p))
+    .filter((p) => p.length > 0)
+    .slice(0, 2);
+  const joinedLen = rawParagraphs.reduce((s, p) => s + p.length, 0);
+  const cappedParagraphs =
+    joinedLen <= 400
+      ? rawParagraphs
+      : rawParagraphs.length === 1
+        ? [cleanField(rawParagraphs[0], 400)]
+        : [
+            cleanField(rawParagraphs[0], 200),
+            cleanField(rawParagraphs[1], 200),
+          ];
   const preCorrected = {
     greeting: cleanField(winner.greeting, 80),
-    paragraphs: winner.paragraphs
-      .map((p) => cleanParagraph(p))
-      .filter((p) => p.length > 0)
-      .slice(0, 3),
+    paragraphs: cappedParagraphs,
     pullquote: winner.pullquote ? cleanField(winner.pullquote, 180) : "",
     signoff: cleanField(winner.signoff, 120),
     outro: cleanField(winner.outro, 360),
