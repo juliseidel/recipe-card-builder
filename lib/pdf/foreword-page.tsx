@@ -3,6 +3,7 @@ import { GoldDiamond } from "./recipe-card-pdf";
 import type { Brand } from "@/lib/brands";
 import type { Pack, CardLayout } from "@/lib/packs";
 import type { PackForewordContent } from "@/lib/ai/generate-foreword";
+import { extractForewordLegacyFields } from "@/lib/foreword-adapter";
 import { packTheme, fontFamilyForPack, blendWithWhite } from "./theme";
 import { BeeIcon } from "./bee-icon";
 import { restoreGermanUmlauts } from "@/lib/restore-umlauts";
@@ -11,14 +12,22 @@ import { restoreGermanUmlauts } from "@/lib/restore-umlauts";
 // die vor dem Umlaut-Fix-Commit generiert wurden, haben "fuer"/"schoen"
 // statt "fuer"/"schoen" gespeichert. Statt jeden Pack neu zu enrichen,
 // fixt der Renderer das beim PDF-Build automatisch.
+//
+// v3-Update: laeuft ueber extractForewordLegacyFields (lib/foreword-adapter)
+// damit Block-basierte v3-Forewords gleich behandelt werden wie v2-Flat.
+// blocks im Output absichtlich entfernt — die Layouts lesen greeting/story/
+// signoff, blocks waeren redundant + verwirrend.
 function fixUmlauts(content: PackForewordContent): PackForewordContent {
+  const legacy = extractForewordLegacyFields(content);
   return {
-    greeting: restoreGermanUmlauts(content.greeting ?? ""),
-    story: restoreGermanUmlauts(content.story ?? ""),
-    signoff: restoreGermanUmlauts(content.signoff ?? ""),
-    outro: content.outro
-      ? restoreGermanUmlauts(content.outro)
+    ...content,
+    greeting: restoreGermanUmlauts(legacy.greeting),
+    story: restoreGermanUmlauts(legacy.story),
+    signoff: restoreGermanUmlauts(legacy.signoff),
+    outro: legacy.outro
+      ? restoreGermanUmlauts(legacy.outro)
       : content.outro,
+    blocks: undefined,
   };
 }
 

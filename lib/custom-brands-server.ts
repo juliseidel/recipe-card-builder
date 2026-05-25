@@ -82,6 +82,7 @@ export async function loadBrand(slug: string): Promise<Brand | undefined> {
       voiceProfile: code.voiceProfile ?? db.voiceProfile,
       audienceAnalysis: code.audienceAnalysis ?? db.audienceAnalysis,
       imageStyle: code.imageStyle ?? db.imageStyle,
+      creatorStory: code.creatorStory ?? db.creatorStory,
     };
   }
   return code ?? db;
@@ -166,4 +167,13 @@ export async function updateBrandVoiceProfile(
   voiceProfile: Brand["voiceProfile"]
 ): Promise<void> {
   await upsertBrandData(slug, { voiceProfile });
+}
+
+/** Persistiert die Creator-Story eines Brands. Funktioniert fuer DB-Brands
+ *  und Code-Brands gleichermassen (legt ggf. DB-Stub fuer Code-Brands an). */
+export async function updateBrandCreatorStory(
+  slug: string,
+  creatorStory: string
+): Promise<void> {
+  await upsertBrandData(slug, { creatorStory });
 }

@@ -25,6 +25,7 @@ import { packs } from "../lib/packs";
 import { generateForewordImage } from "../lib/ai/generate-foreword-image";
 import { generatePackForeword } from "../lib/ai/generate-foreword";
 import type { PackForewordContent } from "../lib/ai/generate-foreword";
+import { extractForewordLegacyFields } from "../lib/foreword-adapter";
 import { packForewords } from "../lib/pack-forewords";
 
 config({ path: ".env.local" });
@@ -101,10 +102,22 @@ async function generateText(
   }
   console.log(`  → generating text for ${packSlug}…`);
   const content = await generatePackForeword(pack, brand);
-  console.log(`  ✓ greeting: ${content.greeting}`);
-  console.log(`  ✓ story:    ${content.story.slice(0, 80)}…`);
-  console.log(`  ✓ signoff:  ${content.signoff}`);
-  return content;
+  // v3-Adapter: generate liefert blocks-Form; das statische Cache-File
+  // (lib/pack-forewords.ts) ist auf flache greeting/story/signoff-Form
+  // ausgelegt und wird so von den Code-Brand-Layouts geliefert.
+  const legacy = extractForewordLegacyFields(content);
+  console.log(`  ✓ greeting: ${legacy.greeting}`);
+  console.log(`  ✓ story:    ${legacy.story.slice(0, 80)}…`);
+  console.log(`  ✓ signoff:  ${legacy.signoff}`);
+  // Im Cache speichern wir die flache Form. Das ist bewusst: die fuenf
+  // Bienen-Packs sind hand-poliert und Code-Brand-Layouts profitieren
+  // nicht von blocks. Bei Bedarf manuell pflegen.
+  return {
+    greeting: legacy.greeting,
+    story: legacy.story,
+    signoff: legacy.signoff,
+    outro: legacy.outro || undefined,
+  };
 }
 
 function renderForewordsFile(map: Record<string, PackForewordContent>): string {
@@ -114,12 +127,16 @@ function renderForewordsFile(map: Record<string, PackForewordContent>): string {
     .map((slug) => {
       const c = map[slug];
       const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      // Defensive: cached Forewords sind via flatten gespeichert, aber
+      // wenn jemand ein Block-form-Eintrag direkt in lib/pack-forewords.ts
+      // einfuegt, adaptieren wir beim Re-Write.
+      const flat = extractForewordLegacyFields(c);
       return [
         `  "${slug}": {`,
-        `    greeting: "${esc(c.greeting)}",`,
+        `    greeting: "${esc(flat.greeting)}",`,
         `    story:`,
-        `      "${esc(c.story)}",`,
-        `    signoff: "${esc(c.signoff)}",`,
+        `      "${esc(flat.story)}",`,
+        `    signoff: "${esc(flat.signoff)}",`,
         `  },`,
       ].join("\n");
     })

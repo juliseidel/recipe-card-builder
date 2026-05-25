@@ -139,6 +139,15 @@ export type Brand = {
    *  Text-Generierungs-Pipelines als Steuersignal genutzt. Code-Brands
    *  ohne Profil fallen auf bio/tagline-basierte Defaults zurueck. */
   voiceProfile?: BrandVoiceProfile;
+  /** Persoenliche Lebens-/Themen-Story des Creators: 5-10 Saetze ueber
+   *  Werdegang, Wendepunkt, warum kocht er/sie was er/sie kocht. Wird
+   *  beim Onboarding einmalig aus Bio + Top-Reel-Captions + Voice-Profile
+   *  via Gemini Pro destilliert (lib/ai/analyze-creator-story.ts) und in
+   *  brand.data.creatorStory persistiert. Speist sich in den Foreword-
+   *  Generator ein, damit Vorworte nicht generisch klingen, sondern
+   *  echte Persoenlichkeit transportieren. Code-Brands ohne Story
+   *  fallen auf bio/tagline-basierte Defaults zurueck. */
+  creatorStory?: string;
   /** Welcher Pack-Type ist Default fuer diesen Brand. "recipe" (Default)
    *  = Rezepte-Workspace; "fitness" = Trainings-Workspace. Steuert welche
    *  Pipeline bei Karten-Anlage laeuft (Hero-Generation, Klassifikator,

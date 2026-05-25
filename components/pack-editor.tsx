@@ -11,6 +11,10 @@ import {
   moodFamilies,
   displayFontOptions,
 } from "@/lib/pack-presets";
+import {
+  extractForewordLegacyFields,
+  type ForewordLegacyFields,
+} from "@/lib/foreword-adapter";
 import { SiteHeader } from "@/components/site-header";
 import { LayoutPicker } from "@/components/layout-picker";
 
@@ -53,9 +57,16 @@ export function PackEditor({ brand, pack, packId }: PackEditorProps) {
   const [cardLayout, setCardLayout] = useState<CardLayout>(pack.cardLayout);
   const [coverImage, setCoverImage] = useState(pack.coverImage);
   const [forewordImage, setForewordImage] = useState(pack.forewordImage ?? "");
-  const [foreword, setForeword] = useState<NonNullable<Pack["foreword"]>>(
-    pack.foreword ?? { greeting: "", story: "", signoff: "", outro: "" }
+  // v3-Adapter: pack.foreword kann blocks-Form (neu, gemini-2.5-pro) oder
+  // greeting/story/signoff-Form (Legacy) sein. Editor bedient nur die
+  // 4 Klassik-Felder; Adapter extrahiert sie in beiden Faellen. Beim Save
+  // ueberschreiben wir mit dieser legacy form — KI-blocks gehen damit
+  // verloren, was OK ist: User-Edit ist die neue Source-of-Truth.
+  const initialForeword = useMemo<ForewordLegacyFields>(
+    () => extractForewordLegacyFields(pack.foreword),
+    [pack.foreword]
   );
+  const [foreword, setForeword] = useState<ForewordLegacyFields>(initialForeword);
 
   const [lockedFields, setLockedFields] = useState<Set<string>>(
     new Set(pack.editedFields ?? [])
@@ -78,10 +89,13 @@ export function PackEditor({ brand, pack, packId }: PackEditorProps) {
     if (cardLayout !== pack.cardLayout) dirty.add("cardLayout");
     if (coverImage !== pack.coverImage) dirty.add("coverImage");
     if (forewordImage !== (pack.forewordImage ?? "")) dirty.add("forewordImage");
-    if (foreword.greeting !== (pack.foreword?.greeting ?? "")) dirty.add("foreword.greeting");
-    if (foreword.story !== (pack.foreword?.story ?? "")) dirty.add("foreword.story");
-    if (foreword.signoff !== (pack.foreword?.signoff ?? "")) dirty.add("foreword.signoff");
-    if (foreword.outro !== (pack.foreword?.outro ?? "")) dirty.add("foreword.outro");
+    // Dirty-Check gegen den Initial-State (via Adapter aus pack.foreword
+    // extrahiert), damit Block-Form-Forewords nicht als "alle Felder leer
+    // → user hat alles editiert" detected werden.
+    if (foreword.greeting !== initialForeword.greeting) dirty.add("foreword.greeting");
+    if (foreword.story !== initialForeword.story) dirty.add("foreword.story");
+    if (foreword.signoff !== initialForeword.signoff) dirty.add("foreword.signoff");
+    if (foreword.outro !== initialForeword.outro) dirty.add("foreword.outro");
     return dirty;
   }, [
     title,
@@ -170,7 +184,9 @@ export function PackEditor({ brand, pack, packId }: PackEditorProps) {
       else if (field === "tagline") setTagline(data.value);
       else if (field === "description") setDescription(data.value);
       else if (field === "category") setCategory(data.value);
-      else if (field === "foreword") setForeword(data.value);
+      // Re-Roll-Result kommt aus /regenerate-field als v3-Block-Form. Wir
+      // adaptieren auf die 4-Felder-Form fuer den Editor-State.
+      else if (field === "foreword") setForeword(extractForewordLegacyFields(data.value));
       else if (field === "coverImage") setCoverImage(data.value);
       else if (field === "forewordImage") setForewordImage(data.value);
       // Re-Roll un-lockt das Feld (KI darf weiter Auto-Sync)
