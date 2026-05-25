@@ -145,7 +145,7 @@ export async function POST(req: Request) {
   // Backward-Compat mit dem File-Marker, ist v3 aber immer false.
   const packRowBrandSlug = row.brand_slug as string;
   async function buildForewordImage(): Promise<
-    { buffer: Buffer; isCollage: boolean } | null
+    { buffer: Buffer; contentType: string; isCollage: boolean } | null
   > {
     if (hasForewordImage) return null;
     // Recipe-Heroes laden aus DB
@@ -164,8 +164,10 @@ export async function POST(req: Request) {
     console.log(
       `[packs/enrich] foreword-image: Nano Banana with ${heroUrls.length} hero refs for ${pack.slug}`
     );
-    const buffer = await generateForewordImage(pack, { heroUrls });
-    return { buffer, isCollage: false };
+    const { buffer, contentType } = await generateForewordImage(pack, {
+      heroUrls,
+    });
+    return { buffer, contentType, isCollage: false };
   }
 
   // Recipe-Titel fuer generatePackForeword laden — gibt der KI konkrete
@@ -266,14 +268,18 @@ export async function POST(req: Request) {
     ) {
       try {
         await ensureBucket(supabase, FOREWORD_BUCKET);
-        const { buffer, isCollage } = forewordImageSettled.value;
+        const { buffer, contentType, isCollage } = forewordImageSettled.value;
+        // Extension folgt echtem MIME — Nano Banana liefert oft PNG, ein
+        // .jpg-File mit PNG-Bytes wird von react-pdf stumm verworfen
+        // (cover-outro-fullbleed v9-Bug).
+        const ext = contentType.includes("png") ? "png" : "jpg";
         const filePath = isCollage
-          ? `${row.id}-collage.jpg`
-          : `${row.id}.jpg`;
+          ? `${row.id}-collage.${ext}`
+          : `${row.id}.${ext}`;
         const upload = await supabase.storage
           .from(FOREWORD_BUCKET)
           .upload(filePath, buffer, {
-            contentType: "image/jpeg",
+            contentType,
             upsert: true,
             cacheControl: "31536000",
           });

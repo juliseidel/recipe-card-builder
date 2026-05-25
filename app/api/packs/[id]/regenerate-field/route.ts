@@ -229,16 +229,22 @@ export async function POST(req: Request, { params }: RouteParams) {
           if (heroUrls.length >= 3) break;
         }
       }
-      const buffer = await generateForewordImage(ctx.pack, { heroUrls });
+      const { buffer, contentType } = await generateForewordImage(ctx.pack, {
+        heroUrls,
+      });
       const supabase = getServerSupabase();
-      const path = `${ctx.brandSlug}/${ctx.pack.slug}-foreword-${Date.now().toString(36)}.jpg`;
+      // Extension folgt dem echten MIME — Nano Banana liefert oft PNG, und
+      // ein .jpg-File mit PNG-Bytes laesst react-pdf das Bild stumm
+      // ignorieren (cover-outro-fullbleed v9-Bug).
+      const ext = contentType.includes("png") ? "png" : "jpg";
+      const path = `${ctx.brandSlug}/${ctx.pack.slug}-foreword-${Date.now().toString(36)}.${ext}`;
       await supabase.storage.createBucket("pack-forewords", {
         public: true,
         fileSizeLimit: 8 * 1024 * 1024,
         allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
       });
       const up = await supabase.storage.from("pack-forewords").upload(path, buffer, {
-        contentType: "image/jpeg",
+        contentType,
         cacheControl: "31536000",
         upsert: false,
       });

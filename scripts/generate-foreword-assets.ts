@@ -71,9 +71,14 @@ async function generateImage(packSlug: string): Promise<void> {
     return;
   }
   console.log(`  → generating image for ${packSlug}…`);
-  const buffer = await generateForewordImage(pack);
+  const { buffer, contentType } = await generateForewordImage(pack);
   await ensureDir(FOREWORDS_DIR);
-  const outputPath = path.join(FOREWORDS_DIR, `${packSlug}.jpg`);
+  // Script ist Code-Brand-Cache (Biene): die statischen Files im public-
+  // Folder erwarten .jpg. Bei Nano-Banana-PNG-Output konvertieren wir
+  // beim Schreiben nicht — Caller kann das spaeter mit Sharp tun. Fuer
+  // jetzt nehmen wir die Buffer-Bytes 1:1, Extension folgt MIME.
+  const ext = contentType.includes("png") ? "png" : "jpg";
+  const outputPath = path.join(FOREWORDS_DIR, `${packSlug}.${ext}`);
   await fs.writeFile(outputPath, buffer);
   console.log(
     `  ✓ wrote ${path.relative(process.cwd(), outputPath)} (${(buffer.length / 1024).toFixed(0)} KB)`

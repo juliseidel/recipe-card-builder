@@ -41,15 +41,24 @@ const FOREWORD_ASPECT = "1:1" as const;
 // kollektive Stil-Anchor-Logik wird unscharf.
 const MAX_REFS = 3;
 
+export type ForewordImageResult = {
+  buffer: Buffer;
+  /** MIME-Type aus dem Generator. Nano Banana liefert oft PNG, manchmal
+   *  JPEG. Caller MUSS das beim Upload + File-Extension nutzen — sonst
+   *  rendert react-pdf das Bild nicht (siehe cover-outro-fullbleed v9
+   *  Bug: hardcoded image/jpeg + PNG-Bytes = silent render fail). */
+  contentType: string;
+};
+
 /**
- * Generates the foreword still-life buffer via Nano Banana, optionally
- * style-anchored by 1-3 Recipe-Heroes. Throws on Gemini failure — caller
+ * Generates the foreword still-life via Nano Banana, optionally style-
+ * anchored by 1-3 Recipe-Heroes. Throws on Gemini failure — caller
  * decides retry/skip.
  */
 export async function generateForewordImage(
   pack: Pack,
   opts: ForewordImageOpts = {}
-): Promise<Buffer> {
+): Promise<ForewordImageResult> {
   const heroUrls = (opts.heroUrls ?? []).slice(0, MAX_REFS);
 
   // Refs laden — fail-tolerant. Wenn Heroes nicht ladbar sind, machen wir
@@ -78,7 +87,7 @@ export async function generateForewordImage(
     aspectRatio: FOREWORD_ASPECT,
   });
 
-  return result.buffer;
+  return { buffer: result.buffer, contentType: result.mimeType };
 }
 
 // ─── Prompt-Builder ──────────────────────────────────────────────────────
