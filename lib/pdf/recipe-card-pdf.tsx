@@ -741,10 +741,15 @@ function PatisseriePage({
     density === "compact" ? 5 : density === "balanced" ? 6 : 8;
   const micros = (recipe.nutrition?.micros ?? []).slice(0, microsLimit);
 
-  // Story-Block nur bei wirklich kurzen Recipes — bei mittleren und
-  // langen frisst er Body-Hoehe, die wir fuer Zutaten + Steps brauchen.
+  // Story-Block wird gezeigt sobald der User eine Description gepflegt hat
+  // (shouldShowStory checkt hideStory-Tweak + ingredient-Heuristik). Nur bei
+  // density="compact" unterdruecken — da hat die Karte sowieso schon zu viel
+  // Inhalt und der Story-Block wuerde echten Body-Overflow erzeugen.
+  // Frueher war hier "density === spacious", was Story-Edits unsichtbar
+  // gemacht hat sobald die Karte balanced wurde (z. B. 9 Ingredients + 4
+  // Steps wie bei der High-Protein-White-Pizza).
   const showStoryHere =
-    shouldShowStory(recipe) && density === "spacious";
+    shouldShowStory(recipe) && density !== "compact";
 
   // Sidebar dimensions — A4 is 595 pt wide. 40 % gives 238 pt for the
   // lavender column, 60 % (357 pt) for the cream body. The body is
@@ -1209,13 +1214,15 @@ function PatisseriePage({
             ))}
           </View>
 
-          {/* Story-Block — Konstante padding/margin. Konsistenz first. */}
+          {/* Story-Block — bei balanced kompakter, bei spacious grosszuegig.
+              Density-aware Padding verhindert Body-Overflow auf der dichteren
+              Stufe (vorher war der Block deshalb komplett unterdrueckt). */}
           {showStoryHere ? (
             <View
               style={{
-                marginTop: 22,
-                paddingTop: 14,
-                paddingBottom: 14,
+                marginTop: density === "spacious" ? 22 : 16,
+                paddingTop: density === "spacious" ? 14 : 10,
+                paddingBottom: density === "spacious" ? 14 : 10,
                 paddingLeft: 14,
                 borderLeftWidth: 2,
                 borderLeftColor: t.accent,
@@ -1226,8 +1233,8 @@ function PatisseriePage({
                 style={{
                   fontFamily: "Fraunces",
                   fontStyle: "italic",
-                  fontSize: 11.5,
-                  lineHeight: 1.5,
+                  fontSize: density === "spacious" ? 11.5 : 10.5,
+                  lineHeight: density === "spacious" ? 1.5 : 1.42,
                   color: t.ink,
                 }}
               >

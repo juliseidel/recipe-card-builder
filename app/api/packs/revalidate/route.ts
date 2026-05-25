@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 // Tiny endpoint the pack editor calls right after a save to drop the
 // workspace's cached server render. Without this, a freshly-created pack
@@ -26,5 +26,16 @@ export async function POST(req: Request) {
   if (body.packSlug) {
     revalidatePath(`/${body.brandSlug}/${body.packSlug}`);
   }
+  // Wirft den unstable_cache "pack-db-rows" (lib/recipes.ts getPackDbRows)
+  // weg. Ohne diese Invalidation las jeder Konsument (Detail-Page, Pack-PDF,
+  // Single-Recipe-PDF) bis zu 30 s lang das alte JSONB-data — heißt z. B.
+  // editierte Story/Title/Steps tauchten im PDF-Download nicht auf, obwohl
+  // sie längst in der DB standen.
+  //
+  // expire:0 statt "max" weil wir read-after-write Garantie wollen: der
+  // nächste Read holt blocking frische Daten. "max" wäre stale-while-
+  // revalidate und würde im schlimmsten Fall noch ein PDF mit alter Story
+  // rendern.
+  revalidateTag("pack-db-rows", { expire: 0 });
   return NextResponse.json({ revalidated: true });
 }

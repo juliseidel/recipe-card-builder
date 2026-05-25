@@ -6,6 +6,7 @@ import { SiteHeader } from "./site-header";
 import { RecipeCardFull, type EnrichingState } from "./recipe-card-full";
 import { PdfExportButton } from "./pdf-export-button";
 import { HeroRerollButton } from "./hero-reroll-button";
+import { HeroUploadButton } from "./hero-upload-button";
 
 type NavTarget = {
   href: string;
@@ -92,14 +93,24 @@ export function RecipeDetailLayout({
             {editAction}
             {deleteAction}
             {recipeId ? (
-              <HeroRerollButton
-                recipeId={recipeId}
-                tint={{
-                  bg: pack.mood.background,
-                  ink: pack.mood.ink,
-                  accent: pack.mood.accent,
-                }}
-              />
+              <>
+                <HeroRerollButton
+                  recipeId={recipeId}
+                  tint={{
+                    bg: pack.mood.background,
+                    ink: pack.mood.ink,
+                    accent: pack.mood.accent,
+                  }}
+                />
+                <HeroUploadButton
+                  recipeId={recipeId}
+                  tint={{
+                    bg: pack.mood.background,
+                    ink: pack.mood.ink,
+                    accent: pack.mood.accent,
+                  }}
+                />
+              </>
             ) : null}
             <PdfExportButton
               type="recipe"

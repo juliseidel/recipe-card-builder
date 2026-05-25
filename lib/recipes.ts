@@ -1922,7 +1922,12 @@ const getPackDbRows = unstable_cache(
     }
   },
   ["pack-db-rows"],
-  { revalidate: 30 }
+  // tag: ohne den greift revalidateTag("pack-db-rows") nicht. Wir invalidieren
+  // den Cache nach jedem Recipe-Edit/Add/Remove via /api/packs/revalidate,
+  // damit Web-View UND PDF-Render unmittelbar die frischen JSONB-Inhalte
+  // sehen (Story, Title, Steps). Ohne diesen Tag konnte ein Pack bis zu
+  // 30 s lang mit der alten Story rendern.
+  { revalidate: 30, tags: ["pack-db-rows"] }
 );
 
 export async function getRecipesForPack(
