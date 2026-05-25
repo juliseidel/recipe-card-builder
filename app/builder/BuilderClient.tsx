@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { themeList } from "@/lib/themes";
 import type { Recipe } from "@/types/recipe";
@@ -12,6 +12,8 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
+  Upload,
+  X,
 } from "lucide-react";
 
 type JobInfo = {
@@ -93,6 +95,8 @@ export function BuilderClient({ initialRecipe }: { initialRecipe: Recipe }) {
     initialRecipe.imageUrl,
   );
   const [job, setJob] = useState<JobInfo | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const recipe: Recipe = useMemo(
     () => ({
@@ -161,6 +165,32 @@ export function BuilderClient({ initialRecipe }: { initialRecipe: Recipe }) {
     });
     const data = await res.json();
     setJob({ id: data.id, status: "pending", progress: 0 });
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadError(null);
+    if (!file.type.startsWith("image/")) {
+      setUploadError("Bitte eine Bilddatei wählen (JPG, PNG, WebP).");
+      return;
+    }
+    const MAX_BYTES = 8 * 1024 * 1024;
+    if (file.size > MAX_BYTES) {
+      setUploadError("Bild ist größer als 8 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        setImageUrl(result);
+        setJob(null);
+      }
+    };
+    reader.onerror = () => setUploadError("Bild konnte nicht gelesen werden.");
+    reader.readAsDataURL(file);
   }
 
   return (
@@ -307,7 +337,7 @@ export function BuilderClient({ initialRecipe }: { initialRecipe: Recipe }) {
 
           <div className="mt-7 rounded-2xl border border-[var(--color-builder-line)] bg-white/60 p-5">
             <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.32em] text-[var(--color-builder-muted)]">
-              KI-Bild für die Karte
+              Bild für die Karte
             </p>
             <textarea
               value={imagePrompt}
@@ -315,20 +345,65 @@ export function BuilderClient({ initialRecipe }: { initialRecipe: Recipe }) {
               placeholder="z. B. cremiger Erdbeer-Mealprep in Glas-Schalen, warmes Morgenlicht …"
               className={inputClass + " min-h-[80px] text-xs"}
             />
-            <button
-              onClick={generateImage}
-              disabled={!imagePrompt.trim() || job?.status === "running"}
-              className="mt-3 inline-flex items-center gap-2 rounded-full bg-[var(--color-builder-accent)] px-4 py-2 text-xs font-medium uppercase tracking-[0.18em] text-[var(--color-cream-50)] transition hover:opacity-90 disabled:opacity-40"
-            >
-              {job?.status === "running" ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <Sparkles className="h-3 w-3" />
-              )}
-              {job?.status === "running"
-                ? `Generiert … ${Math.round((job.progress ?? 0) * 100)} %`
-                : "KI-Bild generieren"}
-            </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={generateImage}
+                disabled={!imagePrompt.trim() || job?.status === "running"}
+                className="inline-flex items-center gap-2 rounded-full bg-[var(--color-builder-accent)] px-4 py-2 text-xs font-medium uppercase tracking-[0.18em] text-[var(--color-cream-50)] transition hover:opacity-90 disabled:opacity-40"
+              >
+                {job?.status === "running" ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3 w-3" />
+                )}
+                {job?.status === "running"
+                  ? `Generiert … ${Math.round((job.progress ?? 0) * 100)} %`
+                  : "KI-Bild generieren"}
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--color-builder-line)] bg-white px-4 py-2 text-xs font-medium uppercase tracking-[0.18em] text-[var(--color-builder-ink)] transition hover:bg-white/70"
+              >
+                <Upload className="h-3 w-3" />
+                Eigenes Bild hochladen
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </div>
+            {uploadError && (
+              <p className="mt-2 text-[11px] text-rose-600">{uploadError}</p>
+            )}
+            {imageUrl && (
+              <div className="mt-3 flex items-center gap-3 rounded-md border border-[var(--color-builder-line)] bg-white/70 p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageUrl}
+                  alt="Aktuelles Karten-Bild"
+                  className="h-12 w-16 rounded object-cover"
+                />
+                <div className="flex-1 text-[10px] uppercase tracking-[0.2em] text-[var(--color-builder-muted)]">
+                  Aktuelles Bild
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImageUrl(undefined);
+                    setJob(null);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-[var(--color-builder-muted)] hover:bg-white"
+                  aria-label="Bild entfernen"
+                >
+                  <X className="h-3 w-3" />
+                  Entfernen
+                </button>
+              </div>
+            )}
             {job && (
               <JobBadge
                 job={job}
