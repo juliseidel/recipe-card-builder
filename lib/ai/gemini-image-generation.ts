@@ -21,8 +21,15 @@ const ENDPOINT =
 
 export type GeminiImageOpts = {
   prompt: string;
-  /** Optionales Reference-Image als data URI für multimodal Generation. */
+  /** Optionales Reference-Image als data URI für multimodal Generation.
+   *  Verwende referenceImages wenn du mehrere Refs schicken willst —
+   *  beide Felder werden konkateniert. */
   referenceImage?: string;
+  /** Mehrere Reference-Images als data URI[]. Wird vor referenceImage
+   *  in die parts-Liste gepackt. Hilfreich wenn die KI mehrere Style-
+   *  Anker auf einmal sehen soll (z.B. Recipe-Heroes als visueller
+   *  Stilanker fuer Vorwort-Bilder). */
+  referenceImages?: string[];
   /** Aspect-Hint im Prompt — Gemini hat keinen separaten Parameter,
    *  wir hängen das ans Prompt-Ende: "square 1:1 aspect ratio". */
   aspectRatio?: "1:1" | "9:16" | "16:9" | "4:3" | "3:4";
@@ -54,21 +61,40 @@ export async function generateImageGemini(
     ? `${opts.prompt}\n\n${aspectHint}`
     : opts.prompt;
 
-  // Parts bauen: Reference-Image (falls vorhanden) ZUERST, dann Text-Prompt.
-  // Bei multimodal Generation will Gemini erst den Kontext-Image sehen,
-  // dann die Instruktion was zu tun ist.
+  // Parts bauen: Reference-Images (falls vorhanden) ZUERST, dann Text-Prompt.
+  // Bei multimodal Generation will Gemini erst den Kontext sehen, dann die
+  // Instruktion. Mehrere Refs werden in der Reihenfolge geschickt — die KI
+  // versteht sie kollektiv als Style-Anker.
   const parts: Array<
     { text: string } | { inlineData: { mimeType: string; data: string } }
   > = [];
 
-  if (opts.referenceImage) {
-    const base64 = opts.referenceImage.split(",")[1] ?? "";
-    if (base64) {
+  // mimeType aus data URI extrahieren falls vorhanden, sonst default jpeg
+  const pushRef = (dataUri: string) => {
+    if (!dataUri) return;
+    const match = dataUri.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
       parts.push({
-        inlineData: { mimeType: "image/jpeg", data: base64 },
+        inlineData: { mimeType: match[1], data: match[2] },
       });
+      return;
+    }
+    // Defensiv: kein data: prefix — als jpeg behandeln + alles als Base64 senden.
+    parts.push({
+      inlineData: { mimeType: "image/jpeg", data: dataUri },
+    });
+  };
+
+  // Multi-Refs zuerst (in Reihenfolge), dann Single-Ref (Backward-Compat).
+  if (opts.referenceImages?.length) {
+    for (const ref of opts.referenceImages) {
+      pushRef(ref);
     }
   }
+  if (opts.referenceImage) {
+    pushRef(opts.referenceImage);
+  }
+
   parts.push({ text: fullPrompt });
 
   const body = {

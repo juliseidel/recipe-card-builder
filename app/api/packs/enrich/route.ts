@@ -4,11 +4,10 @@ import { generatePackCover } from "@/lib/ai/generate-pack-cover";
 import { generateFitnessPackCover } from "@/lib/ai/generate-fitness-pack-cover";
 import { generatePackForeword } from "@/lib/ai/generate-foreword";
 import { generateForewordImage } from "@/lib/ai/generate-foreword-image";
-import {
-  generateForewordCollage,
-  fetchHeroBuffers,
-  isBrandStyleHero,
-} from "@/lib/ai/generate-foreword-collage";
+// v3: Collage + fetchHeroBuffers werden hier nicht mehr direkt aufgerufen
+// (Default = Nano Banana mit Heroes als Refs via generateForewordImage).
+// isBrandStyleHero bleibt — der Pack-Heroes-Filter ist weiter sinnvoll.
+import { isBrandStyleHero } from "@/lib/ai/generate-foreword-collage";
 import { loadBrand } from "@/lib/custom-brands-server";
 import { getServerSupabase, hasServerSupabase } from "@/lib/supabase-server";
 import type { Pack } from "@/lib/packs";
@@ -136,17 +135,14 @@ export async function POST(req: Request) {
     });
   }
 
-  // Foreword-Image-Strategie: wenn der Pack genug Brand-DNA-Heroes hat
-  // (>=3 echte Flux-Bilder), nehmen wir die als 2x2 Collage. Sonst
-  // Fallback auf Flux-Stillleben (generateForewordImage). Vorteil
-  // Collage: User-Request "Bild zeigt alle Rezepte aus dem Pack".
+  // Foreword-Image-Strategie (v3): immer Nano Banana mit den Recipe-Heroes
+  // des Packs als visuelle Style-Anker. Generator entscheidet selbst, was
+  // er mit 0/1/2/3 Refs anstellt. Collage-Code (generateForewordCollage)
+  // bleibt im Repo, wird aber nicht mehr default genutzt — der Setting-
+  // Look von Nano Banana ist editorial-konsistenter als die 2x2-Repetition.
   //
-  // Returns { buffer, isCollage } — der Caller benutzt isCollage als
-  // Filename-Marker (`{id}-collage.jpg` vs `{id}.jpg`), damit das
-  // Safety-Net spaeter erkennen kann ob noch Flux-Stillleben da ist
-  // (dann re-generate, sobald die Brand-Heroes alle da sind).
-  // Local-Capture damit TS row.brand_slug-Narrowing in der inner-function
-  // halten kann (Closure-Boundary-Edge-Case mit Optional-Chain).
+  // Returns { buffer, isCollage } — isCollage bleibt im Type fuer
+  // Backward-Compat mit dem File-Marker, ist v3 aber immer false.
   const packRowBrandSlug = row.brand_slug as string;
   async function buildForewordImage(): Promise<
     { buffer: Buffer; isCollage: boolean } | null
@@ -165,28 +161,10 @@ export async function POST(req: Request) {
         heroUrls.push(recipe.hero);
       }
     }
-    if (heroUrls.length >= 3) {
-      console.log(
-        `[packs/enrich] foreword-image: building collage from ${heroUrls.length} brand-heroes for ${pack.slug}`
-      );
-      try {
-        const buffers = await fetchHeroBuffers(heroUrls.slice(0, 4));
-        if (buffers.length >= 3) {
-          const buffer = await generateForewordCollage(buffers, pack.mood);
-          return { buffer, isCollage: true };
-        }
-      } catch (err) {
-        console.warn(
-          "[packs/enrich] collage failed, fallback to Flux still-life:",
-          err
-        );
-      }
-    } else {
-      console.log(
-        `[packs/enrich] foreword-image: only ${heroUrls.length} brand-heroes — using Flux still-life for ${pack.slug}`
-      );
-    }
-    const buffer = await generateForewordImage(pack);
+    console.log(
+      `[packs/enrich] foreword-image: Nano Banana with ${heroUrls.length} hero refs for ${pack.slug}`
+    );
+    const buffer = await generateForewordImage(pack, { heroUrls });
     return { buffer, isCollage: false };
   }
 

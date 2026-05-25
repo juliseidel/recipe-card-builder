@@ -6,6 +6,7 @@ import { generatePackMeta } from "@/lib/ai/generate-pack-meta";
 import { generatePackForeword } from "@/lib/ai/generate-foreword";
 import { generatePackCover } from "@/lib/ai/generate-pack-cover";
 import { generateForewordImage } from "@/lib/ai/generate-foreword-image";
+import { isBrandStyleHero } from "@/lib/ai/generate-foreword-collage";
 import { loadVisibleRecipesForPack, type Recipe } from "@/lib/recipes";
 import type { Pack } from "@/lib/packs";
 import type { ReelRow } from "@/lib/creator-reels-server";
@@ -212,10 +213,23 @@ export async function POST(req: Request, { params }: RouteParams) {
     }
   }
 
-  // ─── Foreword-Bild (Flux 2 Pro Still-Life) ──────────────────────────────
+  // ─── Foreword-Bild (Nano Banana mit Recipe-Heroes als Style-Refs) ──────
   if (field === "forewordImage") {
     try {
-      const buffer = await generateForewordImage(ctx.pack);
+      // Heroes laden als Style-Anchor — Foreword-Bild wird visuell mit
+      // den echten Rezepten verwandt, statt generisches Stillleben.
+      const recipes = await loadVisibleRecipesForPack(
+        ctx.brandSlug,
+        ctx.pack.slug
+      );
+      const heroUrls: string[] = [];
+      for (const recipe of recipes) {
+        if (recipe.hero && isBrandStyleHero(recipe.hero)) {
+          heroUrls.push(recipe.hero);
+          if (heroUrls.length >= 3) break;
+        }
+      }
+      const buffer = await generateForewordImage(ctx.pack, { heroUrls });
       const supabase = getServerSupabase();
       const path = `${ctx.brandSlug}/${ctx.pack.slug}-foreword-${Date.now().toString(36)}.jpg`;
       await supabase.storage.createBucket("pack-forewords", {
