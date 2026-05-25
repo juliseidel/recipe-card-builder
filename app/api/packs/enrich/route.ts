@@ -173,13 +173,14 @@ export async function POST(req: Request) {
     //     Title direkt im Bild)
     //   - fitness: generateFitnessPackCover (Equipment-Stillleben, alter
     //     Hybrid-Pfad mit react-pdf Text-Overlay)
+    // Wichtig: NICHT nur den Buffer durchreichen — wir brauchen
+    // contentType (PNG bei Gemini, JPEG bei Flux), sonst MIME-Mismatch
+    // beim Upload → react-pdf rendert das Bild im PDF nicht.
     const coverPromise = hasCover
       ? Promise.resolve(null)
       : packType === "fitness"
-        ? generateFitnessPackCover({ pack }).then((r) => r.buffer)
-        : generateCreatorCover({ pack, brand, recipes: packRecipes }).then(
-            (r) => r.buffer
-          );
+        ? generateFitnessPackCover({ pack })
+        : generateCreatorCover({ pack, brand, recipes: packRecipes });
 
     const outroImagePromise = hasOutroImage
       ? Promise.resolve(null)
@@ -195,11 +196,15 @@ export async function POST(req: Request) {
     if (coverSettled.status === "fulfilled" && coverSettled.value) {
       try {
         await ensureBucket(supabase, COVER_BUCKET);
-        const filePath = `${row.id}.jpg`;
+        const { buffer, contentType } = coverSettled.value;
+        // Extension nach contentType — sonst rendert react-pdf das Bild im
+        // PDF nicht (Gemini liefert PNG, Flux liefert JPEG).
+        const ext = contentType === "image/png" ? "png" : "jpg";
+        const filePath = `${row.id}.${ext}`;
         const upload = await supabase.storage
           .from(COVER_BUCKET)
-          .upload(filePath, coverSettled.value, {
-            contentType: "image/jpeg",
+          .upload(filePath, buffer, {
+            contentType,
             upsert: true,
             cacheControl: "31536000",
           });

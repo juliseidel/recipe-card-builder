@@ -204,9 +204,14 @@ export async function POST(req: Request, { params }: RouteParams) {
         recipes,
       });
       const buffer = result.buffer;
+      // Gemini returnt typischerweise PNG; vorher hardcoded ".jpg"+"image/jpeg"
+      // → MIME-Mismatch → react-pdf hat das Bild im PDF nicht gerendert
+      // (User-Befund: "Bild zeigt nichts an"). Jetzt richten wir Extension
+      // + contentType nach result.contentType aus.
+      const ext = result.contentType === "image/png" ? "png" : "jpg";
       // Upload zu Supabase Storage
       const supabase = getServerSupabase();
-      const path = `${ctx.brandSlug}/${ctx.pack.slug}-${Date.now().toString(36)}.jpg`;
+      const path = `${ctx.brandSlug}/${ctx.pack.slug}-${Date.now().toString(36)}.${ext}`;
       // Bucket idempotent erstellen
       await supabase.storage.createBucket("pack-covers", {
         public: true,
@@ -214,7 +219,7 @@ export async function POST(req: Request, { params }: RouteParams) {
         allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
       });
       const up = await supabase.storage.from("pack-covers").upload(path, buffer, {
-        contentType: "image/jpeg",
+        contentType: result.contentType,
         cacheControl: "31536000",
         upsert: false,
       });
