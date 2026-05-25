@@ -132,12 +132,31 @@ function sanitizePatch(input: Partial<Pack>): Partial<Pack> {
             p.kind !== "custom"
           )
             continue;
+          // position-Validation: 3 erlaubte Slots, before-recipe braucht
+          // recipeNumber als positive Zahl. Fallback auf undefined wenn
+          // Schema verletzt — Renderer faellt dann auf "after-foreword".
+          let position: NonNullable<Pack["storyPages"]>[number]["position"];
+          if (p.position && typeof p.position === "object") {
+            const pos = p.position as { slot?: unknown; recipeNumber?: unknown };
+            if (pos.slot === "after-foreword") {
+              position = { slot: "after-foreword" };
+            } else if (pos.slot === "before-outro") {
+              position = { slot: "before-outro" };
+            } else if (
+              pos.slot === "before-recipe" &&
+              typeof pos.recipeNumber === "number" &&
+              pos.recipeNumber > 0
+            ) {
+              position = { slot: "before-recipe", recipeNumber: pos.recipeNumber };
+            }
+          }
           cleaned.push({
             id: p.id,
             kind: p.kind,
             title: p.title.trim().slice(0, 200),
             body: p.body.trim().slice(0, 2000),
             ...(typeof p.imageUrl === "string" ? { imageUrl: p.imageUrl } : {}),
+            ...(position ? { position } : {}),
           });
         }
         out.storyPages = cleaned;

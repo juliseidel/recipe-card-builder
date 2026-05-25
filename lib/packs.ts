@@ -129,6 +129,19 @@ export type Pack = {
   storyPages?: StoryPage[];
 };
 
+/** Position einer Story-Seite im Pack-PDF.
+ *  - "after-foreword" (Default): direkt nach Vorwort, vor Inhaltsverzeichnis
+ *  - "before-recipe": vor einer bestimmten Recipe-Karte (recipeNumber 1-indexed)
+ *  - "before-outro": zwischen Naehrwertuebersicht und Outro
+ *
+ *  Niklas-Wunsch: manche Creator wollen alle Story-Seiten am Anfang
+ *  (Guide-Stil), andere wollen sie zwischen den Rezepten verteilen
+ *  (Magazine-Stil mit eingestreuten Persoenlichkeits-Spreads). */
+export type StoryPagePosition =
+  | { slot: "after-foreword" }
+  | { slot: "before-recipe"; recipeNumber: number }
+  | { slot: "before-outro" };
+
 /** Eine Story-Seite im Guide-Modus. Ganze Seite, mit grossem Bild +
  *  Title + Body-Text. Wird von der KI generiert und kann vom User
  *  editiert/regeneriert werden. */
@@ -146,6 +159,8 @@ export type StoryPage = {
   /** URL zum Story-Bild im pack-story-images-Bucket. Optional waehrend
    *  Generation laeuft oder wenn User noch kein Bild hochgeladen hat. */
   imageUrl?: string;
+  /** Position im Pack-PDF. Default "after-foreword" wenn nicht gesetzt. */
+  position?: StoryPagePosition;
 };
 
 export const packs: Pack[] = [

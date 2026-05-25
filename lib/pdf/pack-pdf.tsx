@@ -1,6 +1,6 @@
 import { Document, Page, View, Text, Image } from "@react-pdf/renderer";
 import type { Brand } from "@/lib/brands";
-import type { Pack } from "@/lib/packs";
+import type { Pack, StoryPage } from "@/lib/packs";
 import type { Recipe } from "@/lib/recipes";
 import type { PackForewordContent } from "@/lib/ai/generate-foreword";
 import { packTheme, withAlpha, blendWithWhite, fontFamilyForPack } from "./theme";
@@ -9,6 +9,39 @@ import { RecipeCardPdfPage } from "./recipe-card-pdf";
 import { ForewordPage } from "./foreword-page";
 import { StoryPagePdf } from "./story-page-pdf";
 import { BeeIcon } from "./bee-icon";
+
+// ─── Story-Page-Position-Bucketing ───────────────────────────────────────
+// User-Wunsch (Inkrement 3): Story-Pages haben Position-Slots — manche
+// kommen direkt nach dem Vorwort, andere zwischen Rezepten, andere vor
+// dem Outro. Wir bucketen die storyPages-Liste nach Slot, behalten aber
+// die User-definierte Reihenfolge innerhalb eines Slots bei.
+type StoryBuckets = {
+  afterForeword: StoryPage[];
+  beforeRecipe: Map<number, StoryPage[]>;
+  beforeOutro: StoryPage[];
+};
+
+function bucketStoryPages(pages: StoryPage[]): StoryBuckets {
+  const buckets: StoryBuckets = {
+    afterForeword: [],
+    beforeRecipe: new Map(),
+    beforeOutro: [],
+  };
+  for (const page of pages) {
+    const pos = page.position ?? { slot: "after-foreword" };
+    if (pos.slot === "before-recipe") {
+      const list = buckets.beforeRecipe.get(pos.recipeNumber) ?? [];
+      list.push(page);
+      buckets.beforeRecipe.set(pos.recipeNumber, list);
+    } else if (pos.slot === "before-outro") {
+      buckets.beforeOutro.push(page);
+    } else {
+      // Default + explicit after-foreword
+      buckets.afterForeword.push(page);
+    }
+  }
+  return buckets;
+}
 
 export type PackPdfProps = {
   brand: Brand;
@@ -60,6 +93,40 @@ export function PackPdfDocument({
     pack.packMode === "guide" && pack.storyPages && pack.storyPages.length > 0
       ? pack.storyPages
       : [];
+  const storyBuckets = bucketStoryPages(storyPages);
+
+  // Helper: finde imageDataUri zu einer StoryPage (anhand der storyPages-
+  // Reihenfolge — storyImageDataUris ist parallel-indiziert).
+  function getStoryImage(page: StoryPage): string | null {
+    if (!storyImageDataUris) return null;
+    const idx = storyPages.indexOf(page);
+    return idx >= 0 ? storyImageDataUris[idx] ?? null : null;
+  }
+
+  // Page-Nummerierung fuer das Inhaltsverzeichnis. Mit Story-Pages an
+  // beliebigen Slots muss IndexPage wissen welche Recipe-Page auf welcher
+  // PDF-Seite landet. Wir berechnen das jetzt einmal und reichen es durch.
+  //
+  // Layout-Sequenz:
+  //   1 Cover
+  //   2 Foreword (wenn showForeword)
+  //   ... afterForewordPages
+  //   ... IndexPage
+  //   ... fuer jedes Recipe: erst beforeRecipePages[recipe.number], dann Recipe
+  //   ... NutritionOverview
+  //   ... beforeOutroPages
+  //   ... OutroPage
+  const recipePageNumbers: number[] = [];
+  let cursor = 1; // Cover
+  if (showForeword) cursor += 1;
+  cursor += storyBuckets.afterForeword.length;
+  cursor += 1; // IndexPage
+  for (const r of recipes) {
+    const before = storyBuckets.beforeRecipe.get(r.number) ?? [];
+    cursor += before.length;
+    recipePageNumbers.push(cursor);
+    cursor += 1; // Recipe selbst
+  }
 
   return (
     <Document
@@ -92,47 +159,77 @@ export function PackPdfDocument({
         />
       ) : null}
 
-      {/* STORY PAGES (Guide-Modus). Sitzen zwischen Foreword und Index.
-          Bei recipebook-Mode ist storyPages [] und es wird nichts gerendert. */}
-      {storyPages.map((story, idx) => (
+      {/* STORY PAGES — Slot "after-foreword" (Default). Sitzen zwischen
+          Foreword und Index. */}
+      {storyBuckets.afterForeword.map((story) => (
         <StoryPagePdf
           key={story.id}
           brand={brand}
           pack={pack}
           story={story}
-          imageDataUri={storyImageDataUris?.[idx] ?? null}
-          positionIndex={idx + 1}
+          imageDataUri={getStoryImage(story)}
+          positionIndex={storyPages.indexOf(story) + 1}
           totalStories={storyPages.length}
         />
       ))}
 
-      {/* INDEX — Position abhaengig von Foreword + Story-Pages */}
+      {/* INDEX — Position abhaengig von Foreword + after-foreword Stories */}
       <IndexPage
         brand={brand}
         pack={pack}
         recipes={recipes}
         showForeword={showForeword}
-        storyCount={storyPages.length}
+        recipePageNumbers={recipePageNumbers}
       />
 
-      {/* PAGES 3..N+2 — RECIPES */}
-      {recipes.map((recipe, idx) => (
-        <RecipeCardPdfPage
-          key={recipe.slug}
+      {/* RECIPES — pro Recipe ggf. davor "before-recipe" Story-Seiten */}
+      {recipes.map((recipe, idx) => {
+        const before = storyBuckets.beforeRecipe.get(recipe.number) ?? [];
+        return (
+          <>
+            {before.map((story) => (
+              <StoryPagePdf
+                key={story.id}
+                brand={brand}
+                pack={pack}
+                story={story}
+                imageDataUri={getStoryImage(story)}
+                positionIndex={storyPages.indexOf(story) + 1}
+                totalStories={storyPages.length}
+              />
+            ))}
+            <RecipeCardPdfPage
+              key={recipe.slug}
+              brand={brand}
+              pack={pack}
+              recipe={recipe}
+              totalRecipes={recipes.length}
+              heroDataUri={heroDataUris[idx] ?? null}
+              qrDataUri={qrDataUris[idx] ?? null}
+              avatarDataUri={avatarDataUri ?? null}
+            />
+          </>
+        );
+      })}
+
+      {/* NUTRITION OVERVIEW */}
+      <NutritionOverviewPage brand={brand} pack={pack} recipes={recipes} />
+
+      {/* STORY PAGES — Slot "before-outro". Sitzen zwischen
+          Naehrwertuebersicht und Outro. */}
+      {storyBuckets.beforeOutro.map((story) => (
+        <StoryPagePdf
+          key={story.id}
           brand={brand}
           pack={pack}
-          recipe={recipe}
-          totalRecipes={recipes.length}
-          heroDataUri={heroDataUris[idx] ?? null}
-          qrDataUri={qrDataUris[idx] ?? null}
-          avatarDataUri={avatarDataUri ?? null}
+          story={story}
+          imageDataUri={getStoryImage(story)}
+          positionIndex={storyPages.indexOf(story) + 1}
+          totalStories={storyPages.length}
         />
       ))}
 
-      {/* PAGE N+3 — NUTRITION OVERVIEW */}
-      <NutritionOverviewPage brand={brand} pack={pack} recipes={recipes} />
-
-      {/* PAGE N+4 — OUTRO */}
+      {/* OUTRO */}
       <OutroPage brand={brand} pack={pack} titleFont={titleFont} />
     </Document>
   );
@@ -270,14 +367,16 @@ function IndexPage({
   brand,
   pack,
   recipes,
-  showForeword,
-  storyCount = 0,
+  showForeword: _showForeword,
+  recipePageNumbers,
 }: {
   brand: Brand;
   pack: Pack;
   recipes: Recipe[];
   showForeword: boolean;
-  storyCount?: number;
+  /** Pre-berechnete Page-Nummer pro Recipe (parallel-indiziert zu recipes).
+   *  PackPdfDocument berechnet das mit Foreword + Story-Buckets-Offsets. */
+  recipePageNumbers: number[];
 }) {
   const t = packTheme(pack);
   return (
@@ -437,9 +536,11 @@ function IndexPage({
                     textAlign: "right",
                   }}
                 >
-                  {/* Page-Nummer fuer Recipe i (0-indexed):
-                      Cover(1) + Foreword(0|1) + Stories(N) + Index(1) + (i+1) */}
-                  S. {i + (showForeword ? 4 : 3) + storyCount}
+                  {/* Page-Nummer kommt pre-berechnet aus PackPdfDocument,
+                      damit verteilte Story-Pages (before-recipe) korrekt
+                      eingerechnet werden. Fallback auf trivialen Offset
+                      falls Array-Lookup leer. */}
+                  S. {recipePageNumbers[i] ?? i + 3}
                 </Text>
               </View>
             ))}

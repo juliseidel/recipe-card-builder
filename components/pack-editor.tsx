@@ -4,7 +4,13 @@ import { useState, useTransition, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Brand } from "@/lib/brands";
-import type { Pack, PackMood, CardLayout, StoryPage } from "@/lib/packs";
+import type {
+  Pack,
+  PackMood,
+  CardLayout,
+  StoryPage,
+  StoryPagePosition,
+} from "@/lib/packs";
 import {
   layoutPresets,
   moodPresets,
@@ -264,6 +270,24 @@ export function PackEditor({ brand, pack, packId }: PackEditorProps) {
       next[index] = { ...next[index], imageUrl: undefined };
       return next;
     });
+  }
+
+  function updateStoryPagePosition(
+    index: number,
+    position: StoryPagePosition | undefined
+  ) {
+    setStoryPages((prev) => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+      next[index] = { ...next[index], position };
+      return next;
+    });
+  }
+
+  function describePosition(pos: StoryPagePosition | undefined): string {
+    if (!pos || pos.slot === "after-foreword") return "Nach Vorwort";
+    if (pos.slot === "before-outro") return "Vor Outro";
+    return `Vor Rezept ${pos.recipeNumber}`;
   }
 
   async function addStoryPage(kind: StoryPage["kind"]) {
@@ -960,6 +984,84 @@ export function PackEditor({ brand, pack, packId }: PackEditorProps) {
                             placeholder="Story-Body, 2-4 Absaetze, getrennt durch leere Zeilen…"
                             maxLength={2000}
                           />
+
+                          {/* Position-Section */}
+                          <div
+                            className="mt-3 flex flex-wrap items-center gap-2"
+                          >
+                            <span
+                              className="text-[11px] font-medium"
+                              style={{ color: brand.tokens.inkMuted }}
+                            >
+                              Position:
+                            </span>
+                            <select
+                              value={p.position?.slot ?? "after-foreword"}
+                              onChange={(e) => {
+                                const slot = e.target.value as StoryPagePosition["slot"];
+                                if (slot === "after-foreword") {
+                                  updateStoryPagePosition(idx, {
+                                    slot: "after-foreword",
+                                  });
+                                } else if (slot === "before-outro") {
+                                  updateStoryPagePosition(idx, {
+                                    slot: "before-outro",
+                                  });
+                                } else {
+                                  updateStoryPagePosition(idx, {
+                                    slot: "before-recipe",
+                                    recipeNumber:
+                                      p.position?.slot === "before-recipe"
+                                        ? p.position.recipeNumber
+                                        : 1,
+                                  });
+                                }
+                              }}
+                              className="rounded-md border px-2 py-1 text-[11px]"
+                              style={{
+                                borderColor: brand.tokens.line,
+                                color: brand.tokens.ink,
+                                background: brand.tokens.surface,
+                              }}
+                            >
+                              <option value="after-foreword">Nach Vorwort</option>
+                              <option value="before-recipe">Vor Rezept …</option>
+                              <option value="before-outro">Vor Outro</option>
+                            </select>
+                            {p.position?.slot === "before-recipe" ? (
+                              <input
+                                type="number"
+                                min={1}
+                                max={Math.max(1, pack.recipeCount ?? 99)}
+                                value={p.position.recipeNumber}
+                                onChange={(e) => {
+                                  const n = Math.max(
+                                    1,
+                                    Math.min(
+                                      pack.recipeCount ?? 99,
+                                      Number.parseInt(e.target.value, 10) || 1
+                                    )
+                                  );
+                                  updateStoryPagePosition(idx, {
+                                    slot: "before-recipe",
+                                    recipeNumber: n,
+                                  });
+                                }}
+                                className="w-16 rounded-md border px-2 py-1 text-[11px]"
+                                style={{
+                                  borderColor: brand.tokens.line,
+                                  color: brand.tokens.ink,
+                                  background: brand.tokens.surface,
+                                }}
+                              />
+                            ) : null}
+                            <span
+                              className="text-[10px]"
+                              style={{ color: brand.tokens.inkMuted }}
+                            >
+                              {describePosition(p.position)}
+                            </span>
+                          </div>
 
                           {/* Bild-Section */}
                           <div className="mt-3 flex flex-wrap items-center gap-3">
