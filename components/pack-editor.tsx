@@ -4,7 +4,7 @@ import { useState, useTransition, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Brand } from "@/lib/brands";
-import type { Pack, PackMood, CardLayout } from "@/lib/packs";
+import type { Pack, PackMood, CardLayout, StoryPage } from "@/lib/packs";
 import {
   layoutPresets,
   moodPresets,
@@ -68,6 +68,13 @@ export function PackEditor({ brand, pack, packId }: PackEditorProps) {
   );
   const [foreword, setForeword] = useState<ForewordLegacyFields>(initialForeword);
 
+  // Guide-Modus: Pack-Mode-Toggle + Story-Pages (Inkrement 1: nur generieren
+  // + read-only-Liste, kein Edit/Re-Roll/Image — kommt in Inkrement 2).
+  const initialPackMode = pack.packMode ?? brand.defaultPackMode ?? "recipebook";
+  const [packMode, setPackMode] = useState<"recipebook" | "guide">(initialPackMode);
+  const [storyPages, setStoryPages] = useState<StoryPage[]>(pack.storyPages ?? []);
+  const [isGeneratingStoryPages, setIsGeneratingStoryPages] = useState(false);
+
   const [lockedFields, setLockedFields] = useState<Set<string>>(
     new Set(pack.editedFields ?? [])
   );
@@ -96,6 +103,10 @@ export function PackEditor({ brand, pack, packId }: PackEditorProps) {
     if (foreword.story !== initialForeword.story) dirty.add("foreword.story");
     if (foreword.signoff !== initialForeword.signoff) dirty.add("foreword.signoff");
     if (foreword.outro !== initialForeword.outro) dirty.add("foreword.outro");
+    if (packMode !== initialPackMode) dirty.add("packMode");
+    if (JSON.stringify(storyPages) !== JSON.stringify(pack.storyPages ?? [])) {
+      dirty.add("storyPages");
+    }
     return dirty;
   }, [
     title,
@@ -109,8 +120,42 @@ export function PackEditor({ brand, pack, packId }: PackEditorProps) {
     coverImage,
     forewordImage,
     foreword,
+    initialForeword,
+    packMode,
+    initialPackMode,
+    storyPages,
     pack,
   ]);
+
+  async function handleGenerateStoryPages() {
+    setGlobalError(null);
+    setIsGeneratingStoryPages(true);
+    try {
+      const res = await fetch(
+        `/api/packs/${packId}/story-pages/generate`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ replace: true }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setGlobalError(data.error ?? "Story-Seiten konnten nicht generiert werden.");
+        return;
+      }
+      const newPages: StoryPage[] = data.pack?.storyPages ?? [];
+      setStoryPages(newPages);
+      setPackMode("guide");
+      setGlobalSuccess(
+        `${newPages.length} Story-Seiten generiert. Speichern um sie ans Pack zu binden.`
+      );
+    } catch (err) {
+      setGlobalError((err as Error).message);
+    } finally {
+      setIsGeneratingStoryPages(false);
+    }
+  }
 
   const hasChanges = dirtyFields.size > 0;
 
@@ -135,6 +180,8 @@ export function PackEditor({ brand, pack, packId }: PackEditorProps) {
         dirtyFields.has("foreword.signoff") ||
         dirtyFields.has("foreword.outro");
       if (forewordChanged) patch.foreword = foreword;
+      if (dirtyFields.has("packMode")) patch.packMode = packMode;
+      if (dirtyFields.has("storyPages")) patch.storyPages = storyPages;
 
       // editedFields: alle gerade-editierten Felder UND alle bereits-lockten
       const editedFields = [...lockedFields, ...dirtyFields];
@@ -623,6 +670,143 @@ export function PackEditor({ brand, pack, packId }: PackEditorProps) {
                 </button>
               </div>
             </div>
+          </div>
+        </Section>
+
+        {/* ─── Guide-Modus & Story-Seiten ──────────────────────────────── */}
+        <Section
+          title="Guide-Modus & Story-Seiten"
+          subtitle="Im Guide-Modus bekommt das Pack zusaetzliche Seiten zwischen Vorwort und Inhaltsverzeichnis — z.B. Werdegang, Philosophie, Was-du-findest. Fuer Creator-Guides die mehr als ein Rezeptbuch sein sollen."
+          brand={brand}
+        >
+          <div className="space-y-4">
+            {/* Pack-Mode Toggle */}
+            <div className="flex items-center gap-3">
+              <label className="text-[12px] font-medium" style={{ color: brand.tokens.ink }}>
+                Pack-Modus
+              </label>
+              <div
+                className="inline-flex rounded-full border p-1"
+                style={{ borderColor: brand.tokens.line, background: brand.tokens.background }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setPackMode("recipebook")}
+                  className="rounded-full px-4 py-1.5 text-[12px] font-medium transition"
+                  style={
+                    packMode === "recipebook"
+                      ? { background: brand.tokens.ink, color: brand.tokens.background }
+                      : { color: brand.tokens.inkMuted }
+                  }
+                >
+                  Rezeptbuch
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPackMode("guide")}
+                  className="rounded-full px-4 py-1.5 text-[12px] font-medium transition"
+                  style={
+                    packMode === "guide"
+                      ? { background: brand.tokens.ink, color: brand.tokens.background }
+                      : { color: brand.tokens.inkMuted }
+                  }
+                >
+                  Guide
+                </button>
+              </div>
+              <span className="text-[11px]" style={{ color: brand.tokens.inkMuted }}>
+                {packMode === "guide"
+                  ? "Story-Seiten werden zwischen Vorwort und Inhaltsverzeichnis gerendert."
+                  : "Klassischer Pack-Aufbau ohne Story-Seiten."}
+              </span>
+            </div>
+
+            {/* Story-Pages-Liste — nur sichtbar im Guide-Modus */}
+            {packMode === "guide" ? (
+              <div
+                className="rounded-2xl border p-4"
+                style={{ borderColor: brand.tokens.line, background: brand.tokens.background }}
+              >
+                {storyPages.length === 0 ? (
+                  <div className="flex flex-col items-start gap-3">
+                    <p className="text-[12px]" style={{ color: brand.tokens.inkMuted }}>
+                      Noch keine Story-Seiten generiert. KI schlaegt 3 Standard-Themen vor: Meine
+                      Geschichte, Mein Why, Was dich erwartet.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleGenerateStoryPages}
+                      disabled={isGeneratingStoryPages}
+                      className="rounded-full px-4 py-2 text-[12px] font-semibold disabled:opacity-40"
+                      style={{ background: brand.tokens.accent, color: brand.tokens.background }}
+                    >
+                      {isGeneratingStoryPages
+                        ? "Generiere Story-Seiten…"
+                        : "Story-Seiten generieren"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {storyPages.map((p, idx) => (
+                      <div
+                        key={p.id}
+                        className="rounded-xl border p-4"
+                        style={{
+                          borderColor: brand.tokens.line,
+                          background: brand.tokens.surface,
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                            style={{
+                              background: brand.tokens.accentSoft,
+                              color: brand.tokens.accent,
+                            }}
+                          >
+                            Story · {String(idx + 1).padStart(2, "0")}
+                          </span>
+                          <span
+                            className="text-[10px] uppercase tracking-wide"
+                            style={{ color: brand.tokens.inkMuted }}
+                          >
+                            {p.kind}
+                          </span>
+                        </div>
+                        <h3
+                          className="mt-2 text-[16px] font-semibold"
+                          style={{ color: brand.tokens.ink, fontFamily: "var(--font-fraunces)" }}
+                        >
+                          {p.title}
+                        </h3>
+                        <p
+                          className="mt-2 whitespace-pre-line text-[12px] leading-relaxed"
+                          style={{ color: brand.tokens.ink }}
+                        >
+                          {p.body}
+                        </p>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleGenerateStoryPages}
+                        disabled={isGeneratingStoryPages}
+                        className="rounded-full border px-4 py-2 text-[12px] font-semibold disabled:opacity-40"
+                        style={{ borderColor: brand.tokens.line, color: brand.tokens.ink }}
+                      >
+                        {isGeneratingStoryPages
+                          ? "Generiere neu…"
+                          : "Story-Seiten neu generieren"}
+                      </button>
+                      <span className="text-[11px]" style={{ color: brand.tokens.inkMuted }}>
+                        Editieren und Bilder kommen in der naechsten Iteration.
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
         </Section>
 

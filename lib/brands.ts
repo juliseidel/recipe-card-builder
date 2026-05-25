@@ -155,6 +155,12 @@ export type Brand = {
    *  Optional fuer Backward-Compat — Bestands-Brands ohne Feld werden als
    *  "recipe" interpretiert. */
   defaultPackType?: "recipe" | "fitness";
+  /** Default-Pack-Modus fuer diesen Brand. "recipebook" (Default) =
+   *  klassischer Rezept-Pack ohne Story-Seiten. "guide" = mit 2-4 Story-
+   *  Seiten zur Person (Werdegang, Philosophie etc.). Per-Pack ueber-
+   *  schreibbar via Pack.packMode. Niklas-Wunsch: manche Creator
+   *  (Biene-Stil) wollen Guide, andere (Julia-Stil) nicht. */
+  defaultPackMode?: "recipebook" | "guide";
 };
 
 export const brands: Brand[] = [

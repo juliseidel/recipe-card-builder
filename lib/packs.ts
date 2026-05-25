@@ -116,6 +116,36 @@ export type Pack = {
    *  Optional fuer Backward-Compat — Bestands-Packs ohne Feld werden als
    *  "recipe" interpretiert. */
   packType?: "recipe" | "fitness";
+  /** Pack-Modus. "recipebook" (Default) = Cover + Vorwort + Inhaltsverzeichnis
+   *  + Rezepte + Outro. "guide" = wie recipebook, plus 2-4 Story-Seiten
+   *  zwischen Vorwort und Inhaltsverzeichnis (Werdegang, Philosophie,
+   *  Was-du-findest etc.). Per-Pack-Override des Brand-Defaults
+   *  (brand.defaultPackMode). */
+  packMode?: "recipebook" | "guide";
+  /** Story-Seiten fuer den Guide-Modus. Geordnete Liste; rendert in der
+   *  Reihenfolge zwischen Vorwort und Inhaltsverzeichnis. Nur aktiv wenn
+   *  packMode === "guide". Wird via generateStoryPages initial befuellt
+   *  und kann im Editor erweitert/editiert werden. */
+  storyPages?: StoryPage[];
+};
+
+/** Eine Story-Seite im Guide-Modus. Ganze Seite, mit grossem Bild +
+ *  Title + Body-Text. Wird von der KI generiert und kann vom User
+ *  editiert/regeneriert werden. */
+export type StoryPage = {
+  /** Stabile ID, beim Erzeugen via crypto.randomUUID(). */
+  id: string;
+  /** Inhaltlicher Anker. Steuert Default-Title, KI-Generierungs-Thema
+   *  und Bild-Setting (Werdegang = vintage Kueche, Philosophie =
+   *  Notizbuch+Kaffee, etc.). "custom" = User-defined ohne Anker. */
+  kind: "personal-story" | "philosophy" | "what-you-find" | "custom";
+  /** Seite-Titel, z.B. "Meine Geschichte", "Mein Why". Editierbar. */
+  title: string;
+  /** Body-Text, ~600-1200 Zeichen, 2-3 Absaetze. */
+  body: string;
+  /** URL zum Story-Bild im pack-story-images-Bucket. Optional waehrend
+   *  Generation laeuft oder wenn User noch kein Bild hochgeladen hat. */
+  imageUrl?: string;
 };
 
 export const packs: Pack[] = [

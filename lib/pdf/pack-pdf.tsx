@@ -7,6 +7,7 @@ import { packTheme, withAlpha, blendWithWhite, fontFamilyForPack } from "./theme
 import { pad2, totalTime } from "./helpers";
 import { RecipeCardPdfPage } from "./recipe-card-pdf";
 import { ForewordPage } from "./foreword-page";
+import { StoryPagePdf } from "./story-page-pdf";
 import { BeeIcon } from "./bee-icon";
 
 export type PackPdfProps = {
@@ -27,6 +28,10 @@ export type PackPdfProps = {
   forewordContent?: PackForewordContent | null;
   forewordImageDataUri?: string | null;
   avatarDataUri?: string | null;
+  // Story-Pages (Guide-Modus). Nur gerendert wenn pack.packMode==='guide'
+  // UND pack.storyPages?.length > 0. storyImageDataUris in derselben
+  // Reihenfolge wie pack.storyPages — null-Entries rendern Placeholder.
+  storyImageDataUris?: Array<string | null>;
 };
 
 export function PackPdfDocument({
@@ -39,6 +44,7 @@ export function PackPdfDocument({
   forewordContent,
   forewordImageDataUri,
   avatarDataUri,
+  storyImageDataUris,
 }: PackPdfProps) {
   // Show foreword whenever cached text is available. The still-life image
   // is optional — Variants render a graceful Text-Only-Layout wenn
@@ -48,6 +54,12 @@ export function PackPdfDocument({
   const showForeword = Boolean(forewordContent);
   const t = packTheme(pack);
   const titleFont = fontFamilyForPack(pack);
+
+  // Story-Pages aktiv nur im Guide-Modus mit mind. 1 Page.
+  const storyPages =
+    pack.packMode === "guide" && pack.storyPages && pack.storyPages.length > 0
+      ? pack.storyPages
+      : [];
 
   return (
     <Document
@@ -80,12 +92,27 @@ export function PackPdfDocument({
         />
       ) : null}
 
-      {/* INDEX (page 2 without foreword, page 3 with foreword) */}
+      {/* STORY PAGES (Guide-Modus). Sitzen zwischen Foreword und Index.
+          Bei recipebook-Mode ist storyPages [] und es wird nichts gerendert. */}
+      {storyPages.map((story, idx) => (
+        <StoryPagePdf
+          key={story.id}
+          brand={brand}
+          pack={pack}
+          story={story}
+          imageDataUri={storyImageDataUris?.[idx] ?? null}
+          positionIndex={idx + 1}
+          totalStories={storyPages.length}
+        />
+      ))}
+
+      {/* INDEX — Position abhaengig von Foreword + Story-Pages */}
       <IndexPage
         brand={brand}
         pack={pack}
         recipes={recipes}
         showForeword={showForeword}
+        storyCount={storyPages.length}
       />
 
       {/* PAGES 3..N+2 — RECIPES */}
@@ -244,11 +271,13 @@ function IndexPage({
   pack,
   recipes,
   showForeword,
+  storyCount = 0,
 }: {
   brand: Brand;
   pack: Pack;
   recipes: Recipe[];
   showForeword: boolean;
+  storyCount?: number;
 }) {
   const t = packTheme(pack);
   return (
@@ -408,7 +437,9 @@ function IndexPage({
                     textAlign: "right",
                   }}
                 >
-                  S. {i + (showForeword ? 4 : 3)}
+                  {/* Page-Nummer fuer Recipe i (0-indexed):
+                      Cover(1) + Foreword(0|1) + Stories(N) + Index(1) + (i+1) */}
+                  S. {i + (showForeword ? 4 : 3) + storyCount}
                 </Text>
               </View>
             ))}

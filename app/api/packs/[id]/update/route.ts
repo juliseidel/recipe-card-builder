@@ -45,6 +45,8 @@ const ALLOWED_FIELDS = new Set<keyof Pack>([
   "mood",
   "displayFont",
   "cardLayout",
+  "packMode",
+  "storyPages",
 ]);
 
 const VALID_FONTS: Pack["displayFont"][] = ["fraunces", "dm-serif", "inter-tight"];
@@ -105,6 +107,40 @@ function sanitizePatch(input: Partial<Pack>): Partial<Pack> {
           signoff: f.signoff?.trim() ?? "",
           ...(f.outro ? { outro: f.outro.trim() } : {}),
         };
+      }
+      continue;
+    }
+    if (key === "packMode") {
+      if (value === "recipebook" || value === "guide") {
+        out.packMode = value;
+      }
+      continue;
+    }
+    if (key === "storyPages") {
+      if (Array.isArray(value)) {
+        // Defensive Sanitization — wir trusten die Server-Side (generate-Route
+        // baut sie sauber), aber clampen Title/Body-Laenge als Safety-Net.
+        const cleaned: NonNullable<Pack["storyPages"]> = [];
+        for (const raw of value) {
+          if (!raw || typeof raw !== "object") continue;
+          const p = raw as Partial<NonNullable<Pack["storyPages"]>[number]>;
+          if (typeof p.id !== "string" || typeof p.title !== "string" || typeof p.body !== "string") continue;
+          if (
+            p.kind !== "personal-story" &&
+            p.kind !== "philosophy" &&
+            p.kind !== "what-you-find" &&
+            p.kind !== "custom"
+          )
+            continue;
+          cleaned.push({
+            id: p.id,
+            kind: p.kind,
+            title: p.title.trim().slice(0, 200),
+            body: p.body.trim().slice(0, 2000),
+            ...(typeof p.imageUrl === "string" ? { imageUrl: p.imageUrl } : {}),
+          });
+        }
+        out.storyPages = cleaned;
       }
       continue;
     }
