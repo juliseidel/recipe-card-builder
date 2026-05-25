@@ -1494,14 +1494,23 @@ export function RecipeEditor({
 
                   <Field
                     label="Story-Block"
-                    hint="Bei kurzen Karten (≤10 Zutaten) blendet das Layout automatisch ein italic-Zitat aus der Beschreibung ein, damit die Seite nicht halbleer wirkt. Hier abschaltbar."
+                    hint='Der Story-Text wird als italic-Zitat auf der Karte angezeigt (auf kurzen Karten automatisch eingeblendet). Hier kannst du den Text direkt anpassen oder den ganzen Block ausblenden. Synchron mit dem Feld „Kurzbeschreibung" unten.'
                   >
-                    <ToggleRow
-                      label="Story-Zitat ausblenden"
-                      checked={hideStory}
-                      onChange={setHideStory}
-                      accent={pack.mood.accent}
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="2–3 Sätze, die als Story-Zitat auf der Karte erscheinen"
+                      rows={3}
+                      className="editor-input resize-none"
                     />
+                    <div className="mt-3">
+                      <ToggleRow
+                        label="Story-Zitat komplett ausblenden"
+                        checked={hideStory}
+                        onChange={setHideStory}
+                        accent={pack.mood.accent}
+                      />
+                    </div>
                   </Field>
 
                   <Field
@@ -1582,7 +1591,10 @@ export function RecipeEditor({
                   />
                 </Field>
 
-                <Field label="Kurzbeschreibung">
+                <Field
+                  label="Kurzbeschreibung (Story-Text)"
+                  hint='Identisch zum „Story-Block" oben — beide bearbeiten denselben Text. Wird auf der Karte als italic-Zitat angezeigt.'
+                >
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
