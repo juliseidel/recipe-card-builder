@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import type { Pack } from "@/lib/packs";
 import { generateImageGemini } from "./gemini-image-generation";
 import { fetchHeroBuffers } from "./generate-foreword-collage";
@@ -87,7 +88,17 @@ export async function generateForewordImage(
     aspectRatio: FOREWORD_ASPECT,
   });
 
-  return { buffer: result.buffer, contentType: result.mimeType };
+  // Sharp-Konversion zu JPEG. Nano Banana liefert oft PNG, aber der
+  // pack-forewords-Bucket ist mit allowedMimeTypes=["image/jpeg"]
+  // erstellt worden (Flux-Stillleben-Zeit) und nimmt nur JPEG. Statt
+  // den Bucket umzukonfigurieren, normalisieren wir hier — gleicher
+  // Vorteil: alle Foreword-Bilder haben einheitliches Format,
+  // PDF-Renderer hat keinen MIME-Type-Mismatch-Bug mehr.
+  const jpegBuffer = await sharp(result.buffer)
+    .jpeg({ quality: 92, mozjpeg: true, progressive: true })
+    .toBuffer();
+
+  return { buffer: jpegBuffer, contentType: "image/jpeg" };
 }
 
 // ─── Prompt-Builder ──────────────────────────────────────────────────────

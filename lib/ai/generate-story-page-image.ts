@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import type { Pack, StoryPage } from "@/lib/packs";
 import { generateImageGemini } from "./gemini-image-generation";
 import { fetchHeroBuffers } from "./generate-foreword-collage";
@@ -102,7 +103,14 @@ export async function generateStoryPageImage(
     aspectRatio: STORY_IMAGE_ASPECT,
   });
 
-  return { buffer: result.buffer, contentType: result.mimeType };
+  // Sharp-Konversion zu JPEG fuer einheitliches Format ueber alle Pack-
+  // Image-Buckets. Verhindert MIME-Type-Mismatch-Bugs zwischen Nano
+  // Banana (PNG default) und react-pdf (silent-fail bei MIME-Mismatch).
+  const jpegBuffer = await sharp(result.buffer)
+    .jpeg({ quality: 92, mozjpeg: true, progressive: true })
+    .toBuffer();
+
+  return { buffer: jpegBuffer, contentType: "image/jpeg" };
 }
 
 function buildPrompt(pack: Pack, story: StoryPage, refCount: number): string {

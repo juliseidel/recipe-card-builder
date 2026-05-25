@@ -227,9 +227,24 @@ export function PackEditor({ brand, pack, packId }: PackEditorProps) {
         setGlobalError(data.error ?? "Story-Bild konnte nicht generiert werden.");
         return;
       }
-      const newPages: StoryPage[] = data.pack?.storyPages ?? [];
-      setStoryPages(newPages);
-      setGlobalSuccess(`Story-Bild ${index + 1} generiert.`);
+      // Defensive: wenn data.pack null oder data.pack.storyPages undefined ist
+      // (Backend-Fehler beim DB-Write), NICHT den State leeren — sonst
+      // verlieren wir alle Pages im UI obwohl die DB sie hat.
+      const updatedPages = data.pack?.storyPages;
+      if (Array.isArray(updatedPages) && updatedPages.length > 0) {
+        setStoryPages(updatedPages);
+        setGlobalSuccess(`Story-Bild ${index + 1} generiert.`);
+      } else if (data.imageUrl) {
+        // Mindestens die einzelne Page-imageUrl haben wir — lokal patchen
+        setStoryPages((prev) =>
+          prev.map((p, i) => (i === index ? { ...p, imageUrl: data.imageUrl } : p))
+        );
+        setGlobalSuccess(`Story-Bild ${index + 1} generiert.`);
+      } else {
+        setGlobalError(
+          "Backend hat 200 zurueckgegeben, aber kein Pack/Bild geliefert. Pruefe Vercel-Logs."
+        );
+      }
     } catch (err) {
       setGlobalError((err as Error).message);
     } finally {
