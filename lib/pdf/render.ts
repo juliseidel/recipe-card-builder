@@ -248,19 +248,36 @@ export async function renderPackPdf(args: {
   // so the avatar is needed even when this pack has no foreword). All
   // fan out via Promise.all so total wall-clock stays close to the
   // slowest single asset.
-  const [heroDataUris, qrDataUris, forewordImageDataUri, avatarDataUri] =
-    await Promise.all([
-      Promise.all(
-        args.recipes.map((r) =>
-          loadImageAsDataUri(r.hero ?? args.pack.coverImage)
-        )
-      ),
-      Promise.all(args.recipes.map((r) => generateQrDataUri(r.sourceUrl))),
-      forewordImagePath
-        ? loadImageAsDataUri(forewordImagePath)
-        : Promise.resolve(null),
-      loadImageAsDataUri(args.brand.avatar),
-    ]);
+  //
+  // Plus (v3 Guide-Modus): pack.storyPages[].imageUrl. Wenn der Pack im
+  // Guide-Modus ist und Pages mit Bildern hat, laden wir die parallel.
+  const guideStoryPages =
+    args.pack.packMode === "guide" && args.pack.storyPages
+      ? args.pack.storyPages
+      : [];
+  const [
+    heroDataUris,
+    qrDataUris,
+    forewordImageDataUri,
+    avatarDataUri,
+    storyImageDataUris,
+  ] = await Promise.all([
+    Promise.all(
+      args.recipes.map((r) =>
+        loadImageAsDataUri(r.hero ?? args.pack.coverImage)
+      )
+    ),
+    Promise.all(args.recipes.map((r) => generateQrDataUri(r.sourceUrl))),
+    forewordImagePath
+      ? loadImageAsDataUri(forewordImagePath)
+      : Promise.resolve(null),
+    loadImageAsDataUri(args.brand.avatar),
+    Promise.all(
+      guideStoryPages.map((p) =>
+        p.imageUrl ? loadImageAsDataUri(p.imageUrl) : Promise.resolve(null)
+      )
+    ),
+  ]);
 
   // Pre-Render-Verifikation: jede Recipe-Card einzeln rendern und
   // notfalls mit Tweaks neu rendern bis sie auf 1 Seite passt. Das
@@ -305,6 +322,7 @@ export async function renderPackPdf(args: {
       forewordContent,
       forewordImageDataUri,
       avatarDataUri,
+      storyImageDataUris,
     })
   );
   args.onProgress?.("done", 100);

@@ -157,6 +157,142 @@ export function PackEditor({ brand, pack, packId }: PackEditorProps) {
     }
   }
 
+  // Per-Page-Helpers fuer Edit/Delete/Re-Roll/Add (Inkrement 2 Stufe 1)
+  function updateStoryPageField(index: number, field: "title" | "body", value: string) {
+    setStoryPages((prev) => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  }
+
+  function removeStoryPage(index: number) {
+    setStoryPages((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  const [pageBusy, setPageBusy] = useState<{
+    index: number;
+    mode: "reroll" | "add" | "image";
+  } | null>(null);
+  const storyImageInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  async function rerollStoryPage(index: number) {
+    setGlobalError(null);
+    setPageBusy({ index, mode: "reroll" });
+    try {
+      const res = await fetch(
+        `/api/packs/${packId}/story-pages/regenerate-one`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: "replace", index }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setGlobalError(data.error ?? "Story-Page-Re-Roll fehlgeschlagen.");
+        return;
+      }
+      const newPages: StoryPage[] = data.pack?.storyPages ?? [];
+      setStoryPages(newPages);
+      setGlobalSuccess(`Story-Seite ${index + 1} neu generiert.`);
+    } catch (err) {
+      setGlobalError((err as Error).message);
+    } finally {
+      setPageBusy(null);
+    }
+  }
+
+  async function generateStoryPageImage(index: number) {
+    setGlobalError(null);
+    setPageBusy({ index, mode: "image" });
+    try {
+      const res = await fetch(
+        `/api/packs/${packId}/story-pages/regenerate-image`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ index }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setGlobalError(data.error ?? "Story-Bild konnte nicht generiert werden.");
+        return;
+      }
+      const newPages: StoryPage[] = data.pack?.storyPages ?? [];
+      setStoryPages(newPages);
+      setGlobalSuccess(`Story-Bild ${index + 1} generiert.`);
+    } catch (err) {
+      setGlobalError((err as Error).message);
+    } finally {
+      setPageBusy(null);
+    }
+  }
+
+  async function uploadStoryPageImage(index: number, file: File) {
+    setGlobalError(null);
+    setPageBusy({ index, mode: "image" });
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("index", String(index));
+      const res = await fetch(
+        `/api/packs/${packId}/story-pages/upload-image`,
+        { method: "POST", body: form }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setGlobalError(data.error ?? "Story-Bild-Upload fehlgeschlagen.");
+        return;
+      }
+      const newPages: StoryPage[] = data.pack?.storyPages ?? [];
+      setStoryPages(newPages);
+      setGlobalSuccess(`Story-Bild ${index + 1} hochgeladen.`);
+    } catch (err) {
+      setGlobalError((err as Error).message);
+    } finally {
+      setPageBusy(null);
+    }
+  }
+
+  function clearStoryPageImage(index: number) {
+    setStoryPages((prev) => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+      next[index] = { ...next[index], imageUrl: undefined };
+      return next;
+    });
+  }
+
+  async function addStoryPage(kind: StoryPage["kind"]) {
+    setGlobalError(null);
+    setPageBusy({ index: storyPages.length, mode: "add" });
+    try {
+      const res = await fetch(
+        `/api/packs/${packId}/story-pages/regenerate-one`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: "add", kind }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setGlobalError(data.error ?? "Story-Page konnte nicht hinzugefuegt werden.");
+        return;
+      }
+      const newPages: StoryPage[] = data.pack?.storyPages ?? [];
+      setStoryPages(newPages);
+      setGlobalSuccess(`Neue Story-Seite ('${kind}') hinzugefuegt.`);
+    } catch (err) {
+      setGlobalError((err as Error).message);
+    } finally {
+      setPageBusy(null);
+    }
+  }
+
   const hasChanges = dirtyFields.size > 0;
 
   async function handleSave() {
@@ -747,61 +883,241 @@ export function PackEditor({ brand, pack, packId }: PackEditorProps) {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {storyPages.map((p, idx) => (
-                      <div
-                        key={p.id}
-                        className="rounded-xl border p-4"
-                        style={{
-                          borderColor: brand.tokens.line,
-                          background: brand.tokens.surface,
-                        }}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                            style={{
-                              background: brand.tokens.accentSoft,
-                              color: brand.tokens.accent,
-                            }}
-                          >
-                            Story · {String(idx + 1).padStart(2, "0")}
-                          </span>
-                          <span
-                            className="text-[10px] uppercase tracking-wide"
-                            style={{ color: brand.tokens.inkMuted }}
-                          >
-                            {p.kind}
-                          </span>
+                    {storyPages.map((p, idx) => {
+                      const isThisRerolling =
+                        pageBusy?.index === idx && pageBusy.mode === "reroll";
+                      return (
+                        <div
+                          key={p.id}
+                          className="rounded-xl border p-4"
+                          style={{
+                            borderColor: brand.tokens.line,
+                            background: brand.tokens.surface,
+                          }}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                                style={{
+                                  background: brand.tokens.accentSoft,
+                                  color: brand.tokens.accent,
+                                }}
+                              >
+                                Story · {String(idx + 1).padStart(2, "0")}
+                              </span>
+                              <span
+                                className="text-[10px] uppercase tracking-wide"
+                                style={{ color: brand.tokens.inkMuted }}
+                              >
+                                {p.kind}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => rerollStoryPage(idx)}
+                                disabled={!!pageBusy}
+                                className="rounded-full border px-3 py-1 text-[11px] font-medium disabled:opacity-40"
+                                style={{
+                                  borderColor: brand.tokens.line,
+                                  color: brand.tokens.ink,
+                                }}
+                              >
+                                {isThisRerolling ? "Generiere…" : "Re-Roll"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeStoryPage(idx)}
+                                disabled={!!pageBusy}
+                                className="rounded-full border px-3 py-1 text-[11px] font-medium disabled:opacity-40"
+                                style={{
+                                  borderColor: brand.tokens.line,
+                                  color: brand.tokens.inkMuted,
+                                }}
+                                title="Diese Seite loeschen (nimmt erst beim Speichern Wirkung)"
+                              >
+                                Loeschen
+                              </button>
+                            </div>
+                          </div>
+                          <input
+                            value={p.title}
+                            onChange={(e) =>
+                              updateStoryPageField(idx, "title", e.target.value)
+                            }
+                            className="editor-input mt-3 !text-[16px] !font-semibold"
+                            style={{ fontFamily: "var(--font-fraunces)" }}
+                            placeholder="Story-Titel"
+                            maxLength={200}
+                          />
+                          <textarea
+                            value={p.body}
+                            onChange={(e) =>
+                              updateStoryPageField(idx, "body", e.target.value)
+                            }
+                            className="editor-input mt-2 min-h-[180px] !text-[12px] leading-relaxed"
+                            placeholder="Story-Body, 2-4 Absaetze, getrennt durch leere Zeilen…"
+                            maxLength={2000}
+                          />
+
+                          {/* Bild-Section */}
+                          <div className="mt-3 flex flex-wrap items-center gap-3">
+                            {p.imageUrl ? (
+                              <div
+                                className="relative h-20 w-32 overflow-hidden rounded-md border"
+                                style={{ borderColor: brand.tokens.line }}
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={p.imageUrl}
+                                  alt={`Story-Bild ${idx + 1}`}
+                                  className="h-full w-full object-cover"
+                                />
+                              </div>
+                            ) : (
+                              <div
+                                className="flex h-20 w-32 items-center justify-center rounded-md border text-[11px]"
+                                style={{
+                                  borderColor: brand.tokens.line,
+                                  color: brand.tokens.inkMuted,
+                                  background: brand.tokens.accentSoft,
+                                }}
+                              >
+                                Kein Bild
+                              </div>
+                            )}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => generateStoryPageImage(idx)}
+                                disabled={!!pageBusy}
+                                className="rounded-full px-3 py-1.5 text-[11px] font-semibold disabled:opacity-40"
+                                style={{
+                                  background: brand.tokens.accent,
+                                  color: brand.tokens.background,
+                                }}
+                              >
+                                {pageBusy?.index === idx && pageBusy.mode === "image"
+                                  ? "Generiere…"
+                                  : p.imageUrl
+                                    ? "Bild neu generieren"
+                                    : "Bild generieren"}
+                              </button>
+                              <input
+                                ref={(el) => {
+                                  storyImageInputRefs.current[p.id] = el;
+                                }}
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp,image/heic"
+                                hidden
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) uploadStoryPageImage(idx, file);
+                                  e.target.value = "";
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  storyImageInputRefs.current[p.id]?.click()
+                                }
+                                disabled={!!pageBusy}
+                                className="rounded-full border px-3 py-1.5 text-[11px] font-medium disabled:opacity-40"
+                                style={{
+                                  borderColor: brand.tokens.line,
+                                  color: brand.tokens.ink,
+                                }}
+                              >
+                                Hochladen
+                              </button>
+                              {p.imageUrl ? (
+                                <button
+                                  type="button"
+                                  onClick={() => clearStoryPageImage(idx)}
+                                  disabled={!!pageBusy}
+                                  className="rounded-full border px-3 py-1.5 text-[11px] font-medium disabled:opacity-40"
+                                  style={{
+                                    borderColor: brand.tokens.line,
+                                    color: brand.tokens.inkMuted,
+                                  }}
+                                >
+                                  Bild entfernen
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
                         </div>
-                        <h3
-                          className="mt-2 text-[16px] font-semibold"
-                          style={{ color: brand.tokens.ink, fontFamily: "var(--font-fraunces)" }}
-                        >
-                          {p.title}
-                        </h3>
-                        <p
-                          className="mt-2 whitespace-pre-line text-[12px] leading-relaxed"
-                          style={{ color: brand.tokens.ink }}
-                        >
-                          {p.body}
-                        </p>
-                      </div>
-                    ))}
-                    <div className="flex items-center gap-2 pt-1">
+                      );
+                    })}
+
+                    {/* Bottom-Bar mit Aktionen */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
                       <button
                         type="button"
                         onClick={handleGenerateStoryPages}
-                        disabled={isGeneratingStoryPages}
+                        disabled={isGeneratingStoryPages || !!pageBusy}
                         className="rounded-full border px-4 py-2 text-[12px] font-semibold disabled:opacity-40"
-                        style={{ borderColor: brand.tokens.line, color: brand.tokens.ink }}
+                        style={{
+                          borderColor: brand.tokens.line,
+                          color: brand.tokens.ink,
+                        }}
                       >
                         {isGeneratingStoryPages
-                          ? "Generiere neu…"
-                          : "Story-Seiten neu generieren"}
+                          ? "Generiere alle neu…"
+                          : "Alle 3 neu generieren"}
                       </button>
-                      <span className="text-[11px]" style={{ color: brand.tokens.inkMuted }}>
-                        Editieren und Bilder kommen in der naechsten Iteration.
+                      <span
+                        className="text-[11px]"
+                        style={{ color: brand.tokens.inkMuted }}
+                      >
+                        ·
                       </span>
+                      <span
+                        className="text-[11px] font-medium"
+                        style={{ color: brand.tokens.inkMuted }}
+                      >
+                        Seite hinzufuegen:
+                      </span>
+                      {(
+                        [
+                          { kind: "personal-story", label: "Geschichte" },
+                          { kind: "philosophy", label: "Philosophie" },
+                          { kind: "what-you-find", label: "Was du findest" },
+                          { kind: "custom", label: "Frei" },
+                        ] as Array<{ kind: StoryPage["kind"]; label: string }>
+                      ).map(({ kind, label }) => (
+                        <button
+                          key={kind}
+                          type="button"
+                          onClick={() => addStoryPage(kind)}
+                          disabled={!!pageBusy || isGeneratingStoryPages}
+                          className="rounded-full px-3 py-1.5 text-[11px] font-semibold disabled:opacity-40"
+                          style={{
+                            background: brand.tokens.accentSoft,
+                            color: brand.tokens.accent,
+                          }}
+                        >
+                          + {label}
+                        </button>
+                      ))}
+                      {pageBusy?.mode === "add" ? (
+                        <span
+                          className="text-[11px]"
+                          style={{ color: brand.tokens.inkMuted }}
+                        >
+                          Generiere neue Seite…
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div
+                      className="text-[11px]"
+                      style={{ color: brand.tokens.inkMuted }}
+                    >
+                      Bilder werden in 16:9-Querformat generiert und passen
+                      ins Story-Page-Layout. Manueller Upload geht via
+                      &quot;Hochladen&quot; (JPG/PNG/WebP/HEIC, max 12 MB).
                     </div>
                   </div>
                 )}
