@@ -344,21 +344,28 @@ async function loadRecipe(
   packSlug: string,
   recipeSlug: string
 ): Promise<Recipe | null> {
-  // Try the curated set first (static or already-seeded DB row)
-  const stat = await getRecipe(packSlug, recipeSlug);
-  if (stat) return stat;
-  // Fall back to custom (Supabase-stored)
-  const { data, error } = await supabase
+  // Custom-Override FIRST — direkt + uncached. Wenn der User eine curated
+  // Recipe editiert (Story, Title, Steps), liegt die aktuelle Version als
+  // is_custom=true Row in der DB. getRecipe() unten geht durch den
+  // getPackDbRows-unstable_cache (30s TTL) — der kann beim Download direkt
+  // nach einem Edit noch stale sein und das alte data-JSONB liefern. Für
+  // den PDF-Render lesen wir deshalb hier read-after-write garantiert frisch.
+  const { data: customRow, error: customErr } = await supabase
     .from("recipes")
     .select("data")
     .eq("pack_slug", packSlug)
     .eq("recipe_slug", recipeSlug)
+    .eq("is_custom", true)
     .maybeSingle();
-  if (error) {
-    console.warn("[pdf-jobs] loadRecipe custom lookup failed", error);
-    return null;
+  if (customErr) {
+    console.warn("[pdf-jobs] loadRecipe custom lookup failed", customErr);
+  } else if (customRow?.data) {
+    return customRow.data as Recipe;
   }
-  return (data?.data as Recipe | undefined) ?? null;
+
+  // Curated/static fallback (lib/recipes.ts → staticRecipe + DB-hero-merge).
+  const stat = await getRecipe(packSlug, recipeSlug);
+  return stat ?? null;
 }
 
 async function countCustomRecipes(
