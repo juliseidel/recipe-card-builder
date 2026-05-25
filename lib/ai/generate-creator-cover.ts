@@ -64,9 +64,9 @@ function pickRecipeContext(recipes: Recipe[] | undefined): string {
   return `${titles[0]}, ${titles[1]}, and ${titles[2]}`;
 }
 
-// Helper: Pack-spezifischer Szenen-Hint. Lehnt sich an die alten
-// styleFromTitle-Heuristiken an (Airfryer, Backen, Snacks, Meal-Prep)
-// — aber jetzt mit Person-im-Frame statt nur Items.
+// Helper: Pack-spezifischer Szenen-Hint. Gender-neutral formuliert
+// (User-Feedback: nicht zu viele "her/she" — auch maennliche Creator
+// dabei). Lehnt sich an Pack-Title-Heuristiken an.
 function sceneHintFromPack(pack: Pack): string {
   const t = pack.title.toLowerCase();
   if (
@@ -75,7 +75,7 @@ function sceneHintFromPack(pack: Pack): string {
     t.includes("heisluft") ||
     t.includes("fritteuse")
   ) {
-    return "standing in a sunlit modern kitchen beside an open airfryer with golden crispy contents, hands holding the airfryer drawer with confidence";
+    return "stands in a sunlit modern kitchen beside an open airfryer with golden crispy contents, holding the airfryer drawer with confidence";
   }
   if (
     t.includes("backwelt") ||
@@ -84,29 +84,44 @@ function sceneHintFromPack(pack: Pack): string {
     t.includes("dessert") ||
     t.includes("kuchen")
   ) {
-    return "in a warm baker's kitchen, hands gently dusting flour over a freshly-baked cake on a wire cooling rack, soft late-morning light";
+    return "is in a warm baker's kitchen, gently dusting flour over a freshly-baked cake on a wire cooling rack, soft late-morning light";
   }
   if (t.includes("meal") || t.includes("prep") || t.includes("vorkoch")) {
-    return "in an organised kitchen with three glass meal-prep containers in front, gently arranging the second container, Sunday-prep mood";
+    return "is in an organised kitchen with three glass meal-prep containers in front, arranging them with focused attention, Sunday-prep mood";
   }
   if (t.includes("salat") || t.includes("bowl") || t.includes("veggie")) {
-    return "at a fresh kitchen island with a deep ceramic bowl of vibrant greens, mid-action lifting a wooden serving spoon, bright noon light";
+    return "stands at a fresh kitchen island holding a deep ceramic bowl of vibrant greens, bright noon light";
   }
   if (t.includes("snack") || t.includes("naschen") || t.includes("bites")) {
-    return "in a minimal kitchen, gently placing one small ceramic ramekin of bite-sized snacks on the counter, soft indirect daylight";
+    return "is in a minimal kitchen, placing one small ceramic ramekin of bite-sized snacks on the counter, soft indirect daylight";
+  }
+  if (t.includes("pasta") || t.includes("nudel")) {
+    return "stands in a warm kitchen with a deep bowl of fresh pasta with herbs and cherry tomatoes, parmesan and basil in front, soft daylight";
+  }
+  if (t.includes("pizza")) {
+    return "is in a warm kitchen holding a freshly baked pizza on a wooden board, melted cheese and herbs visible";
   }
   if (
     t.includes("protein") ||
     t.includes("high-protein") ||
-    t.includes("highprotein")
+    t.includes("highprotein") ||
+    t.includes("hähnchen") ||
+    t.includes("haehnchen") ||
+    t.includes("chicken")
   ) {
-    return "in a modern bright kitchen, beside a plated high-protein dish, holding a wooden serving spoon, confident editorial pose";
+    return "is in a modern bright kitchen, holding a plated high-protein dish with grilled chicken and fresh greens, confident pose";
   }
   if (t.includes("frühstück") || t.includes("breakfast") || t.includes("morgen")) {
-    return "at a warm wooden breakfast table with a bowl of porridge and berries, holding a coffee mug, soft golden morning light";
+    return "is at a warm wooden breakfast table with a bowl of porridge and berries, holding a coffee mug, soft golden morning light";
   }
-  // Default: generischer "Creator in der Kueche mit Pack-Hero-Dish"
-  return "in a warm sunlit kitchen, beside a beautifully plated dish from this recipe pack, holding a wooden serving spoon, confident editorial pose";
+  if (t.includes("abnehm") || t.includes("kalor") || t.includes("schlank")) {
+    return "is in a bright modern kitchen holding a fresh bowl of high-protein salad with grilled chicken, fitness-foodie vibe, additional dishes visible";
+  }
+  if (t.includes("süß") || t.includes("suess") || t.includes("treat") || t.includes("sweet")) {
+    return "is in a warm cozy kitchen with a plate of sweet treats — small cheesecakes, berry tarts, decorative serving";
+  }
+  // Default: generisch "Creator in Küche mit Pack-Hero-Dish"
+  return "stands in a warm sunlit kitchen beside a beautifully plated dish from this recipe pack, holding a wooden serving spoon, confident pose";
 }
 
 // Helper: lokalisiere das Pack-Thema kurz auf Englisch fuer Gemini.
@@ -119,32 +134,38 @@ function buildCoverPrompt(input: CreatorCoverInput): string {
   const recipeContext = pickRecipeContext(recipes);
 
   return [
-    `A candid, documentary-style food photograph — the kind a food blogger would actually post to her own Instagram. NOT a polished magazine cover, NOT a studio shot.`,
+    `A professional cookbook cover photograph in the style of high-end Pinterest/Canva recipe books (Smitten Kitchen, Penguin Random House cookbook covers, Tracksmith editorial).`,
     ``,
-    `Subject: the person from the FIRST reference image (${brand.name}, ${brand.handle}). Use her real face, hair, body type, skin tone, and general appearance from that reference — she must be clearly recognisable as ${brand.name}, not a generic person who looks like her. She is shown ${sceneHint}.`,
+    `SUBJECT — 1:1 LIKENESS LOCK:`,
+    `The person from the FIRST reference image is the creator (${brand.name}, ${brand.handle}). Reproduce their face, hairstyle, hair colour, eye colour, body type, and overall appearance EXACTLY as in the reference — same person, not a similar-looking one. They may be in a different pose, in a different setting, wearing different clothes — but FACE and IDENTITY must match the reference 1:1. This applies regardless of gender: male creator stays male, female creator stays female. Do not stereotype, do not feminize/masculinize beyond the reference.`,
     ``,
-    `REALISM RULES — these are critical, the photo must look genuinely real, not AI-generated:`,
-    `  - Natural skin texture with pores, slight blemishes, real human imperfection. NO smooth airbrushed skin, NO plastic look.`,
-    `  - Candid unposed expression — caught mid-action, not staged for camera. Slight imperfect framing is welcome.`,
-    `  - Authentic kitchen mess: a few stray crumbs, water marks on the counter, a wooden spoon resting carelessly. NOT pristine, NOT styled.`,
-    `  - Lighting is real ambient daylight from a real window — soft directional shadows, NOT studio softbox, NOT cinematic dramatic light.`,
-    `  - Slight imperfections in focus or grain (think shot-on-iPhone-Pro, not shot-on-medium-format).`,
-    `  - Hands look like real hands (correct number of fingers, natural creases, slight imperfection).`,
-    `  - Skin tone is natural, NOT overly warm-orange, NOT overly cool.`,
-    ``,
-    `Visual world: the ADDITIONAL reference images (if any) are real recipes from this pack — use them as a style anchor for plating, food colours, lighting mood. The dish visible in the cover should feel like it belongs to the same visual universe (NOT a literal copy of any single one).`,
+    `SCENE:`,
+    `The creator ${sceneHint}. The ADDITIONAL reference images are real dishes from this pack — use them as visual anchor for plating, food colours, lighting mood. The dish in the foreground should belong to the same visual universe (NOT a literal copy).`,
     ``,
     `Pack theme: "${pack.title}" — ${pack.tagline}. Recipes include: ${recipeContext}.`,
     ``,
-    `COMPOSITION FOR TEXT OVERLAY — CRITICAL:`,
-    `The bottom third of the frame MUST be a visually calm, slightly darker area suitable for a text overlay that gets added later. The person and the main dish should sit in the upper two-thirds. Think of it as leaving a "title bar" area at the bottom — keep the bottom band relatively uncluttered and tonally darker (a shadowed counter edge, a dark wood surface, a darker corner of the kitchen).`,
+    `═══════════════ COVER DESIGN — CRITICAL ═══════════════`,
     ``,
-    `Composition: 3:4 portrait orientation, person positioned to one side of the upper frame (not centre-frame, not in the bottom band), scene feels lived-in and slightly imperfect.`,
+    `This is a FULL COOKBOOK COVER with integrated typography and decorative design elements layered over the photo. NOT just a photo with title — a composed cover layout like Pinterest/Canva cookbook covers.`,
     ``,
-    `HARD RULES — strictly enforced:`,
-    `  - ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO WRITING, NO LOGOS, NO BRAND NAMES, NO CAPTIONS, NO TITLES, NO SIGNAGE anywhere in the image. Text gets added separately in post-production via overlay — Gemini's German typography is unreliable (misspellings, broken Umlauts), so the image must stay completely text-free.`,
-    `  - Real food only — no plastic-looking renders, no oversaturated colours.`,
-    `  - AVOID anything that looks AI-generated: no glossy plastic skin, no impossibly perfect symmetric face, no over-styled magazine feel, no studio backdrop, no perfect symmetric composition.`,
+    `TYPOGRAPHY (rendered INSIDE the image, perfect German spelling):`,
+    `  1. MAIN TITLE: "${pack.title}" — large, elegant serif font (think Fraunces, Playfair, Cormorant). Place upper-left or centre-left. Use a TWO-TONE colour treatment: one word in cream-white, another word in a soft accent colour (dusty rose / warm terracotta / sage green / honey-amber — pick what matches the food). Render with high precision: every German Umlaut (ä, ö, ü, ß) must be pixel-perfect.`,
+    pack.subtitle ? `  2. SUBTITLE: "${pack.subtitle}" — smaller sans-serif (Inter, Helvetica), below the title, with a thin horizontal divider line between title and subtitle.` : "",
+    `  3. CIRCULAR BADGE: place a soft cream-coloured round badge somewhere in the composition (typically lower-third). Inside: 2-3 short German words like "Einfach. Lecker. Von Herzen." or "Schnell & kalorienbewusst" — fitting the pack theme. Decorate with a tiny heart or small sprig.`,
+    `  4. BOTTOM STRIP: a thin band at the very bottom with 2-3 small feature pills/icons (e.g. clock-icon + "Schnell zubereitet", leaf-icon + "Leicht & kalorienbewusst", heart-icon + "Mit Liebe gemacht"). Use simple line-icons.`,
+    `  5. OPTIONAL TOP ACCENT: a small decorative element above the title — a hand-drawn heart, a tiny bee, a sprig of herbs, a small brushstroke. Subtle, not loud.`,
+    ``,
+    `LAYOUT PRINCIPLE:`,
+    `Think Cookbook-Cover-Design with multiple visual layers — photo as background, typography elements layered over it with small whitespace gaps so each text-element breathes. Food + creator stay clearly visible, the text complements without dominating.`,
+    ``,
+    `IMAGE QUALITY:`,
+    `Real photography style — soft natural daylight, warm tones, slight film grain. Real human skin (pores, natural texture, not airbrushed plastic). Real food (no glossy plastic). Professional but not over-stylized — should feel like a real published cookbook cover, not AI-generated.`,
+    ``,
+    `HARD CONSTRAINTS:`,
+    `  - GERMAN TEXT PERFECTION: every word from title/subtitle/badge MUST be spelled correctly with intact German diacritics. NO misspellings, NO broken Umlauts (no "Eiwes reiche" instead of "Eiweißreiche", no "oeh" instead of "öl"). Text rendering quality is the most important quality bar for this cover.`,
+    `  - NO logos or brand names beyond the handle.`,
+    `  - NO oversaturated colours, no neon, no AI-art gloss, no impossibly perfect symmetric face.`,
+    `  - 3:4 portrait orientation.`,
   ]
     .filter(Boolean)
     .join("\n");

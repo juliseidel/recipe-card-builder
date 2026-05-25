@@ -17,8 +17,20 @@
 // damit rechnen + die Title-Texte robust formulieren (kurz, sparsame
 // Umlaute).
 
-const ENDPOINT =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent";
+// Modell-IDs für Gemini Image-Gen — siehe ai.google.dev/gemini-api/docs/models.
+// nano-banana    = gemini-2.5-flash-image (schnell, billig, schwach bei Text)
+// nano-banana-2  = gemini-3.1-flash-image-preview (besser, mid-price)
+// nano-banana-pro = gemini-3-pro-image-preview (best text rendering, premium)
+export type GeminiImageModel =
+  | "gemini-2.5-flash-image"
+  | "gemini-3.1-flash-image-preview"
+  | "gemini-3-pro-image-preview";
+
+const DEFAULT_MODEL: GeminiImageModel = "gemini-3-pro-image-preview";
+
+function endpointFor(model: GeminiImageModel): string {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+}
 
 export type GeminiImageReference = {
   /** Roher Bild-Buffer (z.B. von fs.readFile oder fetch.arrayBuffer). */
@@ -50,6 +62,11 @@ export type GeminiImageOptions = {
   /** Retries on 5xx / network errors. Default 1 (Image-Gen ist teuer, kein
    *  aggressiver Retry). */
   retries?: number;
+  /** Modell-Override. Default: gemini-3-pro-image-preview (Nano Banana Pro,
+   *  best text rendering — wichtig fuer deutsche Cookbook-Cover-Titel mit
+   *  Umlauten). Fuer Tests/Cost-Sparen kann auf gemini-2.5-flash-image
+   *  (Nano Banana) gewechselt werden. */
+  model?: GeminiImageModel;
 };
 
 export type GeminiImageResult = {
@@ -116,9 +133,11 @@ export async function generateGeminiImage(
   const retries = opts.retries ?? 1;
   let lastErr: unknown = null;
 
+  const endpoint = endpointFor(opts.model ?? DEFAULT_MODEL);
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const res = await fetch(ENDPOINT, {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
