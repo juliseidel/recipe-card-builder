@@ -144,18 +144,25 @@ function CoverPage({
   const TEXT_LIGHT = "#fdfaf2";
   const hasCover = !!coverDataUri;
 
-  // ─── Pure Image Page (Creator-Cover v3) ──────────────────────────────────
-  // Wenn das aktuelle coverImage vom generateCreatorCover-Pfad kommt
-  // (pack.coverStyle === "creator"), enthaelt das Bild bereits Title +
-  // Subtitle + Handle als von Gemini gerenderten Text. Wir rendern dann
-  // KEIN react-pdf Text-Overlay — sonst doppelt + visuell konkurrierend.
-  // Full-bleed Image, sonst nichts.
+  // ─── Creator-Cover (v8, Mai 2026): Image + react-pdf Text-Overlay ──────
+  // v3-v7: Gemini sollte Text direkt ins Bild rendern. Funktioniert für
+  // englischen Text okay, aber bei deutschem Text mit Umlauten unreliable
+  // (User-Befund: "Eiwes reiche Rezepte" statt "Eiweißreiche Rezepte",
+  // "öh" statt "öl"). Gemini-2.5-Flash-Image-Doku warnt explizit:
+  // "struggles with precise typography compared to Gemini 3 variants".
+  //
+  // v8 Lösung: Bild ist text-frei (Prompt hat "ABSOLUTELY NO TEXT") und
+  // wir legen Title + Subtitle + Handle in Brand-Fonts via react-pdf
+  // drüber — 100% korrekte Rechtschreibung, perfekte Umlaute. Bild bleibt
+  // weiterhin Creator-Cover (Lifestyle + Person), nur Text wird unten in
+  // einem dezenten Band gerendert.
   if (hasCover && pack.coverStyle === "creator") {
     return (
       <Page
         size="A4"
         style={{ backgroundColor: t.ink, fontFamily: "Inter" }}
       >
+        {/* Full-bleed Image (Gemini-generated, text-free) */}
         <Image
           src={coverDataUri!}
           style={{
@@ -168,6 +175,96 @@ function CoverPage({
             objectPosition: "center",
           }}
         />
+
+        {/* Bottom shadow band für Text-Lesbarkeit. 3 gestapelte halb-
+            transparente Layers approximieren einen smoothen Gradient
+            (react-pdf hat keine native linear-gradient). */}
+        <View
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 260,
+            height: 120,
+            backgroundColor: "rgba(0,0,0,0.15)",
+          }}
+        />
+        <View
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 130,
+            height: 130,
+            backgroundColor: "rgba(0,0,0,0.40)",
+          }}
+        />
+        <View
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 130,
+            backgroundColor: "rgba(0,0,0,0.62)",
+          }}
+        />
+
+        {/* Text-Overlay bottom-left, Brand-Fonts */}
+        <View
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            padding: 44,
+            paddingBottom: 50,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 9,
+              letterSpacing: 2.4,
+              textTransform: "uppercase",
+              color: TEXT_LIGHT,
+              opacity: 0.88,
+              marginBottom: 14,
+            }}
+          >
+            {recipes.length} Rezepte · {brand.handle}
+          </Text>
+
+          <Text
+            style={{
+              fontFamily: titleFont,
+              fontWeight: titleFont === "Inter" ? 700 : 400,
+              fontSize: titleFont === "Inter" ? 56 : 64,
+              lineHeight: 0.96,
+              letterSpacing: titleFont === "Inter" ? -1.5 : -0.7,
+              color: TEXT_LIGHT,
+              maxWidth: 480,
+            }}
+          >
+            {pack.title}
+          </Text>
+
+          {pack.subtitle ? (
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontStyle: "italic",
+                fontSize: 18,
+                lineHeight: 1.3,
+                color: TEXT_LIGHT,
+                opacity: 0.94,
+                marginTop: 12,
+                maxWidth: 460,
+              }}
+            >
+              {pack.subtitle}
+            </Text>
+          ) : null}
+        </View>
       </Page>
     );
   }

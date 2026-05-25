@@ -136,15 +136,15 @@ function buildCoverPrompt(input: CreatorCoverInput): string {
     ``,
     `Pack theme: "${pack.title}" — ${pack.tagline}. Recipes include: ${recipeContext}.`,
     ``,
-    `IMPORTANT — text composition: render the following German text DIRECTLY INSIDE the image, integrated as cookbook cover typography. The text must be sharply rendered, legible, German spelling preserved (Umlauts ä/ö/ü/ß intact):`,
-    `  - Large title (top or bottom third): ${pack.title}`,
-    pack.subtitle ? `  - Smaller italic subtitle just below the title: ${pack.subtitle}` : "",
-    `  - Small handle in the lower corner: ${brand.handle}`,
-    `Text style: warm off-white with subtle shadow for readability, elegant serif typography. Place text in a visually calm area (lower-left third or bottom band) so the person and food stay prominent.`,
+    `COMPOSITION FOR TEXT OVERLAY — CRITICAL:`,
+    `The bottom third of the frame MUST be a visually calm, slightly darker area suitable for a text overlay that gets added later. The person and the main dish should sit in the upper two-thirds. Think of it as leaving a "title bar" area at the bottom — keep the bottom band relatively uncluttered and tonally darker (a shadowed counter edge, a dark wood surface, a darker corner of the kitchen).`,
     ``,
-    `Composition: 3:4 portrait orientation, person positioned to one side of the frame (not centre-frame), scene feels lived-in and slightly imperfect.`,
+    `Composition: 3:4 portrait orientation, person positioned to one side of the upper frame (not centre-frame, not in the bottom band), scene feels lived-in and slightly imperfect.`,
     ``,
-    `Hard rules: NO additional text beyond what's specified above. NO logos, watermarks, brand names other than the handle. Real food only — no plastic-looking renders, no oversaturated colours. AVOID anything that looks AI-generated: no glossy plastic skin, no impossibly perfect symmetric face, no over-styled magazine feel, no studio backdrop.`,
+    `HARD RULES — strictly enforced:`,
+    `  - ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO WRITING, NO LOGOS, NO BRAND NAMES, NO CAPTIONS, NO TITLES, NO SIGNAGE anywhere in the image. Text gets added separately in post-production via overlay — Gemini's German typography is unreliable (misspellings, broken Umlauts), so the image must stay completely text-free.`,
+    `  - Real food only — no plastic-looking renders, no oversaturated colours.`,
+    `  - AVOID anything that looks AI-generated: no glossy plastic skin, no impossibly perfect symmetric face, no over-styled magazine feel, no studio backdrop, no perfect symmetric composition.`,
   ]
     .filter(Boolean)
     .join("\n");
