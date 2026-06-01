@@ -5211,6 +5211,13 @@ function StepsList({
   stepNumFontSize?: number;
 }) {
   const groups = groupSteps(steps);
+  // Fortlaufende Nummerierung in RENDER-Reihenfolge (1..N über alle Gruppen
+  // hinweg), NICHT item.index. groupSteps zieht ungruppierte Steps nach vorn
+  // und gruppierte dahinter — die Original-Position (item.index) wuerde dann
+  // springen (z.B. 3,4 dann 1,2 bei "Brownie Schicht"/"Cheesecake Schicht").
+  // Ein lauffender Zaehler garantiert, dass die sichtbaren Zahlen immer der
+  // tatsaechlichen Lese-Reihenfolge der Karte entsprechen.
+  let stepCounter = 0;
   return (
     <View style={{ marginTop: 8 }}>
       {groups.map((group, gIdx) => (
@@ -5231,7 +5238,9 @@ function StepsList({
               {group.name}
             </Text>
           ) : null}
-          {group.items.map((item) => (
+          {group.items.map((item) => {
+            const displayNum = ++stepCounter;
+            return (
             <View
               key={item.index}
               style={{
@@ -5264,7 +5273,7 @@ function StepsList({
                   lineHeight: 1.45,
                 }}
               >
-                {item.index + 1}
+                {displayNum}
               </Text>
               <Text
                 style={{
@@ -5280,7 +5289,8 @@ function StepsList({
                 {item.text}
               </Text>
             </View>
-          ))}
+            );
+          })}
         </View>
       ))}
     </View>
