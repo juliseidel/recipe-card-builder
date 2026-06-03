@@ -431,8 +431,8 @@ function EditorialPage({
         />
         <PortionTile
           label="GESAMTZEIT"
-          value={String(time)}
-          sub={`Min · ${recipe.difficulty}`}
+          value={`${time} Min`}
+          sub={recipe.difficulty}
           theme={t}
           compact
         />
@@ -5080,6 +5080,10 @@ function IngredientGroupBody({
           rowPadV={rowPadV}
           nameFontSize={nameFontSize}
           noteFontSize={noteFontSize}
+          // Letzte Zeile der Gruppe: kein Bottom-Strich. Sonst liegt er
+          // direkt ueber dem Gruppen-Trenner zur naechsten Sektion ("Sauce")
+          // = doppelte Linie (Leon-Feedback). Der grosse Trenner bleibt.
+          isLast={i === items.length - 1}
         />
       ))}
     </View>
@@ -5095,6 +5099,7 @@ function IngredientRow({
   rowPadV,
   nameFontSize,
   noteFontSize,
+  isLast = false,
 }: {
   ing: IngredientGroup["items"][number];
   theme: ReturnType<typeof packTheme>;
@@ -5104,6 +5109,7 @@ function IngredientRow({
   rowPadV?: number;
   nameFontSize?: number;
   noteFontSize?: number;
+  isLast?: boolean;
 }) {
   // Density overrides take precedence; legacy `compact` boolean kept for
   // any callers that haven't migrated yet. Werte hier so gewaehlt, dass
@@ -5151,7 +5157,7 @@ function IngredientRow({
     <View
       style={{
         flexDirection: "row",
-        borderBottomWidth: 0.5,
+        borderBottomWidth: isLast ? 0 : 0.5,
         borderBottomColor: withAlpha(theme.ink, 0.08),
         paddingVertical: padV,
         gap: 5,
