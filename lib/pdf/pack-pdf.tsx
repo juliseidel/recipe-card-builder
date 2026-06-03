@@ -775,13 +775,15 @@ function NutritionOverviewPage({
           );
         })}
 
-        {/* Totals row */}
+        {/* Durchschnitt pro Rezept statt Pack-Summe (Leon: "Pack-Total
+            macht keinen Sinn, niemand isst alles auf einmal"). Der Schnitt
+            je Rezept ist die sinnvolle Kennzahl zum Abschluss der Tabelle. */}
         <View
           style={{
             flexDirection: "row",
             backgroundColor: blendWithWhite(t.bg, 0.45),
             paddingVertical: 10,
-            paddingHorizontal: 8,
+            paddingHorizontal: 12,
             marginTop: 4,
             borderRadius: 6,
           }}
@@ -796,19 +798,19 @@ function NutritionOverviewPage({
               textTransform: "uppercase",
             }}
           >
-            Pack-Total
+            Ø pro Rezept
           </Text>
           <Text style={{ width: 48, fontSize: 10, fontWeight: 700, color: t.ink, textAlign: "right" }}>
-            {totals.kcal}
+            {avg.kcal}
           </Text>
           <Text style={{ width: 60, fontSize: 10, fontWeight: 700, color: t.ink, textAlign: "right" }}>
-            {totals.protein} g
+            {avg.protein} g
           </Text>
           <Text style={{ width: 60, fontSize: 10, fontWeight: 700, color: t.ink, textAlign: "right" }}>
-            {totals.carbs} g
+            {avg.carbs} g
           </Text>
           <Text style={{ width: 48, fontSize: 10, fontWeight: 700, color: t.ink, textAlign: "right" }}>
-            {totals.fat} g
+            {avg.fat} g
           </Text>
         </View>
 
@@ -821,8 +823,8 @@ function NutritionOverviewPage({
             fontStyle: "italic",
           }}
         >
-          Die kcal-Spalte zeigt den Wert pro Portion bzw. pro Stück, die letzte
-          Zeile die Pack-Summe. Werte basieren auf {brand.name}s
+          Alle Werte gelten pro Portion bzw. pro Stück, die letzte Zeile zeigt
+          den Durchschnitt je Rezept. Sie basieren auf {brand.name}s
           Original-Rezepten und können je nach verwendeter Marke leicht
           abweichen.
         </Text>
