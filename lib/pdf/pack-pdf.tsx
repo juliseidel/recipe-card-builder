@@ -366,6 +366,45 @@ function CoverPage({
   );
 }
 
+// 5er-Gruppen-Separator: feine Linie links+rechts mit zentrierter Raute.
+// Klassisch-edler Kochbuch-Trenner statt einer durchgehenden Strich-Linie
+// (Leon-Feedback). Wird im Inhaltsverzeichnis + in der Pack-Uebersicht vor
+// jeder neuen 5er-Gruppe eingesetzt.
+function GroupSeparator({
+  theme,
+  marginV = 7,
+}: {
+  theme: ReturnType<typeof packTheme>;
+  marginV?: number;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 9,
+        marginVertical: marginV,
+        paddingHorizontal: 4,
+      }}
+    >
+      <View style={{ flex: 1, height: 0.8, backgroundColor: theme.divider }} />
+      {/* Kleine Raute als gedrehtes Quadrat (View, nicht Schrift-Glyph —
+          Fraunces hat kein ◆-Zeichen, das wuerde als Ersatzglyph "Æ"
+          rendern). 4x4 pt um 45° gedreht = sauberer Diamant in Akzentfarbe. */}
+      <View
+        style={{
+          width: 4,
+          height: 4,
+          backgroundColor: theme.accent,
+          transform: "rotate(45deg)",
+        }}
+      />
+      <View style={{ flex: 1, height: 0.8, backgroundColor: theme.divider }} />
+    </View>
+  );
+}
+
 // ─── INDEX / INHALTSVERZEICHNIS ──────────────────────────────────────────────
 function IndexPage({
   brand,
@@ -479,28 +518,22 @@ function IndexPage({
             }}
           >
             {recipes.map((r, i) => {
-              // 5er-Gruppierung via zartem Wechsel-Tint + Abstand statt
-              // harter Linie (Leon: Striche wirken billig). Gruppe 2,4,…
-              // bekommt einen hauchzarten Marken-Tint, jede neue Gruppe
-              // etwas Luft + gerundete Ecken — ruhige Cluster ohne Striche.
-              const groupIdx = Math.floor(i / 5);
-              const groupTint = groupIdx % 2 === 1 ? blendWithWhite(t.bg, 0.72) : "#ffffff";
-              const isGroupStart = i % 5 === 0;
-              const isGroupEnd = i % 5 === 4 || i === recipes.length - 1;
+              // Ornament-Separator vor jeder neuen 5er-Gruppe (Leon: alle 5
+              // Rezepte). Feine Linie + Raute statt durchgehendem Strich.
+              const showSep = i > 0 && i % 5 === 0;
+              // Zeilen-Trennlinie nur INNERHALB der Gruppe (nicht direkt vor
+              // einem Separator und nicht nach der letzten Zeile).
+              const showRowLine = i < recipes.length - 1 && (i + 1) % 5 !== 0;
               return (
+              <View key={r.slug}>
+              {showSep ? <GroupSeparator theme={t} marginV={rowPadV - 1} /> : null}
               <View
-                key={r.slug}
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  backgroundColor: groupTint,
-                  marginTop: isGroupStart && i > 0 ? 6 : 0,
-                  borderTopLeftRadius: isGroupStart ? 7 : 0,
-                  borderTopRightRadius: isGroupStart ? 7 : 0,
-                  borderBottomLeftRadius: isGroupEnd ? 7 : 0,
-                  borderBottomRightRadius: isGroupEnd ? 7 : 0,
+                  borderBottomWidth: showRowLine ? 0.5 : 0,
+                  borderBottomColor: t.divider,
                   paddingVertical: rowPadV,
-                  paddingHorizontal: 12,
                   gap: 10,
                 }}
               >
@@ -560,6 +593,7 @@ function IndexPage({
                       falls Array-Lookup leer. */}
                   S. {recipePageNumbers[i] ?? i + 4}
                 </Text>
+              </View>
               </View>
               );
             })}
@@ -675,29 +709,22 @@ function NutritionOverviewPage({
           </Text>
         </View>
 
-        {/* Body rows — 5er-Gruppierung via zartem Wechsel-Tint statt harter
-            Trennlinie (Leon: Striche wirken billig). Jede 5er-Gruppe
-            alterniert zwischen Weiss und einem hauchzarten Marken-Tint;
-            erste Zeile jeder Gruppe bekommt etwas mehr Luft oben. Das
-            clustert optisch ruhig + premium, ganz ohne Linien. */}
+        {/* Body rows — Ornament-Separator (Linie + Raute) vor jeder neuen
+            5er-Gruppe (Leon: alle 5 Rezepte). Feine Zeilen-Trennlinie nur
+            INNERHALB der Gruppe. */}
         {recipes.map((r, i) => {
-          const groupIdx = Math.floor(i / 5);
-          const groupTint = groupIdx % 2 === 1 ? blendWithWhite(t.bg, 0.72) : "#ffffff";
-          const isGroupStart = i % 5 === 0;
-          const isGroupEnd = i % 5 === 4 || i === recipes.length - 1;
+          const showSep = i > 0 && i % 5 === 0;
+          const showRowLine = i < recipes.length - 1 && (i + 1) % 5 !== 0;
           return (
+          <View key={r.slug}>
+          {showSep ? <GroupSeparator theme={t} marginV={5} /> : null}
           <View
-            key={r.slug}
             style={{
               flexDirection: "row",
-              backgroundColor: groupTint,
-              marginTop: isGroupStart && i > 0 ? 7 : 0,
-              borderTopLeftRadius: isGroupStart ? 7 : 0,
-              borderTopRightRadius: isGroupStart ? 7 : 0,
-              borderBottomLeftRadius: isGroupEnd ? 7 : 0,
-              borderBottomRightRadius: isGroupEnd ? 7 : 0,
+              borderBottomWidth: showRowLine ? 0.5 : 0,
+              borderBottomColor: t.divider,
               paddingVertical: 8,
-              paddingHorizontal: 12,
+              paddingHorizontal: 8,
               alignItems: "center",
             }}
           >
@@ -721,6 +748,7 @@ function NutritionOverviewPage({
             <Text style={{ width: 48, fontSize: 10, color: t.ink, textAlign: "right" }}>
               {r.nutrition.fat} g
             </Text>
+          </View>
           </View>
           );
         })}
