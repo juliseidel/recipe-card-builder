@@ -524,6 +524,13 @@ function IndexPage({
               // Zeilen-Trennlinie nur INNERHALB der Gruppe (nicht direkt vor
               // einem Separator und nicht nach der letzten Zeile).
               const showRowLine = i < recipes.length - 1 && (i + 1) % 5 !== 0;
+              // Jede zweite 5er-Gruppe (also die Mitte: Rezept 6-10, bei mehr
+              // Rezepten auch 16-20 etc.) zart pink hinterlegen — hebt die
+              // Gruppe zusaetzlich zu den Trennern ab.
+              const tinted = Math.floor(i / 5) % 2 === 1;
+              const groupBg = tinted ? blendWithWhite(t.bg, 0.72) : "transparent";
+              const isGroupStart = i % 5 === 0;
+              const isGroupEnd = i % 5 === 4 || i === recipes.length - 1;
               return (
               <View key={r.slug}>
               {showSep ? <GroupSeparator theme={t} marginV={rowPadV - 1} /> : null}
@@ -531,9 +538,15 @@ function IndexPage({
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
+                  backgroundColor: groupBg,
+                  borderTopLeftRadius: tinted && isGroupStart ? 7 : 0,
+                  borderTopRightRadius: tinted && isGroupStart ? 7 : 0,
+                  borderBottomLeftRadius: tinted && isGroupEnd ? 7 : 0,
+                  borderBottomRightRadius: tinted && isGroupEnd ? 7 : 0,
                   borderBottomWidth: showRowLine ? 0.5 : 0,
                   borderBottomColor: t.divider,
                   paddingVertical: rowPadV,
+                  paddingHorizontal: 12,
                   gap: 10,
                 }}
               >
@@ -715,16 +728,25 @@ function NutritionOverviewPage({
         {recipes.map((r, i) => {
           const showSep = i > 0 && i % 5 === 0;
           const showRowLine = i < recipes.length - 1 && (i + 1) % 5 !== 0;
+          const tinted = Math.floor(i / 5) % 2 === 1;
+          const groupBg = tinted ? blendWithWhite(t.bg, 0.72) : "transparent";
+          const isGroupStart = i % 5 === 0;
+          const isGroupEnd = i % 5 === 4 || i === recipes.length - 1;
           return (
           <View key={r.slug}>
           {showSep ? <GroupSeparator theme={t} marginV={5} /> : null}
           <View
             style={{
               flexDirection: "row",
+              backgroundColor: groupBg,
+              borderTopLeftRadius: tinted && isGroupStart ? 7 : 0,
+              borderTopRightRadius: tinted && isGroupStart ? 7 : 0,
+              borderBottomLeftRadius: tinted && isGroupEnd ? 7 : 0,
+              borderBottomRightRadius: tinted && isGroupEnd ? 7 : 0,
               borderBottomWidth: showRowLine ? 0.5 : 0,
               borderBottomColor: t.divider,
               paddingVertical: 8,
-              paddingHorizontal: 8,
+              paddingHorizontal: 12,
               alignItems: "center",
             }}
           >
