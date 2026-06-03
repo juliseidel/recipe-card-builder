@@ -43,3 +43,6 @@ next-env.d.ts
 # claude / agents
 /.claude/
 .env*.local
+
+# Perfektions-Workflow Arbeitsverzeichnis (PDFs, Render-Zwischenstände)
+_pdf_out/

@@ -101,7 +101,7 @@ export const BIENE_STYLE: BrandImageStyle = {
   // mode, which renders headline overlays. "Natural unstaged" gets the
   // same look without the trigger word.
   cameraAesthetic:
-    "natural unstaged food photograph, homemade-feeling, no studio look",
+    "natural unstaged food photograph, homemade-feeling, no studio look. The dish is large and fills most of the frame as the clear hero — fairly tightly framed, the food is the main subject with only a little counter visible around it",
   // Bienes signature framing: cutting board with a MAIN-INGREDIENT bowl in
   // the soft background. NO scattered greens on counter or board — that
   // earlier hypothesis didn't survive contact with the sweet/baked dishes
@@ -116,7 +116,7 @@ export const BIENE_STYLE: BrandImageStyle = {
   // klar funktioniert besser; die "main ingredient"-Auswahl ueberlassen
   // wir Gemini's Intuition.
   heroElementGuidance:
-    "A complete English phrase describing the scene: 'a small wooden cutting board with a small ceramic bowl of [main recipe ingredient in its most photogenic natural form] sits softly in the background, behind the dish'. The cutting board is a separate prop in the background, never under the dish itself.",
+    "A complete English phrase describing the scene: 'a small wooden cutting board with a small ceramic bowl of [main recipe ingredient in its most photogenic natural form] sits softly in the background behind the dish, with a few more tasteful styling props around the scene — a folded linen napkin, a couple of scattered raw ingredients, a small spoon or fork — so the background feels richer and more decorated, while staying softly blurred and never cluttered'. The cutting board and props are separate background elements, never under the dish itself; the dish stays the large clear hero in front.",
   // Per-shape angle overrides. Calibrated against Bienes real reels:
   // pasta-bowls and plated mains shoot top-down (most of her content),
   // layered desserts (cheesecake, tiramisu) shoot 30° three-quarter so

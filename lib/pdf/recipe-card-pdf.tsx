@@ -286,19 +286,19 @@ function EditorialPage({
         {/* alignSelf flex-start + feste Hoehe: sonst streckt der row-Parent
             (alignItems default "stretch") den Bild-Slot auf die Section-
             Hoehe — bei dichten Karten wuchs das Hero dadurch sichtbar. */}
-        <View style={{ width: 130, height: 130, alignSelf: "flex-start" }}>
+        <View style={{ width: 165, height: 165, alignSelf: "flex-start" }}>
           {heroDataUri ? (
             <View
               style={{
                 borderRadius: 10,
                 overflow: "hidden",
-                width: 130,
-                height: 130,
+                width: 165,
+                height: 165,
               }}
             >
               <Image
                 src={heroDataUri}
-                style={{ width: 130, height: 130, objectFit: "cover" }}
+                style={{ width: 165, height: 165, objectFit: "cover" }}
               />
             </View>
           ) : null}
