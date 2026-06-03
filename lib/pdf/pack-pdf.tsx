@@ -65,6 +65,11 @@ export type PackPdfProps = {
   // UND pack.storyPages?.length > 0. storyImageDataUris in derselben
   // Reihenfolge wie pack.storyPages — null-Entries rendern Placeholder.
   storyImageDataUris?: Array<string | null>;
+  // Outro-Bild (Pack-Schlussseite). Optional — wenn null/undefined rendert
+  // OutroPage im alten Look (Solid-Backdrop + zentrierter Text statt
+  // Full-bleed + Quote-Card-Overlay). Backward-Compat für Bestands-Packs
+  // ohne generiertes Outro-Bild.
+  outroImageDataUri?: string | null;
 };
 
 export function PackPdfDocument({
@@ -78,6 +83,7 @@ export function PackPdfDocument({
   forewordImageDataUri,
   avatarDataUri,
   storyImageDataUris,
+  outroImageDataUri,
 }: PackPdfProps) {
   // Show foreword whenever cached text is available. The still-life image
   // is optional — Variants render a graceful Text-Only-Layout wenn
@@ -155,9 +161,11 @@ export function PackPdfDocument({
         titleFont={titleFont}
       />
 
-      {/* PAGE 2 — FOREWORD (only when both text and still-life are
-          available; otherwise this page is omitted and the index slides
-          back into position 2 like in the original layout). */}
+      {/* PAGE 2 — FOREWORD (User-Korrektur 2026-05-24: Vorwort gehoert
+          REIN, nicht das was der User vorher als 'Vorwort' kritisiert
+          hatte. Das war die alte CoverPage mit Text-Overlay. ForewordPage
+          ist das richtige Vorwort mit greeting/story/signoff und sollte
+          wieder gerendert werden wenn pack.foreword vorhanden ist). */}
       {showForeword && forewordContent ? (
         <ForewordPage
           brand={brand}
@@ -251,8 +259,13 @@ export function PackPdfDocument({
         />
       ))}
 
-      {/* OUTRO */}
-      <OutroPage brand={brand} pack={pack} titleFont={titleFont} />
+      {/* OUTRO — mit optionalem Outro-Bild (origin/main Feature) */}
+      <OutroPage
+        brand={brand}
+        pack={pack}
+        titleFont={titleFont}
+        outroImageDataUri={outroImageDataUri ?? null}
+      />
     </Document>
   );
 }
@@ -272,113 +285,217 @@ function CoverPage({
   titleFont: "Fraunces" | "Inter";
 }) {
   const t = packTheme(pack);
+  // Light text-color für Overlay über dem dunklen Image-Gradient.
+  // Cream-white statt pure-white damit's nicht zu klinisch wirkt.
+  const TEXT_LIGHT = "#fdfaf2";
+  const hasCover = !!coverDataUri;
+
+  // ─── Creator-Cover (v10, Mai 2026): Pure Image (Gemini 3 Pro Image) ──────
+  // v3-v7: Text im Bild via Gemini 2.5 Flash Image (Nano Banana) — Text
+  //        oft mit deutschen Rechtschreibfehlern + broken Umlauts.
+  // v8-v9: Bild text-frei + react-pdf Overlay — Text perfekt, aber
+  //        Composition zu simpel, User wollte verspieltes Cookbook-Cover-
+  //        Design mit Badges, Brushstrokes, mehrfarbigem Title.
+  // v10:   Modell-Switch auf gemini-3-pro-image-preview (Nano Banana Pro)
+  //        mit komplettem Cover-Design-Prompt (Title + Subtitle + Badge +
+  //        Bottom-Strip + Decoration). Pro Image hat best-in-class
+  //        typography rendering — German Umlauts sollten endlich klappen.
+  //        CoverPage ist wieder pure full-bleed image.
+  if (hasCover && pack.coverStyle === "creator") {
+    return (
+      <Page
+        size="A4"
+        style={{ backgroundColor: t.ink, fontFamily: "Inter" }}
+      >
+        <Image
+          src={coverDataUri!}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: "center",
+          }}
+        />
+      </Page>
+    );
+  }
+
+  // ─── Hybrid-Variante (Lifestyle-Image + react-pdf Text-Overlay) ──────────
+  // Fallback fuer Bestands-Packs (coverStyle undefined oder "lifestyle"/
+  // "legacy"). Bild wird leicht abgedunkelt, Text als react-pdf View dr-
+  // ueber gerendert. So bleibt der Print-Output lesbar wenn das alte
+  // 1:1 Bild oder das v2-Lifestyle-Bild im DB liegt.
   return (
     <Page
       size="A4"
-      style={{ backgroundColor: t.bg, fontFamily: "Inter", color: t.ink }}
+      // Wenn kein Cover-Image da ist, Page-Background bleibt der Pack-Mood;
+      // dann rendert der Text-Overlay in t.ink (dunkel) — klassisches
+      // Editorial-Cover ohne Bild. Sobald ein Cover-Image da ist, ziehen
+      // wir t.ink als Backdrop hinter das Bild (sichtbar nur falls
+      // Image-Load fehlschlägt) und switchen Text auf cream-white.
+      style={{
+        backgroundColor: hasCover ? t.ink : t.bg,
+        fontFamily: "Inter",
+      }}
     >
-      <View style={{ flex: 1, padding: 40, justifyContent: "space-between" }}>
-        {/* Top strip leer — Brand-Handle oben rechts entfernt
-            (User-Feedback: kam auch auf jedem Recipe-Footer + im
-            Bottom-Strip vor, war redundant). Lassen wir das Cover oben
-            atmen. */}
-        <View style={{ height: 0 }} />
+      {/* ─── Layer 1: Full-bleed Image ──────────────────────────────────
+          Image ist 3:4 (1:1.333), A4 ist 1:1.414. Mit objectFit cover
+          zieht react-pdf das Bild über die ganze Seite und beschneidet
+          ~6% oben+unten gleichmässig. objectPosition "center 35%" bias-t
+          den Crop leicht nach oben, damit das Haupt-Subject (typisch
+          mid-frame) nicht unter den Title-Overlay fällt. */}
+      {hasCover ? (
+        <Image
+          src={coverDataUri!}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: "center 35%",
+          }}
+        />
+      ) : null}
 
-        {/* Hero image — Container etwas hoeher als breit (320x420 = 4:5
-            Portrait), damit hochformatige Selfie-Cover ohne Crop
-            angezeigt werden. Vorher 380x380 quadratisch → Julias Kopf
-            wurde oben weggeschnitten weil das Original-Foto 1122x1402
-            ist. Mit 4:5 matched der Container die haeufigste Portrait-
-            Ratio; landscape oder square Cover bleiben centered. */}
-        {coverDataUri ? (
+      {/* ─── Layer 2: globaler subtiler Tint ──────────────────────────────
+          Das Bild ist leicht insgesamt abgedunkelt (12%), damit die
+          Aufmerksamkeit zur Text-Zone unten wandert und nicht im hellen
+          Bild verloren geht. */}
+      {hasCover ? (
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(0,0,0,0.12)",
+          }}
+        />
+      ) : null}
+
+      {/* ─── Layer 3: Bottom-Gradient für Text-Lesbarkeit ────────────────
+          react-pdf hat keine native linear-gradient — wir stacken drei
+          semi-transparente schwarze Rechtecke (140pt hoch je, Opacity
+          0.18 → 0.42 → 0.62 von oben nach unten). Total ~420pt =
+          untere Hälfte der Seite. Pseudo-Gradient, visuell stabil. */}
+      {hasCover ? (
+        <>
           <View
             style={{
-              alignSelf: "center",
-              width: 320,
-              height: 420,
-              borderRadius: 12,
-              overflow: "hidden",
-              marginVertical: 12,
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 280,
+              height: 140,
+              backgroundColor: "rgba(0,0,0,0.18)",
             }}
-          >
-            <Image
-              src={coverDataUri}
-              style={{
-                width: 320,
-                height: 420,
-                objectFit: "cover",
-                objectPosition: "center 15%",
-              }}
-            />
-          </View>
-        ) : null}
+          />
+          <View
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 140,
+              height: 140,
+              backgroundColor: "rgba(0,0,0,0.42)",
+            }}
+          />
+          <View
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 140,
+              backgroundColor: "rgba(0,0,0,0.62)",
+            }}
+          />
+        </>
+      ) : null}
 
-        <View>
+      {/* ─── Layer 4: Text-Overlay (bottom-left) ─────────────────────────
+          Sitzt direkt auf der untersten Gradient-Stufe. Eyebrow oben,
+          dann Title, optional Subtitle, optional Description. Author-
+          Signatur bleibt der OutroPage vorbehalten (siehe Memory-Regel:
+          brand.signature nur an EINER Stelle pro Pack). */}
+      <View
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          padding: 48,
+          paddingBottom: 54,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 9,
+            letterSpacing: 2.4,
+            textTransform: "uppercase",
+            color: hasCover ? TEXT_LIGHT : t.inkSoft,
+            opacity: 0.88,
+            marginBottom: 14,
+          }}
+        >
+          {recipes.length} Rezepte · {brand.handle}
+        </Text>
+
+        <Text
+          style={{
+            fontFamily: titleFont,
+            fontWeight: titleFont === "Inter" ? 700 : 400,
+            fontSize: titleFont === "Inter" ? 60 : 68,
+            lineHeight: 0.96,
+            letterSpacing: titleFont === "Inter" ? -1.6 : -0.8,
+            color: hasCover ? TEXT_LIGHT : t.ink,
+            maxWidth: 480,
+          }}
+        >
+          {pack.title}
+        </Text>
+
+        {pack.subtitle ? (
           <Text
             style={{
-              fontFamily: titleFont,
-              fontWeight: titleFont === "Inter" ? 700 : 400,
-              fontSize: titleFont === "Inter" ? 56 : 64,
-              lineHeight: 0.96,
-              letterSpacing: titleFont === "Inter" ? -1.4 : -0.6,
-              color: t.ink,
+              fontFamily: "Fraunces",
+              fontStyle: "italic",
+              fontSize: 19,
+              lineHeight: 1.3,
+              color: hasCover ? TEXT_LIGHT : t.inkSoft,
+              opacity: 0.94,
+              marginTop: 12,
+              maxWidth: 460,
             }}
           >
-            {pack.title}
+            {pack.subtitle}
           </Text>
-          {pack.subtitle ? (
-            <Text
-              style={{
-                fontFamily: "Fraunces",
-                fontStyle: "italic",
-                fontSize: 18,
-                lineHeight: 1.3,
-                color: t.inkSoft,
-                marginTop: 10,
-              }}
-            >
-              {pack.subtitle}
-            </Text>
-          ) : null}
+        ) : null}
 
-          {/* Description — nur rendern wenn ein echter Pack-Text vorhanden,
-              NICHT die generische Default-Phrase aus dem internen Editor
-              ("Eigene Sammlung in ... Welt. Karten kannst du im Editor
-              erstellen ..."). Die ist Tool-Onboarding-Text, nicht
-              Druck-Material. */}
-          {pack.description &&
-          !/Karten kannst du im Editor/.test(pack.description) ? (
-            <Text
-              style={{
-                fontSize: 11,
-                lineHeight: 1.55,
-                color: t.inkSoft,
-                marginTop: 16,
-                maxWidth: 460,
-              }}
-            >
-              {pack.description}
-            </Text>
-          ) : null}
-
-          {/* Recipe-Count alleine. brand.signature ("Deine Julia") und
-              brand.handle (@juliabreitenfeld) entfernt — beide kamen auf
-              jedem Recipe-Footer + auf der Outro-Page nochmal vor, das
-              war "zu viel" (User-Feedback). Auf der Cover-Page steht
-              jetzt nur noch der Recipe-Count als ruhige Schlusszeile. */}
-          <View
+        {/* Description — Default-Editor-Phrase ("Karten kannst du im
+            Editor erstellen …") aktiv ausfiltern, ist Tool-Onboarding-
+            Text, kein Druck-Material. */}
+        {pack.description &&
+        !/Karten kannst du im Editor/.test(pack.description) ? (
+          <Text
             style={{
-              flexDirection: "row",
-              gap: 18,
-              marginTop: 18,
-              alignItems: "center",
+              fontSize: 11,
+              lineHeight: 1.55,
+              color: hasCover ? TEXT_LIGHT : t.inkSoft,
+              opacity: 0.86,
+              marginTop: 14,
+              maxWidth: 440,
             }}
           >
-            <Text style={{ fontSize: 10, color: t.inkSoft }}>
-              {recipes.length} Rezepte
-            </Text>
-          </View>
-        </View>
+            {pack.description}
+          </Text>
+        ) : null}
       </View>
     </Page>
   );
@@ -934,72 +1051,224 @@ const DEFAULT_OUTRO =
 function OutroPage({
   brand,
   pack,
-  titleFont,
+  titleFont: _titleFont,
+  outroImageDataUri,
 }: {
   brand: Brand;
   pack: Pack;
   titleFont: "Fraunces" | "Inter";
+  outroImageDataUri: string | null;
 }) {
   const t = packTheme(pack);
   const outroText = pack.foreword?.outro?.trim() || DEFAULT_OUTRO;
+  const hasImage = !!outroImageDataUri;
+
+  // ─── Image-loser Fallback ──────────────────────────────────────────────
+  // Wenn keine outroImage da ist (Bestands-Packs, Image-Gen failed) rendern
+  // wir den alten Solid-Backdrop-Look. Keine harten Crashes.
+  if (!hasImage) {
+    return (
+      <Page
+        size="A4"
+        style={{ backgroundColor: t.bg, fontFamily: "Inter", color: t.ink }}
+      >
+        <View
+          style={{
+            flex: 1,
+            padding: 60,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 14,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontStyle: "italic",
+                fontSize: 36,
+                color: t.ink,
+                textAlign: "center",
+                lineHeight: 1.15,
+              }}
+            >
+              {brand.signature}
+            </Text>
+            <BeeIcon brandSlug={brand.slug} size={38} />
+          </View>
+          <View style={{ width: 420, marginTop: 16 }}>
+            <Text
+              style={{
+                fontSize: 11,
+                color: t.inkSoft,
+                textAlign: "center",
+                lineHeight: 1.55,
+              }}
+            >
+              {outroText}
+            </Text>
+          </View>
+          <Text
+            style={{
+              fontSize: 9,
+              fontWeight: 600,
+              letterSpacing: 1.6,
+              color: t.inkSoft,
+              marginTop: 28,
+              textTransform: "uppercase",
+            }}
+          >
+            {brand.handle} · {pack.title}
+          </Text>
+        </View>
+      </Page>
+    );
+  }
+
+  // ─── Full-bleed-Variante mit Floating Quote-Card ──────────────────────
+  // Image full-bleed (Aspect 3:4 in A4 1:1.414 via objectFit cover, minimaler
+  // Top/Bottom-Crop). Subtiler globaler Tint damit das Auge in die Mitte
+  // gezogen wird, wo eine semi-transparente Quote-Card mit Signatur,
+  // Outro-Text und Handle-Strip schwebt.
+  //
+  // Card-Position: vertikal zentriert (top: ~38%, height: auto via padding).
+  // Width: 360pt (60% von A4-Width 595pt) — schmal genug damit das Bild
+  // links/rechts ungestört wirkt, breit genug für 3-4 Zeilen lesbaren Text.
   return (
     <Page
       size="A4"
-      style={{ backgroundColor: t.bg, fontFamily: "Inter", color: t.ink }}
+      style={{ backgroundColor: t.ink, fontFamily: "Inter" }}
     >
-      <View style={{ flex: 1, padding: 60, justifyContent: "center", alignItems: "center" }}>
+      {/* Full-bleed Image */}
+      <Image
+        src={outroImageDataUri!}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          objectPosition: "center 30%",
+        }}
+      />
+
+      {/* Globaler subtiler Tint (10%) — wenig genug damit das Bild atmet,
+          genug damit die Card visuell trennt. */}
+      <View
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          backgroundColor: "rgba(0,0,0,0.10)",
+        }}
+      />
+
+      {/* Floating Quote-Card — vertikal zentriert. Semi-transparenter Cream-
+          Backdrop mit dezenter Border, sanfter Schatten via doppelte View
+          (react-pdf hat keine box-shadow — eine größere View leicht
+          versetzt darunter simuliert subtle elevation). */}
+      <View
+        style={{
+          position: "absolute",
+          top: 290,
+          left: 75,
+          right: 75,
+          // Schatten-Layer (etwas tiefer, ganz leicht versetzt nach unten)
+          height: 280,
+        }}
+      >
+        {/* Shadow-Layer */}
         <View
           style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 14,
+            position: "absolute",
+            top: 8,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.18)",
           }}
-        >
-          <Text
-            style={{
-              fontFamily: "Fraunces",
-              fontStyle: "italic",
-              fontSize: 36,
-              color: t.ink,
-              textAlign: "center",
-              lineHeight: 1.15,
-            }}
-          >
-            {brand.signature}
-          </Text>
-          <BeeIcon brandSlug={brand.slug} size={38} />
-        </View>
-        {/* Outro-Text in fester View-Width statt maxWidth direkt am Text.
-            react-pdf wrappt sonst CHARACTER-level statt word-level (User-
-            Report: "SPAGHETTI PROTEIN E\nIS", "fü\nr", "pa\nckt" mitten
-            im Wort gebrochen). View-Container loest das, Text rendert
-            mit normalem word-wrap. */}
-        <View style={{ width: 420, marginTop: 16 }}>
-          <Text
-            style={{
-              fontSize: 11,
-              color: t.inkSoft,
-              textAlign: "center",
-              lineHeight: 1.55,
-            }}
-          >
-            {outroText}
-          </Text>
-        </View>
-        <Text
+        />
+        {/* Card-Layer */}
+        <View
           style={{
-            fontSize: 9,
-            fontWeight: 600,
-            letterSpacing: 1.6,
-            color: t.inkSoft,
-            marginTop: 28,
-            textTransform: "uppercase",
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(253, 250, 242, 0.94)",
+            padding: 36,
+            paddingHorizontal: 38,
+            justifyContent: "center",
+            alignItems: "center",
+            borderWidth: 0.5,
+            borderColor: "rgba(26, 18, 11, 0.10)",
           }}
         >
-          {brand.handle} · {pack.title}
-        </Text>
-      </View>
+            {/* Signatur + Bee */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: "Fraunces",
+                  fontStyle: "italic",
+                  fontSize: 30,
+                  color: t.ink,
+                  textAlign: "center",
+                  lineHeight: 1.15,
+                }}
+              >
+                {brand.signature}
+              </Text>
+              <BeeIcon brandSlug={brand.slug} size={32} />
+            </View>
+
+            {/* Outro-Text — 3-5 Sätze, persönlich, KI-generiert über
+                generatePackForeword.outro. Container-Width sichert
+                word-level wrap (siehe Memory-Regel). */}
+            <View style={{ width: 320, marginTop: 14 }}>
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: t.inkSoft,
+                  textAlign: "center",
+                  lineHeight: 1.6,
+                }}
+              >
+                {outroText}
+              </Text>
+            </View>
+
+            {/* Handle-Strip — dezent, Uppercase, kleiner. */}
+            <Text
+              style={{
+                fontSize: 8.5,
+                fontWeight: 600,
+                letterSpacing: 1.8,
+                color: t.inkSoft,
+                marginTop: 20,
+                textTransform: "uppercase",
+              }}
+            >
+              {brand.handle} · {pack.title}
+            </Text>
+          </View>
+        </View>
     </Page>
   );
 }

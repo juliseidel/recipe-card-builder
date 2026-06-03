@@ -243,14 +243,10 @@ export async function renderPackPdf(args: {
       : null;
 
   args.onProgress?.("loading-recipe-images", 20);
-  // Hero images, QR codes, foreword image (optional), and brand avatar
-  // (always loaded — Patisserie uses it inside its recipe-page footer
-  // so the avatar is needed even when this pack has no foreword). All
-  // fan out via Promise.all so total wall-clock stays close to the
-  // slowest single asset.
-  //
-  // Plus (v3 Guide-Modus): pack.storyPages[].imageUrl. Wenn der Pack im
-  // Guide-Modus ist und Pages mit Bildern hat, laden wir die parallel.
+  // Hero images, QR codes, foreword image (optional), outro image
+  // (optional), brand avatar (always loaded — Patisserie uses it inside its
+  // recipe-page footer), plus Guide-Modus story-page images. All fan out
+  // via Promise.all so total wall-clock stays close to the slowest asset.
   const guideStoryPages =
     args.pack.packMode === "guide" && args.pack.storyPages
       ? args.pack.storyPages
@@ -259,6 +255,7 @@ export async function renderPackPdf(args: {
     heroDataUris,
     qrDataUris,
     forewordImageDataUri,
+    outroImageDataUri,
     avatarDataUri,
     storyImageDataUris,
   ] = await Promise.all([
@@ -270,6 +267,9 @@ export async function renderPackPdf(args: {
     Promise.all(args.recipes.map((r) => generateQrDataUri(r.sourceUrl))),
     forewordImagePath
       ? loadImageAsDataUri(forewordImagePath)
+      : Promise.resolve(null),
+    args.pack.outroImage
+      ? loadImageAsDataUri(args.pack.outroImage)
       : Promise.resolve(null),
     loadImageAsDataUri(args.brand.avatar),
     Promise.all(
@@ -323,6 +323,7 @@ export async function renderPackPdf(args: {
       forewordImageDataUri,
       avatarDataUri,
       storyImageDataUris,
+      outroImageDataUri,
     })
   );
   args.onProgress?.("done", 100);

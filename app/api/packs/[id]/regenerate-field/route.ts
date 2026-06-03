@@ -4,7 +4,7 @@ import { updateCustomPackData } from "@/lib/custom-packs-server";
 import { loadBrand } from "@/lib/custom-brands-server";
 import { generatePackMeta } from "@/lib/ai/generate-pack-meta";
 import { generatePackForeword } from "@/lib/ai/generate-foreword";
-import { generatePackCover } from "@/lib/ai/generate-pack-cover";
+import { generateCreatorCover } from "@/lib/ai/generate-creator-cover";
 import { generateForewordImage } from "@/lib/ai/generate-foreword-image";
 import { isBrandStyleHero } from "@/lib/ai/generate-foreword-collage";
 import { loadVisibleRecipesForPack, type Recipe } from "@/lib/recipes";
@@ -181,14 +181,38 @@ export async function POST(req: Request, { params }: RouteParams) {
     }
   }
 
-  // ─── Cover-Bild (Flux 2 Pro) ─────────────────────────────────────────────
+  // ─── Cover-Bild (Creator-Cover via Gemini Nano Banana, v3) ──────────────
+  // Mai 2026 v4-Fix: vorher rief dieser Branch generatePackCover (alter
+  // Flux-Single-Dish-Pfad) + persistierte NICHT coverStyle. Effekt: UI-
+  // Button "Cover neu generieren" produzierte weiterhin Bon-Appetit-Stil,
+  // PDF-CoverPage blieb auf Hybrid-Fallback → User-Befund "Cover hat
+  // nichts mit Creator zu tun".
+  //
+  // Jetzt: generateCreatorCover mit Avatar + bis zu 3 Recipe-Heroes als
+  // Gemini-References, coverStyle="creator" persistiert, PDF-CoverPage
+  // rendert pure-image-page.
   if (field === "coverImage") {
     try {
-      const result = await generatePackCover({ pack: ctx.pack });
+      // Recipes laden — werden als Gemini-Style-References mitgegeben +
+      // als thematischer Anker (Top-3 Titel) im Prompt.
+      const recipes = await loadVisibleRecipesForPack(
+        ctx.brandSlug,
+        ctx.pack.slug
+      );
+      const result = await generateCreatorCover({
+        pack: ctx.pack,
+        brand,
+        recipes,
+      });
       const buffer = result.buffer;
+      // Gemini returnt typischerweise PNG; vorher hardcoded ".jpg"+"image/jpeg"
+      // → MIME-Mismatch → react-pdf hat das Bild im PDF nicht gerendert
+      // (User-Befund: "Bild zeigt nichts an"). Jetzt richten wir Extension
+      // + contentType nach result.contentType aus.
+      const ext = result.contentType === "image/png" ? "png" : "jpg";
       // Upload zu Supabase Storage
       const supabase = getServerSupabase();
-      const path = `${ctx.brandSlug}/${ctx.pack.slug}-${Date.now().toString(36)}.jpg`;
+      const path = `${ctx.brandSlug}/${ctx.pack.slug}-${Date.now().toString(36)}.${ext}`;
       // Bucket idempotent erstellen
       await supabase.storage.createBucket("pack-covers", {
         public: true,
@@ -196,16 +220,26 @@ export async function POST(req: Request, { params }: RouteParams) {
         allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
       });
       const up = await supabase.storage.from("pack-covers").upload(path, buffer, {
-        contentType: "image/jpeg",
+        contentType: result.contentType,
         cacheControl: "31536000",
         upsert: false,
       });
       if (up.error) throw new Error(up.error.message);
       const { data: pub } = supabase.storage.from("pack-covers").getPublicUrl(path);
       const coverImage = pub.publicUrl;
-      const updated = await updateCustomPackData(id, { coverImage });
+      // KRITISCH: coverStyle setzen, damit PackPdfDocument den Pure-Image-
+      // Branch (kein react-pdf Text-Overlay) wählt. Sonst rendert die
+      // CoverPage Hybrid-Layout obwohl das Bild schon Text enthält.
+      const updated = await updateCustomPackData(id, {
+        coverImage,
+        coverStyle: "creator",
+      });
       return NextResponse.json({ ok: true, pack: updated, field, value: coverImage });
     } catch (err) {
+      // Stacktrace + Message ins Server-Log damit Vercel-Runtime-Logs
+      // den eigentlichen Fehler zeigen — vorher kam nur generisches 500
+      // beim User an, kein Debug-Hinweis im Log.
+      console.error("[regenerate-field] cover generation failed:", err);
       return NextResponse.json(
         { error: `Cover-Re-Generate fehlgeschlagen: ${(err as Error).message}` },
         { status: 500 }
