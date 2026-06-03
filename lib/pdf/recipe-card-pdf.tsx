@@ -354,7 +354,7 @@ function EditorialPage({
               </Text>
             </View>
           </View>
-          {recipe.tags?.length ? (
+          {recipe.tags?.length || recipe.mealSize ? (
             <View
               style={{
                 flexDirection: "row",
@@ -363,7 +363,26 @@ function EditorialPage({
                 gap: 4,
               }}
             >
-              {recipe.tags.slice(0, 5).map((tag) => (
+              {/* Mahlzeitengröße-Badge zuerst, gefüllt in Akzentfarbe als
+                  klares aber cleanes Label (Creatorin-Wunsch). */}
+              {recipe.mealSize ? (
+                <Text
+                  style={{
+                    fontSize: 6.5,
+                    fontWeight: 700,
+                    letterSpacing: 0.8,
+                    textTransform: "uppercase",
+                    color: "#ffffff",
+                    backgroundColor: t.accent,
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    borderRadius: 999,
+                  }}
+                >
+                  {recipe.mealSize === "klein" ? "Kleine Mahlzeit" : "Große Mahlzeit"}
+                </Text>
+              ) : null}
+              {recipe.tags.slice(0, 4).map((tag) => (
                 <Text
                   key={tag}
                   style={{

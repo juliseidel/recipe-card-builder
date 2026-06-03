@@ -116,6 +116,11 @@ export function PackPdfDocument({
   //   ... NutritionOverview
   //   ... beforeOutroPages
   //   ... OutroPage
+  // Mahlzeitengröße-Modus: aktiv wenn die Rezepte mealSize tragen (vom
+  // render-book --group-by-size gesetzt). Dann verschmolzenes Makro-Index
+  // vorne + keine separate Nährwert-Seite hinten.
+  const sizeGrouped = recipes.some((r) => Boolean(r.mealSize));
+
   const recipePageNumbers: number[] = [];
   let cursor = 1; // Cover = Seite 1
   if (showForeword) cursor += 1; // Foreword
@@ -177,14 +182,24 @@ export function PackPdfDocument({
         />
       ))}
 
-      {/* INDEX — Position abhaengig von Foreword + after-foreword Stories */}
-      <IndexPage
-        brand={brand}
-        pack={pack}
-        recipes={recipes}
-        showForeword={showForeword}
-        recipePageNumbers={recipePageNumbers}
-      />
+      {/* INDEX — bei Mahlzeitengröße-Gruppierung (Biene) das verschmolzene
+          Makro-Inhaltsverzeichnis, sonst das klassische. */}
+      {sizeGrouped ? (
+        <MacroIndexPage
+          brand={brand}
+          pack={pack}
+          recipes={recipes}
+          recipePageNumbers={recipePageNumbers}
+        />
+      ) : (
+        <IndexPage
+          brand={brand}
+          pack={pack}
+          recipes={recipes}
+          showForeword={showForeword}
+          recipePageNumbers={recipePageNumbers}
+        />
+      )}
 
       {/* RECIPES — pro Recipe ggf. davor "before-recipe" Story-Seiten */}
       {recipes.map((recipe, idx) => {
@@ -216,8 +231,11 @@ export function PackPdfDocument({
         );
       })}
 
-      {/* NUTRITION OVERVIEW */}
-      <NutritionOverviewPage brand={brand} pack={pack} recipes={recipes} />
+      {/* NUTRITION OVERVIEW — entfällt bei sizeGrouped, da Makros bereits
+          vorne im verschmolzenen Inhaltsverzeichnis stehen (Creatorin-Wunsch). */}
+      {sizeGrouped ? null : (
+        <NutritionOverviewPage brand={brand} pack={pack} recipes={recipes} />
+      )}
 
       {/* STORY PAGES — Slot "before-outro". Sitzen zwischen
           Naehrwertuebersicht und Outro. */}
@@ -406,6 +424,84 @@ function GroupSeparator({
 }
 
 // ─── INDEX / INHALTSVERZEICHNIS ──────────────────────────────────────────────
+// Verschmolzenes Inhaltsverzeichnis + Nährwert-Übersicht, nach Mahlzeiten-
+// größe gruppiert (Biene-Wunsch der Creatorin via Ingo): "Die Übersicht mit
+// Makros nach vorne als Inhaltsverzeichnis ziehen." Ersetzt sowohl die alte
+// IndexPage als auch die hintere NutritionOverviewPage in EINER Seite vorne.
+// Gruppen-Sektionen "Kleine Mahlzeiten" / "Große Mahlzeiten", pro Rezept
+// Makros + Seitenzahl. Aktiv nur wenn recipes mealSize tragen.
+function MacroIndexPage({
+  brand,
+  pack,
+  recipes,
+  recipePageNumbers,
+}: {
+  brand: Brand;
+  pack: Pack;
+  recipes: Recipe[];
+  recipePageNumbers: number[];
+}) {
+  const t = packTheme(pack);
+  // Reihenfolge-erhaltende Gruppierung (recipes sind schon klein→groß sortiert)
+  const groups: Array<{ label: string; items: { r: Recipe; idx: number }[] }> = [];
+  recipes.forEach((r, idx) => {
+    const label = r.mealSize === "gross" ? "Große Mahlzeiten" : "Kleine Mahlzeiten";
+    let g = groups.find((x) => x.label === label);
+    if (!g) { g = { label, items: [] }; groups.push(g); }
+    g.items.push({ r, idx });
+  });
+  const col = { kcal: 42, ew: 38, kh: 38, fat: 34, page: 30 };
+  return (
+    <Page size="A4" style={{ backgroundColor: "#ffffff", fontFamily: "Inter", color: t.ink }}>
+      <View style={{ backgroundColor: t.paper, borderBottomWidth: 1, borderBottomColor: t.divider, paddingHorizontal: 40, paddingTop: 28, paddingBottom: 18 }}>
+        <Text style={{ fontSize: 9, fontWeight: 600, letterSpacing: 1.6, color: t.inkSoft, textTransform: "uppercase" }}>
+          Inhalt & Nährwerte · {recipes.length} Rezepte
+        </Text>
+        <Text style={{ fontFamily: "Fraunces", fontSize: 28, color: t.ink, marginTop: 4, letterSpacing: -0.3 }}>
+          {pack.title}
+        </Text>
+      </View>
+      <View style={{ paddingHorizontal: 40, paddingTop: 16, paddingBottom: 24 }}>
+        {/* Spalten-Kopf */}
+        <View style={{ flexDirection: "row", alignItems: "flex-end", paddingBottom: 5, paddingHorizontal: 4 }}>
+          <Text style={{ flex: 1, fontSize: 7, fontWeight: 600, letterSpacing: 1, color: t.inkSoft, textTransform: "uppercase" }}>Rezept</Text>
+          <Text style={{ width: col.kcal, fontSize: 7, fontWeight: 600, letterSpacing: 0.8, color: t.inkSoft, textAlign: "right", textTransform: "uppercase" }}>kcal</Text>
+          <Text style={{ width: col.ew, fontSize: 7, fontWeight: 600, letterSpacing: 0.8, color: t.inkSoft, textAlign: "right", textTransform: "uppercase" }}>EW</Text>
+          <Text style={{ width: col.kh, fontSize: 7, fontWeight: 600, letterSpacing: 0.8, color: t.inkSoft, textAlign: "right", textTransform: "uppercase" }}>KH</Text>
+          <Text style={{ width: col.fat, fontSize: 7, fontWeight: 600, letterSpacing: 0.8, color: t.inkSoft, textAlign: "right", textTransform: "uppercase" }}>Fett</Text>
+          <Text style={{ width: col.page, fontSize: 7, fontWeight: 600, letterSpacing: 0.8, color: t.inkSoft, textAlign: "right", textTransform: "uppercase" }}>S.</Text>
+        </View>
+        {groups.map((g, gi) => (
+          <View key={g.label} style={{ marginTop: gi === 0 ? 4 : 14 }}>
+            {/* Gruppen-Header */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <View style={{ width: 5, height: 5, backgroundColor: t.accent, transform: "rotate(45deg)" }} />
+              <Text style={{ fontFamily: "Fraunces", fontSize: 13, fontWeight: 600, color: t.ink }}>{g.label}</Text>
+              <View style={{ flex: 1, height: 0.8, backgroundColor: t.divider }} />
+              <Text style={{ fontSize: 7.5, color: t.inkSoft }}>{g.items.length} Rezepte</Text>
+            </View>
+            {g.items.map(({ r, idx }, j) => (
+              <View key={r.slug} style={{ flexDirection: "row", alignItems: "center", borderBottomWidth: j < g.items.length - 1 ? 0.5 : 0, borderBottomColor: t.divider, paddingVertical: 6.5, paddingHorizontal: 4 }}>
+                <Text style={{ fontFamily: "Fraunces", fontSize: 11, color: t.accent, width: 22 }}>{pad2(r.number)}</Text>
+                <Text style={{ flex: 1, fontSize: 10.5, fontWeight: 500, color: t.ink }}>{r.title}</Text>
+                <Text style={{ width: col.kcal, fontFamily: "Fraunces", fontSize: 10.5, color: t.ink, textAlign: "right" }}>{r.nutrition.kcal}</Text>
+                <Text style={{ width: col.ew, fontSize: 9.5, color: t.inkSoft, textAlign: "right" }}>{r.nutrition.protein} g</Text>
+                <Text style={{ width: col.kh, fontSize: 9.5, color: t.inkSoft, textAlign: "right" }}>{r.nutrition.carbs} g</Text>
+                <Text style={{ width: col.fat, fontSize: 9.5, color: t.inkSoft, textAlign: "right" }}>{r.nutrition.fat} g</Text>
+                <Text style={{ width: col.page, fontSize: 9, fontWeight: 600, color: t.inkSoft, textAlign: "right" }}>{recipePageNumbers[idx] ?? ""}</Text>
+              </View>
+            ))}
+          </View>
+        ))}
+        <Text style={{ fontSize: 8.5, color: t.inkSoft, marginTop: 16, lineHeight: 1.5, fontStyle: "italic" }}>
+          Alle Werte gelten pro Portion bzw. pro Stück und sind Richtwerte.
+          Je nach den Produkten, die du verwendest, können sie leicht abweichen.
+        </Text>
+      </View>
+    </Page>
+  );
+}
+
 function IndexPage({
   brand,
   pack,

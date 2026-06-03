@@ -72,6 +72,10 @@ export type Recipe = {
   hero?: string;
   sourceUrl?: string;
   sourceLabel?: string;
+  /** Optional: Mahlzeitengröße-Kategorie für Badge + Index-Gruppierung.
+   *  Wird vom Render-Pipeline-Schritt gesetzt (kcal-Schwelle), nicht in
+   *  der DB gespeichert. undefined = kein Badge / keine Gruppierung. */
+  mealSize?: "klein" | "gross";
   /**
    * Optional per-recipe layout override. When set, the renderer uses this
    * instead of pack.cardLayout. Lets the user pick a layout per card from
