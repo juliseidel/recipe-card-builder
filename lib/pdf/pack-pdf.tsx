@@ -823,9 +823,8 @@ function NutritionOverviewPage({
             fontStyle: "italic",
           }}
         >
-          Alle Werte gelten pro Portion bzw. pro Stück, die letzte Zeile zeigt
-          den Durchschnitt je Rezept. Sie basieren auf {brand.name}s
-          Original-Rezepten und können je nach verwendeter Marke leicht
+          Alle Werte gelten pro Portion bzw. pro Stück und sind Richtwerte.
+          Je nach den Produkten, die du verwendest, können sie leicht
           abweichen.
         </Text>
       </View>
