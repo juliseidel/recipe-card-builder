@@ -235,7 +235,12 @@ function EditorialPage({
           borderBottomWidth: 1,
           borderBottomColor: t.divider,
           paddingHorizontal: 32,
-          paddingVertical: 8,
+          // Mehr Luft oben als unten: die Caps-Schrift sitzt sonst optisch
+          // gedrueckt am oberen Rand (Leon-Feedback "oben weniger space als
+          // unter der Schrift, wirkt gedrungen"). Asymmetrisches Padding
+          // (oben > unten) zentriert den Text optisch in der Leiste.
+          paddingTop: 13,
+          paddingBottom: 9,
         }}
         wrap={false}
       >
@@ -305,7 +310,10 @@ function EditorialPage({
               style={{
                 fontFamily: "Fraunces",
                 fontSize: titleFontSize + titleFontSizeOffset(recipe),
-                lineHeight: 1.02,
+                // lineHeight 1.02 war zu eng: bei 2-zeiligen Titeln (Rezept
+                // 2,10,11) ueberlappten die Grossbuchstaben-Oberlaengen der
+                // zweiten Zeile mit der ersten. 1.15 gibt jeder Zeile Luft.
+                lineHeight: 1.15,
                 letterSpacing: -0.3,
                 color: t.ink,
                 textTransform: "uppercase",
@@ -405,8 +413,8 @@ function EditorialPage({
         />
         <PortionTile
           label={nutritionBasisLabel(recipe.nutritionBasis)}
-          value={String(recipe.nutrition.kcal)}
-          sub={`kcal · ${recipe.nutrition.carbs} g KH · ${recipe.nutrition.fat} g Fett`}
+          value={`${recipe.nutrition.kcal} kcal`}
+          sub={`${recipe.nutrition.carbs} g KH · ${recipe.nutrition.fat} g Fett`}
           theme={t}
           highlight
           borderRight
@@ -5250,7 +5258,9 @@ function StepsList({
                 // naechsten Step-Zeile bedraengt wirkt. User-Feedback war:
                 // "lass zwischen den Zahlen mehr Platz".
                 marginBottom: stepMarginBottom + 4,
-                gap: 10,
+                // Nummer naeher am Text (Leon: "naeher am entsprechenden
+                // Paragraphen dran"). Vorher gap 10 + width 22 = grosse Luecke.
+                gap: 6,
                 alignItems: "flex-start",
               }}
             >
@@ -5269,11 +5279,11 @@ function StepsList({
                   fontStyle: "italic",
                   fontWeight: 700,
                   color: theme.accent,
-                  width: 22,
+                  width: 14,
                   lineHeight: 1.45,
                 }}
               >
-                {displayNum}
+                {displayNum}.
               </Text>
               <Text
                 style={{
@@ -5339,16 +5349,55 @@ function PortionTile({
       >
         {label}
       </Text>
-      <Text
-        style={{
-          fontFamily: "Fraunces",
-          fontSize: 22,
-          color: theme.ink,
-          lineHeight: 1,
-        }}
-      >
-        {value}
-      </Text>
+      {(() => {
+        // Wert in Zahl + Einheit trennen, damit die Einheit ("g", "×", "Min")
+        // als kleinerer, fest angekoppelter Span neben der Zahl sitzt statt
+        // umzubrechen. Vorher: "40 g" mit lineHeight 1 ist umgebrochen → das
+        // "g" rutschte in die "pro Portion"-Zeile darunter (Leon-Feedback).
+        const m = /^(\S+?)\s*(g|kcal|×|Min)$/.exec(value);
+        const num = m ? m[1] : value;
+        const unit = m ? m[2] : null;
+        // Zahl-Schrift adaptiv: "358 kcal" ist breiter als "40 g". Bei
+        // langer Zahl+Einheit etwas kleiner, damit nichts umbricht oder
+        // ueber die schmale Kachel hinausragt.
+        const combinedLen = num.length + (unit ? unit.length : 0);
+        const numSize = combinedLen >= 6 ? 19 : 22;
+        const unitSize = unit && unit.length >= 3 ? 10.5 : 13;
+        return (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "baseline",
+              justifyContent: "center",
+            }}
+            wrap={false}
+          >
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontSize: numSize,
+                color: theme.ink,
+                lineHeight: 1.1,
+              }}
+            >
+              {num}
+            </Text>
+            {unit ? (
+              <Text
+                style={{
+                  fontFamily: "Fraunces",
+                  fontSize: unitSize,
+                  color: theme.ink,
+                  lineHeight: 1.1,
+                  marginLeft: 2,
+                }}
+              >
+                {unit}
+              </Text>
+            ) : null}
+          </View>
+        );
+      })()}
       <Text
         style={{
           fontSize: 7.5,
@@ -5577,6 +5626,25 @@ function CardFooter({
             ? `  ·  ${recipe.sourceLabel ?? "Original-Reel"}`
             : ""}
         </Text>
+
+        {/* Seitenzahl — echte PDF-Seitennummer via render-Prop (zaehlt
+            Cover/Vorwort/Index automatisch mit, passt damit zum
+            Inhaltsverzeichnis). Mittig in der fixed-Fusszeile. */}
+        <Text
+          fixed
+          style={{
+            position: "absolute",
+            bottom: hasQr ? 8 : 10,
+            left: 0,
+            right: 0,
+            textAlign: "center",
+            fontSize: 7.5,
+            fontWeight: 600,
+            letterSpacing: 1,
+            color: brand.tokens.inkMuted,
+          }}
+          render={({ pageNumber }: { pageNumber: number }) => `${pageNumber}`}
+        />
 
         {hasQr ? (
           <View

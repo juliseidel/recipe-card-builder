@@ -117,15 +117,19 @@ export function PackPdfDocument({
   //   ... beforeOutroPages
   //   ... OutroPage
   const recipePageNumbers: number[] = [];
-  let cursor = 1; // Cover
-  if (showForeword) cursor += 1;
+  let cursor = 1; // Cover = Seite 1
+  if (showForeword) cursor += 1; // Foreword
   cursor += storyBuckets.afterForeword.length;
-  cursor += 1; // IndexPage
+  cursor += 1; // IndexPage selbst belegt eine Seite
+  // cursor zeigt jetzt AUF die Index-Seite. Das erste Rezept kommt danach,
+  // also vor dem Push erst auf die naechste Seite ruecken. (Bugfix: vorher
+  // wurde die Index-Seitennummer als erste Rezept-Seite gepusht → ganzes
+  // Inhaltsverzeichnis war um 1 zu niedrig vs. echte Fusszeilen-Seitenzahl.)
   for (const r of recipes) {
     const before = storyBuckets.beforeRecipe.get(r.number) ?? [];
     cursor += before.length;
+    cursor += 1; // auf die Recipe-Seite ruecken
     recipePageNumbers.push(cursor);
-    cursor += 1; // Recipe selbst
   }
 
   return (
@@ -482,6 +486,12 @@ function IndexPage({
                   alignItems: "center",
                   borderBottomWidth: 0.5,
                   borderBottomColor: t.divider,
+                  // Separator alle 5 Rezepte (Leon): kraeftigere Akzent-Linie
+                  // oben an Zeile 6, 11, 16 ... gibt 5er-Bloecke zur besseren
+                  // Orientierung in der langen Liste.
+                  borderTopWidth: i > 0 && i % 5 === 0 ? 1.5 : 0,
+                  borderTopColor: t.accent,
+                  marginTop: i > 0 && i % 5 === 0 ? 4 : 0,
                   paddingVertical: rowPadV,
                   gap: 10,
                 }}
@@ -540,7 +550,7 @@ function IndexPage({
                       damit verteilte Story-Pages (before-recipe) korrekt
                       eingerechnet werden. Fallback auf trivialen Offset
                       falls Array-Lookup leer. */}
-                  S. {recipePageNumbers[i] ?? i + 3}
+                  S. {recipePageNumbers[i] ?? i + 4}
                 </Text>
               </View>
             ))}
@@ -657,13 +667,17 @@ function NutritionOverviewPage({
         </View>
 
         {/* Body rows */}
-        {recipes.map((r) => (
+        {recipes.map((r, i) => (
           <View
             key={r.slug}
             style={{
               flexDirection: "row",
               borderBottomWidth: 0.5,
               borderBottomColor: t.divider,
+              // Separator alle 5 Rezepte (Leon), analog zum Inhaltsverzeichnis.
+              borderTopWidth: i > 0 && i % 5 === 0 ? 1.5 : 0,
+              borderTopColor: t.accent,
+              marginTop: i > 0 && i % 5 === 0 ? 4 : 0,
               paddingVertical: 8,
               paddingHorizontal: 8,
               alignItems: "center",
