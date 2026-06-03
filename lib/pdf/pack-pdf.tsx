@@ -478,21 +478,29 @@ function IndexPage({
               paddingBottom: bodyPadBottom,
             }}
           >
-            {recipes.map((r, i) => (
+            {recipes.map((r, i) => {
+              // 5er-Gruppierung via zartem Wechsel-Tint + Abstand statt
+              // harter Linie (Leon: Striche wirken billig). Gruppe 2,4,…
+              // bekommt einen hauchzarten Marken-Tint, jede neue Gruppe
+              // etwas Luft + gerundete Ecken — ruhige Cluster ohne Striche.
+              const groupIdx = Math.floor(i / 5);
+              const groupTint = groupIdx % 2 === 1 ? blendWithWhite(t.bg, 0.72) : "#ffffff";
+              const isGroupStart = i % 5 === 0;
+              const isGroupEnd = i % 5 === 4 || i === recipes.length - 1;
+              return (
               <View
                 key={r.slug}
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  borderBottomWidth: 0.5,
-                  borderBottomColor: t.divider,
-                  // Separator alle 5 Rezepte (Leon): kraeftigere Akzent-Linie
-                  // oben an Zeile 6, 11, 16 ... gibt 5er-Bloecke zur besseren
-                  // Orientierung in der langen Liste.
-                  borderTopWidth: i > 0 && i % 5 === 0 ? 1.5 : 0,
-                  borderTopColor: t.accent,
-                  marginTop: i > 0 && i % 5 === 0 ? 4 : 0,
+                  backgroundColor: groupTint,
+                  marginTop: isGroupStart && i > 0 ? 6 : 0,
+                  borderTopLeftRadius: isGroupStart ? 7 : 0,
+                  borderTopRightRadius: isGroupStart ? 7 : 0,
+                  borderBottomLeftRadius: isGroupEnd ? 7 : 0,
+                  borderBottomRightRadius: isGroupEnd ? 7 : 0,
                   paddingVertical: rowPadV,
+                  paddingHorizontal: 12,
                   gap: 10,
                 }}
               >
@@ -553,7 +561,8 @@ function IndexPage({
                   S. {recipePageNumbers[i] ?? i + 4}
                 </Text>
               </View>
-            ))}
+              );
+            })}
           </View>
         );
       })()}
@@ -666,20 +675,29 @@ function NutritionOverviewPage({
           </Text>
         </View>
 
-        {/* Body rows */}
-        {recipes.map((r, i) => (
+        {/* Body rows — 5er-Gruppierung via zartem Wechsel-Tint statt harter
+            Trennlinie (Leon: Striche wirken billig). Jede 5er-Gruppe
+            alterniert zwischen Weiss und einem hauchzarten Marken-Tint;
+            erste Zeile jeder Gruppe bekommt etwas mehr Luft oben. Das
+            clustert optisch ruhig + premium, ganz ohne Linien. */}
+        {recipes.map((r, i) => {
+          const groupIdx = Math.floor(i / 5);
+          const groupTint = groupIdx % 2 === 1 ? blendWithWhite(t.bg, 0.72) : "#ffffff";
+          const isGroupStart = i % 5 === 0;
+          const isGroupEnd = i % 5 === 4 || i === recipes.length - 1;
+          return (
           <View
             key={r.slug}
             style={{
               flexDirection: "row",
-              borderBottomWidth: 0.5,
-              borderBottomColor: t.divider,
-              // Separator alle 5 Rezepte (Leon), analog zum Inhaltsverzeichnis.
-              borderTopWidth: i > 0 && i % 5 === 0 ? 1.5 : 0,
-              borderTopColor: t.accent,
-              marginTop: i > 0 && i % 5 === 0 ? 4 : 0,
+              backgroundColor: groupTint,
+              marginTop: isGroupStart && i > 0 ? 7 : 0,
+              borderTopLeftRadius: isGroupStart ? 7 : 0,
+              borderTopRightRadius: isGroupStart ? 7 : 0,
+              borderBottomLeftRadius: isGroupEnd ? 7 : 0,
+              borderBottomRightRadius: isGroupEnd ? 7 : 0,
               paddingVertical: 8,
-              paddingHorizontal: 8,
+              paddingHorizontal: 12,
               alignItems: "center",
             }}
           >
@@ -704,7 +722,8 @@ function NutritionOverviewPage({
               {r.nutrition.fat} g
             </Text>
           </View>
-        ))}
+          );
+        })}
 
         {/* Totals row */}
         <View
