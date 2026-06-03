@@ -683,15 +683,8 @@ function NutritionOverviewPage({
         >
           Pack-Übersicht · alle {recipes.length} Karten
         </Text>
-        <Text
-          style={{
-            fontSize: 11,
-            color: t.inkSoft,
-            marginTop: 6,
-          }}
-        >
-          Ø {avg.kcal} kcal · Ø {avg.protein} g Eiweiß je Rezept
-        </Text>
+        {/* Durchschnitts-Zeile hier entfernt — stand doppelt: identische
+            Info ("Ø pro Rezept") schon als letzte Tabellenzeile unten. */}
       </View>
 
       <View style={{ paddingHorizontal: 40, paddingTop: 22 }}>
