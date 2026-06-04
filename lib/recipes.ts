@@ -1835,6 +1835,45 @@ export function mergeAndRenumber<R extends Recipe>(
   })) as R[];
 }
 
+// ════════════════════════════════════════════════
+// Mahlzeitengröße-Gruppierung (Biene-Wunsch der Creatorin via Ingo:
+// "Übersicht mit Makros nach vorne, Rezepte nach Größe sortiert").
+//
+// Trennt Rezepte nach kcal in "Kleine Mahlzeit" (< Schwelle) und "Große
+// Mahlzeit" (>= Schwelle), kleine zuerst, innerhalb jeder Gruppe aufsteigend
+// nach kcal. Setzt das `mealSize`-Feld (steuert Badge in der Recipe-Card +
+// die gruppierte MacroIndexPage in lib/pdf/pack-pdf.tsx) und vergibt `number`
+// neu 1..N, damit Karten-Reihenfolge, Footer-Index und Inhaltsverzeichnis
+// konsistent sind.
+//
+// Schwelle 500 kcal faellt in Bienes natuerliche Luecke (11 Rezepte
+// 249-449 kcal, dann Sprung auf 573-747). Pro Pack via pack.groupByMealSize
+// aktiviert; renderPackPdf ruft das zur Laufzeit auf, sodass mealSize NICHT
+// in der DB persistiert werden muss.
+//
+// Idempotent: nochmaliges Anwenden auf eine bereits gruppierte Liste liefert
+// dasselbe Ergebnis (stabile Sortierung + deterministische mealSize/number-
+// Vergabe). So ist es egal, ob der lokale render-book-Script vorab gruppiert
+// oder renderPackPdf es zur Laufzeit macht — kein Doppel-Effekt.
+export const MEAL_SIZE_THRESHOLD_KCAL = 500;
+
+export function groupRecipesBySize<R extends Recipe>(
+  recipes: R[],
+  thresholdKcal: number = MEAL_SIZE_THRESHOLD_KCAL
+): R[] {
+  const withSize = recipes.map((r) => ({
+    ...r,
+    mealSize: ((r.nutrition?.kcal ?? 0) < thresholdKcal ? "klein" : "gross") as
+      | "klein"
+      | "gross",
+  }));
+  withSize.sort((a, b) => {
+    if (a.mealSize !== b.mealSize) return a.mealSize === "klein" ? -1 : 1;
+    return (a.nutrition?.kcal ?? 0) - (b.nutrition?.kcal ?? 0);
+  });
+  return withSize.map((r, i) => ({ ...r, number: i + 1 })) as R[];
+}
+
 function staticRecipe(
   packSlug: string,
   recipeSlug: string

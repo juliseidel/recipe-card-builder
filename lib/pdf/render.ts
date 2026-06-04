@@ -2,7 +2,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { PDFDocument } from "pdf-lib";
 import type { Brand } from "@/lib/brands";
 import type { Pack } from "@/lib/packs";
-import type { Recipe } from "@/lib/recipes";
+import { groupRecipesBySize, type Recipe } from "@/lib/recipes";
 import { ensureFontsRegistered } from "./fonts";
 import { loadImageAsDataUri } from "./assets";
 import { generateQrDataUri } from "./qr";
@@ -220,6 +220,18 @@ export async function renderPackPdf(args: {
 }): Promise<Buffer> {
   ensureFontsRegistered();
 
+  // Mahlzeitengröße-Gruppierung pro Pack (pack.groupByMealSize). Muss GANZ
+  // am Anfang passieren, weil sie Reihenfolge + number der Rezepte aendert
+  // und alle folgenden Arrays (heroDataUris, qrDataUris, fittedRecipes)
+  // parallel-indiziert zu dieser Liste aufgebaut werden. So zeigt auch der
+  // Web-Download (Job-Runner → renderPackPdf) die gruppierte MacroIndexPage +
+  // Badges, ohne dass mealSize in der DB stehen muss. Idempotent (siehe
+  // groupRecipesBySize), daher unschaedlich falls die Liste schon gruppiert
+  // reinkommt (lokaler render-book-Script).
+  const recipes = args.pack.groupByMealSize
+    ? groupRecipesBySize(args.recipes)
+    : args.recipes;
+
   args.onProgress?.("loading-cover", 8);
   const coverDataUri = await loadImageAsDataUri(args.pack.coverImage);
 
@@ -260,11 +272,9 @@ export async function renderPackPdf(args: {
     storyImageDataUris,
   ] = await Promise.all([
     Promise.all(
-      args.recipes.map((r) =>
-        loadImageAsDataUri(r.hero ?? args.pack.coverImage)
-      )
+      recipes.map((r) => loadImageAsDataUri(r.hero ?? args.pack.coverImage))
     ),
-    Promise.all(args.recipes.map((r) => generateQrDataUri(r.sourceUrl))),
+    Promise.all(recipes.map((r) => generateQrDataUri(r.sourceUrl))),
     forewordImagePath
       ? loadImageAsDataUri(forewordImagePath)
       : Promise.resolve(null),
@@ -294,19 +304,18 @@ export async function renderPackPdf(args: {
   // der Job-Runner ohnehin asynchron laeuft.
   args.onProgress?.("verifying-recipes", 35);
   const fittedRecipes: Recipe[] = [];
-  for (let i = 0; i < args.recipes.length; i++) {
+  for (let i = 0; i < recipes.length; i++) {
     const fit = await fitRecipeToOnePage({
       brand: args.brand,
       pack: args.pack,
-      recipe: args.recipes[i],
-      totalRecipes: args.recipes.length,
+      recipe: recipes[i],
+      totalRecipes: recipes.length,
       heroDataUri: heroDataUris[i] ?? null,
       qrDataUri: qrDataUris[i] ?? null,
       avatarDataUri,
     });
     fittedRecipes.push(fit.recipe);
-    const verifyPct =
-      35 + Math.round(((i + 1) / args.recipes.length) * 20);
+    const verifyPct = 35 + Math.round(((i + 1) / recipes.length) * 20);
     args.onProgress?.("verifying-recipes", verifyPct);
   }
 

@@ -63,3 +63,55 @@ export function extractForewordLegacyFields(
     outro: content.outro ?? "",
   };
 }
+
+// ─── Reiche Extraktion fuer Multi-Paragraph- + Pull-Quote-Layouts ──────────
+// Wie extractForewordLegacyFields, aber erhaelt die Absatz-STRUKTUR als Array
+// UND den Pullquote. Fuer Renderer, die echte mehr-spaltige Absaetze und eine
+// eigene Pull-Quote setzen koennen — konkret die Premium-Buch-Vorwort-Seite
+// (lib/pdf/pack-pdf.tsx → PremiumForewordPage). Der Legacy-Extractor oben
+// bleibt fuer alle bestehenden Layouts, die nur ein flaches story-Feld lesen.
+export type ForewordParts = {
+  greeting: string;
+  paragraphs: string[];
+  pullquote: string;
+  signoff: string;
+  outro: string;
+};
+
+export function extractForewordParts(
+  content: PackForewordContent | null | undefined
+): ForewordParts {
+  if (!content) {
+    return { greeting: "", paragraphs: [], pullquote: "", signoff: "", outro: "" };
+  }
+
+  // v3 mit blocks-Liste — Paragraph-Blocks bleiben getrennt, Pullquote-Block
+  // wird (anders als im Legacy-Extractor) erhalten.
+  if (content.blocks && content.blocks.length > 0) {
+    const greeting =
+      content.blocks.find((b) => b.kind === "greeting")?.text ?? "";
+    const paragraphs = content.blocks
+      .filter((b) => b.kind === "paragraph")
+      .map((b) => b.text.trim())
+      .filter((t) => t.length > 0);
+    const pullquote =
+      content.blocks.find((b) => b.kind === "pullquote")?.text?.trim() ?? "";
+    const signoff =
+      content.blocks.find((b) => b.kind === "signoff")?.text ?? "";
+    return { greeting, paragraphs, pullquote, signoff, outro: content.outro ?? "" };
+  }
+
+  // v2-Legacy: story an Doppel-Umbruechen in Absaetze splitten; Pullquote
+  // gab es in v2 nicht.
+  const paragraphs = (content.story ?? "")
+    .split(/\n\n+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return {
+    greeting: content.greeting ?? "",
+    paragraphs,
+    pullquote: "",
+    signoff: content.signoff ?? "",
+    outro: content.outro ?? "",
+  };
+}

@@ -143,6 +143,42 @@ export type Pack = {
    *  packMode === "guide". Wird via generateStoryPages initial befuellt
    *  und kann im Editor erweitert/editiert werden. */
   storyPages?: StoryPage[];
+  /** Mahlzeitengröße-Gruppierung aktivieren. Wenn true, sortiert
+   *  renderPackPdf die Rezepte zur Laufzeit per groupRecipesBySize() in
+   *  "Kleine Mahlzeiten" (< 500 kcal) und "Große Mahlzeiten" und setzt das
+   *  recipe.mealSize-Feld. Das aktiviert in pack-pdf.tsx automatisch die
+   *  verschmolzene MacroIndexPage (Inhalt + Nährwerte vorne, nach Größe
+   *  gruppiert) statt der klassischen IndexPage + hinterer Nährwert-Seite,
+   *  plus die "Kleine/Große Mahlzeit"-Badges auf den Karten. mealSize wird
+   *  NICHT in der DB gespeichert — die Berechnung passiert bei jedem Render
+   *  aus den kcal. Default (undefined/false): klassisches Layout. */
+  groupByMealSize?: boolean;
+  /** Premium-Buch-Modus (Auslieferungs-Qualität). Wenn gesetzt, rendert
+   *  PackPdfDocument die drei Rahmen-Seiten (Cover / Vorwort / Schluss) im
+   *  Premium-Layout: full-bleed HD-Bild mit eingebranntem Scrim + Vektor-
+   *  Text-Overlay (Cover/Schluss) bzw. Bild-Banner oben + Textblock
+   *  (Vorwort). Ersetzt fuer dieses Pack die Standard-CoverPage/ForewordPage/
+   *  OutroPage. Andere Packs (Feld undefined) rendern unveraendert weiter.
+   *
+   *  Bilder kommen aus pack.coverImage / pack.forewordImage / pack.outroImage
+   *  (Scrim ist ins Cover/Outro-Bild eingebrannt). Texte: Cover-Titel =
+   *  pack.title, Cover-Footer = brand.handle + Rezeptzahl, Vorwort =
+   *  pack.foreword (greeting/paragraphs/pullquote/signoff), Schluss-Titel =
+   *  brand.signature, Schluss-Body = pack.foreword.outro. Nur die zwei
+   *  Cover-Felder ohne Pendant werden hier ueberschrieben. */
+  premiumBook?: {
+    /** Cover-Kicker (Eyebrow oben), z.B. "Meine Lieblingsrezepte". */
+    coverKicker?: string;
+    /** Cover-Subtitle. Faellt auf pack.subtitle zurueck wenn leer. Eigenes
+     *  Feld, weil der Cover-Claim oft anders formuliert ist als der
+     *  pack.subtitle, der in der Web-UI steht. */
+    coverSubtitle?: string;
+    /** Hintergrundfarbe der Vorwort-Seite (HEX). Das finale Premium-PDF nutzt
+     *  ein helleres Rose (#f7e8ea) als pack.mood.background — die Innen-Seiten
+     *  (Karten/Index) bleiben beim mood-Wert. Faellt auf pack.mood.background
+     *  zurueck wenn leer. */
+    paperBg?: string;
+  };
 };
 
 /** Position einer Story-Seite im Pack-PDF.

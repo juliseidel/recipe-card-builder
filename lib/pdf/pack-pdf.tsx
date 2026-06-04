@@ -3,6 +3,7 @@ import type { Brand } from "@/lib/brands";
 import type { Pack, StoryPage } from "@/lib/packs";
 import type { Recipe } from "@/lib/recipes";
 import type { PackForewordContent } from "@/lib/ai/generate-foreword";
+import { extractForewordParts } from "@/lib/foreword-adapter";
 import { packTheme, withAlpha, blendWithWhite, fontFamilyForPack } from "./theme";
 import { pad2, totalTime } from "./helpers";
 import { RecipeCardPdfPage } from "./recipe-card-pdf";
@@ -93,6 +94,10 @@ export function PackPdfDocument({
   const showForeword = Boolean(forewordContent);
   const t = packTheme(pack);
   const titleFont = fontFamilyForPack(pack);
+  // Premium-Buch-Modus: drei Rahmen-Seiten (Cover/Vorwort/Schluss) rendern im
+  // Premium-Layout statt der Standard-Seiten. Nur fuer Packs mit gesetztem
+  // premiumBook — alle anderen unveraendert.
+  const premium = pack.premiumBook ?? null;
 
   // Story-Pages aktiv nur im Guide-Modus mit mind. 1 Page.
   const storyPages =
@@ -152,14 +157,24 @@ export function PackPdfDocument({
       creator="Recipe Card Builder"
       producer="Recipe Card Builder · Wolf Family Office Test Week"
     >
-      {/* PAGE 1 — COVER */}
-      <CoverPage
-        brand={brand}
-        pack={pack}
-        coverDataUri={coverDataUri}
-        recipes={recipes}
-        titleFont={titleFont}
-      />
+      {/* PAGE 1 — COVER (Premium-Scrim-Cover oder Standard-CoverPage) */}
+      {premium ? (
+        <PremiumCoverPage
+          brand={brand}
+          pack={pack}
+          coverDataUri={coverDataUri}
+          recipeCount={recipes.length}
+          premium={premium}
+        />
+      ) : (
+        <CoverPage
+          brand={brand}
+          pack={pack}
+          coverDataUri={coverDataUri}
+          recipes={recipes}
+          titleFont={titleFont}
+        />
+      )}
 
       {/* PAGE 2 — FOREWORD (User-Korrektur 2026-05-24: Vorwort gehoert
           REIN, nicht das was der User vorher als 'Vorwort' kritisiert
@@ -167,13 +182,23 @@ export function PackPdfDocument({
           ist das richtige Vorwort mit greeting/story/signoff und sollte
           wieder gerendert werden wenn pack.foreword vorhanden ist). */}
       {showForeword && forewordContent ? (
-        <ForewordPage
-          brand={brand}
-          pack={pack}
-          content={forewordContent}
-          imageDataUri={forewordImageDataUri ?? null}
-          avatarDataUri={avatarDataUri ?? null}
-        />
+        premium ? (
+          <PremiumForewordPage
+            brand={brand}
+            pack={pack}
+            content={forewordContent}
+            imageDataUri={forewordImageDataUri ?? null}
+            premium={premium}
+          />
+        ) : (
+          <ForewordPage
+            brand={brand}
+            pack={pack}
+            content={forewordContent}
+            imageDataUri={forewordImageDataUri ?? null}
+            avatarDataUri={avatarDataUri ?? null}
+          />
+        )
       ) : null}
 
       {/* STORY PAGES — Slot "after-foreword" (Default). Sitzen zwischen
@@ -259,13 +284,22 @@ export function PackPdfDocument({
         />
       ))}
 
-      {/* OUTRO — mit optionalem Outro-Bild (origin/main Feature) */}
-      <OutroPage
-        brand={brand}
-        pack={pack}
-        titleFont={titleFont}
-        outroImageDataUri={outroImageDataUri ?? null}
-      />
+      {/* OUTRO — Premium-Schluss-Seite oder Standard-Outro */}
+      {premium ? (
+        <PremiumOutroPage
+          brand={brand}
+          pack={pack}
+          content={forewordContent ?? null}
+          outroImageDataUri={outroImageDataUri ?? null}
+        />
+      ) : (
+        <OutroPage
+          brand={brand}
+          pack={pack}
+          titleFont={titleFont}
+          outroImageDataUri={outroImageDataUri ?? null}
+        />
+      )}
     </Document>
   );
 }
@@ -496,6 +530,387 @@ function CoverPage({
             {pack.description}
           </Text>
         ) : null}
+      </View>
+    </Page>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PREMIUM-BUCH-SEITEN (Auslieferungs-Qualität, pack.premiumBook)
+// ═════════════════════════════════════════════════════════════════════════════
+// Exakter Port der drei Rahmen-Seiten aus scripts/perfektion/render-premium.tsx
+// (mit dem die finalen Auslieferungs-PDFs gebaut wurden) in die Web-Pipeline.
+// Damit ergibt der Web-Download dasselbe Buch wie der lokale Premium-Workflow:
+// full-bleed HD-Bild mit eingebranntem Scrim + Vektor-Text-Overlay (Cover/
+// Schluss) bzw. Bild-Banner oben + Textblock auf hellem Rose (Vorwort).
+//
+// Palette kommt aus packTheme(pack) — ink/inkSoft/accent stimmen mit der
+// finalen Premium-Config ueberein (Biene-Rose). Der Scrim ist ins Cover-/
+// Outro-Bild gebrannt (scripts/perfektion/add-scrim.mjs), daher kein
+// Overlay-Block noetig und dunkler ink-Text bleibt lesbar. Nur aktiv wenn
+// pack.premiumBook gesetzt ist — alle anderen Packs rendern unveraendert ueber
+// CoverPage/ForewordPage/OutroPage.
+
+// ─── PREMIUM COVER: Full-bleed Scrim-Bild + Text-Overlay unten ───
+function PremiumCoverPage({
+  brand,
+  pack,
+  coverDataUri,
+  recipeCount,
+  premium,
+}: {
+  brand: Brand;
+  pack: Pack;
+  coverDataUri: string | null;
+  recipeCount: number;
+  premium: NonNullable<Pack["premiumBook"]>;
+}) {
+  const t = packTheme(pack);
+  const kicker = premium.coverKicker ?? "Meine Lieblingsrezepte";
+  const subtitle = premium.coverSubtitle ?? pack.subtitle;
+  const footer = `${brand.handle} · ${recipeCount} Rezepte`;
+  return (
+    <Page
+      size="A4"
+      style={{ position: "relative", backgroundColor: t.ink, fontFamily: "Inter" }}
+    >
+      {coverDataUri ? (
+        <Image
+          src={coverDataUri}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            // Explizite 595x840pt (NICHT "100%"/841.89): react-pdf wirft sonst
+            // eine leere "Geister-Seite" hinter dem Bild, weil das Vollhoehen-
+            // Bild als nicht-umbrechbar + groesser-als-Seite gewertet wird.
+            // 2pt Sicherheitsmarge zur A4-Hoehe verhindert den Page-Break
+            // (identisch zu scripts/perfektion/render-premium.tsx).
+            width: 595,
+            height: 840,
+            objectFit: "cover",
+          }}
+        />
+      ) : null}
+      {/* Scrim ist ins Bild gebrannt → kein Overlay-Block. Text-Overlay unten. */}
+      <View
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          padding: 48,
+          paddingBottom: 54,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontWeight: 700,
+            fontSize: 11,
+            letterSpacing: 3,
+            color: t.ink,
+            marginBottom: 14,
+            textTransform: "uppercase",
+          }}
+        >
+          {kicker}
+        </Text>
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontWeight: 700,
+            fontSize: 56,
+            lineHeight: 0.98,
+            letterSpacing: -0.8,
+            color: t.ink,
+            maxWidth: 470,
+          }}
+        >
+          {pack.title}
+        </Text>
+        {subtitle ? (
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontStyle: "italic",
+              fontSize: 15,
+              lineHeight: 1.4,
+              color: t.inkSoft,
+              marginTop: 16,
+              maxWidth: 430,
+            }}
+          >
+            {subtitle}
+          </Text>
+        ) : null}
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontWeight: 500,
+            fontSize: 10,
+            letterSpacing: 2,
+            color: t.inkSoft,
+            marginTop: 22,
+            textTransform: "uppercase",
+          }}
+        >
+          {footer}
+        </Text>
+      </View>
+    </Page>
+  );
+}
+
+// ─── PREMIUM VORWORT: Bild-Banner oben (Crop) + Textblock unten ───
+function PremiumForewordPage({
+  brand,
+  pack,
+  content,
+  imageDataUri,
+  premium,
+}: {
+  brand: Brand;
+  pack: Pack;
+  content: PackForewordContent;
+  imageDataUri: string | null;
+  premium: NonNullable<Pack["premiumBook"]>;
+}) {
+  const t = packTheme(pack);
+  const bg = premium.paperBg ?? t.bg;
+  const bannerH = 384;
+  // greeting + getrennte Absaetze + Pullquote + signoff aus blocks (v3) ODER
+  // Legacy-story (v2) ziehen — extractForewordParts erhaelt die Absatz-
+  // Struktur und den Pullquote, die der Legacy-Extractor flachklopfen wuerde.
+  const { greeting, paragraphs, pullquote, signoff } =
+    extractForewordParts(content);
+  const signature = brand.signature;
+  return (
+    <Page
+      size="A4"
+      style={{ position: "relative", backgroundColor: bg, fontFamily: "Inter" }}
+    >
+      {imageDataUri ? (
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: bannerH,
+            overflow: "hidden",
+          }}
+        >
+          <Image
+            src={imageDataUri}
+            style={{
+              width: 595,
+              height: 797,
+              objectFit: "cover",
+              objectPosition: "center 32%",
+            }}
+          />
+        </View>
+      ) : null}
+      <View
+        style={{
+          position: "absolute",
+          top: imageDataUri ? bannerH : 56,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          paddingHorizontal: 56,
+          paddingTop: 38,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontWeight: 600,
+            fontSize: 10,
+            letterSpacing: 3,
+            color: t.accent,
+            textTransform: "uppercase",
+            marginBottom: 16,
+          }}
+        >
+          Vorwort
+        </Text>
+        {greeting ? (
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontWeight: 600,
+              fontStyle: "italic",
+              fontSize: 25,
+              lineHeight: 1.18,
+              color: t.ink,
+              maxWidth: 430,
+              marginBottom: 20,
+            }}
+          >
+            {greeting}
+          </Text>
+        ) : null}
+        {paragraphs.map((para, i) => (
+          <Text
+            key={i}
+            style={{
+              fontFamily: "Inter",
+              fontWeight: 400,
+              fontSize: 11.5,
+              lineHeight: 1.62,
+              color: t.inkSoft,
+              marginBottom: 14,
+              maxWidth: 452,
+            }}
+          >
+            {para}
+          </Text>
+        ))}
+        {pullquote ? (
+          <View
+            style={{
+              borderLeftWidth: 2,
+              borderLeftColor: t.accent,
+              paddingLeft: 16,
+              marginTop: 6,
+              marginBottom: 18,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: "Fraunces",
+                fontStyle: "italic",
+                fontSize: 14.5,
+                lineHeight: 1.4,
+                color: t.ink,
+                maxWidth: 420,
+              }}
+            >
+              {pullquote}
+            </Text>
+          </View>
+        ) : null}
+        {signoff ? (
+          <Text
+            style={{
+              fontFamily: "Inter",
+              fontWeight: 400,
+              fontSize: 11.5,
+              lineHeight: 1.6,
+              color: t.inkSoft,
+              marginBottom: 4,
+            }}
+          >
+            {signoff}
+          </Text>
+        ) : null}
+        {signature ? (
+          <Text
+            style={{
+              fontFamily: "Fraunces",
+              fontStyle: "italic",
+              fontSize: 18,
+              color: t.ink,
+              marginTop: 10,
+            }}
+          >
+            {signature}
+          </Text>
+        ) : null}
+      </View>
+    </Page>
+  );
+}
+
+// ─── PREMIUM SCHLUSS: Full-bleed Scrim-Bild + zentrierter Text-Overlay ───
+function PremiumOutroPage({
+  brand,
+  pack,
+  content,
+  outroImageDataUri,
+}: {
+  brand: Brand;
+  pack: Pack;
+  content: PackForewordContent | null;
+  outroImageDataUri: string | null;
+}) {
+  const t = packTheme(pack);
+  const title = brand.signature;
+  const body = content?.outro?.trim() || DEFAULT_OUTRO;
+  const footer = `${brand.handle} · ${pack.title}`;
+  return (
+    <Page
+      size="A4"
+      style={{ position: "relative", backgroundColor: t.ink, fontFamily: "Inter" }}
+    >
+      {outroImageDataUri ? (
+        <Image
+          src={outroImageDataUri}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            // Explizite 595x840pt gegen die leere Geister-Seite (siehe
+            // PremiumCoverPage). Vollhoehen-Bild als "100%" triggert den
+            // Page-Break sonst auch hier.
+            width: 595,
+            height: 840,
+            objectFit: "cover",
+          }}
+        />
+      ) : null}
+      <View
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          padding: 52,
+          paddingBottom: 58,
+          alignItems: "center",
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: "Fraunces",
+            fontWeight: 700,
+            fontStyle: "italic",
+            fontSize: 40,
+            color: t.ink,
+            marginBottom: 18,
+            textAlign: "center",
+          }}
+        >
+          {title}
+        </Text>
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontWeight: 400,
+            fontSize: 12,
+            lineHeight: 1.62,
+            color: t.inkSoft,
+            textAlign: "center",
+            maxWidth: 400,
+            marginBottom: 22,
+          }}
+        >
+          {body}
+        </Text>
+        <Text
+          style={{
+            fontFamily: "Inter",
+            fontWeight: 600,
+            fontSize: 10,
+            letterSpacing: 2,
+            color: t.accent,
+            textTransform: "uppercase",
+          }}
+        >
+          {footer}
+        </Text>
       </View>
     </Page>
   );
