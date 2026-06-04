@@ -100,8 +100,20 @@ export const BIENE_STYLE: BrandImageStyle = {
   // No "smartphone reel" or "phone" — both trigger Flux 2 Pro's reel-frame
   // mode, which renders headline overlays. "Natural unstaged" gets the
   // same look without the trigger word.
+  //
+  // 2026-06-04 REVERT der b50bc7b-"Gericht formatfuellend"-Klausel
+  // ("dish ... fills most of the frame ... only a little counter visible").
+  // Sie landete im Flux-Prompt DIREKT vor "dish shape, color, serving vessel
+  // ... matching the reference" (lib/ai/image-prompts.ts) und hat den
+  // Bildausschnitt des Gerichts GEGEN die Reel-Referenz gedrueckt -> das
+  // Gericht sah nicht mehr aus wie das echte Rezept (User-Befund 2026-06-04).
+  // Zusaetzlich liess das "nur wenig Counter sichtbar" keinen Platz fuer den
+  // reicheren Hintergrund, den Biene eigentlich wollte. Zurueck auf die
+  // bewaehrte schlanke Aussage: die Referenz steuert Form + Ausschnitt des
+  // Gerichts, der Prompt steuert nur die Szene drumherum. (Die groessere
+  // DARSTELLUNG kommt ohnehin aus dem Karten-Hero 165px, nicht aus dem Crop.)
   cameraAesthetic:
-    "natural unstaged food photograph, homemade-feeling, no studio look. The dish is large and fills most of the frame as the clear hero — fairly tightly framed, the food is the main subject with only a little counter visible around it",
+    "natural unstaged food photograph, homemade-feeling, no studio look",
   // Bienes signature framing: cutting board with a MAIN-INGREDIENT bowl in
   // the soft background. NO scattered greens on counter or board — that
   // earlier hypothesis didn't survive contact with the sweet/baked dishes
@@ -115,8 +127,18 @@ export const BIENE_STYLE: BrandImageStyle = {
   // mit Beispielen + sechs Negationen. Das ueberforderte Flux. Knapp und
   // klar funktioniert besser; die "main ingredient"-Auswahl ueberlassen
   // wir Gemini's Intuition.
+  //
+  // 2026-06-04: Biene wollte "mehr Hintergrund-Elemente". b50bc7b hat das mit
+  // GENERISCHEN Props geloest ("folded linen napkin, a couple of scattered raw
+  // ingredients, a small spoon or fork") — das verletzte direkt die
+  // 2026-05-07-Lektion oben: scattered, gericht-fremde Props lesen sich als
+  // zufaellige Flecken neben dem Essen und passen NICHT zum Rezept (User-
+  // Befund). FIX: den reicheren Hintergrund aus den EIGENEN Zutaten des
+  // Gerichts bauen (immer relevant, nie generisch), locker um die Signature-
+  // Bowl arrangiert, alles weich unscharf -> Hintergrund wirkt voller UND
+  // passt, das Gericht bleibt das scharfe Subjekt. Bewusst knapp gehalten.
   heroElementGuidance:
-    "A complete English phrase describing the scene: 'a small wooden cutting board with a small ceramic bowl of [main recipe ingredient in its most photogenic natural form] sits softly in the background behind the dish, with a few more tasteful styling props around the scene — a folded linen napkin, a couple of scattered raw ingredients, a small spoon or fork — so the background feels richer and more decorated, while staying softly blurred and never cluttered'. The cutting board and props are separate background elements, never under the dish itself; the dish stays the large clear hero in front.",
+    "A complete English phrase describing the scene: 'a small wooden cutting board with a small ceramic bowl of [main recipe ingredient in its most photogenic natural form] sits softly in the background behind the dish, with a few of the dish's own key ingredients arranged naturally around the bowl so the background feels gently styled and full, everything kept softly out of focus so the dish stays the clear subject'. The cutting board and ingredients sit separately in the background, never under the dish itself.",
   // Per-shape angle overrides. Calibrated against Bienes real reels:
   // pasta-bowls and plated mains shoot top-down (most of her content),
   // layered desserts (cheesecake, tiramisu) shoot 30° three-quarter so
