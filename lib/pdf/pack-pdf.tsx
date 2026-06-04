@@ -983,6 +983,18 @@ function MacroIndexPage({
     g.items.push({ r, idx });
   });
   const col = { kcal: 42, ew: 38, kh: 38, fat: 34, page: 30 };
+  // Adaptive Zeilenhoehe: die Tabelle soll die Seite schoen fuellen statt
+  // (wie vorher bei 14 Rezepten) das untere Drittel leer zu lassen. rowPadV
+  // wird aus der Rezeptanzahl berechnet, sodass der Inhalt ~Zielhoehe erreicht;
+  // geclamped, damit grosse Packs (25+) nicht ueberlaufen und kleine keine
+  // absurd hohen Zeilen bekommen. rowFont skaliert leicht mit der Anzahl.
+  const N = recipes.length;
+  const G = Math.max(groups.length, 1);
+  const rowFont = N <= 16 ? 11.5 : N <= 22 ? 10.5 : 9.5;
+  const OVERHEAD = 172 + G * 34; // Header-Band + Spaltenkopf + Gruppen-Header + Footnote + Paddings
+  const rowH = (740 - OVERHEAD) / Math.max(N, 1);
+  const rowPadV = Math.max(5, Math.min(14, (rowH - rowFont) / 2));
+  const groupGap = rowPadV >= 9 ? 20 : 14;
   return (
     <Page size="A4" style={{ backgroundColor: "#ffffff", fontFamily: "Inter", color: t.ink }}>
       <View style={{ backgroundColor: t.paper, borderBottomWidth: 1, borderBottomColor: t.divider, paddingHorizontal: 40, paddingTop: 28, paddingBottom: 18 }}>
@@ -1004,23 +1016,23 @@ function MacroIndexPage({
           <Text style={{ width: col.page, fontSize: 7, fontWeight: 600, letterSpacing: 0.8, color: t.inkSoft, textAlign: "right", textTransform: "uppercase" }}>S.</Text>
         </View>
         {groups.map((g, gi) => (
-          <View key={g.label} style={{ marginTop: gi === 0 ? 4 : 14 }}>
+          <View key={g.label} style={{ marginTop: gi === 0 ? 6 : groupGap }}>
             {/* Gruppen-Header */}
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
-              <View style={{ width: 5, height: 5, backgroundColor: t.accent, transform: "rotate(45deg)" }} />
-              <Text style={{ fontFamily: "Fraunces", fontSize: 13, fontWeight: 600, color: t.ink }}>{g.label}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <View style={{ width: 6, height: 6, backgroundColor: t.accent, transform: "rotate(45deg)" }} />
+              <Text style={{ fontFamily: "Fraunces", fontSize: 14, fontWeight: 600, color: t.ink }}>{g.label}</Text>
               <View style={{ flex: 1, height: 0.8, backgroundColor: t.divider }} />
               <Text style={{ fontSize: 7.5, color: t.inkSoft }}>{g.items.length} Rezepte</Text>
             </View>
             {g.items.map(({ r, idx }, j) => (
-              <View key={r.slug} style={{ flexDirection: "row", alignItems: "center", borderBottomWidth: j < g.items.length - 1 ? 0.5 : 0, borderBottomColor: t.divider, paddingVertical: 6.5, paddingHorizontal: 4 }}>
-                <Text style={{ fontFamily: "Fraunces", fontSize: 11, color: t.accent, width: 22 }}>{pad2(r.number)}</Text>
-                <Text style={{ flex: 1, fontSize: 10.5, fontWeight: 500, color: t.ink }}>{r.title}</Text>
-                <Text style={{ width: col.kcal, fontFamily: "Fraunces", fontSize: 10.5, color: t.ink, textAlign: "right" }}>{r.nutrition.kcal}</Text>
-                <Text style={{ width: col.ew, fontSize: 9.5, color: t.inkSoft, textAlign: "right" }}>{r.nutrition.protein} g</Text>
-                <Text style={{ width: col.kh, fontSize: 9.5, color: t.inkSoft, textAlign: "right" }}>{r.nutrition.carbs} g</Text>
-                <Text style={{ width: col.fat, fontSize: 9.5, color: t.inkSoft, textAlign: "right" }}>{r.nutrition.fat} g</Text>
-                <Text style={{ width: col.page, fontSize: 9, fontWeight: 600, color: t.inkSoft, textAlign: "right" }}>{recipePageNumbers[idx] ?? ""}</Text>
+              <View key={r.slug} style={{ flexDirection: "row", alignItems: "center", borderBottomWidth: j < g.items.length - 1 ? 0.5 : 0, borderBottomColor: t.divider, paddingVertical: rowPadV, paddingHorizontal: 4 }}>
+                <Text style={{ fontFamily: "Fraunces", fontSize: rowFont + 0.5, color: t.accent, width: 24 }}>{pad2(r.number)}</Text>
+                <Text style={{ flex: 1, fontSize: rowFont, fontWeight: 500, color: t.ink }}>{r.title}</Text>
+                <Text style={{ width: col.kcal, fontFamily: "Fraunces", fontSize: rowFont, color: t.ink, textAlign: "right" }}>{r.nutrition.kcal}</Text>
+                <Text style={{ width: col.ew, fontSize: rowFont - 1, color: t.inkSoft, textAlign: "right" }}>{r.nutrition.protein} g</Text>
+                <Text style={{ width: col.kh, fontSize: rowFont - 1, color: t.inkSoft, textAlign: "right" }}>{r.nutrition.carbs} g</Text>
+                <Text style={{ width: col.fat, fontSize: rowFont - 1, color: t.inkSoft, textAlign: "right" }}>{r.nutrition.fat} g</Text>
+                <Text style={{ width: col.page, fontSize: rowFont - 1.5, fontWeight: 600, color: t.inkSoft, textAlign: "right" }}>{recipePageNumbers[idx] ?? ""}</Text>
               </View>
             ))}
           </View>

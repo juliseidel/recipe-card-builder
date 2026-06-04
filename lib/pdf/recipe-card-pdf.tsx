@@ -199,6 +199,27 @@ function EditorialPage({
   const rawDensity = getDensity(recipe);
   const density = rawDensity === "spacious" ? "balanced" : rawDensity;
   const d = EDITORIAL_DENSITY[density];
+  // Adaptive Hero-Groesse (Creatorin-Wunsch @bienesfitlife: "Rezeptbilder
+  // groesser"). Ein FIXES grosses Hero ist unmoeglich: dichte Karten
+  // (Donauwelle 18 Zutaten, Trueffel-Pasta 13/7) sind randvoll und wuerden
+  // ueberlaufen, leichte (Smoothie 5/2) haben dagegen ~250pt Leerraum. Loesung:
+  // Hero skaliert INVERS zur Content-Last (gleiche Score-Basis wie getDensity:
+  // Zutaten + Schritte*1.5). Leichte Rezepte bekommen ein deutlich groesseres
+  // Hero (fuellt den Leerraum, sieht premium aus), dichte bleiben bei ~165
+  // (1-Seiten-Garantie haelt). Clamp [165, 228]. Quadratisch, damit der volle
+  // generierte Bildinhalt inkl. Hintergrund erhalten bleibt (kein Panorama-
+  // Crop, der genau den Hintergrund wegschneidet, den Biene mehr haben wollte).
+  const contentLoad = recipe.ingredients.length + recipe.steps.length * 1.5;
+  // Hero-Gate: dichte Karten (density "compact" — von Natur aus content-reich
+  // ODER vom Fit-Guard heruntergestuft, weil sie sonst ueberlaufen) behalten
+  // das kompakte 165er-Hero. Dort fehlt der vertikale Platz, und ein grosses
+  // Hero wuerde nur die persoenliche Story verdraengen und trotzdem Leerraum
+  // lassen (siehe erdbeer-brownie). Das groessere, invers zur Content-Last
+  // skalierte Hero bekommen NUR Karten mit echtem Spielraum (balanced).
+  const heroSize =
+    density === "compact"
+      ? 165
+      : Math.round(Math.max(165, Math.min(228, 165 + (22 - contentLoad) * 4.6)));
   // Adaptive Title-FontSize bei langen Titles (analog Patisserie). Plus
   // softWrapTitle damit Bindestriche ("Parmesan-Chicken-Sticks") als
   // wrap-Punkt funktionieren und der Title nicht hinten abgeschnitten
@@ -286,19 +307,19 @@ function EditorialPage({
         {/* alignSelf flex-start + feste Hoehe: sonst streckt der row-Parent
             (alignItems default "stretch") den Bild-Slot auf die Section-
             Hoehe — bei dichten Karten wuchs das Hero dadurch sichtbar. */}
-        <View style={{ width: 165, height: 165, alignSelf: "flex-start" }}>
+        <View style={{ width: heroSize, height: heroSize, alignSelf: "flex-start" }}>
           {heroDataUri ? (
             <View
               style={{
-                borderRadius: 10,
+                borderRadius: 12,
                 overflow: "hidden",
-                width: 165,
-                height: 165,
+                width: heroSize,
+                height: heroSize,
               }}
             >
               <Image
                 src={heroDataUri}
-                style={{ width: 165, height: 165, objectFit: "cover" }}
+                style={{ width: heroSize, height: heroSize, objectFit: "cover" }}
               />
             </View>
           ) : null}

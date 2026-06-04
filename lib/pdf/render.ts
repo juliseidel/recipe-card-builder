@@ -50,6 +50,20 @@ type FallbackAttempt = {
 
 const FALLBACK_ATTEMPTS: FallbackAttempt[] = [
   {
+    // Sanftester Fallback: nur Density auf compact, Story + Micros BLEIBEN.
+    // Viele Recipes (wenige Zutaten, aber lange Step-Texte — z. B. erdbeer-
+    // brownie) laufen bei balanced nur knapp ueber; das compact-Spacing allein
+    // holt sie auf 1 Seite, ohne die persoenliche Creator-Story oder die
+    // Mikros zu opfern. Erst wenn das nicht reicht, greifen die haerteren
+    // Stufen mit hideStory. Rein additiv: passt compact-allein nicht, faellt
+    // die Schleife einfach auf die naechste Stufe wie bisher.
+    label: "compact (Story + Micros bleiben)",
+    apply: (r) => ({
+      ...r,
+      tweaks: { ...r.tweaks, densityOverride: "compact" },
+    }),
+  },
+  {
     label: "compact + hideStory",
     apply: (r) => ({
       ...r,
