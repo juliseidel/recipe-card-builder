@@ -178,6 +178,16 @@ export type Pack = {
      *  (Karten/Index) bleiben beim mood-Wert. Faellt auf pack.mood.background
      *  zurueck wenn leer. */
     paperBg?: string;
+    /** Buch-Bilder, ENTKOPPELT von pack.coverImage/forewordImage/outroImage.
+     *  Grund: der Editor-Pfad "Cover/Bild neu generieren" (regenerate-field)
+     *  ueberschreibt die pack-Bild-Felder jederzeit mit frischen Gemini-
+     *  Bildern (coverStyle="creator") — ein finalisiertes Premium-Buch soll
+     *  davon NICHT betroffen sein. renderPackPdf bevorzugt diese Felder, wenn
+     *  premiumBook gesetzt ist; so bleibt das PDF gegen Cover-Regen immun.
+     *  Cover/Outro haben den Scrim eingebrannt, Vorwort ist ein Banner. */
+    coverImage?: string;
+    forewordImage?: string;
+    outroImage?: string;
   };
 };
 

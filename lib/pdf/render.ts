@@ -232,8 +232,20 @@ export async function renderPackPdf(args: {
     ? groupRecipesBySize(args.recipes)
     : args.recipes;
 
+  // Premium-Buch-Bilder (pack.premiumBook) haben Vorrang vor den normalen
+  // pack-Bild-Feldern. Grund: der Editor-Pfad "Cover/Bild neu generieren"
+  // (app/api/packs/[id]/regenerate-field) ueberschreibt pack.coverImage/
+  // forewordImage/outroImage jederzeit mit frischen Gemini-Bildern
+  // (coverStyle="creator") — ein finalisiertes Premium-Buch soll davon NICHT
+  // betroffen sein. Die Buch-Bilder liegen separat in premiumBook und sind so
+  // gegen Cover-Regen immun. Fallback auf die pack-Felder, wenn nicht gesetzt.
+  const premiumImages = args.pack.premiumBook;
+  const outroImageSrc = premiumImages?.outroImage ?? args.pack.outroImage;
+
   args.onProgress?.("loading-cover", 8);
-  const coverDataUri = await loadImageAsDataUri(args.pack.coverImage);
+  const coverDataUri = await loadImageAsDataUri(
+    premiumImages?.coverImage ?? args.pack.coverImage
+  );
 
   // Foreword sources, in priority order:
   //   1. Statischer Cache (lib/pack-forewords.ts) — die 5 kuratierten
@@ -248,11 +260,13 @@ export async function renderPackPdf(args: {
   // einfach uebersprungen, alles andere rendert normal.
   const cachedForeword = getPackForeword(args.pack.slug);
   const forewordContent = cachedForeword ?? args.pack.foreword ?? null;
-  const forewordImagePath: string | null = cachedForeword
-    ? `/brands/${args.brand.slug}/forewords/${args.pack.slug}.jpg`
-    : forewordContent && args.pack.forewordImage
-      ? args.pack.forewordImage
-      : null;
+  const forewordImagePath: string | null =
+    premiumImages?.forewordImage ??
+    (cachedForeword
+      ? `/brands/${args.brand.slug}/forewords/${args.pack.slug}.jpg`
+      : forewordContent && args.pack.forewordImage
+        ? args.pack.forewordImage
+        : null);
 
   args.onProgress?.("loading-recipe-images", 20);
   // Hero images, QR codes, foreword image (optional), outro image
@@ -278,8 +292,8 @@ export async function renderPackPdf(args: {
     forewordImagePath
       ? loadImageAsDataUri(forewordImagePath)
       : Promise.resolve(null),
-    args.pack.outroImage
-      ? loadImageAsDataUri(args.pack.outroImage)
+    outroImageSrc
+      ? loadImageAsDataUri(outroImageSrc)
       : Promise.resolve(null),
     loadImageAsDataUri(args.brand.avatar),
     Promise.all(
