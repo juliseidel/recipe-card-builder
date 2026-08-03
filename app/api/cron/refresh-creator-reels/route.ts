@@ -13,18 +13,27 @@ import { regenerateSuggestionsForBrand } from "@/lib/reel-library/classify-and-s
 import { brands as codeBrands, getCodeBrandsWithHandle, type Brand } from "@/lib/brands";
 import type { SocialPlatform } from "@/lib/integrations/platform";
 
-// Auto-Refresh-Cron. Vercel feuert das alle 4h (siehe vercel.json), wir
-// scrapen pro Brand die letzten ~50 Posts der letzten 14 Tage. Dedup auf
-// ig_id verhindert Duplikate; nur neue Reels landen in der Library.
-// Apify-Webhook-Pipeline uebernimmt Klassifikation + Suggestions-Regen
-// + Cover-Caching automatisch.
+// ⚠️ KEIN CRON MEHR. Abgeschaltet am 03.08.2026 auf Julis Ansage.
 //
-// Was sich vom alten Daily-Cron unterscheidet:
-//   - Frequenz 24h → 4h (vercel.json)
-//   - Auch Code-Brands (z.B. Biene) werden mitgescrapt — vorher nur DB-Brands
-//   - Skip-Lock: Brands, deren letzte Aktualisierung < 2h alt ist, werden
-//     uebersprungen. Verhindert Overlap mit manuellen Refreshes und spart
-//     Apify-Credits bei sehr aktivem Cron.
+// Der Eintrag in vercel.json ist entfernt. Vercel ruft diese Route nicht mehr
+// von selbst auf. Die Route bleibt bestehen und funktioniert weiter, wenn man
+// sie von Hand aufruft.
+//
+// Warum: der Lauf war zuletzt der einzige verbleibende Apify-Verbraucher des
+// Kontos. Zwoelf Marken taeglich, rund 0,36 $ am Tag, also etwa 11 $ im Monat.
+//
+// Zum Wiederanschalten in vercel.json zuruecklegen:
+//   "crons": [{ "path": "/api/cron/refresh-creator-reels", "schedule": "0 6 * * *" }]
+// Achtung, der Takt war TAEGLICH um 06:00 UTC, nicht alle 4h. Ein frueherer
+// Kommentar an dieser Stelle behauptete 4h. Das stimmte nicht und haette beim
+// Zuruecklegen das Sechsfache gekostet.
+//
+// Was die Route tut: scrapt pro Brand die letzten ~50 Posts der letzten 14
+// Tage. Dedup auf ig_id verhindert Duplikate, nur neue Reels landen in der
+// Library. Die Apify-Webhook-Pipeline uebernimmt Klassifikation,
+// Suggestions-Regen und Cover-Caching automatisch. Code-Brands wie Biene
+// werden mitgescrapt. Der Skip-Lock ueberspringt Brands, deren letzte
+// Aktualisierung juenger als zwei Stunden ist.
 //
 // Authentifizierung: Vercel setzt automatisch den Header
 // `authorization: Bearer <CRON_SECRET>`, wenn `CRON_SECRET` env-var
@@ -34,6 +43,23 @@ import type { SocialPlatform } from "@/lib/integrations/platform";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+// ─── Riegel 2 von 2: harte Bremse ───────────────────────────────────────
+// Abgeschaltet am 03.08.2026 auf Julis Ansage. Absichtlich doppelt:
+//   1. Der crons-Eintrag in vercel.json ist entfernt, Vercel ruft nicht mehr.
+//   2. Diese Bremse. Falls der Eintrag jemals zurueckkommt oder die Route von
+//      Hand gerufen wird, bricht sie hier ab, statt Apify Geld auszugeben.
+//
+// ⚠️ ZUM WIEDERANSCHALTEN MUESSEN BEIDE ZURUECK:
+//      a) hier AUTO_REFRESH_AKTIV = true
+//      b) in vercel.json:
+//         "crons": [{ "path": "/api/cron/refresh-creator-reels",
+//                     "schedule": "0 6 * * *" }]
+//    Nur eines von beiden reicht nicht.
+//
+// Der Aktualisieren-Knopf in der Oberflaeche ist NICHT betroffen. Der geht
+// ueber /api/brands/[slug]/refresh-reels und laeuft unveraendert weiter.
+const AUTO_REFRESH_AKTIV = false;
 
 // Wenn der letzte Scrape eines Brands juenger als dieses Fenster ist,
 // ueberspringen wir. 2h Fenster = 30 Min Puffer auf den 4h-Cron-Takt.
@@ -65,6 +91,17 @@ function isSuggestionsStale(latestCreatedAt: string | null): boolean {
 }
 
 export async function GET(req: Request) {
+  // Riegel 2: siehe AUTO_REFRESH_AKTIV oben. Vor jeder Pruefung, vor jedem
+  // Datenbankzugriff, vor jedem Apify-Aufruf.
+  if (!AUTO_REFRESH_AKTIV) {
+    return NextResponse.json({
+      abgeschaltet: true,
+      seit: "2026-08-03",
+      grund:
+        "Auto-Refresh auf Julis Ansage abgeschaltet. Es wurden keine Apify-Laeufe gestartet.",
+    });
+  }
+
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const auth = req.headers.get("authorization");
